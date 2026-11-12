@@ -40,6 +40,7 @@ local context = addon:GetModule('Context')
 ---@field groupByParent? string If this is a groupBy subcategory, this is the name of the parent search category.
 ---@field automation? string What it does with its items on its own: "sell" or "destroy" (automation.md).
 ---@field confirmSale? boolean false when Auto Sell sells at once; confirmed in the vendor's dock otherwise (automation.md §3).
+---@field deposit? string Where Auto Deposit puts its items when the bank opens: "bank" or "warbank" (automation.md §7).
 ---@field skipRecent? boolean Its items skip Recent Items (Skip Recent Items, docs/next-batch-2.md §1).
 ---@field hidden? table<BagKind, boolean> The bags its items are not shown in (Hide In, category-lifecycle.md §10).
 ---@field ignoredItems? table<number, boolean> Items that never land in it, by item ID (Ignored Items, docs/next-batch-2.md §2).
@@ -425,6 +426,9 @@ function categories:CreateCategory(ctx, category)
       if savedState.confirmSale ~= nil then
         category.confirmSale = savedState.confirmSale
       end
+      if savedState.deposit ~= nil then
+        category.deposit = savedState.deposit
+      end
       if savedState.skipRecent ~= nil then
         category.skipRecent = savedState.skipRecent
       end
@@ -486,7 +490,7 @@ end
 local function saveState(filter)
   database:UpdateEphemeralItemCategory(filter.name, { enabled = filter.enabled, color = filter.color,
     priority = filter.priority, automation = filter.automation, confirmSale = filter.confirmSale,
-    skipRecent = filter.skipRecent, ignoredItems = filter.ignoredItems, hidden = filter.hidden })
+    deposit = filter.deposit, skipRecent = filter.skipRecent, ignoredItems = filter.ignoredItems, hidden = filter.hidden })
 end
 
 -- setPriority sets a category's place, saving a plugin's in its saved state as UpdateCategory does.
@@ -582,15 +586,15 @@ end
 -- UpdateCategory changes a category in place, keeping its items: fields may hold color (a color, or
 -- false for none), priority, enabled (the bags named are set, the others kept), rule (its search;
 -- empty for none), groupBy, automation ("sell", "destroy", or false for none), confirmSale (false:
--- Auto Sell sells at once; true, the default, is not stored), skipRecent (true: its items skip Recent
--- Items; false, the default, is not stored) and hidden (the bags named are set, the others kept; shown, the
--- default, is not stored). A plugin's category keeps its own rule and
--- group by; the bags, color, priority and automation set for it are saved, and win when the plugin makes
--- it again. The bags are recalculated unless only the automation changed, which changes no item's
--- category. It returns false for a name no category has.
+-- Auto Sell sells at once; true, the default, is not stored), deposit ("bank", "warbank", or false for
+-- none), skipRecent (true: its items skip Recent Items; false, the default, is not stored) and hidden (the
+-- bags named are set, the others kept; shown, the default, is not stored). A plugin's category keeps its
+-- own rule and group by; the bags, color, priority and automation set for it are saved, and win when the
+-- plugin makes it again. The bags are recalculated unless only the automation changed, which changes no
+-- item's category. It returns false for a name no category has.
 ---@param ctx Context
 ---@param name string
----@param fields {color?: number[]|false, priority?: number, enabled?: table<BagKind, boolean>, rule?: string, groupBy?: number, automation?: string|false, confirmSale?: boolean, skipRecent?: boolean}
+---@param fields {color?: number[]|false, priority?: number, enabled?: table<BagKind, boolean>, rule?: string, groupBy?: number, automation?: string|false, confirmSale?: boolean, deposit?: string|false, skipRecent?: boolean}
 ---@return boolean
 function categories:UpdateCategory(ctx, name, fields)
   local saved = database:GetItemCategory(name)
@@ -612,6 +616,9 @@ function categories:UpdateCategory(ctx, name, fields)
     filter.confirmSale = false
   elseif fields.confirmSale ~= nil then
     filter.confirmSale = nil
+  end
+  if fields.deposit ~= nil then
+    filter.deposit = fields.deposit or nil
   end
   if fields.skipRecent ~= nil then
     filter.skipRecent = fields.skipRecent == true or nil
@@ -641,9 +648,9 @@ function categories:UpdateCategory(ctx, name, fields)
     saveState(filter)
   end
   events:SendMessage(ctx, 'categories/Changed')
-  local onlyAutomation = fields.automation ~= nil or fields.confirmSale ~= nil
+  local onlyAutomation = fields.automation ~= nil or fields.confirmSale ~= nil or fields.deposit ~= nil
   for key in pairs(fields) do
-    if key ~= 'automation' and key ~= 'confirmSale' then
+    if key ~= 'automation' and key ~= 'confirmSale' and key ~= 'deposit' then
       onlyAutomation = false
     end
   end
@@ -837,6 +844,18 @@ function categories:ConfirmsSaleOf(name)
     filter = self:GetCategoryByName(filter.groupByParent)
   end
   return not (filter and filter.confirmSale == false)
+end
+
+-- DepositOf returns where Auto Deposit puts a category's items when the bank opens ("bank", "warbank" or
+-- nil; automation.md §7): a group by's sections where their category does. A built-in category has none.
+---@param name string
+---@return string?
+function categories:DepositOf(name)
+  local filter = self:GetCategoryByName(name)
+  if filter and filter.isGroupBySubcategory and filter.groupByParent then
+    filter = self:GetCategoryByName(filter.groupByParent)
+  end
+  return filter and filter.deposit or nil
 end
 
 -- GetSortedSearchCategories returns the categories with a rule in the order (category-lifecycle.md §7):

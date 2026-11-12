@@ -48,7 +48,7 @@ database.CreateOrUpdateCategory = function(_, category)
       name = category.name, enabled = category.enabled, dynamic = category.dynamic,
       isGroupBySubcategory = category.isGroupBySubcategory, groupByParent = category.groupByParent, itemList = {},
       color = saved and saved.color, priority = saved and saved.priority, automation = saved and saved.automation,
-      confirmSale = saved and saved.confirmSale, skipRecent = saved and saved.skipRecent,
+      confirmSale = saved and saved.confirmSale, deposit = saved and saved.deposit, skipRecent = saved and saved.skipRecent,
       ignoredItems = saved and saved.ignoredItems, hidden = saved and saved.hidden,
     }
   end
@@ -546,6 +546,41 @@ describe("Categories", function()
       assert.is_false(categories:GetCategoryByName("Openable").confirmSale, "the player's choice wins")
     end)
 
+    -- Asked (#1280): Auto Deposit, where a category's items go when the bank opens. It changes no item's
+    -- category, so the bags are not recalculated for it.
+    it("sets where a category deposits its items without recalculating the bags", function()
+      dbCategories["Mats"] = { name = "Mats", itemList = {}, save = true }
+      assert.is_true(categories:UpdateCategory(context:New("Test"), "Mats", { deposit = "warbank" }))
+      assert.are.equal("warbank", dbCategories["Mats"].deposit)
+      assert.are.same({ { "categories/Changed" } }, sent)
+      categories:UpdateCategory(context:New("Test"), "Mats", { deposit = false })
+      assert.is_nil(dbCategories["Mats"].deposit)
+      assert.are.same({ { "categories/Changed" }, { "categories/Changed" } }, sent)
+      sent = {}
+      categories:UpdateCategory(context:New("Test"), "Mats", { deposit = "bank", priority = 4 })
+      assert.are.same({ "bags/Rederive", { resetLayout = true, buttons = true } }, sent[2], "with another change")
+    end)
+
+    it("keeps a plugin's Auto Deposit across its next creation and a move in the order", function()
+      local ctx = context:New("Test")
+      categories:CreateCategory(ctx, { name = "Openable", itemList = {}, priority = 1 })
+      categories:UpdateCategory(ctx, "Openable", { deposit = "bank" })
+      assert.are.equal("bank", dbEphemeralCategories["Openable"].deposit)
+      dbCategories["Mats"] = { name = "Mats", itemList = {}, save = true, priority = 5 }
+      -- The real database writes every field it is given, so what a move saves must hold the deposit too.
+      local real, given = database.UpdateEphemeralItemCategory, nil
+      database.UpdateEphemeralItemCategory = function(self, name, fields)
+        given = fields
+        return real(self, name, fields)
+      end
+      finally(function() database.UpdateEphemeralItemCategory = real end)
+      categories:MoveCategory(ctx, "Openable", "Mats")
+      assert.are.equal("bank", given.deposit, "a move keeps it")
+      categories:Init()
+      categories:CreateCategory(ctx, { name = "Openable", itemList = {}, priority = 1, deposit = "warbank" })
+      assert.are.equal("bank", categories:GetCategoryByName("Openable").deposit, "the player's choice wins")
+    end)
+
     -- Asked: "Skip Recent Items" (docs/next-batch-2.md §1). It changes which items show in Recent
     -- Items, so the bags are recalculated.
     it("turns skipping Recent Items on and off, keeping only on, and recalculates the bags", function()
@@ -648,6 +683,18 @@ describe("Categories", function()
       assert.is_false(categories:ConfirmsSaleOf("Ore"))
       assert.is_false(categories:ConfirmsSaleOf("Ore - Copper"))
       assert.is_true(categories:ConfirmsSaleOf("Armor"))
+    end)
+
+    it("deposits where its category does, a group by's sections as their category does", function()
+      local ctx = context:New("Test")
+      dbCategories["Ore"] = { name = "Ore", itemList = {}, save = true, deposit = "warbank" }
+      dbCategories["Mats"] = { name = "Mats", itemList = {}, save = true }
+      categories:CreateCategory(ctx, { name = "Ore - Copper", itemList = {}, dynamic = true,
+        isGroupBySubcategory = true, groupByParent = "Ore" })
+      assert.are.equal("warbank", categories:DepositOf("Ore"))
+      assert.are.equal("warbank", categories:DepositOf("Ore - Copper"))
+      assert.is_nil(categories:DepositOf("Mats"))
+      assert.is_nil(categories:DepositOf("Armor"), "a built-in category has none")
     end)
   end)
 

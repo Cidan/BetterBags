@@ -98,6 +98,14 @@ categories:RegisterCategoryFunction(id, func)
 
 -- Get all categories
 categories:GetAllCategories()
+
+-- What a category does on its own (a group by's sections as their category): Auto Sell ("sell",
+-- "destroy" or nil), whether its sale waits for the player, and where Auto Deposit puts its items
+-- ("bank", "warbank" or nil)
+categories:AutomationOf(name)
+categories:ConfirmsSaleOf(name)
+categories:DepositOf(name)
+categories:UpdateCategory(ctx, name, { automation = "sell", confirmSale = false, deposit = "warbank" })
 ```
 
 ### Search (`search.lua`)
@@ -274,6 +282,24 @@ Manages item stacking logic.
 - **Dynamic Updates**: Adjusts as items are added/removed
 - **Count Management**: Tracks total stack counts
 
+### Automation (`automation.lua`)
+
+What a category does with the backpack's items on its own, set in its Automation tab
+(`.claude/rules/automation.md`). Every list reads the bags' last read; the client is asked about a slot
+only when acting on it (`StillThere`).
+
+#### Features
+- **Auto Sell** (`OnMerchantShow`, `SellList`): sells a category's items when a merchant opens, through
+  the Seller (`seller.lua`), one item at a time; a category that confirms waits in BetterBags Next's
+  vendor dock (`SaleOffer`)
+- **Destroy What Can't Be Sold** (`DestroyQueue`, `DestroyNext`): destroys what no merchant buys, one
+  item per click or key press
+- **Auto Deposit** (`OnBankShow`, `DepositList`, `StartDeposit`): when the bank opens, deposits a
+  category's items into the character's bank or the Warbank, the frame after, all at once; Shift held
+  keeps them, and what the Warbank refuses stays in the bags
+- **Left alone** (`BlockedReason`): items whose data has not loaded, whose upgrade state is unknown, in
+  an equipment set, or still refundable
+
 ## Usage Examples
 
 ### Refreshing Bags
@@ -335,6 +361,7 @@ end
 - `BAG_UPDATE` - Bag contents changed
 - `BAG_UPDATE_DELAYED` - Batched bag updates
 - `EQUIPMENT_SETS_CHANGED` - Equipment sets modified
+- `MERCHANT_SHOW` / `BANKFRAME_OPENED` - Category automation sells or deposits
 - `bags/RefreshAll` - Manual refresh request
 - `bags/SortBackpack` - Sort request
 

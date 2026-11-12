@@ -87,8 +87,11 @@ page's `Content.Top` and `Bottom`).
 - **Automation tab** (automation.md §5): a section ("Merchants") of three settings rows, drawn as every
   page's settings (not controls of its own): Auto Sell, Confirm Auto Sell (on by default) and Destroy
   What Can't Be Sold, the last two disabled while Auto Sell is off, saved at once
-  (`NextSettingsCategories:AutomationOptions`). Shown while a category is chosen, a plugin's too. The
-  heading's line ends "Sells at merchants" or "Sells, destroys the rest".
+  (`NextSettingsCategories:AutomationOptions`); a section ("Bank", automation.md §7) of Auto Deposit and
+  Deposit Into, the bank or the Warbank (`DepositOptions`, the dropdown left out where there is no
+  Warbank); and Recent Items. Shown while a category is chosen, a plugin's too. The heading's line ends
+  "Sells at merchants" or "Sells, destroys the rest", then "Deposits in the bank" or "Deposits in the
+  Warbank".
 - `NextSettingsCategories:Show(name)` chooses a category for the next time the page shows (a bag's tab
   links here); `NewFromSearch(query)` makes the list ask for a new category's name with the search as
   its rule (the search box's Enter to Make Category, through `config/NewCategoryFromSearch`, which

@@ -28,6 +28,7 @@ local BACKPACK = 0
 describe("Automation", function()
   local saved, slots, actions, ofCategory, timers, printed, used, picked, deleted, cursor, shift, combat
   local buys, refundable, registered, asked, messages, confirms
+  local deposits, into, argc, usable, notForWarbank, allowedAsked, usableAsked
 
   local function override(tbl, key, value)
     table.insert(saved, { tbl, key, rawget(tbl, key) })
@@ -79,6 +80,9 @@ describe("Automation", function()
     actions = { Junk = "sell", Trash = "destroy", Mats = nil }
     -- Which categories confirm their sale in BetterBags Next's dock: none here, so a sale sells at once.
     confirms = {}
+    -- Where categories deposit their items when the bank opens (Auto Deposit, Deposit Into).
+    deposits = { Herbs = "bank", Ore = "warbank" }
+    into, argc, usable, notForWarbank, allowedAsked, usableAsked = {}, {}, {}, {}, {}, {}
     cursor, shift, combat, buys, refundable, registered = false, false, false, true, {}, {}
     messages = {}
     automation:Init()
@@ -95,6 +99,7 @@ describe("Automation", function()
     end)
     override(categories, "AutomationOf", function(_, name) return actions[name] end)
     override(categories, "ConfirmsSaleOf", function(_, name) return confirms[name] == true end)
+    override(categories, "DepositOf", function(_, name) return deposits[name] end)
     -- Both Automation and the seller listen to merchants: registered fires every listener.
     local listeners = {}
     override(events, "RegisterEvent", function(_, name, fn)
@@ -114,8 +119,11 @@ describe("Automation", function()
         local s = slots[bag .. "_" .. slot]
         return s and s.live
       end,
-      UseContainerItem = function(bag, slot)
+      -- (containerIndex, slotIndex [, unitToken [, bankType [, reagentBankOpen]]]), ContainerDocumentation.lua.
+      UseContainerItem = function(...)
+        local bag, slot, _, bankType = ...
         table.insert(used, bag .. "_" .. slot)
+        into[bag .. "_" .. slot], argc[bag .. "_" .. slot] = bankType, select("#", ...)
         slots[bag .. "_" .. slot] = nil
       end,
       PickupContainerItem = function(bag, slot)
@@ -145,6 +153,21 @@ describe("Automation", function()
         return refundable[bag .. "_" .. slot] == true
       end,
     })
+    -- CanUseBank(bankType) and IsItemAllowedInBankType(bankType, itemLocation), BankDocumentation.lua.
+    override(_G, "C_Bank", {
+      CanUseBank = function(bankType)
+        table.insert(usableAsked, bankType)
+        return usable[bankType] ~= false
+      end,
+      IsItemAllowedInBankType = function(bankType, location)
+        local bag, slot = location:GetBagAndSlot()
+        table.insert(allowedAsked, bag .. "_" .. slot)
+        return not (bankType == Enum.BankType.Account and notForWarbank[bag .. "_" .. slot])
+      end,
+    })
+    override(addon, "isRetail", true)
+    override(addon, "hasWarbank", true)
+    override(addon, "atBank", true)
     override(_G, "C_MerchantFrame", { IsSellAllJunkEnabled = function() return buys end })
     override(_G, "C_CurrencyInfo", { GetCoinTextureString = function(copper) return copper .. "c" end })
     override(_G, "CursorHasItem", function() return cursor end)
@@ -738,6 +761,196 @@ describe("Automation", function()
       put(0, 1, 11, "Trash", { noValue = true })
       BetterBags_DestroyNextItem()
       assert.are.equal(1, deleted)
+    end)
+  end)
+
+  -- Asked (#1280): Auto Deposit puts a category's items in the bank or the Warbank when the bank opens. A
+  -- deposit can be taken back out, so nothing waits for the player; Shift held keeps them, as at a merchant.
+  describe("depositing at the bank", function()
+    local function keysOf(list)
+      local keys = {}
+      for i, e in ipairs(list) do keys[i] = e.data.slotkey .. ":" .. e.target end
+      return keys
+    end
+
+    local function deposit()
+      local status = automation:OnBankShow(ctx())
+      for _ = 1, 10 do
+        if run() == 0 then break end
+      end
+      return status
+    end
+
+    it("lists the backpack's items whose category deposits, by bag and slot, with where each goes", function()
+      put(1, 1, 11, "Herbs")
+      put(0, 2, 12, "Ore")
+      put(0, 1, 13, "Junk")
+      put(0, 3, 14, "Herbs", { noValue = true })
+      put(6, 1, 15, "Herbs")
+      local list = automation:DepositList(ctx())
+      assert.are.same({ "0_2:warbank", "0_3:bank", "1_1:bank" }, keysOf(list))
+      assert.are.equal("Ore", list[1].category)
+      assert.is_true(asked[1].ignoreRecent, "a recent item goes by the category it will have")
+      assert.is_falsy(asked[1].own, "search categories count")
+    end)
+
+    it("deposits a category's items whether or not it also sells them at merchants", function()
+      deposits.Junk = "bank"
+      put(0, 1, 11, "Junk")
+      assert.are.same({ "0_1:bank" }, keysOf(automation:DepositList(ctx())))
+      assert.are.equal(1, #automation:SellList(ctx()))
+    end)
+
+    it("leaves alone what automation leaves alone", function()
+      put(0, 1, 11, "Herbs", { sets = { "Tank" } })
+      put(0, 2, 12, "Herbs", { refundable = true })
+      put(0, 3, 13, "Herbs", { cold = true })
+      put(0, 4, 14, "Herbs", { upgradeUnknown = true })
+      put(0, 5, 15, "Herbs")
+      assert.are.same({ "0_5:bank" }, keysOf(automation:DepositList(ctx())))
+    end)
+
+    it("deposits from the frame after the bank opens, each into its bank, then says what it deposited", function()
+      put(0, 1, 11, "Herbs", { count = 20 })
+      put(0, 2, 12, "Ore")
+      put(0, 3, 13, "Herbs")
+      put(0, 4, 14, "Junk")
+      assert.are.equal("depositing", automation:OnBankShow(ctx()))
+      assert.are.same({}, used, "nothing in the frame the bank opens")
+      run()
+      assert.are.same({ "0_1", "0_2", "0_3" }, used)
+      assert.are.same({ ["0_1"] = Enum.BankType.Character, ["0_2"] = Enum.BankType.Account,
+        ["0_3"] = Enum.BankType.Character }, into)
+      assert.are.same({ "BetterBags: Depositing 2 items into the bank.",
+        "BetterBags: Depositing 1 item into the Warbank." }, printed)
+    end)
+
+    it("listens to the bank opening", function()
+      automation:OnEnable()
+      assert.is_function(registered.BANKFRAME_OPENED)
+      put(0, 1, 11, "Herbs")
+      registered.BANKFRAME_OPENED(ctx())
+      run()
+      assert.are.same({ "0_1" }, used)
+    end)
+
+    it("deposits nothing while Shift is held as the bank opens, or with nothing to deposit", function()
+      put(0, 1, 11, "Herbs")
+      shift = true
+      assert.are.equal("shift", deposit())
+      shift = false
+      deposits.Herbs = nil
+      assert.are.equal("nothing", deposit())
+      assert.are.same({}, used)
+      assert.are.same({}, printed)
+    end)
+
+    it("deposits nothing once the bank has closed", function()
+      put(0, 1, 11, "Herbs")
+      automation:OnBankShow(ctx())
+      local waiting = automation.deposit
+      addon.atBank = false
+      assert.are.equal("closed", automation:StartDeposit(waiting))
+      run()
+      assert.are.same({}, used)
+      assert.are.same({}, printed)
+    end)
+
+    it("deposits once when the bank opens again before it started", function()
+      put(0, 1, 11, "Herbs")
+      automation:OnBankShow(ctx())
+      local first = automation.deposit
+      automation:OnBankShow(ctx())
+      assert.are.equal("replaced", automation:StartDeposit(first))
+      run()
+      assert.are.same({ "0_1" }, used)
+      assert.are.same({ "BetterBags: Depositing 1 item into the bank." }, printed)
+    end)
+
+    it("deposits nothing when the bank opens again with Shift held before the waiting deposit started", function()
+      put(0, 1, 11, "Herbs")
+      automation:OnBankShow(ctx())
+      shift = true
+      assert.are.equal("shift", automation:OnBankShow(ctx()))
+      run()
+      assert.are.same({}, used)
+    end)
+
+    it("leaves in the bags what the Warbank does not take, what moved, and what is locked or refundable now", function()
+      put(0, 1, 11, "Ore")
+      put(0, 2, 12, "Ore")
+      put(0, 3, 13, "Herbs")
+      put(0, 4, 14, "Herbs")
+      put(0, 5, 15, "Herbs")
+      notForWarbank["0_1"] = true
+      slots["0_3"].guid = "another item"
+      slots["0_4"].live.isLocked = true
+      refundable["0_5"] = true
+      deposit()
+      assert.are.same({ "0_2" }, used)
+      assert.are.same({ "BetterBags: Depositing 1 item into the Warbank." }, printed)
+    end)
+
+    it("deposits nothing into a bank it cannot use now, asking once for each bank", function()
+      put(0, 1, 11, "Ore")
+      put(0, 2, 12, "Herbs")
+      put(0, 3, 13, "Ore")
+      put(0, 4, 14, "Herbs")
+      usable[Enum.BankType.Account] = false
+      deposit()
+      assert.are.same({ "0_2", "0_4" }, used)
+      assert.are.same({ Enum.BankType.Account, Enum.BankType.Character }, usableAsked)
+    end)
+
+    -- What automation decides comes from the bags' last read (§2): the client is asked about a slot only
+    -- once it shows the item is still there.
+    it("asks whether the Warbank takes an item only once its slot still holds it", function()
+      put(0, 1, 11, "Ore")
+      put(0, 2, 12, "Ore")
+      put(0, 3, 13, "Herbs")
+      slots["0_1"].live, slots["0_1"].guid = nil, nil
+      assert.are.same({ "0_1:warbank", "0_2:warbank", "0_3:bank" }, keysOf(automation:DepositList(ctx())))
+      assert.are.same({}, allowedAsked, "listing asks the client nothing")
+      deposit()
+      assert.are.same({ "0_2" }, allowedAsked, "never the bank's items, nor an emptied slot")
+      assert.are.same({ "0_2", "0_3" }, used)
+    end)
+
+    it("deposits with the item alone where the client has no bank types", function()
+      override(addon, "isRetail", false)
+      override(addon, "hasWarbank", false)
+      override(_G, "C_Bank", nil)
+      put(0, 1, 11, "Herbs")
+      deposit()
+      assert.are.same({ "0_1" }, used)
+      assert.are.equal(2, argc["0_1"])
+      assert.are.same({ "BetterBags: Depositing 1 item into the bank." }, printed)
+    end)
+
+    -- Found by the bug review: Import Categories brings a retail category's "warbank" to a client without a
+    -- Warbank, where Deposit Into is not shown. Classic's C_Bank has no IsItemAllowedInBankType: every deposit
+    -- raised an error there. Where there is no Warbank, the bank is the only place to deposit.
+    it("deposits a category set to the Warbank into the bank where there is no Warbank", function()
+      override(addon, "isRetail", false)
+      override(addon, "hasWarbank", false)
+      override(_G, "C_Bank", {})
+      put(0, 1, 11, "Herbs")
+      put(0, 2, 12, "Ore")
+      assert.are.same({ "0_1:bank", "0_2:bank" }, keysOf(automation:DepositList(ctx())))
+      assert.has_no.errors(deposit)
+      assert.are.same({ "0_1", "0_2" }, used)
+      assert.are.same({ 2, 2 }, { argc["0_1"], argc["0_2"] })
+      assert.are.same({ "BetterBags: Depositing 2 items into the bank." }, printed)
+    end)
+
+    it("deposits a category set to the Warbank into the character's bank on WoW: Forever", function()
+      override(addon, "hasWarbank", false)
+      put(0, 1, 11, "Ore")
+      deposit()
+      assert.are.same({ "0_1" }, used)
+      assert.are.equal(Enum.BankType.Character, into["0_1"])
+      assert.are.same({ Enum.BankType.Character }, usableAsked)
+      assert.are.same({}, allowedAsked)
     end)
   end)
 end)

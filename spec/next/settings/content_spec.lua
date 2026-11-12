@@ -253,16 +253,26 @@ describe("NextSettingsContent", function()
         if t.id == "automation" then automation = t end
       end
       local sections = pages:Sections(automation)
-      assert.are.equal(2, #sections)
+      assert.are.equal(3, #sections)
       assert.are.equal("Merchants", sections[1].title)
       local automationRows = sections[1].rows
       local rowTitles = {}
       for i, row in ipairs(automationRows) do rowTitles[i] = row.option.title end
       assert.are.same({ "Auto Sell", "Confirm Auto Sell", "Destroy What Can't Be Sold" }, rowTitles)
+      -- Asked (#1280): Auto Deposit, and the bank it deposits into where there is a Warbank to choose.
+      assert.are.equal("Bank", sections[2].title)
+      assert.are.same({ "Auto Deposit", "Deposit Into" },
+        { sections[2].rows[1].option.title, sections[2].rows[2].option.title })
+      assert.are.equal(2, #sections[2].rows)
+      assert.is_nil(sections[2].rows[1].hidden)
+      override(addon, "hasWarbank", true)
+      assert.is_false(sections[2].rows[2].hidden())
+      addon.hasWarbank = false
+      assert.is_true(sections[2].rows[2].hidden(), "only the bank where there is no Warbank")
       -- Asked: Skip Recent Items "under automation for categories (not under 'merchant' though)".
-      assert.are.equal("Recent Items", sections[2].title)
-      assert.are.same({ "Skip Recent Items" }, { sections[2].rows[1].option.title })
-      assert.are.equal(1, #sections[2].rows)
+      assert.are.equal("Recent Items", sections[3].title)
+      assert.are.same({ "Skip Recent Items" }, { sections[3].rows[1].option.title })
+      assert.are.equal(1, #sections[3].rows)
       settings:Select("categories", "ignored")
       assert.are.equal(settings.frame, made["CreateItemsTab:ignored"].owner)
       assert.are.same({ const.BAG_KIND.BACKPACK, const.BAG_KIND.BANK, const.BAG_KIND.GUILD },

@@ -465,6 +465,7 @@ function content:Init()
   })
   -- Every category, defined once (category-lifecycle.md §6), for both designs.
   local automationOptions = categoryEditor:AutomationOptions()
+  local depositOptions = categoryEditor:DepositOptions()
   local recentOptions = categoryEditor:RecentOptions()
   pages:Define({
     id = "categories", group = L:G("BetterBags"), title = L:G("Categories"),
@@ -492,6 +493,11 @@ function content:Init()
         sections = {
           { title = L:G("Merchants"), rows = {
             { option = automationOptions[1] }, { option = automationOptions[2] }, { option = automationOptions[3] },
+          } },
+          -- Where there is no Warbank, the bank is the only place to deposit.
+          { title = L:G("Bank"), rows = {
+            { option = depositOptions[1] },
+            { option = depositOptions[2], hidden = function() return not addon.hasWarbank end },
           } },
           { title = L:G("Recent Items"), rows = { { option = recentOptions[1] } } },
         } },
