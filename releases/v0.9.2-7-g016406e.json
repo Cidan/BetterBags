@@ -1,0 +1,26 @@
+{
+  "id": 1794464990,
+  "version": "v0.9.2-7-g016406e",
+  "channel": "alpha",
+  "date": "2026-11-12",
+  "from": "b3826c3ec04b698e01f2c08b7cfed373fd0de83c",
+  "to": "016406ec29ef0888767107718c076d54ec448903",
+  "headline": "Aligned bag tab icons and corrected keyring display and ordering on Classic and Forever.",
+  "entries": [
+    {
+      "category": "Improved",
+      "title": "Aligned bag tab rail icons",
+      "details": "Icons on bag and bank tabs now align in a neat column instead of shifting with the length of each tab name.",
+      "clients": []
+    },
+    {
+      "category": "Fixed",
+      "title": "Cleaned up keyring slots and bag order",
+      "details": "Keyrings now only display their available slots instead of rows of locked padlocks. In views sorted by slot, the keyring now appears after your bags rather than before the backpack.",
+      "clients": [
+        "Classic",
+        "Forever"
+      ]
+    }
+  ]
+}
