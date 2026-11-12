@@ -1,0 +1,17 @@
+{
+  "id": 1794473453,
+  "version": "v0.9.2-10-g813c48a",
+  "channel": "alpha",
+  "date": "2026-11-12",
+  "from": "af31b8b5b6a780a73182aa306b664772e222925e",
+  "to": "813c48ac1f4f7a8c0cb46cb1e550a06f1cf163e2",
+  "headline": "Categories can now be configured to automatically deposit their items when opening the bank or Warbank.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "Auto deposit items into the bank or Warbank",
+      "details": "A new Bank section in each category's Automation settings lets you automatically deposit its items into your personal bank or Warbank when the bank opens. Holding Shift as the bank opens skips depositing.",
+      "clients": []
+    }
+  ]
+}
