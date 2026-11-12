@@ -25,24 +25,34 @@ local L = addon:GetModule('Localization')
 local seller = addon:GetModule('Seller')
 
 -- Automation is what a category does with its items on its own, set in its Automation tab
--- (.claude/rules/automation.md): Auto Sell sells them when a merchant opens, and Destroy What Can't Be
+-- (.claude/rules/automation.md): Auto Sell sells them when a merchant opens, Destroy What Can't Be
 -- Sold (which needs Auto Sell) destroys, one at a time on a click (BetterBags Next's vendor card) or a
--- key press, those no merchant buys. It acts on the backpack's items by their category, a recent item by
--- the category it has once it is no longer recent.
+-- key press, those no merchant buys, and Auto Deposit puts them in the bank or the Warbank when the bank
+-- opens. It acts on the backpack's items by their category, a recent item by the category it has once it
+-- is no longer recent.
 ---@class Automation: AceModule
 ---@field atMerchant boolean A merchant is open (MERCHANT_SHOW to MERCHANT_CLOSED).
 ---@field sale? AutomationSale The sale running.
+---@field deposit? AutomationDeposit The deposit waiting for the frame after the bank opened.
 local automation = addon:NewModule('Automation')
 
 -- What a category's automation holds: Auto Sell, or Auto Sell and Destroy What Can't Be Sold.
 automation.SELL = "sell"
 automation.DESTROY = "destroy"
+-- What Auto Deposit does, and where it puts a category's items (categories:DepositOf).
+automation.DEPOSIT = "deposit"
+automation.BANK = "bank"
+automation.WARBANK = "warbank"
 
 ---@class AutomationEntry
 ---@field data ItemData The item, as the bags last read it.
 ---@field category string Its category (without Recent Items).
----@field action string What its category does: "sell" or "destroy".
+---@field action string What its category does: "sell", "destroy" or "deposit".
+---@field target? string Where Auto Deposit puts it: "bank" or "warbank".
 ---@field blocked? string Why automation leaves it alone.
+
+---@class AutomationDeposit
+---@field list AutomationEntry[]
 
 ---@class AutomationSale
 ---@field list AutomationEntry[]
@@ -55,14 +65,22 @@ automation.DESTROY = "destroy"
 local WAIT_FOR_ANSWERS = 10
 local LOOK_FOR_ANSWERS = 0.25
 
+-- What a deposit says it sent into each bank: one item, and more.
+local DEPOSITING = {
+  bank = { L:G("Depositing %d item into the bank."), L:G("Depositing %d items into the bank.") },
+  warbank = { L:G("Depositing %d item into the Warbank."), L:G("Depositing %d items into the Warbank.") },
+}
+
 function automation:Init()
   self.atMerchant = false
   self.sale = nil
+  self.deposit = nil
 end
 
 function automation:OnEnable()
   events:RegisterEvent('MERCHANT_SHOW', function(ctx) self:OnMerchantShow(ctx) end)
   events:RegisterEvent('MERCHANT_CLOSED', function(ctx) self:OnMerchantClosed(ctx) end)
+  events:RegisterEvent('BANKFRAME_OPENED', function(ctx) self:OnBankShow(ctx) end)
 end
 
 ---@param copper number
@@ -79,6 +97,17 @@ end
 local function priceOf(data)
   local traits = data.itemInfo.traits
   return (traits and traits.sellPrice) or data.itemInfo.sellPrice or 0
+end
+
+-- bySlot orders automation's entries by bag and slot.
+---@param a AutomationEntry
+---@param b AutomationEntry
+---@return boolean
+local function bySlot(a, b)
+  if a.data.bagid ~= b.data.bagid then
+    return a.data.bagid < b.data.bagid
+  end
+  return a.data.slotid < b.data.slotid
 end
 
 -- BlockedReason says why automation leaves an item alone, or nil: an item whose data has not
@@ -131,12 +160,34 @@ function automation:Entries(ctx, only)
       end
     end
   end
-  table.sort(list, function(a, b)
-    if a.data.bagid ~= b.data.bagid then
-      return a.data.bagid < b.data.bagid
+  table.sort(list, bySlot)
+  return list
+end
+
+-- DepositList lists what Auto Deposit puts in the bank when it opens: the backpack's items whose category
+-- deposits (categories:DepositOf), whether or not it also sells at merchants, by bag and slot, each with
+-- where it goes (the bank, on a client without a Warbank, whatever the category was set to), leaving out
+-- what automation leaves alone (BlockedReason), as the bags were last read.
+-- Whether the Warbank takes an item is asked only when depositing it (StartDeposit).
+---@param ctx Context
+---@return AutomationEntry[]
+function automation:DepositList(ctx)
+  local slotInfo = items.slotInfo and items.slotInfo[const.BAG_KIND.BACKPACK]
+  local list = {}
+  for _, data in pairs(slotInfo and slotInfo.itemsBySlotKey or {}) do
+    if not data.isItemEmpty and data.itemInfo and const.BACKPACK_BAGS[data.bagid] ~= nil then
+      local category = items:GetCategory(ctx, data, false, true)
+      local target = categories:DepositOf(category)
+      -- A client without a Warbank can hold a retail category's "warbank" (Import Categories).
+      if target == self.WARBANK and not addon.hasWarbank then
+        target = self.BANK
+      end
+      if target and not self:BlockedReason(data, self.DEPOSIT) then
+        table.insert(list, { data = data, category = category, action = self.DEPOSIT, target = target })
+      end
     end
-    return a.data.slotid < b.data.slotid
-  end)
+  end
+  table.sort(list, bySlot)
   return list
 end
 
@@ -301,6 +352,80 @@ end
 function automation:OnMerchantClosed(ctx)
   local _ = ctx
   self.atMerchant = false
+end
+
+-- OnBankShow lists, when the bank opens, what Auto Deposit puts in it (DepositList), and deposits it from
+-- the frame after (StartDeposit). A deposit can be taken back out, so nothing waits for the player.
+-- Holding Shift as it opens deposits nothing. A deposit still waiting from an earlier opening is replaced.
+-- It returns what it did, for profiler traces.
+---@param ctx Context
+---@return string
+function automation:OnBankShow(ctx)
+  self.deposit = nil
+  if IsShiftKeyDown() then
+    return "shift"
+  end
+  local list = self:DepositList(ctx)
+  if #list == 0 then
+    return "nothing"
+  end
+  ---@type AutomationDeposit
+  local deposit = { list = list }
+  self.deposit = deposit
+  C_Timer.After(0, function() self:StartDeposit(deposit) end)
+  return "depositing"
+end
+
+-- bankTypeOf returns the bank type a deposit goes into (UseContainerItem's bankType), or nil on a
+-- Classic client, whose bank takes the item alone.
+---@param target string
+---@return number?
+local function bankTypeOf(target)
+  if not addon.isRetail then
+    return nil
+  end
+  return target == automation.WARBANK and Enum.BankType.Account or Enum.BankType.Character
+end
+
+-- StartDeposit deposits what the bank's opening listed, all at once as a section dragged into the bank
+-- moves (SectionFrame:MoveItems), while BetterBags has the bank open (addon.atBank): each item still where
+-- the bags' read had it (StillThere), into a bank the player can use now (C_Bank.CanUseBank: another of the
+-- player's characters can hold the Warbank), and, for the Warbank, one it takes
+-- (C_Bank.IsItemAllowedInBankType: what it refuses stays in the bags). It says how many it sent into each
+-- bank, and returns what it did.
+---@param deposit AutomationDeposit
+---@return string
+function automation:StartDeposit(deposit)
+  if self.deposit ~= deposit then
+    return "replaced"
+  end
+  self.deposit = nil
+  if not addon.atBank then
+    return "closed"
+  end
+  local sent, usable = {}, {}
+  for _, entry in ipairs(deposit.list) do
+    local bag, slot, bankType = entry.data.bagid, entry.data.slotid, bankTypeOf(entry.target)
+    if usable[entry.target] == nil then
+      usable[entry.target] = bankType == nil or C_Bank.CanUseBank(bankType) == true
+    end
+    if usable[entry.target] and self:StillThere(entry, false) and (entry.target ~= self.WARBANK
+      or C_Bank.IsItemAllowedInBankType(bankType, ItemLocation:CreateFromBagAndSlot(bag, slot))) then
+      if bankType == nil then
+        C_Container.UseContainerItem(bag, slot)
+      else
+        C_Container.UseContainerItem(bag, slot, nil, bankType)
+      end
+      sent[entry.target] = (sent[entry.target] or 0) + 1
+    end
+  end
+  for _, target in ipairs({ self.BANK, self.WARBANK }) do
+    local n = sent[target]
+    if n then
+      print("BetterBags: " .. format(DEPOSITING[target][n == 1 and 1 or 2], n))
+    end
+  end
+  return "deposited"
 end
 
 -- StartSale sells the sale through the seller (Seller:Sell): one item at a time, each still there when

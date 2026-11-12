@@ -1149,7 +1149,7 @@ function DB:CreateOrUpdateCategory(category)
     end
   else
     -- A plugin's category saves only what is the player's (its bags, and the color, priority,
-    -- automation and confirming they set): the plugin gives the rest again when it makes it.
+    -- automation, confirming and deposit they set): the plugin gives the rest again when it makes it.
     local saved = DB.data.profile.ephemeralCategoryFilters[category.name]
     DB.data.profile.ephemeralCategoryFilters[category.name] = {
       name = category.name,
@@ -1162,6 +1162,7 @@ function DB:CreateOrUpdateCategory(category)
       priority = saved and saved.priority,
       automation = saved and saved.automation,
       confirmSale = saved and saved.confirmSale,
+      deposit = saved and saved.deposit,
       skipRecent = saved and saved.skipRecent,
       ignoredItems = saved and saved.ignoredItems,
       hidden = saved and saved.hidden,
@@ -1170,9 +1171,10 @@ function DB:CreateOrUpdateCategory(category)
 end
 
 -- UpdateEphemeralItemCategory saves what a player set for a plugin's category (its bags, color,
--- priority, automation, confirming, skipping Recent Items, its Ignored Items, the bags it is hidden in).
+-- priority, automation, confirming, where it deposits, skipping Recent Items, its Ignored Items, the bags it
+-- is hidden in).
 ---@param name string
----@param fields {enabled?: table<BagKind, boolean>, color?: number[], priority?: number, automation?: string, confirmSale?: boolean, skipRecent?: boolean, ignoredItems?: table<number, boolean>}
+---@param fields {enabled?: table<BagKind, boolean>, color?: number[], priority?: number, automation?: string, confirmSale?: boolean, deposit?: string, skipRecent?: boolean, ignoredItems?: table<number, boolean>}
 function DB:UpdateEphemeralItemCategory(name, fields)
   local saved = DB.data.profile.ephemeralCategoryFilters[name]
   if saved == nil then
@@ -1184,6 +1186,7 @@ function DB:UpdateEphemeralItemCategory(name, fields)
   saved.priority = fields.priority
   saved.automation = fields.automation
   saved.confirmSale = fields.confirmSale
+  saved.deposit = fields.deposit
   saved.skipRecent = fields.skipRecent
   saved.ignoredItems = fields.ignoredItems
   saved.hidden = fields.hidden

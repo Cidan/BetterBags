@@ -80,7 +80,8 @@ local itemsTab = addon:GetModule('NextSettingsItemsTab')
 -- - Search Rule: its search, Apply Search Rule, and the Search Results (counted beside their name as it
 --   is typed) as items, those showing in another category saying where.
 -- - Automation: what it does with your backpack's items on its own (automation.md): Auto Sell, and
---   Destroy What Can't Be Sold, which needs Auto Sell on, as settings rows (AutomationOptions).
+--   Destroy What Can't Be Sold, which needs Auto Sell on (AutomationOptions), and Auto Deposit, into the
+--   bank or the Warbank (DepositOptions), as settings rows.
 -- - Added Items: the items added to it by hand, as a grid that holds thousands (NextItemGrid), filtered
 --   by name; an item dropped anywhere on it is added, a right click removes one, Remove All asks first.
 -- A plugin's category can be used in bags, colored, ordered and automated; its rule (when it has one)
@@ -108,6 +109,11 @@ local NAME_OF_GROUP_BY = {
 
 -- What a category does on its own (automation.md), in its heading's line.
 local DOES = { sell = L:G("Sells at merchants"), destroy = L:G("Sells, destroys the rest") }
+local DEPOSITS = { bank = L:G("Deposits in the bank"), warbank = L:G("Deposits in the Warbank") }
+
+-- The banks Deposit Into chooses from, in the dropdown's order, and what each saves (categories:DepositOf).
+local BANK_NAMES = { L:G("Bank"), L:G("Warbank") }
+local DEPOSIT_OF_NAME = { [L:G("Bank")] = "bank", [L:G("Warbank")] = "warbank" }
 
 -- The messages that say a bag's items were read (data/items.lua Phase11): the list counts again.
 local BAG_READ = { 'items/RefreshBackpack/Done', 'items/RefreshBank/Done', 'items/RefreshGuildBank/Done' }
@@ -181,6 +187,14 @@ local function describe(filter)
   end
   if DOES[filter.automation] then
     line = line .. " · " .. DOES[filter.automation]
+  end
+  -- Where there is no Warbank, Auto Deposit puts everything in the bank (Automation:DepositList).
+  local deposit = filter.deposit
+  if deposit == "warbank" and not addon.hasWarbank then
+    deposit = "bank"
+  end
+  if DEPOSITS[deposit] then
+    line = line .. " · " .. DEPOSITS[deposit]
   end
   return line
 end
@@ -327,6 +341,43 @@ function editor:AutomationOptions()
       disabled = function() return not sells() end,
       get = function() return automation() == "destroy" end,
       set = function(ctx, on) save(ctx, on and "destroy" or "sell") end,
+    },
+  }
+end
+
+-- DepositOptions returns the Automation tab's Bank settings (automation.md §7), a section of their own,
+-- independent of the merchant settings: Auto Deposit (on saves "bank"), and Deposit Into, the bank or the
+-- Warbank, disabled while Auto Deposit is off. Each saves at once and shows the page's rows again.
+---@return NextSettingsOption[]
+function editor:DepositOptions()
+  local function deposit()
+    local filter = self:Chosen()
+    return filter and filter.deposit
+  end
+  local function save(ctx, value)
+    if self.selected then
+      categories:UpdateCategory(ctx, self.selected, { deposit = value })
+    end
+    settings:Refresh(ctx)
+  end
+  return {
+    {
+      kind = "toggle",
+      title = L:G("Auto Deposit"),
+      description = L:G("Deposit this category's items in your bank when you open it. Hold Shift to keep them."),
+      keywords = { "automation", "deposit", "bank", "warbank", "store" },
+      get = function() return deposit() ~= nil end,
+      set = function(ctx, on) save(ctx, on and "bank" or false) end,
+    },
+    {
+      kind = "dropdown",
+      title = L:G("Deposit Into"),
+      description = L:G("The bank Auto Deposit puts this category's items in: yours, or the Warbank. Items the Warbank does not take stay in your bags."),
+      keywords = { "automation", "deposit", "bank", "warbank", "account" },
+      items = BANK_NAMES,
+      disabled = function() return deposit() == nil end,
+      get = function() return deposit() == "warbank" and L:G("Warbank") or L:G("Bank") end,
+      set = function(ctx, name) save(ctx, DEPOSIT_OF_NAME[name]) end,
     },
   }
 end

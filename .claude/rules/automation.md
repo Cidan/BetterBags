@@ -1,16 +1,18 @@
 ---
 paths:
   - "data/automation.lua"
+  - "data/categories.lua"
   - "next/settings/categories.lua"
+  - "next/settings/content.lua"
   - "next/vendor.lua"
   - "Bindings.xml"
   - "spec/automation_spec.lua"
 ---
 # Category Automation (`data/automation.lua`, the Automation tab)
 
-A category can act on its items on its own, set with three switches in its Automation tab on the
-Categories page: **Auto Sell**, **Confirm Auto Sell** (on by default) and **Destroy What Can't Be
-Sold**, the last two needing Auto Sell on. Asked (2026-10-22), after deciding against
+A category can act on its items on its own, set in its Automation tab on the Categories page: at
+merchants, **Auto Sell**, **Confirm Auto Sell** (on by default) and **Destroy What Can't Be Sold**, the
+last two needing Auto Sell on; at the bank, **Auto Deposit** and **Deposit Into** (§7). Asked (2026-10-22), after deciding against
 importing Vendor's rules or integrating with Vendor (docs/vendor-compat.md, decision 2): "we add
 vendor-like features to a new Automation tab for categories". A category's rule is a search, which
 already speaks what Vendor's rules use (search-indexing.md §10-§17), so a category plus an action is a
@@ -224,10 +226,12 @@ pages. The options are page options (`NextSettingsOption`), from `AutomationOpti
   any category): recent-items.md §4.
 - **Destroy What Can't Be Sold**: disabled while Auto Sell is off (the row's `disabled`); on saves
   `"destroy"`, off `"sell"`.
-- Each saves at once (`UpdateCategory { automation }` or `{ confirmSale }`) and then
+- A section between the two, **Bank**, holds **Auto Deposit** and **Deposit Into** (`DepositOptions()`, §7).
+- Each saves at once (`UpdateCategory { automation }`, `{ confirmSale }` or `{ deposit }`) and then
   `NextSettings:Refresh`, so the other rows' state follows; `categories/Changed` also shows the page
   again.
-The category's heading line ends "Sells at merchants" or "Sells, destroys the rest".
+The category's heading line ends "Sells at merchants" or "Sells, destroys the rest", then "Deposits in
+the bank" or "Deposits in the Warbank".
 
 ## 6. Coverage
 
@@ -288,3 +292,84 @@ their double clicks, and destroying from the dock and the key binding. To check:
 `rarity = poor` with Auto Sell on, open a merchant (once holding Shift; once with Confirm Auto Sell off),
 and a category with Destroy What Can't Be Sold on holding an item merchants do not buy; open a merchant
 with BetterBags Next, double-click the sale, click the destroy. `/console taintLog 1` should log nothing for BetterBags.
+
+## 7. Depositing at the bank (`OnBankShow`, `DepositList`, `StartDeposit`)
+
+Asked (#1280, from a Discord request; #307 asked the same in 2024): "Add an option to automatically deposit
+items in a category to the bank / warbank ... added to the Automation tab for any given category. When
+interacting with a bank or warbank, items belonging to categories enabled for auto-deposit should
+automatically be transferred." Decided with the user (2026-11-11): a dropdown for where; items the Warbank
+does not take stay in the bags (never quietly sent to the character's bank instead); no confirmation (a
+deposit can be taken back out, unlike a sale), Shift held keeps them as at a merchant; a field of its own,
+so a category can both sell at merchants and deposit at the bank; everything in one frame, as a section
+dragged into the bank moves.
+
+- **The setting.** `deposit = "bank" | "warbank"` on the category, nil for none
+  (`CustomCategoryFilter.deposit`), beside `automation`, not a value of it. Set with `categories:UpdateCategory(ctx,
+  name, { deposit = "bank" | "warbank" | false })`, which, alone or with the other automation fields, sends
+  no `bags/Rederive` (it changes no item's category). Read with `categories:DepositOf(name)`, a group by's
+  sections as their category. A plugin's is in its saved state (`saveState`, `DB:UpdateEphemeralItemCategory`,
+  kept by `DB:CreateOrUpdateCategory` and winning in `categories:CreateCategory`), as its automation is (§1).
+- **The tab** (§5): a section **Bank** between Merchants and Recent Items. **Auto Deposit** (a switch: on
+  saves `"bank"`, off `false`) and **Deposit Into** (a dropdown, Bank or Warbank, disabled while Auto
+  Deposit is off, and left out where there is no Warbank, `addon.hasWarbank`: Classic and WoW: Forever,
+  where the bank is the only place).
+- **Which items** (`DepositList`): the backpack's committed items (`items.slotInfo[BACKPACK]`, in
+  `const.BACKPACK_BAGS`), by bag and slot, each by its category without Recent Items (as §2) and with where
+  it goes (`target`), leaving out what `BlockedReason(data, "deposit")` leaves alone: an item whose data has
+  not loaded, whose upgrade state is not known yet, in an equipment set, or that can still be refunded.
+  Whether merchants buy it does not matter. It reads the bags' last read alone (§2): nothing about a slot
+  is asked of the client here.
+- **No Warbank, only the bank.** On a client without a Warbank (`addon.hasWarbank` false) every deposit goes
+  into the bank, and the heading says "Deposits in the bank": a category set to the Warbank on retail can
+  arrive there through Import Categories (`DB:ImportSettings` copies the filters whole), where Deposit Into is
+  not shown. Found by the bug review: Classic's and Era's `C_Bank` have no `IsItemAllowedInBankType`, so such
+  a category raised an error at every bank opening, after the items before it in slot order had moved; on
+  WoW: Forever (`isRetail`) it asked `CanUseBank(Account)` and deposited nothing.
+- **When** (`OnBankShow`, on `BANKFRAME_OPENED`, registered in `OnEnable`): nothing while Shift is held as
+  the bank opens, nor with nothing to deposit; else the list is kept (`automation.deposit`) and deposited
+  the frame after (`C_Timer.After(0)`), as a sale starts. An opening replaces a deposit still waiting from
+  an earlier one. It returns `"shift"`, `"nothing"` or `"depositing"`.
+- **Depositing** (`StartDeposit`): nothing once replaced (`"replaced"`) or once the bank has closed
+  (`addon.atBank`, which `Refresh` sets on `BANKFRAME_OPENED` and clears on `BANKFRAME_CLOSED`;
+  `"closed"`). Else every item at once, each only when its slot still holds it (`StillThere`: the same GUID,
+  unlocked, not refundable now), into a bank the player can use now (`C_Bank.CanUseBank(bankType)`, asked
+  once per bank: another of the player's characters can hold the Warbank), and, for the Warbank, only what
+  it takes (`C_Bank.IsItemAllowedInBankType(Enum.BankType.Account, location)`, asked once `StillThere` has
+  seen the item in its slot, never for the character's bank). Retail and WoW: Forever name the bank:
+  `C_Container.UseContainerItem(bag, slot, nil, bankType)`, `Enum.BankType.Character` or `.Account`, as
+  Blizzard's own right click does (`ContainerFrameItemButton_OnClick` passes `BankFrame:GetActiveBankType()`).
+  Classic and Era have no `C_Bank.CanUseBank` or `IsItemAllowedInBankType` (their `BankDocumentation.lua`
+  lacks both) and no Warbank: the item alone, `UseContainerItem(bag, slot)`. It prints, for each bank it
+  sent anything into, "Depositing N items into the bank." / "... into the Warbank." (what it sent: whether
+  the bank had room is the client's to say), and returns `"deposited"`.
+- **Not built for:**
+  - An item whose upgrade state its provider cannot tell yet when the bank opens stays in the bags until the
+    next visit: the sale's wait for answers (§3) is not repeated here. It is left alone, never deposited by a
+    guess, and Pawn answers late only in a session's first seconds.
+  - A full bank: the client refuses each item with its own error, as for a section dragged into a full
+    bank, and the item stays.
+  - An item held on the cursor as the bank opens: the Seller waits for the cursor before each sale, the
+    deposit does not (nor does a section dragged into the bank, `MoveItems`). Raised by the bug review; what
+    `UseContainerItem` does then has not been seen.
+- **Coverage:** `spec/automation_spec.lua` ("depositing at the bank": which items and where, a category that
+  also sells, what is left alone, the frame after the opening and the bank types, the event, Shift and
+  nothing to deposit, a closed bank, an opening replacing a waiting deposit, what the Warbank refuses and what
+  moved, locked or became refundable, a bank that cannot be used and asked once per bank, asking the client
+  only about a slot still holding its item, a client without bank types, a category set to the Warbank on
+  Classic and on Forever); `spec/categories_spec.lua` (saving without recalculating,
+  a plugin's across creation and what a move saves, `DepositOf` and sub-categories); `spec/database_spec.lua`
+  (a plugin's saved state); `spec/next/settings/categories_spec.lua` ("the Auto Deposit settings", the
+  heading, also without a Warbank); `spec/next/settings/content_spec.lua` (the Bank section, Deposit Into
+  only with a Warbank). Mutation-tested: 28 mutations of the deposit, the setting and the tab, all caught
+  once a test was added for the one that first survived (an opening with Shift held cancelling a deposit
+  still waiting).
+
+**Not verified in game.** Whether `UseContainerItem` deposits from an event handler with no click: our
+other notes say a move needs a hardware event (patterns-ui-next.md "A Drop Is the Release's Hardware
+Event", next-drag.md §7), which nothing recorded checking, while our Seller sells with it from a timer and
+EMA (`Modules/Bank.lua`, interface 120001) deposits with it from `BANKFRAME_OPENED`. Also unchecked: many
+items in one frame (the reason sales went one at a time was "That object is busy"), `CanUseBank` while
+another character holds the Warbank, and Classic's bank. To check: give a category Auto Deposit (once into
+the Warbank, once the bank) holding a few items, a soulbound one among the Warbank's, open a bank (once
+holding Shift), with `/console taintLog 1`; the items should move and the chat say how many.

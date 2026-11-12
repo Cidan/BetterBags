@@ -207,6 +207,7 @@ describe("NextSettingsCategories", function()
         f.confirmSale = nil
       end
       if fields.skipRecent ~= nil then f.skipRecent = fields.skipRecent == true or nil end
+      if fields.deposit ~= nil then f.deposit = fields.deposit or nil end
       for k, v in pairs(fields.enabled or {}) do f.enabled[k] = v end
       for k, v in pairs(fields.hidden or {}) do
         f.hidden = f.hidden or {}
@@ -552,11 +553,25 @@ describe("NextSettingsCategories", function()
     end)
 
     it("says what a category does on its own", function()
+      override(addon, "hasWarbank", true)
       filters.Mats.automation = "sell"
       editor.selected = "Mats"
       assert.are.same({ "Mats", "2 added items · Sells at merchants" }, { editor:Heading() })
       filters.Mats.automation = "destroy"
       assert.are.same({ "Mats", "2 added items · Sells, destroys the rest" }, { editor:Heading() })
+      filters.Mats.deposit = "warbank"
+      assert.are.same({ "Mats", "2 added items · Sells, destroys the rest · Deposits in the Warbank" }, { editor:Heading() })
+      filters.Mats.automation, filters.Mats.deposit = nil, "bank"
+      assert.are.same({ "Mats", "2 added items · Deposits in the bank" }, { editor:Heading() })
+    end)
+
+    -- Found by the bug review: Import Categories brings a retail category's "warbank" to a client without one,
+    -- where Deposit Into is not shown and Auto Deposit puts everything in the bank.
+    it("says a category deposits in the bank where there is no Warbank, whatever it was set to", function()
+      override(addon, "hasWarbank", false)
+      filters.Mats.deposit = "warbank"
+      editor.selected = "Mats"
+      assert.are.same({ "Mats", "2 added items · Deposits in the bank" }, { editor:Heading() })
     end)
 
     it("says which tabs show: Rule for yours and a plugin's with a rule; Added Items while one is chosen", function()
@@ -971,6 +986,71 @@ describe("NextSettingsCategories", function()
       assert.is_false(sellOption.get())
       sellOption.set(ctx(), true)
       confirmOption.set(ctx(), false)
+      assert.are.same({}, updates())
+    end)
+  end)
+
+  -- Asked (#1280): Auto Deposit, and where to (Deposit Into: the bank or the Warbank), in the Automation tab, as
+  -- settings rows; independent of the merchant settings.
+  describe("the Auto Deposit settings", function()
+    local depositOption, intoOption
+
+    before_each(function()
+      depositOption, intoOption = unpack(editor:DepositOptions())
+    end)
+
+    it("are a switch and a choice of bank, named and described", function()
+      assert.are.same({ "toggle", "dropdown" }, { depositOption.kind, intoOption.kind })
+      assert.are.equal("Auto Deposit", depositOption.title)
+      assert.are.equal("Deposit Into", intoOption.title)
+      assert.are.same({ "Bank", "Warbank" }, intoOption.items)
+      for _, option in ipairs({ depositOption, intoOption }) do
+        assert.truthy(option.description:find("bank", 1, true))
+        assert.truthy(#option.keywords > 0)
+      end
+    end)
+
+    it("show where the chosen category deposits, the bank only with Auto Deposit on", function()
+      editor.selected = "Mats"
+      assert.is_false(depositOption.get())
+      assert.are.equal("Bank", intoOption.get(), "the bank by default")
+      assert.is_true(intoOption.disabled())
+      assert.is_nil(depositOption.disabled, "never needs Auto Sell")
+      filters.Mats.deposit = "warbank"
+      assert.is_true(depositOption.get())
+      assert.are.equal("Warbank", intoOption.get())
+      assert.is_false(intoOption.disabled())
+      filters.Mats.deposit = "bank"
+      assert.are.equal("Bank", intoOption.get())
+    end)
+
+    it("save at once and show the page's rows again", function()
+      editor.selected = "Mats"
+      depositOption.set(ctx(), true)
+      intoOption.set(ctx(), "Warbank")
+      intoOption.set(ctx(), "Bank")
+      depositOption.set(ctx(), false)
+      assert.are.same({
+        { "UpdateCategory", "Mats", { deposit = "bank" } },
+        { "UpdateCategory", "Mats", { deposit = "warbank" } },
+        { "UpdateCategory", "Mats", { deposit = "bank" } },
+        { "UpdateCategory", "Mats", { deposit = false } },
+      }, updates())
+      assert.are.equal(4, refreshed, "the bank's state follows")
+      assert.is_true(intoOption.disabled())
+    end)
+
+    it("work for a plugin's category too", function()
+      editor.selected = "Openable"
+      depositOption.set(ctx(), true)
+      assert.are.same({ { "UpdateCategory", "Openable", { deposit = "bank" } } }, updates())
+    end)
+
+    it("change nothing with no category chosen", function()
+      editor.selected = nil
+      assert.is_false(depositOption.get())
+      depositOption.set(ctx(), true)
+      intoOption.set(ctx(), "Warbank")
       assert.are.same({}, updates())
     end)
   end)
