@@ -107,9 +107,9 @@ the sell cursor). So the frame must stay shown, on tab 1, and never be seen:
     - **The cost's place**: `costsOf` keeps it (`costIndex`, the API's `i`, past a place it leaves out for a
       missing texture), and `PriceOf` carries it, so a Shopping List card (profession-shopping-list.md) shows the
       cost's tooltip for its quantity too. `TotalOf`'s total sums costs across items: it is no card, and has no areas.
-    - **Not seen in game yet**: that the client's `GetStringWidth` of a part matches where the price draws it
-      (inline textures included, as tooltips size their lines to them), and that a drop passes through a
-      motion-only frame to the card under it.
+    - **Seen in game** (2026-11-12, WoW: Forever, the Darkmoon Faire): the pointer over a card's Darkmoon Prize
+      Ticket cost shows the ticket's tooltip. Not seen yet: that a drop passes through a motion-only frame to the card
+      under it.
     - **Left as it is (bug review):** no spec sees the price's width set to none before measuring. The client measures a
       font string cut short at the width it is cut to (next-small-names.md §14g), as the specs model it, and every measure
       is cut at the price's width anyway, so taking it out changes nothing a faithful mock can show (the mutation
