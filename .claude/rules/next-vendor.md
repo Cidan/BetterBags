@@ -325,10 +325,9 @@ Decided with the user:
   (`GetMerchantItemCostItem`'s `currencyName`, no link for a currency, warcraft.wiki.gg), found by name among the
   merchant's currencies (`C_MerchantFrame.GetMerchantCurrencies`, retail 12.0.7 and WoW: Forever 1.60.1) with
   `C_CurrencyInfo.GetCurrencyInfo(id).quantity`. Classic lists no merchant's currencies, so a currency limits
-  nothing there, as in Blizzard's. The currency line counts in whole numbers (`have * stackCount / value`:
-  `have / (value / stackCount)` is a hair under 15 for 33 / 2.2); the money and item lines are Blizzard's formula as
-  before, which can come out one short at an exact multiple when a purchase gives more than one (reported to the user,
-  not changed: it predates this).
+  nothing there, as in Blizzard's. The money, the cost items and the currencies are each counted in whole numbers
+  first (`have * stackCount / cost`): Blizzard's `have / (cost / stackCount)` is a hair under 15 for 33 / 2.2, and came
+  out one short at an exact multiple when a purchase gives more than one (found in review; the user asked for it fixed).
 - **Nothing is asked when nothing can be bought** (`MaxPurchasable` under 1: Blizzard's stack split hides for that),
   nor while `NextDialog` shows over another window (the settings window's: the vendor's would replace it unanswered,
   and its Cancel is what puts a "Hide" switch back, next-settings-categories.md).
@@ -390,8 +389,8 @@ the price's width, none for one cut off, laid out again when styled, the cost's 
 hover only, none over gold, a buyback, a repair or a released card, a Shopping List's; 11 mutations, all caught, then
 the bug review's 16, two surviving: the price's width set to none before measuring, which no faithful mock can see, §10b),
 `spec/next/merchant_spec.lua` also each cost's place (`costIndex`, past one left out, carried by `PriceOf`), and
-currencies held limiting `MaxPurchasable` (the scarcer of two, one the merchant does not list, none on Classic, whole
-numbers); `spec/next/vendorbutton_spec.lua` also the quantity dialog (over the vendor, starting at a purchase's worth
+currencies held limiting `MaxPurchasable` (the scarcer of two, one the merchant does not list, none on Classic; the
+money, cost items and currencies counted in whole numbers); `spec/next/vendorbutton_spec.lua` also the quantity dialog (over the vendor, starting at a purchase's worth
 or less, `-`/`+` by a purchase's worth, Max asked again, nothing for none, nothing over another window's dialog,
 Buy staying open with no number); the dialog itself in `spec/next/controls/panel_controls_spec.lua` (next-controls.md §2),
 `spec/next/settings/window_spec.lua` (settings closing leaves the vendor's dialog open),

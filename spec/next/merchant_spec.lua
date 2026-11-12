@@ -516,14 +516,22 @@ describe("NextMerchant", function()
       ResetMockCurrencies()
     end)
 
-    -- Found in review: 33 / (11 / 5) is a hair under 15 in floating point.
-    it("counts a currency's whole purchases exactly", function()
+    -- Found in review: 33 / (11 / 5) is a hair under 15 in floating point, so the money, the cost items and the
+    -- currencies each counted one short at an exact multiple of a purchase giving more than one.
+    it("counts the whole purchases the money, the cost items and the currencies pay for exactly", function()
       ResetMockCurrencies()
       _G._merchant.currencies = { 1191 }
       _G._currencies[1191] = { name = "Valor", quantity = 33 }
-      local item = read(vendorItem(11, { price = 0, hasExtendedCost = true, stackCount = 5, maxStack = 200,
-        costs = { { texture = 1, value = 11, currencyName = "Valor" } } }))[1]
-      assert.are.equal(15, merchant:MaxPurchasable(item))
+      override(_G, "GetMoney", function() return 33 end)
+      override(C_Item, "GetItemCount", function() return 33 end)
+      local list = read(vendorItem(10, { price = 11, stackCount = 5, maxStack = 200 }),
+        vendorItem(11, { price = 0, hasExtendedCost = true, stackCount = 5, maxStack = 200,
+          costs = { { texture = 1, value = 11, link = link(12) } } }),
+        vendorItem(12, { price = 0, hasExtendedCost = true, stackCount = 5, maxStack = 200,
+          costs = { { texture = 1, value = 11, currencyName = "Valor" } } }))
+      assert.are.equal(15, merchant:MaxPurchasable(list[1]), "the money")
+      assert.are.equal(15, merchant:MaxPurchasable(list[2]), "the cost items")
+      assert.are.equal(15, merchant:MaxPurchasable(list[3]), "the currencies")
       ResetMockCurrencies()
     end)
 
