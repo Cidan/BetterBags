@@ -260,6 +260,7 @@ globals = {
 	"GetInventoryItemQuality",
 	"GetInventorySlotInfo",
 	"GetItemInfo",
+	"GetKeyRingSize",
 	"GetLocale",
 	"GetMoney",
 	"GetNumBankSlots",

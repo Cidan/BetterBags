@@ -170,6 +170,30 @@ describe("NextTabs", function()
     assert.is_false(rail.tabs[1].icon:IsShown(), "a reused tab drops the icon it had")
   end)
 
+  -- Asked: "the icon for shown bag tabs, should be on the right of the text (so they align top to bottom)". A
+  -- tab's name is justified to the body; an icon placed after it moved out with the name's width, so the bag
+  -- slots' icons (Show Blizzard Bags) were ragged down the rail.
+  it("puts a tab's icon against the body and its name beside it, so the icons line up down the rail", function()
+    rail:SetTabs({ { id = 1, name = "Linen Bag", icon = 1 }, { id = 2, name = "Old Blanchy's Feed Pouch", icon = 2 },
+      { id = 3, name = "Plain" } })
+    local pad, iconRoom = style.TAB_PADDING, style.TAB_PADDING + style.TAB_ICON + style.TAB_ICON_GAP
+    local iconTop = -math.floor((style.TAB_HEIGHT - style.TAB_ICON) / 2)
+    for i = 1, 2 do
+      local tab = rail.tabs[i]
+      local _, fontHeight = tab.text:GetFont()
+      local textTop = -math.floor((style.TAB_HEIGHT - fontHeight) / 2) + TEXT
+      assert.are.same({ "TOPRIGHT", tab.button, "TOPRIGHT", -pad, iconTop }, { tab.icon:GetPoint(1) }, tab.text:GetText())
+      assert.are.same({ "TOPRIGHT", tab.button, "TOPRIGHT", -iconRoom + TEXT, textTop }, { tab.text:GetPoint(1) },
+        tab.text:GetText())
+    end
+    local plain = rail.tabs[3]
+    assert.are.equal(-pad + TEXT, select(4, plain.text:GetPoint(1)), "a name with no icon keeps the padding")
+    rail:Select(1)
+    assert.are.equal(-iconRoom + TEXT, select(4, rail.tabs[1].text:GetPoint(1)), "still past the icon in the selected font")
+    rail:SetTabs({ { id = 1, name = "Linen Bag" } })
+    assert.are.equal(-pad + TEXT, select(4, rail.tabs[1].text:GetPoint(1)), "a reused tab's name back at the padding")
+  end)
+
   it("fills the tooltip itself when a tab's tooltip is a function", function()
     local filled
     rail:SetTabs({ { id = 1, name = "Tab", tooltip = function(owner)
@@ -254,6 +278,17 @@ describe("NextTabs", function()
       left:Select(2)
       local step = style.TAB_HEIGHT + style.TAB_SPACING
       assert.are.same({ "TOPLEFT", left.frame, "TOPLEFT", 0, -step }, { left.indicator:GetPoint(1) })
+    end)
+
+    it("puts a tab's icon against the body, on its left, and its name after it", function()
+      left:SetTabs({ { id = 1, name = "Ore Deposits", icon = 1 }, { id = 2, name = "Warbank", atlas = "warbands-icon" } })
+      local pad, iconRoom = style.TAB_PADDING, style.TAB_PADDING + style.TAB_ICON + style.TAB_ICON_GAP
+      for _, tab in ipairs(left.tabs) do
+        local point, rel, relPoint, x = tab.icon:GetPoint(1)
+        assert.are.same({ "TOPLEFT", tab.button, "TOPLEFT", pad }, { point, rel, relPoint, x })
+        point, rel, relPoint, x = tab.text:GetPoint(1)
+        assert.are.same({ "TOPLEFT", tab.button, "TOPLEFT", iconRoom + TEXT }, { point, rel, relPoint, x })
+      end
     end)
 
     it("fades each tab out toward its outer end", function()

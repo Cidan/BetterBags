@@ -228,6 +228,7 @@ ITEM_SORT_TYPE = {
 
 **Special Cases:**
 - Free slots always sort last
+- Slot order (Show Bags, `SortItemDataBySlot`): by bag, then slot, the backpack's keyring (Classic Era, WoW: Forever) after every bag
 - Recent Items section always first
 - Fill-width sections sort separately
 - Invalid data handling

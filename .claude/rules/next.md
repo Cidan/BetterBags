@@ -271,6 +271,17 @@ section dragged out of a panel returns to the panel's strata (next-drag.md §7).
   glides to it; a hovered one slides out a little. Left click switches group (the same data, drawn
   for that tab), right click opens the group menu (rename, delete) and "+" creates a group, both
   through the classic backpack behavior's dialogs. Hidden when groups are off.
+  - **A tab's icon** (`NextTabEntry.icon` or `atlas`: the bag slots in Show Blizzard Bags, the bank's tabs, the
+    Warbank's) is against the body, the padding in from the tab's body side, and its name past it and the icon gap
+    (`placeContent`): on the backpack's rail the icon is right of the name, on the bank's and the guild bank's
+    (tabs sticking out to the right) left of it. Every icon down a rail is in one column. Asked: "the icon for shown
+    bag tabs, should be on the right of the text (so they align top to bottom)": the name is justified to the
+    body, and an icon placed after it moved out with the name's width. A tab without an icon has its name the
+    padding in. The tab's width is unchanged (padding, icon, gap, name, padding). Left as it is: a name wider than
+    what a tab capped at `TAB_MAX_WIDTH` leaves it (about 114 units on Default, its padding, icon and gap taken) runs
+    past the tab's outer end, by as much as the icon did before (the overflow is the same; the name is the part
+    outside now). Names are not cut; nobody has asked for it (found in review). Coverage:
+    `spec/next/tabs_spec.lua` ("puts a tab's icon against the body ...", and on the left side of the screen).
 - **Moving tabs** (every Next rail: the backpack, the bank's groups and its Blizzard tabs, the guild
   bank, the vendor; asked: "all tabs in all Next windows should be reorderable by clicking and holding to
   slide. animate the slide, but pin the X axis so you can't move it left and right, just drag it up and

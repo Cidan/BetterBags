@@ -25,7 +25,7 @@ The main item management module that handles all item data operations including 
 - **Unified Item Loading**: Uses ContinuableContainer for efficient async item data loading
 - **Item Data Management**: Stores and manages all item information including stats, quality, binding status, etc.
 - **Item Level Tracking**: Updates per-character max item level and notifies listeners for dynamic color scaling
-- **Bag Type Detection**: Identifies different bag types (normal, profession, reagent, keyring). The keyring (Classic Era, and WoW: Forever) is read with the backpack, its slots are not free space, and Show Bags names it "Keyring", numbered after the last bag (`GetBagName`)
+- **Bag Type Detection**: Identifies different bag types (normal, profession, reagent, keyring). The keyring (Classic Era, and WoW: Forever) is read with the backpack, only the slots the game opens (`GetKeyRingSize()`; the rest are padlocked), its slots are not free space, and Show Bags names it "Keyring", numbered after the last bag (`GetBagName`) and listed after every bag (`.claude/rules/keyring.md`)
 - **Item Hashing**: Generates unique hashes for item stacking
 - **Category Assignment**: Determines item categories based on filters. Items no custom or search category claims are named from the enabled filters joined with " - ": item type, subtype, trade skill, expansion (`GetCategory`). A subtype equal to the type before it is skipped, so quest items read "Quest", not "Quest - Quest" (settings saved under old names are moved by `DB:RenameRepeatedTypeCategories`, `.claude/rules/category-lifecycle.md` §5)
 - **New Item Tracking**: Manages "new item" status with timers

@@ -521,6 +521,58 @@ describe("Sort", function()
       assert.is_false(sort.SortItemDataBySlot(slot2_1, slot1_5))
     end)
 
+    -- The keyring's bag ID is below the backpack's (-2 on Classic Era, -1 on WoW: Forever), which put it
+    -- first in Show Bags; it is numbered after the last bag (items:GetBagName). Asked: "keyring should go
+    -- last here in terms of sort".
+    describe("the backpack's keyring", function()
+      local savedBags, savedKeyring
+
+      before_each(function()
+        savedBags, savedKeyring = const.BACKPACK_BAGS, Enum.BagIndex.Keyring
+      end)
+
+      after_each(function()
+        const.BACKPACK_BAGS, Enum.BagIndex.Keyring = savedBags, savedKeyring
+      end)
+
+      for _, client in ipairs({ { name = "Classic Era", keyring = -2, last = 4 }, { name = "WoW: Forever", keyring = -1, last = 5 } }) do
+        it("comes after every bag on " .. client.name, function()
+          Enum.BagIndex.Keyring = client.keyring
+          const.BACKPACK_BAGS = { [client.keyring] = client.keyring }
+          for bag = 0, client.last do const.BACKPACK_BAGS[bag] = bag end
+          local key = MockItemData({bagid = client.keyring, slotid = 1})
+          for bag = 0, client.last do
+            local other = MockItemData({bagid = bag, slotid = 30})
+            assert.is_true(sort.SortItemDataBySlot(other, key), "bag " .. bag)
+            assert.is_false(sort.SortItemDataBySlot(key, other), "bag " .. bag)
+          end
+          local nextKey = MockItemData({bagid = client.keyring, slotid = 2})
+          assert.is_true(sort.SortItemDataBySlot(key, nextKey), "its own slots in order")
+          assert.is_false(sort.SortItemDataBySlot(nextKey, key))
+        end)
+      end
+
+      -- Classic Era's bank is -1, its keyring -2: the bank keeps its place before its bank bags.
+      it("leaves the Classic Era bank first", function()
+        Enum.BagIndex.Keyring = -2
+        const.BACKPACK_BAGS = { [-2] = -2, [0] = 0, [1] = 1, [2] = 2, [3] = 3, [4] = 4 }
+        local bank = MockItemData({bagid = -1, slotid = 1})
+        local bankBag = MockItemData({bagid = 5, slotid = 1})
+        assert.is_true(sort.SortItemDataBySlot(bank, bankBag))
+        assert.is_false(sort.SortItemDataBySlot(bankBag, bank))
+      end)
+
+      -- Live retail's enum has a Keyring member (-1) and no keyring: the backpack does not read it.
+      it("leaves the enum's keyring ID alone where the backpack reads no keyring", function()
+        Enum.BagIndex.Keyring = -1
+        const.BACKPACK_BAGS = { [0] = 0, [1] = 1, [2] = 2, [3] = 3, [4] = 4, [5] = 5 }
+        local other = MockItemData({bagid = -1, slotid = 1})
+        local bag = MockItemData({bagid = 0, slotid = 1})
+        assert.is_true(sort.SortItemDataBySlot(other, bag))
+        assert.is_false(sort.SortItemDataBySlot(bag, other))
+      end)
+    end)
+
     it("SortItemDataBySlot handles equal slots", function()
       local slot1 = MockItemData({bagid = 1, slotid = 1})
       local slot2 = MockItemData({bagid = 1, slotid = 1})

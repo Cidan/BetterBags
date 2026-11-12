@@ -320,6 +320,17 @@ function sort.SortItemDataByExpansion(aData, bData)
   return aData.itemInfo.itemGUID < bData.itemInfo.itemGUID
 end
 
+-- slotOrder is where a bag's slots go in slot order: the backpack's keyring (Classic Era, WoW: Forever), whose bag
+-- ID is below the backpack's, after every bag, as its number says (items:GetBagName).
+---@param bagid number
+---@return number
+local function slotOrder(bagid)
+  if bagid == Enum.BagIndex.Keyring and const.BACKPACK_BAGS[bagid] ~= nil then
+    return math.huge
+  end
+  return bagid
+end
+
 ---@param aData ItemData
 ---@param bData ItemData
 ---@return boolean
@@ -327,7 +338,7 @@ function sort.SortItemDataBySlot(aData, bData)
   if not aData then return false end
   if not bData then return true end
   if aData.bagid ~= bData.bagid then
-    return aData.bagid < bData.bagid
+    return slotOrder(aData.bagid) < slotOrder(bData.bagid)
   end
   return aData.slotid < bData.slotid
 end

@@ -3266,6 +3266,36 @@ _G.Enum.ItemClass = {
 _G.C_ActionBar = _G.C_ActionBar or {}
 _G.C_ActionBar.ShouldShowKeyring = function() return _G._keyringEnabled ~= false end
 
+-- GetKeyRingSize() -> how many keyring slots the game opens; Blizzard's bags padlock the rest
+-- (ContainerFrame_GetContainerNumSlots). Blizzard's own Lua, ported as is from
+-- Blizzard_MainMenuBarBagButtons (Camelot/MainMenuBarBagButtons.lua on WoW: Forever,
+-- Classic/MainMenuBarBagButtons.lua on Classic Era), with KEYRING_CONTAINER (Enum.BagIndex.Keyring,
+-- Blizzard_FrameXMLBase Constants.lua): the last filled slot rounded up to a row of 4, a row more
+-- once every slot up to it is filled, never more than the keyring's slots.
+_G.GetKeyRingSize = function()
+  local keyring = _G.Enum.BagIndex.Keyring
+  local numKeyringSlots = _G.C_Container.GetContainerNumSlots(keyring)
+  local maxSlotNumberFilled = 0
+  local numItems = 0
+  for i = 1, numKeyringSlots do
+    local texture = _G.C_Container.GetContainerItemInfo(keyring, i)
+    if texture and i > maxSlotNumberFilled then
+      maxSlotNumberFilled = i
+    end
+    if texture then
+      numItems = numItems + 1
+    end
+  end
+  local modulo = maxSlotNumberFilled % 4
+  local size
+  if modulo == 0 and numItems < maxSlotNumberFilled then
+    size = maxSlotNumberFilled
+  else
+    size = maxSlotNumberFilled + (4 - modulo)
+  end
+  return math.min(size, numKeyringSlots)
+end
+
 -- C_Bank Setup
 _G.C_Bank = _G.C_Bank or {}
 _G.C_Bank.FetchDepositedMoney = function(bankType)

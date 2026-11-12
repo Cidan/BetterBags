@@ -369,6 +369,90 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
     assert.are.equal(1, free)
   end)
 
+  -- The keyring reports about 32 slots, but the game opens only GetKeyRingSize()'s: its last filled slot
+  -- rounded up to a row of 4, a row more once every slot up to it holds a key. Blizzard's bags padlock the
+  -- rest (ContainerFrame_GetContainerNumSlots, ContainerFrameItemButtonMixin:UpdateExtended), and so did
+  -- Show Bags, which drew them as 28 padlocked slots. Asked: "for keyring, don't show locked slots, just the
+  -- empty slots (and full slots) that are enabled by the game".
+  describe("keyring slots the game opens", function()
+    local function keyringSlotKeys(slotInfo)
+      local keys = {}
+      for slotkey, item in pairs(slotInfo.itemsBySlotKey) do
+        if item.bagid == -1 then table.insert(keys, slotkey) end
+      end
+      table.sort(keys, function(a, b) return tonumber(a:match("_(%d+)$")) < tonumber(b:match("_(%d+)$")) end)
+      return keys
+    end
+
+    local function shownKeyringSlots(slotInfo)
+      local keys = {}
+      for _, item in ipairs(slotInfo.sortedItems) do
+        if item.bagid == -1 then keys[item.slotkey] = true end
+      end
+      return keys
+    end
+
+    before_each(function()
+      override(_G.Enum.BagIndex, "Keyring", -1)
+      override(const, "BACKPACK_BAGS", { [-1] = -1, [0] = 0, [1] = 1 })
+      override(database, "GetBagView", function() return const.BAG_VIEW.SECTION_ALL_BAGS end)
+      mockContainer[-1] = {}
+      for i = 1, 32 do mockContainer[-1][i] = {} end
+      mockContainer[0] = { { itemID = 101, guid = "guid-101" }, {} }
+    end)
+
+    it("reads the first row of an empty keyring and none of its padlocked slots", function()
+      local slotInfo = refreshBackpack({ wipe = true })
+      assert.are.same({ "-1_1", "-1_2", "-1_3", "-1_4" }, keyringSlotKeys(slotInfo))
+      assert.are.same({ ["-1_1"] = true, ["-1_2"] = true, ["-1_3"] = true, ["-1_4"] = true }, shownKeyringSlots(slotInfo))
+      assert.is_nil(slotInfo.emptySlotByBagAndSlot[-1] and slotInfo.emptySlotByBagAndSlot[-1][5])
+      assert.is_not_nil(slotInfo.itemsBySlotKey["0_2"], "every slot of the other bags")
+    end)
+
+    it("opens the next row once the keys fill the last, and closes it when one leaves", function()
+      for i = 1, 4 do mockContainer[-1][i] = { itemID = 900 + i, guid = "guid-key-" .. i } end
+      local slotInfo = refreshBackpack({ wipe = true })
+      assert.are.equal(8, #keyringSlotKeys(slotInfo))
+      assert.is_true(shownKeyringSlots(slotInfo)["-1_8"])
+
+      mockContainer[-1][4] = {}
+      slotInfo = refreshBackpack({ bags = { [-1] = true } })
+      assert.are.same({ "-1_1", "-1_2", "-1_3", "-1_4" }, keyringSlotKeys(slotInfo))
+      assert.is_nil(shownKeyringSlots(slotInfo)["-1_5"])
+    end)
+
+    it("reads up to a key in a far slot, rounded up to its row", function()
+      mockContainer[-1][10] = { itemID = 910, guid = "guid-key-10" }
+      local slotInfo = refreshBackpack({ wipe = true })
+      assert.are.equal(12, #keyringSlotKeys(slotInfo))
+      assert.are.equal(910, slotInfo.itemsBySlotKey["-1_10"].itemInfo.itemID)
+    end)
+
+    -- Asked: "keyring should go last here in terms of sort". Sorted by the real slot order (util/sort.lua): the
+    -- Sort module this spec stubs keeps its place in the registry, only its slot order is the real one.
+    it("lists the keyring's section after every bag's, its slots in order", function()
+      local aceAddon = LibStub("AceAddon-3.0")
+      local stub, stubAddon = addon.modules.Sort, aceAddon.addons.BetterBags_Sort
+      ResetModuleStub("Sort", "util/sort.lua")
+      LoadBetterBagsModule("util/sort.lua")
+      local real = addon:GetModule("Sort")
+      ResetModuleStub("Sort", "util/sort.lua")
+      addon.modules.Sort, aceAddon.addons.BetterBags_Sort = stub, stubAddon
+      override(stub, "SortItemDataBySlot", real.SortItemDataBySlot)
+      mockContainer[-1][1] = { itemID = 900, guid = "guid-key" }
+      mockContainer[1] = { { itemID = 202, guid = "guid-202" }, {} }
+
+      local slotInfo = refreshBackpack({ wipe = true })
+
+      local names = {}
+      for _, category in ipairs(slotInfo.tabs[1].categories) do table.insert(names, category.name) end
+      assert.are.same({ "#1: Mock Bag 0", "#2: Mock Bag 1", "#3: Keyring" }, names)
+      local order = {}
+      for _, item in ipairs(slotInfo.sortedItems) do table.insert(order, item.slotkey) end
+      assert.are.same({ "0_1", "0_2", "1_1", "1_2", "-1_1", "-1_2", "-1_3", "-1_4" }, order)
+    end)
+  end)
+
   it("clears the Recent Items status of an item that was only moved between slots", function()
     override(database, "GetCategoryFilter", function(_, _, filter) return filter == "RecentItems" end)
     mockContainer[0] = {
