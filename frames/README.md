@@ -84,6 +84,7 @@ Individual item button implementation with full WoW item functionality.
 - Cooldown tracking
 - Search highlighting
 - Upgrade indicator
+- Junk coin at a vendor (Blizzard's `UpdateJunkItem`), redrawn when a vendor opens or closes through the sweep's junk mark (`data.junkMarked`, one of the inputs a skipped redraw compares; `.claude/rules/item-drawing.md` §7b)
 - Stack management
 - Free slot display
 

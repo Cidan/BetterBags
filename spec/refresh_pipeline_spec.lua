@@ -1890,6 +1890,65 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
     end)
   end)
 
+  -- #1284: Blizzard's UpdateJunkItem shows the junk coin on a poor item that sells for something while
+  -- MerchantFrame:IsShown() (Blizzard_UIPanels_Game/Mainline/ContainerFrame.lua). Opening and closing a
+  -- vendor recalculates the backpack (core/hooks.lua: derive, categories unchanged) and changes nothing
+  -- else about the item, so the sweep marks it, and the mark is what redraws its button.
+  describe("the junk mark", function()
+    local merchantShown
+
+    local function vendorRecalculation()
+      return refreshBackpack({ derive = true, categoriesUnchanged = true })
+    end
+
+    before_each(function()
+      merchantShown = false
+      saveGlobal(_G, "MerchantFrame")
+      _G.MerchantFrame = { IsShown = function() return merchantShown end }
+      -- C_Item.GetItemQuality(itemLocation) -> itemQuality, which the backpack read takes an item's quality from.
+      override(_G.C_Item, "GetItemQuality", function(location)
+        local bagid, slotid = location:GetBagAndSlot()
+        local slot = mockContainer[bagid] and mockContainer[bagid][slotid]
+        return slot and slot.info and slot.info.quality or 1
+      end)
+      mockContainer[0] = {
+        { itemID = 101, guid = "guid-junk", count = 1, info = { quality = 0 } },
+        { itemID = 102, guid = "guid-novalue", count = 1, info = { quality = 0, hasNoValue = true } },
+        { itemID = 103, guid = "guid-common", count = 1 },
+      }
+      mockContainer[1] = { { itemID = 104, guid = "guid-junk-2", count = 1, info = { quality = 0 } } }
+    end)
+
+    it("marks a poor item that sells for something while a vendor is open, and only then", function()
+      local slotInfo = refreshBackpack({ wipe = true })
+      for _, slotkey in ipairs({ "0_1", "0_2", "0_3", "1_1" }) do
+        assert.is_false(slotInfo.itemsBySlotKey[slotkey].junkMarked, slotkey .. " away from a vendor")
+      end
+      local generation = slotInfo.itemsBySlotKey["0_1"].drawGeneration
+
+      merchantShown = true
+      slotInfo = vendorRecalculation()
+      assert.is_true(slotInfo.itemsBySlotKey["0_1"].junkMarked)
+      assert.is_true(slotInfo.itemsBySlotKey["1_1"].junkMarked)
+      assert.is_false(slotInfo.itemsBySlotKey["0_2"].junkMarked, "sells for nothing")
+      assert.is_false(slotInfo.itemsBySlotKey["0_3"].junkMarked, "not poor")
+      assert.equal(generation, slotInfo.itemsBySlotKey["0_1"].drawGeneration, "no new generation redraws every button")
+
+      merchantShown = false
+      slotInfo = vendorRecalculation()
+      assert.is_false(slotInfo.itemsBySlotKey["0_1"].junkMarked)
+      assert.is_false(slotInfo.itemsBySlotKey["1_1"].junkMarked)
+    end)
+
+    it("marks the items a targeted read carried over", function()
+      refreshBackpack({ wipe = true })
+      merchantShown = true
+      mockContainer[0][3].count = 2
+      local slotInfo = refreshBackpack({ bags = { [0] = true } })
+      assert.is_true(slotInfo.itemsBySlotKey["1_1"].junkMarked)
+    end)
+  end)
+
   -- Two 12.1 Catalyst pieces: identical itemID, item level and bonus IDs, differing
   -- only in the secondary stats reported by GetItemStats. Without a stat component in
   -- the item hash they collide and one is hidden behind a virtual stack.

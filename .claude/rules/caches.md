@@ -206,8 +206,10 @@ upgrade provider reads `equipmentCache` (`GetItemDataFromInventorySlot`).
 
 ### 4. Button draw record (`item.drawState`, item-drawing.md §7b)
 Kept value: what the button shows. A redraw whose inputs (the item's `itemHash` and every other
-field the setters read, `drawGeneration`, the decoration and Sonata's generation) match
-the record is skipped. Invalidated by `ResetVisuals` (a release, or item/free/empty mode changes),
+field the setters read, the junk mark `junkMarked`, `drawGeneration`, the decoration and Sonata's
+generation) match the record is skipped. Blizzard's `UpdateJunkItem` reads whether a vendor is open
+itself, so every sweep marks junk from that (item-drawing.md §7b) and opening or closing a vendor
+redraws the junk. Invalidated by `ResetVisuals` (a release, or item/free/empty mode changes),
 `SetSize` with a new size (Masque's skin follows the size only through a full draw's re-skin)
 and `Lock`; `UpdateSearch` keeps the search match current. `drawGeneration` changes on every wipe;
 `ItemFrame.styleGeneration` (also in the record, bumped by `RestyleButtons`) changes when a setting

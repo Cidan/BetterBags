@@ -1151,6 +1151,7 @@ describe("ItemFrame Static Buttons and Parent Removal Tests", function()
           { "search match", function(d) d.isSearchResult = false end },
           { "upgrade", function(d) d.isUpgrade = true end },
           { "context match", function(d) d.itemContextMatchResult = 2 end },
+          { "junk mark", function(d) d.junkMarked = true end },
           { "item hash", function(d) d.itemHash = "hash-other" end },
           { "item link", function(d) d.itemInfo.itemLink = "item:12345:0:0:0:0:0:0:0:0:0:0:0:1:9999" end },
           { "icon", function(d) d.itemInfo.itemIcon = 1 end },
@@ -1172,6 +1173,55 @@ describe("ItemFrame Static Buttons and Parent Removal Tests", function()
           assert.equal(1, fullDraws)
         end)
 
+        -- #1284: Blizzard's UpdateJunkItem shows the junk coin only while MerchantFrame:IsShown()
+        -- (Blizzard_UIPanels_Game/Mainline/ContainerFrame.lua). Opening or closing a vendor changes
+        -- nothing else about a junk item, so the sweep's junk mark is what redraws it.
+        describe("the junk coin", function()
+          local savedMerchantFrame, merchantShown, coin
+
+          local function junk(marked)
+            return data({ function(d)
+              d.itemInfo.itemQuality = 0
+              d.containerInfo.hasNoValue = false
+              d.junkMarked = marked
+            end })
+          end
+
+          before_each(function()
+            savedMerchantFrame = _G.MerchantFrame
+            merchantShown = false
+            _G.MerchantFrame = { IsShown = function() return merchantShown end }
+            coin = false
+            item._decoration.UpdateJunkItem = function(_, quality, noValue)
+              coin = quality == 0 and not noValue and _G.MerchantFrame:IsShown()
+            end
+            item:SetItemFromData(btnCtx, junk(false))
+            fullDraws = 0
+          end)
+
+          after_each(function()
+            _G.MerchantFrame = savedMerchantFrame
+          end)
+
+          it("shows when a vendor opens, and hides when it closes, with nothing else about the item changed", function()
+            merchantShown = true
+            item:SetItemFromData(btnCtx, junk(true))
+            assert.is_true(coin, "shown at the vendor")
+            merchantShown = false
+            item:SetItemFromData(btnCtx, junk(false))
+            assert.is_false(coin, "gone once the vendor closed")
+          end)
+
+          it("still skips a redraw at the vendor that changes nothing", function()
+            merchantShown = true
+            item:SetItemFromData(btnCtx, junk(true))
+            assert.equal(1, fullDraws)
+            item:SetItemFromData(btnCtx, junk(true))
+            assert.equal(1, fullDraws)
+            assert.is_true(coin)
+          end)
+        end)
+
         -- The profiler's call trace records this method's return value for every draw, which
         -- is how a capture shows why a button redrew (data-driven.md).
         it("names the input that changed, and nothing when the redraw can be skipped", function()
@@ -1182,6 +1232,7 @@ describe("ItemFrame Static Buttons and Parent Removal Tests", function()
             { function(d) d.itemInfo.isNewItem = true end, "isNewItem" },
             { function(d) d.isUpgrade = true end, "isUpgrade" },
             { function(d) d.itemContextMatchResult = 2 end, "itemContextMatchResult" },
+            { function(d) d.junkMarked = true end, "junkMarked" },
             { function(d) d.drawGeneration = 2 end, "drawGeneration" },
             { function(d) d.isSearchResult = false end, "matches" },
             { function(d) d.itemHash = "hash-other" end, "itemHash" },

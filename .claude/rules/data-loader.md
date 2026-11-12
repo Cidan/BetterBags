@@ -185,6 +185,8 @@ Upgrade arrows (`data.isUpgrade`, resolved in `Phase6_EnrichData` via `items:Res
 ### 17. Draw Generation
 Every item carries `drawGeneration`, stamped in `Phase6_EnrichData` from `items._drawGeneration[kind]`, which `RunRefresh` bumps on every wipe sweep of the kind. Item buttons include it in the inputs that decide whether a redraw can be skipped (item-drawing.md §7b): a setting the data phase reads (stacking rules, the upgrade provider) sends `bags/FullRefreshAll`, a wipe, so a new generation makes every button of the kind draw in full. It is per kind, so a bank wipe does not redraw the backpack. Settings that only change how a button draws (glow intensity, item level display) do not wipe: they redraw with `ItemFrame:RestyleButtons()`, and a theme change bumps Sonata's generation (`Sonata:GetGeneration()`, refresh-scheduler.md §9). Coverage: `spec/refresh_pipeline_spec.lua` ("draw generation").
 
+`Phase6_EnrichData` also marks every item, every sweep, with whether Blizzard's junk coin shows on it (`junkMarked`: poor, sells for something, `MerchantFrame:IsShown()` read once per sweep), a draw input that redraws only the junk when a vendor opens or closes, rather than a new generation redrawing every button (item-drawing.md §7b). Coverage: `spec/refresh_pipeline_spec.lua` ("the junk mark").
+
 ### 18. Deriving Only What Changed (Kept Per-Item Work)
 A refresh used to work out every item's category, grey-out and upgrade arrow again, and compare
 every item with its search entry, whatever it read: the per-slot harvest cache (§16) and the

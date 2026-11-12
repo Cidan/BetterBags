@@ -29,6 +29,7 @@ The main item management module that handles all item data operations including 
 - **Item Hashing**: Generates unique hashes for item stacking
 - **Category Assignment**: Determines item categories based on filters. Items no custom or search category claims are named from the enabled filters joined with " - ": item type, subtype, trade skill, expansion (`GetCategory`). A subtype equal to the type before it is skipped, so quest items read "Quest", not "Quest - Quest" (settings saved under old names are moved by `DB:RenameRepeatedTypeCategories`, `.claude/rules/category-lifecycle.md` §5)
 - **New Item Tracking**: Manages "new item" status with timers
+- **Junk Mark**: Every sweep marks each item with whether Blizzard's junk coin shows on it (`junkMarked`: poor, sells for something, `MerchantFrame:IsShown()`), so opening or closing a vendor redraws only the junk (`.claude/rules/item-drawing.md` §7b)
 - **Equipment Data**: Handles equipped item information
 
 #### Key Functions
