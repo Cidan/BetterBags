@@ -1,0 +1,17 @@
+{
+  "id": 1794523639,
+  "version": "v0.9.2-12-g3ceb4a2",
+  "channel": "alpha",
+  "date": "2026-11-12",
+  "from": "352564d65e0138a5563bdac3c76f79b38936718a",
+  "to": "3ceb4a2a60300c7d8eeaa6bcdf5471aadbb5214d",
+  "headline": "Shift-clicking vendor items now opens an improved quantity prompt with minus, plus, and Max buttons.",
+  "entries": [
+    {
+      "category": "Improved",
+      "title": "Vendor quantity prompt with plus, minus, and Max",
+      "details": "Shift-clicking an item at a vendor opens an interactive quantity prompt featuring minus, plus, and Max buttons. The field starts with a single purchase amount, prevents invalid quantities, and accurately calculates the maximum you can afford across gold, cost items, and currencies.",
+      "clients": []
+    }
+  ]
+}
