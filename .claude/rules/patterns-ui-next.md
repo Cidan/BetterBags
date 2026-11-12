@@ -1,6 +1,6 @@
 ---
 paths:
-  - "next/{drag,lift,dock,dockcard,panel,content,pixel,chain,vendor,tabs,uipanels}.lua"
+  - "next/{drag,lift,dock,dockcard,panel,content,pixel,chain,vendor,vendorbutton,tabs,uipanels}.lua"
   - "render/texels.lua"
   - "spec/helpers/layout.lua"
 ---
@@ -107,3 +107,14 @@ keep every other value that reads them true (the stand-in's `checkFitExtraWidth`
 back as it was, then `UpdateUIPanelPositions()`. Never move Blizzard's panels after it places them: it places them again
 on every change. Test against the manager's own source, not a port of it (`spec/helpers/uipanels.lua`), and have it
 reviewed: three reviews each found what the last fix had broken. next-uipanels.md §27.
+
+## A Tooltip Over Part of Something Clickable Is a Hover-Only Frame
+**Problem**: a card that takes every click (buy, sell a drop) shows one tooltip, but part of its text names something
+else that has a tooltip of its own (a vendor price's crest cost). A font string takes no mouse, and a mouse-enabled frame
+laid over that part would take the card's clicks and drops there.
+**Solution**: lay a `Frame` over the part, above the card, `EnableMouse(true)` then `SetMouseClickEnabled(false)`, as
+Blizzard's tooltip-only widgets do (`UIWidgetTemplateTooltipFrameMixin:SetMouse`): it gets `OnEnter`/`OnLeave`, and clicks
+and drops reach the card under it. Find the part's place by measuring the text up to it on the font string itself (width
+set to none, text set to the part, `GetStringWidth`, then its text and width back, before the client draws), and lay it
+out again whenever the text's font or width changes. Leaving it is the card's `OnLeave`; entering it lights the card as
+the card does. next-vendor.md §10b ("A cost's own tooltip").

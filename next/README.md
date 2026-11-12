@@ -59,7 +59,10 @@ The vendor (`vendor.lua`, `addon.Vendor`) and the guild bank (`guildbank.lua`, `
 Blizzard's merchant and guild bank frames, each while its own switch is on (Enable Vendor Window, Enable Guild Bank
 Window): `core/bagsystem.lua` switches either off and on at once (`.claude/rules/next-bagsystem.md` §11g). Switched off
 (`Deactivate`), a panel is marked `off` and answers no visit, its Blizzard frame is given back and shows the vendor or
-the guild bank, and `Activate` switches it on again.
+the guild bank, and `Activate` switches it on again. The vendor's item cards (`vendorbutton.lua`) show Blizzard's
+tooltips as its merchant frame does: the item's over the card, and over each cost besides gold (a crest, a currency, an
+item) that cost's own, from an area that takes the pointer and lets clicks through to the card
+(`.claude/rules/next-vendor.md` §10b).
 
 Each companion names the frame of Blizzard's it stands in for (`opts.standIn`: `MerchantFrame`, `BankFrame`,
 `GuildBankFrame`). Blizzard's UI panel manager still lays that frame out, shown and never seen, so `uipanels.lua`

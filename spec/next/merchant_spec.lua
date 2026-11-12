@@ -174,10 +174,22 @@ describe("NextMerchant", function()
         { a.index, a.link, a.itemID, a.name, a.texture, a.price, a.stackCount, a.numAvailable, a.maxStack, a.canAfford,
           a.isPurchasable, a.isUsable, a.hasExtendedCost, a.quality })
       assert.are.same({ true, false, true, 3 }, { b.hasExtendedCost, b.isUsable, b.isQuestStartItem, b.quality })
-      assert.are.same({ { texture = 77, value = 30, currencyName = "Valor" }, { texture = 78, value = 2, link = link(12) } },
-        b.costs)
+      assert.are.same({ { texture = 77, value = 30, currencyName = "Valor", costIndex = 1 },
+        { texture = 78, value = 2, link = link(12), costIndex = 2 } }, b.costs)
       assert.is_true(a.refundable)
       assert.is_false(b.refundable)
+    end)
+
+    -- A cost's tooltip is asked for by its place among the merchant's (GameTooltip:SetMerchantCostItem(index,
+    -- costIndex), issue #1283), which Blizzard's merchant reads past a place without a texture
+    -- (MerchantFrame_UpdateAltCurrency: if itemTexture).
+    it("keeps each cost's place among the merchant's costs, past one it leaves out", function()
+      _G._merchant.items = {
+        vendorItem(11, { price = 0, hasExtendedCost = true,
+          costs = { { value = 1 }, { texture = 78, value = 2, link = link(12) } } }),
+      }
+      local list = merchant:ReadItems(ctx())
+      assert.are.same({ { texture = 78, value = 2, link = link(12), costIndex = 2 } }, list[1].costs)
     end)
 
     it("reads Classic's GetMerchantItemInfo, where nothing is ever non-refundable", function()
@@ -522,9 +534,10 @@ describe("NextMerchant", function()
       assert.are.same({}, costs)
       assert.are.equal(7, (merchant:PriceOf({ price = 10, stackCount = 3, costs = {} }, 2)))
       local _, extended = merchant:PriceOf({ price = 0, stackCount = 5,
-        costs = { { texture = 7, value = 3, currencyName = "Marks" }, { texture = 8, value = 10, link = "|Hitem:12|h" } } }, 7)
-      assert.are.same({ { texture = 7, value = 5, currencyName = "Marks" }, { texture = 8, value = 14, link = "|Hitem:12|h" } },
-        extended)
+        costs = { { texture = 7, value = 3, currencyName = "Marks", costIndex = 1 },
+          { texture = 8, value = 10, link = "|Hitem:12|h", costIndex = 3 } } }, 7)
+      assert.are.same({ { texture = 7, value = 5, currencyName = "Marks", costIndex = 1 },
+        { texture = 8, value = 14, link = "|Hitem:12|h", costIndex = 3 } }, extended, "each cost keeps its place")
     end)
 
     it("adds a list's prices up, each thing it costs once", function()

@@ -36,7 +36,8 @@ local COUNT_INSET = 2
 -- NextVendorButton is a button of BetterBags Next's vendor (next.md §10): an item for sale, a
 -- buyback, or an item to repair. It shows the icon, stack size, stock, quality, the quest mark, what
 -- makes it unusable or sold out (as Blizzard's MerchantFrame_UpdateMerchantInfo tints them), and, on
--- a card beside the icon, its name and price; its tooltip is Blizzard's; its clicks buy (NextMerchant:Purchase, through
+-- a card beside the icon, its name and price; its tooltip is Blizzard's, and over each cost besides gold the cost's own
+-- (placeCosts), as Blizzard's merchant shows it; its clicks buy (NextMerchant:Purchase, through
 -- Blizzard's confirmations), ask a quantity (our own dialog, as CompactVendor has its own), buy
 -- back or repair, the way Blizzard's merchant item buttons do. A left click never puts the item on
 -- the cursor, so it cannot be bought by dropping it on a bag slot past Blizzard's confirmations.
@@ -81,6 +82,10 @@ end
 ---@field count FontString
 ---@field stock FontString
 ---@field price FontString
+---@field priceWidth number How wide the price is drawn, which cuts it short (Style).
+---@field priceAmount? number The gold of the price it shows.
+---@field priceCosts? NextVendorCost[] The other costs of the price it shows.
+---@field costAreas Frame[] An area over each cost the price shows besides gold (placeCosts), made as needed.
 ---@field durability Texture
 ---@field mode? NextVendorButtonMode
 ---@field item? NextVendorItem
@@ -98,13 +103,12 @@ end
 
 vendorButton:Init()
 
--- PriceText is a price on one line, as Blizzard's merchant writes it: each coin of the gold it has
--- (gold, silver, copper; none for a coin it has none of), each amount then its coin, then each other
--- cost the same way (Vendor.CoinSize). It is cut short when it does not fit; the tooltip shows it all.
----@param price number
+-- priceParts is a price's parts in the order PriceText writes them, and how many of them are coins: each
+-- coin of the gold it has, then each other cost.
+---@param price? number
 ---@param costs NextVendorCost[]
----@return string
-function vendorButton:PriceText(price, costs)
+---@return string[] parts, number coins
+local function priceParts(price, costs)
   local size = style.Theme.Vendor.CoinSize
   local parts = {}
   local function add(n, texture)
@@ -118,10 +122,21 @@ function vendorButton:PriceText(price, costs)
       end
     end
   end
+  local coins = #parts
   for _, cost in ipairs(costs) do
     add(cost.value, cost.texture)
   end
-  return table.concat(parts, " ")
+  return parts, coins
+end
+
+-- PriceText is a price on one line, as Blizzard's merchant writes it: each coin of the gold it has
+-- (gold, silver, copper; none for a coin it has none of), each amount then its coin, then each other
+-- cost the same way (Vendor.CoinSize). It is cut short when it does not fit; the tooltip shows it all.
+---@param price number
+---@param costs NextVendorCost[]
+---@return string
+function vendorButton:PriceText(price, costs)
+  return (table.concat((priceParts(price, costs)), " "))
 end
 
 ---@return NextVendorButtonFrame
@@ -173,7 +188,7 @@ local function newButton()
   local b = setmetatable({
     key = "", frame = frame, button = button, card = card, cardFill = cardFill, cardHover = cardHover,
     icon = icon, border = border, quest = quest, count = count, stock = stock, name = name, price = price,
-    durability = durability, highlight = highlight, affordable = true, quality = nil,
+    durability = durability, highlight = highlight, affordable = true, quality = nil, costAreas = {},
   }, { __index = buttonProto })
   b:Style()
   for _, target in ipairs({ button, card }) do
@@ -213,6 +228,7 @@ function buttonProto:Style()
   price:ClearAllPoints()
   pixel:Point(price, "BOTTOMLEFT", frame, "BOTTOMLEFT", icon + gap, pixel:Snap(frame, style.VENDOR_PRICE_RAISE))
   price:SetWidth(textWidth)
+  self.priceWidth = textWidth
   local inset = pixel:Snap(frame, COUNT_INSET)
   self.count:ClearAllPoints()
   pixel:Point(self.count, "BOTTOMRIGHT", self.icon, "BOTTOMRIGHT", -inset, inset)
@@ -240,6 +256,7 @@ function buttonProto:Style()
   style:SetFont(self.stock, V.StackFont)
   self:setNameFont()
   self:setPriceFont()
+  self:placeCosts()
 end
 
 -- sizeDurability makes the durability bar its share of the icon's width, in whole pixels.
@@ -338,6 +355,8 @@ function buttonProto:Release()
   self.frame:ClearAllPoints()
   self.frame:SetParent(nil)
   self.mode, self.item, self.buyback, self.repair = nil, nil, nil, nil
+  self.priceAmount, self.priceCosts = nil, nil
+  self:placeCosts()
   table.insert(vendorButton.pool, self)
 end
 
@@ -404,10 +423,92 @@ function buttonProto:SetBuy(item, quantity)
   self:setAffordable(item.canAfford and true or false)
   self:setName(item.name, item.quality)
   if quantity then
-    self.price:SetText(vendorButton:PriceText(merchant:PriceOf(item, quantity)))
+    self:showPrice(merchant:PriceOf(item, quantity))
   else
-    self.price:SetText(vendorButton:PriceText(item.price, item.costs))
+    self:showPrice(item.price, item.costs)
   end
+end
+
+-- showPrice writes a price (PriceText) and lays an area over each of its costs besides gold (placeCosts).
+---@private
+---@param price number
+---@param costs NextVendorCost[]
+function buttonProto:showPrice(price, costs)
+  self.priceAmount, self.priceCosts = price, costs
+  self.price:SetText(vendorButton:PriceText(price, costs))
+  self:placeCosts()
+end
+
+-- placeCosts lays an area over each cost besides gold the price writes (issue #1283), where the pointer shows that
+-- cost's tooltip, as over each cost's button on Blizzard's merchant (OnCostEnter). An area spans from where the
+-- price up to the cost before it ends to where the price up to it ends, measured as the client draws the price (a
+-- font string keeps the width it was cut to, and measures that: set back to none, its text set to the part, it
+-- measures the part; then it takes back its whole text and width, all before the client draws again). One the
+-- price cuts short ends at the price's width; one cut off has none. Styled again (a theme, a new grid, Icon Scale),
+-- the price's font and width change, and the areas are laid out again.
+---@private
+function buttonProto:placeCosts()
+  local costs = self.priceCosts or {}
+  local shown = 0
+  if #costs > 0 then
+    local price, room = self.price, self.priceWidth
+    local parts, coins = priceParts(self.priceAmount, costs)
+    price:SetWidth(0)
+    local left = 0
+    if coins > 0 then
+      price:SetText(table.concat(parts, " ", 1, coins))
+      left = price:GetStringWidth()
+    end
+    for i, cost in ipairs(costs) do
+      if left >= room then
+        break
+      end
+      price:SetText(table.concat(parts, " ", 1, coins + i))
+      local right = math.min(price:GetStringWidth(), room)
+      shown = shown + 1
+      local area = self.costAreas[shown] or self:newCostArea()
+      area.cost = cost
+      area:ClearAllPoints()
+      area:SetPoint("TOPLEFT", price, "TOPLEFT", left, 0)
+      area:SetPoint("BOTTOMRIGHT", price, "BOTTOMLEFT", right, 0)
+      area:Show()
+      left = right
+    end
+    price:SetText(table.concat(parts, " "))
+    price:SetWidth(room)
+  end
+  for i = shown + 1, #self.costAreas do
+    self.costAreas[i]:Hide()
+  end
+end
+
+-- newCostArea makes an area for a cost, over the card: it takes the pointer and never a click, as Blizzard's
+-- tooltip-only widgets (UIWidgetTemplateTooltipFrameMixin:SetMouse: EnableMouse, then SetMouseClickEnabled(false)),
+-- so a click or an item dropped over a cost reaches the card under it, which buys and sells.
+---@private
+---@return Frame
+function buttonProto:newCostArea()
+  local area = CreateFrame("Frame", nil, self.frame)
+  area:SetFrameLevel(self.frame:GetFrameLevel() + 3)
+  area:EnableMouse(true)
+  area:SetMouseClickEnabled(false)
+  area:SetScript("OnEnter", function() self:OnCostEnter(area) end)
+  area:SetScript("OnLeave", function() self:OnLeave() end)
+  table.insert(self.costAreas, area)
+  return area
+end
+
+-- OnCostEnter lights the card and shows the tooltip of the cost an area is over, as Blizzard's merchant shows it
+-- over each cost (SmallDenominationTemplate_OnEnter: GameTooltip:SetMerchantCostItem(index, costIndex)), with the
+-- cursor the card shows: a click there still buys.
+---@param area Frame
+function buttonProto:OnCostEnter(area)
+  if style.Theme.Vendor.CardHover then
+    self.cardHover:Show()
+  end
+  GameTooltip:SetOwner(area, "ANCHOR_RIGHT")
+  GameTooltip:SetMerchantCostItem(self.item.index, area.cost.costIndex)
+  SetCursor(self.item.canAfford and "BUY_CURSOR" or "BUY_ERROR_CURSOR")
 end
 
 -- setAffordable writes the price in the theme's role for whether the player can afford it.
@@ -429,7 +530,7 @@ function buttonProto:SetBuyback(entry)
     self.icon:SetVertexColor(style:RGBA(style.Theme.Vendor.Unusable))
   end
   self:setName(entry.name, entry.quality)
-  self.price:SetText(vendorButton:PriceText(entry.price, {}))
+  self:showPrice(entry.price, {})
 end
 
 -- SetRepair shows a damaged item: how worn it is as a bar along the icon's bottom, green to red,
@@ -446,7 +547,7 @@ function buttonProto:SetRepair(entry)
   self.durability:SetVertexColor(1 - fraction, fraction, 0.1, 1)
   self.durability:Show()
   self:setName(entry.link and entry.link:match("%[(.-)%]"), quality)
-  self.price:SetText(vendorButton:PriceText(entry.cost, {}))
+  self:showPrice(entry.cost, {})
 end
 
 -- SetSearchMatch dims the button when a search leaves it out.
