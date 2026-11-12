@@ -123,6 +123,9 @@ local nextDock = addon:GetModule('NextDock')
 ---@class NextChain: AceModule
 local chain = addon:GetModule('NextChain')
 
+---@class NextUIPanels: AceModule
+local uiPanels = addon:GetModule('NextUIPanels')
+
 ---@class SectionFrame: AceModule
 local sectionFrame = addon:GetModule('SectionFrame')
 
@@ -241,6 +244,7 @@ end
 ---@field closeSound number
 ---@field noDrag? boolean Its sections are not dragged, and nothing is dropped on it (the vendor).
 ---@field chainRole "backpack"|"companion" What it is in the chain (next.md §12).
+---@field standIn? string The global name of the frame of Blizzard's it stands in for, shown and never seen (next-uipanels.md).
 
 ---@class (exact) NextHeaderButton
 ---@field key string The field the button is kept in on the panel, and its icon's key in the theme (Header.Buttons.Icons).
@@ -256,6 +260,7 @@ end
 ---@class NextPanelFrame
 ---@field kind BagKind
 ---@field side NextSide
+---@field standIn? string The global name of the frame of Blizzard's it stands in for (NextPanelOptions).
 ---@field openSound number
 ---@field closeSound number
 ---@field frame Frame The panel.
@@ -412,6 +417,7 @@ function nextPanel:Create(proto, opts)
   p.kind = opts.kind
   p.label = opts.title
   p.side = opts.side
+  p.standIn = opts.standIn
   p.openSound = opts.openSound
   p.closeSound = opts.closeSound
   p.offset = 0
@@ -572,6 +578,8 @@ function nextPanel:SetSize(ctx, size)
   for _, panel in ipairs(chain:Panels()) do
     panel:UpdateSizeButton()
   end
+  -- A full companion moves Blizzard's panels past it, a small one does not (next-uipanels.md): at once, as it switches.
+  uiPanels:Update()
   return "switched"
 end
 

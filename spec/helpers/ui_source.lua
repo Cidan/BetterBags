@@ -66,6 +66,14 @@ local function readAll(branch, paths)
   return contents
 end
 
+-- Read returns the contents of paths on a client's branch, by path (none for a path the branch lacks).
+---@param client table One of M.CLIENTS.
+---@param paths string[]
+---@return table<string, string>
+function M.Read(client, paths)
+  return readAll(client.branch, paths)
+end
+
 local function tokens(value)
   local set = {}
   for token in value:lower():gmatch("[%w]+") do

@@ -98,6 +98,7 @@ function nextGuildBank:Create(ctx)
     openSound = SOUNDKIT.GUILD_VAULT_OPEN,
     closeSound = SOUNDKIT.GUILD_VAULT_CLOSE,
     chainRole = "companion",
+    standIn = "GuildBankFrame",
   })
   g.closeRequested = false
   g.wipeWhenHidden = false

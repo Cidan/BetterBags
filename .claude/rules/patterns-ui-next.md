@@ -1,6 +1,6 @@
 ---
 paths:
-  - "next/{drag,lift,dock,dockcard,panel,content,pixel,chain,vendor,tabs}.lua"
+  - "next/{drag,lift,dock,dockcard,panel,content,pixel,chain,vendor,tabs,uipanels}.lua"
   - "render/texels.lua"
   - "spec/helpers/layout.lua"
 ---
@@ -92,3 +92,18 @@ read it, ran the chain's update and glided the bag over a fraction of a pixel, t
 clear it in every place that makes that fact false, not only in the one that pays it on purpose. Find them by what
 they do (here: each place that sets the bag's place from `SmallPlace()` and places it), and test each one alone,
 since a later path often clears it for the common case and hides a missing clear. next-small-resize.md §14g.
+
+## A Frame Kept Shown Out of Sight Still Takes Room in Blizzard's Panel Layout
+**Problem**: BetterBags Next keeps the frames it stands in for (the merchant frame, the bank's, the guild bank's) shown
+under a hidden frame, so Blizzard's code goes on working. Blizzard's UI panel manager shows them through `ShowUIPanel`
+and lays them out like any panel, by their own widths, so the Character pane and the Dressing Room opened beside a frame
+nobody sees, under the vendor (#1247, #1282).
+**Solution**: tell the manager through the attributes it lays out from, as Blizzard's own frames do: the stand-in's
+layout `width` (`SetUIPanelAttribute`) set so it takes no room, and the layout's `LEFT_OFFSET` moved past what the addon
+covers at the left edge, but only as far as the panels fit on the screen. The manager decides which panels it keeps
+from the same offsets it places from, so move `RIGHT_OFFSET_BUFFER` by the same amount (or it closes panels, and the
+merchant frame with them, to make room), write first whichever leaves more room (Classic lays out on every write), and
+keep every other value that reads them true (the stand-in's `checkFitExtraWidth` for Blizzard's scale-to-fit). Put each
+back as it was, then `UpdateUIPanelPositions()`. Never move Blizzard's panels after it places them: it places them again
+on every change. Test against the manager's own source, not a port of it (`spec/helpers/uipanels.lua`), and have it
+reviewed: three reviews each found what the last fix had broken. next-uipanels.md §27.

@@ -1500,11 +1500,38 @@ function WidgetMethods:GetJustifyV()
   return self._justifyV
 end
 
+-- Frame:SetAttribute(name, value), Frame:SetAttributeNoHandler(name, value), Frame:GetAttribute(name)
+-- (warcraft.wiki.gg API:Frame_SetAttribute, API:Frame_SetAttributeNoHandler): a name is case-insensitive;
+-- SetAttribute runs the frame's OnAttributeChanged with the name and the value, SetAttributeNoHandler does not.
+-- Blizzard's UI panel manager dispatches through the handler (UIParentPanelManager.lua, FramePositionDelegate).
 function WidgetMethods:SetAttribute(attrName, value)
-  self._attributes[attrName] = value
+  self._attributes[attrName:lower()] = value
+  local handler = self._scripts.OnAttributeChanged
+  if handler then
+    handler(self, attrName:lower(), value)
+  end
+end
+function WidgetMethods:SetAttributeNoHandler(attrName, value)
+  self._attributes[attrName:lower()] = value
 end
 function WidgetMethods:GetAttribute(attrName)
-  return self._attributes[attrName]
+  return self._attributes[attrName:lower()]
+end
+-- FrameScriptObject:SetForbidden() and IsForbidden() (SimpleFrameScriptObjectAPIDocumentation.lua; SetForbidden has
+-- restrictions: Blizzard's own code calls it, on its UI panel manager's delegate).
+function WidgetMethods:SetForbidden()
+  self._forbidden = true
+end
+function WidgetMethods:IsForbidden()
+  return self._forbidden == true
+end
+-- Frame:Raise() (SimpleFrameAPIDocumentation.lua; warcraft.wiki.gg API:Frame_Raise: the frame's level above every other
+-- frame's in its strata). The mock keeps no list of every frame, so it records the order frames were raised in
+-- (_raisedAt): the one raised last is on top.
+local raises = 0
+function WidgetMethods:Raise()
+  raises = raises + 1
+  self._raisedAt = raises
 end
 
 -- Strata / Level / Backdrop
@@ -2585,6 +2612,45 @@ _G.issecurevariable = function()
 end
 _G.UIParent = CreateMockWidget("Frame", "UIParent")
 _G.UIParent:SetSize(1920, 1200)
+-- The UI panel manager's attributes, as retail's Blizzard_UIParentPanelManager has them: UIPanelWindows (the panels it
+-- lays out, by frame name; a spec registers the ones it needs), SetUIPanelAttribute(frame, name, value) as
+-- UIParentPanelManager.lua writes it (the frame's "UIPanelLayout-" attributes, set from its UIPanelWindows entry the
+-- first time), and the layout's own attributes on UIPanelLayoutFrame with their defaults, through
+-- GetUIPanelLayoutAttribute and SetUIPanelLayoutAttribute (UIPanelLayoutFrame.lua). UpdateUIPanelPositions(frame) lays
+-- the open panels out again; like ShowUIPanel above, it places nothing here. Blizzard's own manager, run from its
+-- source over these mocks: spec/helpers/uipanels.lua.
+_G.UIPanelWindows = {}
+local function setUIPanelFrameAttributes(frame, attributes)
+  frame:SetAttributeNoHandler("UIPanelLayout-defined", true)
+  for name, value in pairs(attributes) do
+    frame:SetAttributeNoHandler("UIPanelLayout-" .. name, value)
+  end
+end
+_G.SetUIPanelAttribute = function(frame, name, value)
+  local attributes = _G.UIPanelWindows[frame:GetName()]
+  if not attributes then
+    return
+  end
+  if not frame:GetAttribute("UIPanelLayout-defined") then
+    setUIPanelFrameAttributes(frame, attributes)
+  end
+  frame:SetAttributeNoHandler("UIPanelLayout-" .. name, value)
+end
+_G.UIPanelLayoutFrame = CreateMockWidget("Frame", "UIPanelLayoutFrame", _G.UIParent)
+for name, value in pairs({ DEFAULT_FRAME_WIDTH = 384, TOP_OFFSET = -116, LEFT_OFFSET = 16, CENTER_OFFSET = 384,
+  RIGHT_OFFSET = 768, RIGHT_OFFSET_BUFFER = 80, PANEl_SPACING_X = 32 }) do
+  _G.UIPanelLayoutFrame:SetAttribute(name, value)
+end
+_G.GetUIPanelLayoutAttribute = function(name)
+  return _G.UIPanelLayoutFrame:GetAttribute(name)
+end
+_G.SetUIPanelLayoutAttribute = function(name, value)
+  _G.UIPanelLayoutFrame:SetAttribute(name, value)
+end
+_G.UpdateUIPanelPositions = function() end
+-- GetUIPanel(key) -> the panel the manager keeps at key ("left", "center", "right", "doublewide", "fullscreen"); the
+-- mocks' ShowUIPanel keeps none there.
+_G.GetUIPanel = function() return nil end
 -- UIParent's effective scale is its own scale, the UI scale (it has no parent that scales it).
 function _G.UIParent:GetEffectiveScale()
   return self:GetScale()

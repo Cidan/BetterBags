@@ -239,6 +239,13 @@ values, or `{ error = ... }`). Older dumps have no `apiProbe`.
   (`debugDumpExtras.player.fullName`) and sessions record them in `meta`; an extracted fixture leaves
   them out.
 
+### 5b. Blizzard's Own Code Over the Mocks (`spec/helpers/uipanels.lua`)
+Where BetterBags depends on what Blizzard's code does with what it hands it, a spec can run that code instead of a port:
+`spec/helpers/uipanels.lua` loads a client's `Blizzard_UIParentPanelManager` from its branch of
+`.libraries/wow-ui-source` (read through `spec/helpers/ui_source.lua`'s `Read`) over the frame mocks, and returns what
+puts every global back (next-uipanels.md §27f). The frame mock had to follow the Widget API for it: attribute names
+case-insensitive, `SetAttribute` running `OnAttributeChanged`, `SetAttributeNoHandler`, `SetForbidden`, `Raise`.
+
 ### 6. A World of Its Own for Every Spec File (`spec/setup.lua`, `spec/helpers/world.lua`)
 The suite runs every spec file in one Lua process, and gives each file a world of its own, the one it would get run
 alone, let go when the file ends: the suite holds one file's memory at a time.

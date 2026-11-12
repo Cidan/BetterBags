@@ -150,6 +150,11 @@ visit (another panel on the left, Escape through `CloseWindows`). `GiveBack` put
 `UIParent` with its `OnHide` when Next is switched off (refused at the guild bank). With the classic
 bags the hooks do nothing.
 
+**Blizzard's panel manager still lays the frame out**, double-wide (793, or 769 with an `xoffset` of -16 on Classic), and
+put the panels after it far to the right of the guild bank. The panel names it (`standIn = "GuildBankFrame"`, looked up
+as it is used: the frame loads on demand): while the guild bank is open at full size, the frame takes no room in the
+layout and the layout's left edge moves past the guild bank and its tabs (next-uipanels.md §27).
+
 **Enable Guild Bank Window off** (next-bagsystem.md §11g, #1262): the bag system switches the guild bank off by itself
 while Next stays in use, away from the guild bank only: `guildProto:Deactivate` marks the panel `off` (then hides it and
 lets go of its buttons) and `GiveBack` puts Blizzard's frame back with its `OnHide`, so its `ShowUIPanel` hook leaves the

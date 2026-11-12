@@ -121,6 +121,9 @@ The anchor is the bag at the screen edge; the chained bag faces it, so their rib
   would be over a hundred pixels on a move across the screen). Its sections cascade in as it starts
   coming in (`moveIn`), not while it waits. An ordinary opening is the 0.45 s slide with its bounce.
   Coupling takes 0.35 s, letting go 0.25 s.
+- `chain:Update` ends by telling Blizzard's panel manager where the bags rest (`NextUIPanels:Update`,
+  next-uipanels.md §27): chained `left`, its panels open past the backpack beside the companion; chained `right`, the
+  left edge is its own.
 
 ### 12d. The coupling
 
