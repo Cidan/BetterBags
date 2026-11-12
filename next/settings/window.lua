@@ -296,7 +296,8 @@ function settings:ended()
     self.page:Leave(context:New('NextSettings_Hidden'))
   end
   nextMenu:Close()
-  if nextDialog:IsShown() then
+  -- The vendor shows its quantity in the same dialog (next-vendor.md §10d).
+  if nextDialog:IsShown() and nextDialog.owner == self.frame then
     nextDialog:Hide()
   end
 end

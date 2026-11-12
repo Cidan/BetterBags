@@ -21,7 +21,7 @@ for _, m in ipairs({ { "NextStyle", "next/style.lua" }, { "NextTween", "next/twe
   { "NextInput", "next/controls/input.lua" }, { "NextSlider", "next/controls/slider.lua" },
   { "NextMenu", "next/controls/menu.lua" }, { "NextDropdown", "next/controls/dropdown.lua" },
   { "NextSwatch", "next/controls/swatch.lua" }, { "NextTopTabs", "next/controls/toptabs.lua" },
-  { "NextDialog", "next/controls/dialog.lua" }, { "NextSettingsRows", "next/settings/rows.lua" },
+  { "NextLift", "next/lift.lua" }, { "NextDialog", "next/controls/dialog.lua" }, { "NextSettingsRows", "next/settings/rows.lua" },
   { "NextSettingsPage", "next/settings/page.lua" }, { "NextSettingsPages", "next/settings/pages.lua" },
   { "NextSettings", "next/settings/window.lua" } }) do
   ResetModuleStub(m[1], m[2])
@@ -339,6 +339,17 @@ describe("NextSettings", function()
       nextDialog:Show(settings.frame, { title = "T", text = "x", buttons = { { text = "OK", onClick = function() end } } })
       settings:Close()
       assert.is_false(nextDialog:IsShown())
+    end)
+
+    -- Found in review (issue #1281): the vendor asks a quantity in the same dialog.
+    it("leaves a dialog open over another window as it closes", function()
+      open()
+      local vendor = CreateFrame("Frame", "SpecVendorWindow", UIParent)
+      vendor:SetSize(400, 500)
+      vendor:Show()
+      nextDialog:Show(vendor, { title = "Buy", text = "x", buttons = { { text = "OK", onClick = function() end } } })
+      settings:Close()
+      assert.is_true(nextDialog:IsShown())
     end)
 
     -- render-recorder.md §2: while rendering is recorded, each page shown is snapshotted.

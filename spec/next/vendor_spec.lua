@@ -32,6 +32,7 @@ local stubs = {
   merchant = trackStub("NextMerchant"),
   itemFrame = trackStub("ItemFrame"),
   question = trackStub("Question"),
+  dialog = trackStub("NextDialog"),
   automation = trackStub("Automation"),
   seller = trackStub("Seller"),
   shoppingList = trackStub("ProfessionShoppingList"),

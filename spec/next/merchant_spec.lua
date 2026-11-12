@@ -494,6 +494,49 @@ describe("NextMerchant", function()
       assert.are.equal(3, merchant:MaxPurchasable(list[2]))
       assert.are.equal(30, merchant:MaxPurchasable(list[3]))
     end)
+
+    -- Asked (issue #1281): Max counts the currencies held too, which Blizzard's stack split does not. A cost
+    -- names its currency (GetMerchantItemCostItem's currencyName, no link); the merchant's currencies
+    -- (C_MerchantFrame.GetMerchantCurrencies, retail and WoW: Forever) say how much of each the player has.
+    it("counts the currencies a purchase costs, found by name among the merchant's", function()
+      ResetMockCurrencies()
+      _G._merchant.currencies = { 1166, 1191 }
+      _G._currencies[1166] = { name = "Timewarped Badge", quantity = 2500 }
+      _G._currencies[1191] = { name = "Valor", quantity = 700 }
+      local list = read(vendorItem(10, { price = 0, hasExtendedCost = true, stackCount = 5, maxStack = 200,
+        costs = { { texture = 1, value = 1000, currencyName = "Timewarped Badge" } } }),
+        vendorItem(11, { price = 0, hasExtendedCost = true, stackCount = 1, maxStack = 200,
+          costs = { { texture = 1, value = 50, currencyName = "Valor" },
+            { texture = 2, value = 100, currencyName = "Timewarped Badge" } } }),
+        vendorItem(12, { price = 0, hasExtendedCost = true, stackCount = 1, maxStack = 20,
+          costs = { { texture = 1, value = 5, currencyName = "Honor" } } }))
+      assert.are.equal(12, merchant:MaxPurchasable(list[1]), "2500 badges buy 2 purchases of 5, then half of one")
+      assert.are.equal(14, merchant:MaxPurchasable(list[2]), "the scarcer of two currencies")
+      assert.are.equal(20, merchant:MaxPurchasable(list[3]), "a currency the merchant does not list leaves the stack limit")
+      ResetMockCurrencies()
+    end)
+
+    -- Found in review: 33 / (11 / 5) is a hair under 15 in floating point.
+    it("counts a currency's whole purchases exactly", function()
+      ResetMockCurrencies()
+      _G._merchant.currencies = { 1191 }
+      _G._currencies[1191] = { name = "Valor", quantity = 33 }
+      local item = read(vendorItem(11, { price = 0, hasExtendedCost = true, stackCount = 5, maxStack = 200,
+        costs = { { texture = 1, value = 11, currencyName = "Valor" } } }))[1]
+      assert.are.equal(15, merchant:MaxPurchasable(item))
+      ResetMockCurrencies()
+    end)
+
+    -- Classic lists no merchant's currencies (C_MerchantFrame.GetMerchantCurrencies: retail 12.0.7 and WoW: Forever
+    -- 1.60.1 only): a currency there limits nothing, as in Blizzard's stack split.
+    it("leaves a currency uncounted on a client that lists no merchant's currencies", function()
+      override(C_MerchantFrame, "GetMerchantCurrencies", nil)
+      _G._currencies[1191] = { name = "Valor", quantity = 0 }
+      local item = read(vendorItem(11, { price = 0, hasExtendedCost = true, stackCount = 1, maxStack = 20,
+        costs = { { texture = 1, value = 50, currencyName = "Valor" } } }))[1]
+      assert.are.equal(20, merchant:MaxPurchasable(item))
+      ResetMockCurrencies()
+    end)
   end)
 
   -- What Profession Shopping List's BuyFromMerchant buys here (profession-shopping-list.md): for each

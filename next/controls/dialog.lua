@@ -33,13 +33,18 @@ local frameArt = addon:GetModule('NextFrameArt')
 ---@class PixelAudit: AceModule
 local pixelAudit = addon:GetModule('PixelAudit')
 
+---@class NextLift: AceModule
+local lift = addon:GetModule('NextLift')
+
 -- NextDialog is BetterBags Next's dialog (next-settings.md §2), in place of Blizzard's StaticPopup:
--- one at a time, over the window it is shown in, drawn from the theme (Controls.Dialog): a scrim over
--- the window that takes its clicks, and a card with a title, text, a text field when asked, and
--- buttons laid out from the right in the order given. A click on a button calls it with the field's
--- text and closes the dialog, unless it returns true (keep it open: a name already taken). Enter in
--- the field is the last button (the one that answers yes); Escape, or the window hiding, the first
--- (the one that answers no).
+-- one at a time, over everything in the window it is shown in (never wider than it), drawn from the theme
+-- (Controls.Dialog): a scrim over the window that takes its clicks, and a card with a title, text, a text
+-- field when asked, and buttons laid out from the right in the order given. A click on a button calls it
+-- with the field's text and closes the dialog, unless it returns true (keep it open, the field focused
+-- again: a name already taken). Enter in the field is the last button (the one that answers yes); Escape,
+-- in the field or out of it, or the window hiding, the first (the one that answers no). A field may hold a
+-- quantity: digits only, with -, + and a button filling in its max after it on its row, as Blizzard's stack
+-- split has its arrows (StackSplitFrame.lua).
 ---@class NextDialog: AceModule
 ---@field frame Frame
 ---@field scrim Texture
@@ -52,6 +57,9 @@ local pixelAudit = addon:GetModule('PixelAudit')
 ---@field title FontString
 ---@field text FontString
 ---@field input NextInputFrame
+---@field minus NextButtonFrame A quantity's -.
+---@field plus NextButtonFrame A quantity's +.
+---@field most NextButtonFrame Fills in a quantity's max.
 ---@field buttons NextButtonFrame[] Every button made; the first #opts.buttons are shown.
 ---@field opts? NextDialogOptions
 ---@field open boolean
@@ -63,10 +71,17 @@ local nextDialog = addon:NewModule('NextDialog')
 ---@field style? NextButtonStyle
 ---@field onClick fun(ctx: Context, text: string): boolean?
 
+---@class (exact) NextDialogQuantity
+---@field min number The least it holds.
+---@field max fun(): number The most it holds, asked each time it is needed: it may change while the dialog shows.
+---@field step number How far - and + move it: to the multiple of step below or above.
+---@field maxText string The label of the button that fills in its max.
+
 ---@class (exact) NextDialogInput
 ---@field text? string
 ---@field help? string
 ---@field maxLetters? number
+---@field quantity? NextDialogQuantity The field holds a number, kept between its min and its max.
 
 ---@class (exact) NextDialogOptions
 ---@field title string
@@ -109,7 +124,16 @@ function nextDialog:build()
   self.text:SetWordWrap(true)
   self.input = nextInput:Create(card, {
     onEnter = function(ctx) self:Press(ctx, #self.opts.buttons) end,
+    onChange = function() self:typed() end,
+    onArrow = function(_, key) self:arrow(key) end,
+    onEscape = function() self:Hide() end,
   })
+  self.minus = nextButton:Create(card, { text = "-", onClick = function() self:Step(-1) end })
+  self.plus = nextButton:Create(card, { text = "+", onClick = function() self:Step(1) end })
+  self.most = nextButton:Create(card, { text = "", onClick = function() self:fill(self:quantity().max()) end })
+  for _, b in ipairs({ self.minus, self.plus, self.most }) do
+    b.frame:Hide()
+  end
   addon.SetScript(frame, "OnHide", function(ctx) self:hidden(ctx) end)
   self.frame, self.card = frame, card
   sonataNext:RegisterWidget(self)
@@ -129,6 +153,21 @@ function nextDialog:button(i)
   return b
 end
 
+-- levelOver is the frame level that puts the dialog over everything in its window (a docked card's catcher sits
+-- a hundred above its section, NextDock), as far above the highest as a lifted frame's cover (NextLift).
+---@private
+---@param owner Frame
+---@return number
+function nextDialog:levelOver(owner)
+  local level = owner:GetFrameLevel()
+  for _, child in ipairs({ owner:GetChildren() }) do
+    if child ~= self.frame then
+      level = math.max(level, lift:MaxLevel(child))
+    end
+  end
+  return math.min(lift.MAX_LEVEL, level + lift.COVER_ABOVE)
+end
+
 ---@param owner Frame The window the dialog covers.
 ---@param opts NextDialogOptions
 function nextDialog:Show(owner, opts)
@@ -142,16 +181,25 @@ function nextDialog:Show(owner, opts)
   frame:ClearAllPoints()
   frame:SetAllPoints(owner)
   frame:SetFrameStrata(owner:GetFrameStrata())
-  frame:SetFrameLevel(owner:GetFrameLevel() + 100)
+  frame:SetFrameLevel(self:levelOver(owner))
   self.title:SetText(opts.title or "")
   self.text:SetText(opts.text or "")
   local input = opts.input
+  local quantity = input and input.quantity
   self.input.frame:SetShown(input ~= nil)
+  self.input.frame:SetNumeric(quantity ~= nil)
+  for _, b in ipairs({ self.minus, self.plus, self.most }) do
+    b.frame:SetShown(quantity ~= nil)
+  end
+  if quantity ~= nil then
+    self.most:SetText(quantity.maxText)
+  end
   if input ~= nil then
     self.input.frame:SetMaxLetters(input.maxLetters or 0)
     self.input.help:SetText(input.help or "")
     self.input:SetText(input.text or "")
   end
+  self:updateSteppers()
   for i, spec in ipairs(opts.buttons) do
     local b = self:button(i)
     b.style = spec.style or "Plain"
@@ -181,10 +229,11 @@ function nextDialog:ApplyStyle(ctx)
   end
 end
 
--- Style lays the card out: the title, the text wrapped to the card, the field, the buttons from the
--- right; the card as tall as they are, in the middle of the window. All in whole pixels
--- (docs/next-pixel-perfect.md): each part down from the card's top by the heights above it rounded up,
--- never from a text's far edge (the client's measure of it), the buttons corner to corner.
+-- Style lays the card out: the title, the text wrapped to the card, the field (a quantity's -, + and max
+-- button after it, - and + square, the field the room they leave), the buttons from the right; the card as
+-- tall as they are, in the middle of the window. All in whole pixels (docs/next-pixel-perfect.md): each part
+-- down from the card's top by the heights above it rounded up, never from a text's far edge (the client's
+-- measure of it), the field's row centered on its tallest part, the buttons corner to corner.
 function nextDialog:Style()
   local D = controls:Theme("Dialog")
   local frame, card = self.frame, self.card
@@ -194,7 +243,7 @@ function nextDialog:Style()
   controls:Paint(self.cardBorder, D.Border)
   style:SetFont(self.title, D.TitleFont)
   style:SetFont(self.text, D.TextFont)
-  local width = pixel:Length(card, D.Width)
+  local width = math.min(pixel:Length(card, D.Width), pixel:Floor(card, self.owner:GetWidth()))
   card:SetWidth(width)
   local inner = width - 2 * pad
   self.title:SetWidth(inner)
@@ -206,11 +255,35 @@ function nextDialog:Style()
   pixel:Point(self.text, "TOPLEFT", card, "TOPLEFT", pad, -down)
   down = down + pixel:Ceil(card, self.text:GetStringHeight())
   if self.input.frame:IsShown() then
-    self.input.frame:ClearAllPoints()
-    self.input.frame:SetPoint("TOPLEFT", card, "TOPLEFT", pad, -(down + gap))
-    self.input.frame:SetWidth(inner)
+    local top = down + gap
+    local steppers = self.most.frame:IsShown()
+    local fieldWidth = inner
+    if steppers then
+      local square = pixel:Length(card, controls:Theme("Button").Height)
+      self.minus:SetWidth(square)
+      self.plus:SetWidth(square)
+      for _, b in ipairs({ self.minus, self.plus, self.most }) do
+        b:Style()
+      end
+      fieldWidth = inner - (self.most.frame:GetWidth() + 2 * square + 3 * buttonGap)
+    end
+    self.input.frame:SetWidth(fieldWidth)
     self.input:Style()
-    down = down + gap + self.input.frame:GetHeight()
+    local row = self.input.frame:GetHeight()
+    if steppers then
+      row = math.max(row, self.most.frame:GetHeight())
+    end
+    self.input.frame:ClearAllPoints()
+    pixel:Row(self.input.frame, "TOPLEFT", card, pad, row, nil, top)
+    if steppers then
+      local across = pad
+      for _, b in ipairs({ self.most, self.plus, self.minus }) do
+        b.frame:ClearAllPoints()
+        pixel:Row(b.frame, "TOPRIGHT", card, across, row, nil, top)
+        across = across + b.frame:GetWidth() + buttonGap
+      end
+    end
+    down = top + row
   end
   local count = self.opts and #self.opts.buttons or 0
   local right
@@ -233,7 +306,102 @@ function nextDialog:Style()
   self.frameArt:Apply(D.Frame)
 end
 
--- Press answers with the i-th button: called with the field's text, then closed unless it asks to
+-- quantity is what the shown dialog's field holds a quantity of, if it holds one.
+---@private
+---@return NextDialogQuantity?
+function nextDialog:quantity()
+  local input = self.opts and self.opts.input
+  return input and input.quantity
+end
+
+-- within keeps a number between a quantity's min and its max as it is now.
+---@param q NextDialogQuantity
+---@param n number
+---@return number
+local function within(q, n)
+  return math.min(q.max(), math.max(q.min, n))
+end
+
+-- updateSteppers turns - off while the field holds no number above the quantity's min. + and the max button
+-- are never off: each asks the max when clicked, which may have grown since.
+---@private
+function nextDialog:updateSteppers()
+  local q = self:quantity()
+  if q == nil then
+    return
+  end
+  local n = tonumber(self.input:GetText())
+  self.minus:SetEnabled(n ~= nil and n > q.min)
+end
+
+-- fill shows a number in a quantity's field.
+---@private
+---@param n number
+function nextDialog:fill(n)
+  self.input:SetText(tostring(n))
+  self:updateSteppers()
+end
+
+-- Step moves a quantity to the multiple of its step below (direction -1) or above (1), kept between its min
+-- and its max; from an empty field, as from 0.
+---@param direction number
+function nextDialog:Step(direction)
+  local q = self:quantity()
+  if q == nil then
+    return
+  end
+  local n = tonumber(self.input:GetText()) or 0
+  local target
+  if direction < 0 then
+    target = (math.ceil(n / q.step) - 1) * q.step
+  else
+    target = (math.floor(n / q.step) + 1) * q.step
+  end
+  self:fill(within(q, target))
+end
+
+-- typed shows a quantity's max in place of a larger number the player typed; a smaller one is left to be
+-- typed on (a 1 may become a 10), and kept within when answered (answer).
+---@private
+function nextDialog:typed()
+  local q = self:quantity()
+  if q == nil then
+    return
+  end
+  local n, most = tonumber(self.input:GetText()), q.max()
+  if n ~= nil and n > most then
+    self:fill(most)
+  else
+    self:updateSteppers()
+  end
+end
+
+-- arrow steps a quantity with the Up and Down keys, as Blizzard's stack split does (StackSplitMixin:OnKeyDown);
+-- Left and Right stay the field's.
+---@private
+---@param key string
+function nextDialog:arrow(key)
+  if key == "UP" then
+    self:Step(1)
+  elseif key == "DOWN" then
+    self:Step(-1)
+  end
+end
+
+-- answer is the field's text as a button gets it: a quantity's number kept between its min and its max.
+---@private
+---@return string
+function nextDialog:answer()
+  local text = self.input:GetText()
+  local q = self:quantity()
+  local n = q and tonumber(text)
+  if n ~= nil then
+    return tostring(within(q, n))
+  end
+  return text
+end
+
+-- Press answers with the i-th button: called with the field's text (answer), then closed unless it asks to
 -- stay open.
 ---@param ctx Context
 ---@param i number
@@ -244,9 +412,13 @@ function nextDialog:Press(ctx, i)
     return
   end
   self.answered = true
-  local keep = spec.onClick(ctx, self.input:GetText())
+  local keep = spec.onClick(ctx, self:answer())
   if keep == true and self.opts == opts then
     self.answered = false
+    if self.input.frame:IsShown() then
+      self.input:SetFocus()
+      self.input.frame:HighlightText()
+    end
     return
   end
   if self.opts == opts then
@@ -271,6 +443,9 @@ function nextDialog:hidden(ctx)
     return
   end
   self.open = false
+  -- A window hiding hides its children without hiding them for good: one left shown would come back,
+  -- unanswerable, with the window, and keep Escape from the game meanwhile (CloseSpecialWindows reads IsShown).
+  self.frame:Hide()
   controls:ReleaseEscape(self.frame)
   local opts, answered = self.opts, self.answered
   self.opts = nil

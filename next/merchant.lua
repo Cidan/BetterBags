@@ -544,9 +544,28 @@ function merchant:TotalOf(purchases)
   return total, costs
 end
 
+-- currencyHeld is how much of a currency the player has, found by its name (GetMerchantItemCostItem gives a
+-- currency's name, no link) among the open merchant's currencies (C_MerchantFrame.GetMerchantCurrencies, retail and
+-- WoW: Forever); nil on a client that lists none (Classic), or for one the merchant does not list.
+---@param name string
+---@return number?
+local function currencyHeld(name)
+  if C_MerchantFrame == nil or C_MerchantFrame.GetMerchantCurrencies == nil then
+    return nil
+  end
+  for _, id in ipairs(C_MerchantFrame.GetMerchantCurrencies() or {}) do
+    local info = C_CurrencyInfo.GetCurrencyInfo(id)
+    if info and info.name == name then
+      return info.quantity
+    end
+  end
+  return nil
+end
+
 -- MaxPurchasable is the most one quantity purchase can buy, as Blizzard's stack split works it out
 -- (MerchantItemButton_OnModifiedClick): the stack limit, what the money pays for, and what the
--- items it costs pay for.
+-- items it costs pay for; and, which Blizzard's leaves out, what the currencies it costs pay for, where
+-- the client says how much of them the player has (currencyHeld).
 ---@param item NextVendorItem
 ---@return number
 function merchant:MaxPurchasable(item)
@@ -557,7 +576,13 @@ function merchant:MaxPurchasable(item)
   end
   if item.hasExtendedCost then
     for _, cost in ipairs(item.costs) do
-      if cost.link and not cost.currencyName then
+      if cost.currencyName then
+        local have = currencyHeld(cost.currencyName)
+        if have ~= nil then
+          -- Whole numbers first: have / (value / stackCount) can fall a hair under a whole count (33 / 2.2).
+          canAfford = math.min(canAfford, math.floor(have * item.stackCount / cost.value))
+        end
+      elseif cost.link then
         local have = C_Item.GetItemCount(cost.link, false, false, true)
         canAfford = math.min(canAfford, math.floor(have / (cost.value / item.stackCount)))
       end

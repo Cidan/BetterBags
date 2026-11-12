@@ -15,8 +15,8 @@ for _, m in ipairs({ { "NextStyle", "next/style.lua" }, { "NextTween", "next/twe
   { "NextFrameArt", "next/frameart.lua" }, { "NextFill", "next/fill.lua" }, { "NextControls", "next/controls/base.lua" },
   { "NextScrollBar", "next/controls/scrollbar.lua" }, { "NextButton", "next/controls/button.lua" },
   { "NextInput", "next/controls/input.lua" }, { "NextMenu", "next/controls/menu.lua" },
-  { "NextDialog", "next/controls/dialog.lua" }, { "NextItemGrid", "next/controls/itemgrid.lua" },
-  { "NextLift", "next/lift.lua" }, { "NextListReorder", "next/settings/reorder.lua" },
+  { "NextLift", "next/lift.lua" }, { "NextDialog", "next/controls/dialog.lua" }, { "NextItemGrid", "next/controls/itemgrid.lua" },
+  { "NextListReorder", "next/settings/reorder.lua" },
   { "Currencies", "data/currencies.lua" }, { "NextSettingsItemsTab", "next/settings/itemstab.lua" },
   { "NextSettingsCurrencies", "next/settings/currencies.lua" } }) do
   ResetModuleStub(m[1], m[2])
