@@ -91,44 +91,49 @@ content (window.md §3) and are unchanged.
   screen's bottom, keeps it there through the bounce; by the glide's progress where a size does not change). `toX` is worked
   out the same way, which is what it was for every caller before (each had a width that changed).
 - `carries` (the bag chained to it is placed beside it each frame, and the chain settles as it ends) is true where the top
-  moves too (`toY`): a chained bag's spot hangs from its anchor's top. A height glide passes `"RIGHT"`, so a companion
+  moves too (`toY`): a chained bag's spot hangs from its anchor (its bottom, since bags hold their bottom corner,
+  next-bag-anchor.md §30a: a height glide over a held bottom places it on the spot it is on). A height glide passes `"RIGHT"`, so a companion
   anchoring the backpack (its chained side its right) carries it through a height glide whose top stays: placed from where the
   anchor's frame is, the bag beside it reads back the spot it is on, and the braid stays twisted, on 42 screens and Bag Scales
   tried (2560x1440, 1920x1080, 3396x1362 and 1366x768, UI scales 0.53 to 1.07, Bag Scale 50% to 150%). Not carrying a glide whose
   width does not change changed nothing there either (mutation-tested; it went).
 
-#### Where it sits (`clampPlace`, `SmallPlace`, `leftPlace`)
+#### Where it sits (`clampPlace`, `SmallPlace`, `saveSized`)
 
-- Its top stays where the player left it; the bottom edge moves. At its default place (never moved) it is centered for its
-  height as before (`SmallPlace`), so it grows up and down from its middle.
-- **Its bottom stays on the screen** (asked: "move the bag up just enough"): with the setting on, `clampPlace` keeps its top at
-  least its height on the screen up (`max(y, min(screen, height × scale))`) whether or not Clamp Bags to Screen is on (on, it
-  already did, window.md §3a). It moves no further than that, and since the place it keeps is the one saved (a follow saves
-  nothing), it goes back down to where it was left as it shrinks.
+Since #1276 a small bag holds a corner (next-bag-anchor.md §30a): a bottom one unless its anchor square gave it a top one. Holding
+its bottom it grows up from it, and everything below is that mirror of what it was when bags held their top (each held-top rule,
+and the review finding behind it, kept its spec, rewritten for the bottom); holding a top corner it grows down, as bags did
+before, pushed up to keep its bottom on the screen (`clampPlace`, `saveSized`'s `math.min`).
+
+- Its bottom stays where the player left it; the top edge moves. Never placed, it holds its own side's bottom corner where a
+  bag of the default height centered has it (`HeldCorner`), so it grows up from there.
+- **Its top stays on the screen** (the mirror of "move the bag up just enough"): with the setting on, `clampPlace` keeps its top
+  no higher than the screen's and its bottom no lower (`max(min(y, screen), min(screen, height × scale))`) whether or not Clamp
+  Bags to Screen is on (on, it already did, window.md §3a). It is pushed down no further than that, and since the corner it
+  holds is the one saved (a follow saves nothing), it goes back up to where it was left as it shrinks.
   - Everything that places a small panel goes through `clampPlace`, so a drop that leaves its bottom off the screen is put back
     up as it lands, and saved there, as Clamp Bags to Screen does: the drop is where the player put it.
-  - A grip let go and a Shift-click save its place through `leftPlace`: with the setting on, a top raised above the one saved
-    (by the rule above) keeps the one saved, since neither moves its top, so it still goes back down as it shrinks (found by a
-    mutation run: they saved the raise). A top under the one saved (Clamp Bags to Screen keeping a top saved past the screen's
-    on it) is saved where it is, as before (found by the bug review: keeping every saved top kept that one past the screen). A
-    chained bag saves where it stands, its spot (found by the second bug review: it saved its left edge with a top it was once
-    dropped at, read once its anchor goes). Off, where it is, as before.
-  - A grip let go also takes the place it is put at from `leftPlace` before `clampPlace`, so a raised bag the grip made
-    shorter goes back down at once (found by the second bug review: it kept the raised top until its height next changed). A
-    Shift-click needs no such step: with the setting on a reset keeps the height it had, and the height glide after it works
-    the place out again (doing it there too changed nothing; mutation-tested).
-  - A chained bag is placed beside its anchor's top (`ChainedPlace`) and then through `clampPlace` with its own height: one
-    taller than its anchor near the screen's bottom is raised alone, its top off its anchor's, as Clamp Bags to Screen already
-    did with it on. Left as it is: nobody has seen it, and it is the clamp's existing behaviour.
+  - A grip let go and a Shift-click save its corner through `saveSized`: with the setting on, a bottom pushed under the one held
+    (by the rule above) keeps the one held, so it still goes back up as it shrinks (the mirror of the mutation run that found
+    raises saved). A bottom over the one held (Clamp Bags to Screen raising a bottom saved past the screen's) is saved where it
+    is (the mirror of the bug review's). A chained bag saves where it stands, its spot (the second bug review's). Off, where it
+    is.
+  - A grip let go also takes the place it is put at from the bottom it holds before `clampPlace` (`StopSizing`), so a
+    pushed-down bag the grip made shorter goes back up at once (the mirror of the second bug review's). A Shift-click keeps the
+    bottom it holds the same way (`ResetSize`).
+  - A chained bag is placed beside its anchor, bottoms level (`ChainedPlace`), and then through `clampPlace` with its own height:
+    one taller than its anchor near the screen's top is pushed down alone, its bottom off its anchor's, as Clamp Bags to Screen
+    already did with it on. Left as it is: nobody has seen it, and it is the clamp's existing behaviour.
 - **The backpack beside a companion that closes stays where it stands** (`chain:Released`, once a close: from `Hide` as the
   companion starts to close, which marks it `released`, and from `OnHidden` for a hide with no mark, Escape's at once): the backpack
   beside a companion (layout "companion") has an anchor only while a companion is open (`chain:Companion`), and then reads its
   own saved place, the spot it was dropped at. Its anchor's glides (its centered top following its height, its edge for a name),
   refits (a Bag Scale) and its own glides into its spot carried it elsewhere without saving, so once the companion closed its next
   height glide took it back there, its left edge jumping as the glide ended (found by the bug review). As a small companion
-  closes in that layout, the open backpack's place is saved: its left edge where it stands, its top its spot's beside the
-  companion's top (`ChainedPlace`), or where it stands if lower, never a top Autosize Bags raised it to (found by the third bug
-  review: it saved that raise, and never went back down). The slide's end hides the companion too (the client fires `OnHide`),
+  closes in that layout, the open backpack's place is saved: its left edge where it stands, its bottom its spot's beside the
+  companion's bottom (`ChainedPlace`), or where it stands if higher, never a bottom Autosize Bags pushed it down to (the mirror of
+  the third bug review's finding: it saved that raise, and never went back down). Since bottoms are level, a companion's height
+  no longer moves the backpack; its width (a name) and a Bag Scale still do. The slide's end hides the companion too (the client fires `OnHide`),
   and saves nothing more: in its 0.24 s the companion's top can move (a glide the close cut short ends where it was going, below
   where the backpack stands), another companion open and the backpack glide beside it, or the backpack be dropped, and the place
   the close saved stands (found by the fourth bug review, each with its spec). The mark is cleared as the companion opens, so a

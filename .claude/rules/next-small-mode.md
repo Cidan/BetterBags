@@ -27,8 +27,10 @@ they show (§14i, Autosize Bags: next-small-autosize.md).
     small; small being the default makes it every unsaved profile's at the bank, a vendor or the guild bank.
   - **Coverage:** the whole-addon specs that start BetterBags Next now run small panels; Papercraft's "full size and
     small" starts full (it had started on the default).
-  `nextSmallPlaces[kind]` (`DB:Get/SetNextSmallPlace`) where each kind's small
-  panel was left (its top left in UIParent's units), nothing until first moved;
+  `nextSmallCorners[kind]` (`DB:Get/SetNextSmallCorner`) the corner each kind's small panel holds where it was left (one of
+  its four corners in UIParent's units, and which, its side and its edge: next-bag-anchor.md §30a), nothing until first
+  placed; the
+  top left it was saved by before (`nextSmallPlaces`) is taken over as it first shows;
   `nextSmallSizes[kind]` (`DB:Get/SetNextSmallSize`, `{ width, height }`) the size the player gave it
   with its grips (next-small-resize.md §14g), nothing while it is the default size (a reset clears it); with Autosize Bags on
   (next-small-autosize.md §14i) its height is kept for when the setting is off, and a grip saves only the width.
@@ -50,9 +52,10 @@ end of a switch. `BuildPanel` only makes the parts.
   screen edge while docked (`SetDocked`).
 - **Small:** the frame is the body, its size `SmallSize`: the size the player gave it (next-small-resize.md §14g), else
   `BODY_WIDTH` wide (the full body's) and a share of the screen tall (whole units), never below its
-  minimum nor past the screen; with Autosize Bags on, as tall as what it shows (`RestingHeight`, next-small-autosize.md §14i). It is anchored by its top left at its place (`SmallPlace`: where it was
-  left, else a margin in from its own screen edge, centered; kept on the screen while Clamp Bags to
-  Screen is on, `clampPlace`, for its own width, and on whole pixels either way). No feather, clicks everywhere, a 1-pixel lavender edge all round (`edges`), the
+  minimum nor past the screen; with Autosize Bags on, as tall as what it shows (`RestingHeight`, next-small-autosize.md §14i). It is anchored by its top left at its place (`SmallPlace`: over the
+  corner it holds at its size now, next-bag-anchor.md §30a, so it grows up and away from its held side; where it was left,
+  else a margin in from its own screen edge, its bottom where a bag of the default height centered has it; kept on the
+  screen while Clamp Bags to Screen is on, `clampPlace`, for its own width, and on whole pixels either way). No feather, clicks everywhere, a 1-pixel lavender edge all round (`edges`), the
   shorter beam, a grip on each bottom corner (next-small-resize.md §14g). `SetDocked` does nothing to a small panel (it is
   never at its screen edge). The render root hands the content the body's width less its padding
   (`BodyWidth`: the full body's at full size, a small panel's own) and the panel's height less its
@@ -76,8 +79,9 @@ end of a switch. `BuildPanel` only makes the parts.
 - **Moving:** dragging the title row (`mover`: the body's top down to the search box, under the
   header buttons, which stay clickable above it) or the title (`titleButton`) calls `StartMove`
   (`frame:StartMoving()`) and `StopMove`: the place, kept on the screen while the bags are clamped to it,
-  is saved for the kind and the frame anchored there again (the client anchors a moved frame to the
-  nearest screen corner).
+  is saved for the kind (the corner it holds there, on the half of the screen its middle is on: `SavePlace`,
+  next-bag-anchor.md §30a) and the frame anchored there again (the client anchors a moved frame to the
+  nearest screen corner). A held bag does not move (locked, next-bag-anchor.md §30d).
   - **Clamp Bags to Screen** (window.md §3a, one setting for every bag, off by default): a small panel's
     frame is clamped (`ApplyClamp`, from `ApplyGeometry`) and its place kept on the screen (`clampPlace`:
     a move, a resize, a snap, a reset glide, a chained spot, the screen changing, opening) only while it is
@@ -165,8 +169,8 @@ them/coming out the side though!"
   (the backpack was dropped beside a companion, and sits beside whichever is open). Full mode's
   `nextChain` is untouched; each size keeps its own chain.
 - **Where a chained bag sits** (`ChainedPlace`): a companion left of the backpack, the backpack right
-  of a companion (only their facing sides chain), each as wide as the player made it (next-small-resize.md §14g), tops
-  aligned, `SmallGap` between them (both tab
+  of a companion (only their facing sides chain), each as wide as the player made it (next-small-resize.md §14g), bottoms
+  aligned (each holds its bottom and grows up, next-bag-anchor.md §30a; they were tops aligned), `SmallGap` between them (both tab
   rails, each its widest tab plus the hover slide, and a margin; at least `Small.MinGap`).
   `SmallPlace` of a chained bag is that spot beside its anchor where the anchor is now
   (`LivePlace`: under the mouse while dragged, else its place, saved or default, so a companion opens
@@ -204,7 +208,8 @@ them/coming out the side though!"
 - **A companion closing leaves the backpack beside it where it stands** (`chain:Released`, from the companion's `Hide` and
   `OnHidden`): the backpack beside a companion (layout "companion") has an anchor only while a companion is open, then reads its
   own saved place. As a small companion closes (not a parent hiding it), the open backpack's place is saved where it stands,
-  its top its spot's beside the companion (never a raise), so whatever moved it beside the companion (the companion's glides
+  its bottom its spot's beside the companion (never one pushed down to keep its top on the screen, next-bag-anchor.md §30a), so
+  whatever moved it beside the companion (the companion's glides
   and refits, its glide into its spot) is where it is placed from. Found with Autosize Bags (next-small-autosize.md §14i): its
   next height glide took it back to where it was dropped.
 
@@ -258,7 +263,7 @@ just get it done with tests" (docs/next-appearance-size.md).
 - **Small panels only:** `panelProto:Scale()` is the Bag Scale for a small panel and 1 for a full one.
   `ApplyGeometry` and `FitSmall` give the frame that scale (`SetScale`); everything in it (art, text,
   item buttons, sparkles, the braid) scales with it.
-- **Units:** a small panel's place (`placeX`, `placeY`, `nextSmallPlaces`) stays on the screen, in
+- **Units:** a small panel's place (`placeX`, `placeY`, `nextSmallCorners`) stays on the screen, in
   UIParent's units; its size (`smallWidth`, `smallHeight`, `nextSmallSizes`, `MinWidth`, `MinHeight`) is
   in its own units, as its content is laid out. On the screen it is its size times its scale. A scaled
   frame's anchor offsets are in its own units (`setOffset`, `GlideTo`, the reset glide divide by the

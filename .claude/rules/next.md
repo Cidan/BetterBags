@@ -148,8 +148,8 @@ description below is the backpack's (the right side); the bank is its mirror ima
 
 **The backpack's header buttons** (from the screen edge, so the first is at the top right): close
 (asked: "an X at the top right of the backpack to close it"; `closeButton`, the bank's, guild bank's and
-vendor's own button and icon, hiding the backpack), settings, sort, Show Blizzard Bags (below), size
-(next-small-mode.md §14).
+vendor's own button and icon, hiding the backpack), settings, its anchor (while small: next-bag-anchor.md §30b; it replaced
+the sort button, the title sorting on a right click), Show Blizzard Bags (below), size (next-small-mode.md §14).
 
 **A right click on the backpack's title sorts it** (asked: "right click the title of the backpack to sort it. same
 function we call on 'sort bags' button in the menu", "along with tooltip update for it"). The title's button
@@ -421,10 +421,10 @@ reusing their code wherever it is not drawing.
 - **Title:** the group shown (Bank, Warbank, a custom group), or the Blizzard bank tab's name.
 - **Header buttons** (from the screen edge): close (`uitools-icon-close`); settings; Show Bank Tabs
   (retail); Deposit Warbound Items (retail with a Warbank: `C_Bank.AutoDepositItemsIntoBank` for
-  the account bank, the menu button's Shift right click); sort, where the client can sort the bank
-  (`C_Container.SortBankBags` or `SortBankBags`): the menu button's right click
-  (`BagMenuButton:Sort`: the Warbank's sort while a Warbank tab shows, else the bank's; with Shift
-  it deposits). Their icons are the theme's glyphs (next-themes.md §11).
+  the account bank, the menu button's Shift right click); its anchor (while small, next-bag-anchor.md §30b), where its sort
+  button was. A right click on its title sorts it, where the client can sort the bank (`CanSort`: `C_Container.SortBankBags`
+  or `SortBankBags`): the menu button's right click (`BagMenuButton:Sort`: the Warbank's sort while a Warbank tab shows,
+  else the bank's; with Shift it deposits), its tooltip saying so. Their icons are the theme's glyphs (next-themes.md §11).
 - **Tabs, in two modes, as the classic bank:**
   - **Groups** (default): the bank's groups, character groups first and then, after a gap, the
     Warbank groups, each with a teal bar and the Warbank glyph; then "+". Left click shows a group:

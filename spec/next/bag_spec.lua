@@ -131,6 +131,8 @@ describe("NextBag", function()
     override(stubs.database, "SetActiveGroup", function(_, _, id) activeGroup = id end)
     override(stubs.database, "GetNextChain", function() return "apart" end)
     override(stubs.database, "GetNextSize", function() return "full" end)
+    -- Its anchor (docs/next-bag-anchor.md): free; a full-size bag shows none.
+    override(stubs.database, "GetNextAnchorState", function() return "free" end)
     override(stubs.database, "GetNextSectionColumns", function() return 1 end)
     override(stubs.database, "GetNextSectionFill", function() return "across" end)
     override(stubs.database, "GetNextSectionSpan", function() return false end)
@@ -1342,16 +1344,19 @@ describe("NextBag", function()
     -- BetterBags' own glyphs (tools/textures/next_icons.py, next-themes.md §3), the same on every
     -- client, filtered trilinearly so they stay smooth drawn smaller than their 64 pixels.
     -- Asked: "an X at the top right of the backpack to close it".
+    -- Its anchor button where its sort button was (docs/next-bag-anchor.md), shown only while small: at full size the bag
+    -- buttons follow the settings button.
     it("draws its header icons with BetterBags' glyphs, the close button at the screen edge", function()
       local bag = opened()
       assert.are.equal("close", NextIconName(bag.closeButton))
       assert.are.equal("settings", NextIconName(bag.settingsButton))
-      assert.are.equal("sort", NextIconName(bag.sortButton))
-      assert.are.equal("TRILINEAR", bag.sortButton.icon._filterMode)
+      assert.are.equal("anchor", NextIconName(bag.anchorButton))
+      assert.are.equal("TRILINEAR", bag.anchorButton.icon._filterMode)
+      assert.is_nil(bag.sortButton)
+      assert.is_false(bag.anchorButton:IsShown())
       assert.are.same({ "TOPRIGHT", bag.body, "TOPRIGHT", -style.PAD, -(style.TITLE_TOP + 3) },
         { bag.closeButton:GetPoint(1) })
       assert.are.same({ "TOPRIGHT", bag.closeButton, "TOPLEFT", -8, 0 }, { bag.settingsButton:GetPoint(1) })
-      assert.are.same({ "TOPRIGHT", bag.settingsButton, "TOPLEFT", -8, 0 }, { bag.sortButton:GetPoint(1) })
     end)
 
     it("closes from its close button", function()
@@ -1368,7 +1373,7 @@ describe("NextBag", function()
       previousView = nil
       local bag = opened()
       assert.are.equal("bags", NextIconName(bag.bagsButton))
-      assert.are.same({ "TOPRIGHT", bag.sortButton, "TOPLEFT", -8, 0 }, { bag.bagsButton:GetPoint(1) })
+      assert.are.same({ "TOPRIGHT", bag.settingsButton, "TOPLEFT", -8, 0 }, { bag.bagsButton:GetPoint(1) })
       assert.is_nil(bag.classicButton, "the way back to the classic bags is in the settings")
       bag.bagsButton:GetScript("OnEnter")(bag.bagsButton)
       assert.are.equal("Show Blizzard Bags", GameTooltip:GetText())
@@ -1385,17 +1390,15 @@ describe("NextBag", function()
       assert.are.same({ 1, 2, 0 }, ids, "the groups again")
     end)
 
-    it("sorts the backpack and opens the settings from its header", function()
+    it("opens the settings from its header", function()
       local bag = opened()
-      bag.sortButton:GetScript("OnClick")(bag.sortButton, "LeftButton")
       bag.settingsButton:GetScript("OnClick")(bag.settingsButton, "LeftButton")
-      assert.are.equal(1, #sentNamed("bags/SortBackpack"))
       assert.are.equal(1, #sentNamed("config/Open"))
     end)
 
     -- Asked: "right click the title of the backpack to sort it. same function we call on 'sort bags' button in the
-    -- menu", with its tooltip saying so.
-    it("sorts the backpack from a right click on its title, as its sort button does, and says so", function()
+    -- menu", with its tooltip saying so; then its sort button gave its place to its anchor button (docs/next-bag-anchor.md).
+    it("sorts the backpack from a right click on its title, and says so", function()
       local bag = opened()
       local chained, sounds = 0, {}
       override(addon:GetModule("NextChain"), "Click", function() chained = chained + 1 return "alone" end)

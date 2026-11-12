@@ -143,7 +143,8 @@ describe("BetterBags Next's shipped themes", function()
   it("names a glyph BetterBags ships for every header button in Default", function()
     local theme = sonataNext:Resolve("Default")
     local icons = theme.Header.Buttons.Icons
-    local keys = { "settingsButton", "closeButton", "sortButton", "bagsButton", "sizeButtonFull",
+    local keys = { "settingsButton", "closeButton", "anchorButtonFree", "anchorButtonShown", "anchorButtonLocked",
+      "bagsButton", "sizeButtonFull",
       "sizeButtonSmall", "bankTabsButton", "depositButton", "depositGoldButton", "withdrawGoldButton",
       "filterButton", "sellJunkButton", "repairAllButton", "guildRepairButton" }
     local files = {}
@@ -331,7 +332,7 @@ describe("BetterBags Next's shipped themes", function()
       local icons = B.Icons
       assert.are.equal(GW .. "uistuff\\window-close-button-normal.png", art(t, icons.closeButton))
       assert.are.equal(GW .. "uistuff\\window-close-button-hover.png", art(t, icons.closeButton.Highlight))
-      -- The original's actions: Show Bags, Sort, Settings (sonata/themes/gw2.lua).
+      -- The original's actions: Show Bags, Settings (sonata/themes/gw2.lua).
       assert.are.equal(GW .. "icons\\bagmicrobutton-up.png", art(t, icons.bagsButton))
       assert.are.equal(GW .. "icons\\bagmicrobutton-down.png", art(t, icons.bagsButton.Highlight))
       -- Asked: one highlight for every button, as Show Blizzard Bags has: art over the icon (GW2_UI's -down art, or
@@ -342,7 +343,11 @@ describe("BetterBags Next's shipped themes", function()
         end
       end
       assert.are.equal("White", B.ArtHoverColor)
-      assert.are.equal(GW .. "icons\\microicons\\collectionsmicrobutton-up.png", art(t, icons.sortButton))
+      -- GW2_UI draws no anchor: BetterBags' glyphs (docs/next-bag-anchor.md), in the theme's glyph color.
+      local glyphs = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\"
+      for key, name in pairs({ anchorButtonFree = "anchor", anchorButtonShown = "anchorshown", anchorButtonLocked = "lock" }) do
+        assert.are.same({ glyphs .. name .. ".png", true }, { art(t, icons[key]), icons[key].Glyph ~= false }, key)
+      end
       assert.are.equal(GW .. "icons\\microicons\\questlogmicrobutton-up.png", art(t, icons.settingsButton))
       -- Asked: GW2_UI's size art (its only, 32 x 32) drew blurry; BetterBags' own glyphs instead, an underscore and a
       -- box, in the theme's glyph color.
@@ -872,7 +877,8 @@ describe("BetterBags Next's shipped themes", function()
 
     it("draws every glyph by hand", function()
       local theme = t()
-      for _, name in ipairs({ "IconSettings", "IconClose", "IconSort", "IconBags", "IconSmall", "IconFull", "IconBankTabs",
+      for _, name in ipairs({ "IconSettings", "IconClose", "IconAnchor", "IconAnchorShown", "IconLock", "IconBags", "IconSmall",
+        "IconFull", "IconBankTabs",
         "IconDeposit", "IconDepositGold", "IconWithdrawGold", "IconFilter", "IconSellJunk", "IconRepair",
         "IconGuildRepair", "IconChevron", "IconBack", "IconCheck", "IconSearch", "IconPlus" }) do
         assert.is_true(theme.Textures[name]:find("papercraft", 1, true) ~= nil, name)
@@ -1173,7 +1179,8 @@ describe("BetterBags Next's shipped themes", function()
           assert.are.equal("\137PNG\r\n\26\n", data:sub(1, 8), name .. ": " .. file)
         end
       end
-      assert.are.equal(28, count)
+      -- Its sort block gave way to the anchor button's three (docs/next-bag-anchor.md).
+      assert.are.equal(30, count)
     end)
 
     -- Asked: "the bags obviously need the star trek beam down, and beam up animation for appearing and closing".

@@ -327,7 +327,8 @@ def section_bar():
 # glyph cut in dark navy at its right end (20 across, its middle 14 in from the right). Its glyph is the header icon's
 # own (textures/next/icons), resampled.
 BLOCKS = {
-    "settings": PEACH, "sort": LILAC, "bags": SKY, "small": ORANGE, "full": ORANGE, "banktabs": SALMON,
+    "settings": PEACH, "anchor": LILAC, "anchorshown": SKY, "lock": ORANGE, "bags": SKY, "small": ORANGE, "full": ORANGE,
+    "banktabs": SALMON,
     "deposit": BLUE, "depositgold": GOLD, "withdrawgold": GOLD, "filter": LILAC, "selljunk": SALMON, "repair": SKY,
     "guildrepair": BLUE,
 }

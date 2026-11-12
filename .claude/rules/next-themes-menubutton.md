@@ -38,8 +38,10 @@ should have their portrait for the bag button, not the bag texture" (docs/next-p
   original menu too) at the end. Each entry is its button's `label` (else its `tooltip`), checked for a toggle
   (`checked`), disabled as its button is (`IsEnabled`), with its tooltip (`menuTooltip`, else its `tooltip` when that is
   not its name), read as the menu opens (the library calls back on entering an entry only on retail); a click runs its
-  `onClick`. Each panel's buttons say so (`NextHeaderButton`): the backpack's Sort Bags, Show Blizzard Bags and Small Bags
-  (checked), the bank's Show Bank Tabs (checked), Deposit Warbank Items and Sort Bank, the vendor's Filter, Sell Junk,
+  `onClick`. Each panel's buttons say so (`NextHeaderButton`): the backpack's anchor (while small, named for what a click
+  does next: Show Bag Anchor, Lock Bag, Unlock Bag; next-bag-anchor.md §30b; it replaced Sort Bags, its title sorting on a
+  right click), Show Blizzard Bags and Small Bags (checked), the bank's Show Bank Tabs (checked), Deposit Warbank Items and its
+  anchor (it replaced Sort Bank), the vendor's Filter, Sell Junk,
   Repair All and Repair With Guild Funds (their costs: `RepairLines`, shared with the header's tooltips), the guild bank's
   Deposit Gold and Withdraw Gold (`WithdrawLines`), Open Options Screen last on each. The vendor's filter opens from the
   bag button while the filter button is in the menu (`OpenFilter`).

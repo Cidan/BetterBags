@@ -119,18 +119,39 @@ def gear():
 def close():
     return union(line(4.3, 4.3, 15.7, 15.7), line(15.7, 4.3, 4.3, 15.7))
 
-def sort():
-    # A broom, as Blizzard's sort button (bags-button-autosort), with a sparkle.
-    ox, oy = 16.6, 3.4
-    ux, uy = -1 / math.sqrt(2), 1 / math.sqrt(2)
-    vx, vy = 1 / math.sqrt(2), 1 / math.sqrt(2)
-    def p(u, v):
-        return (ox + ux * u + vx * v, oy + uy * u + vy * v)
-    handle = line(*p(0, 0), *p(6.2, 0))
-    head = stroke([p(7.4, -2.1), p(7.4, 2.1), p(15.4, 4.4), p(15.4, -4.4)], True)
-    bristle = stroke([p(10.8, 0), p(15.4, 0)])
-    star = fill([(4.8, 2.2), (5.5, 4.1), (7.4, 4.8), (5.5, 5.5), (4.8, 7.4), (4.1, 5.5), (2.2, 4.8), (4.1, 4.1)])
-    return union(handle, head, bristle, star)
+def anchorShape(cx=10.0, cy=10.0, k=1.0):
+    # A ship's anchor, centered on cx, cy and k of its size: a ring, the shank, the stock across it, and the arms curving up
+    # to their flukes.
+    def p(x, y):
+        return (cx + (x - 10.0) * k, cy + (y - 10.0) * k)
+    w = S * min(1.0, k + 0.2)
+    ring_ = (lambda x, y: abs(math.hypot(x - p(10, 3.4)[0], y - p(10, 3.4)[1]) - 1.7 * k) - w / 2)
+    shank = line(*p(10, 5.1), *p(10, 17.2), w)
+    stock = line(*p(6.2, 7.6), *p(13.8, 7.6), w)
+    arms = stroke([p(*q) for q in arc_points(10, 11.2, 6.0, 20, 160, 20)], w=w)
+    a = math.radians(20)
+    tx, ty = math.sin(a), -math.cos(a)
+    right = chevron(*p(10 + 6.0 * math.cos(a), 11.2 + 6.0 * math.sin(a)), tx, ty, 2.2 * k)
+    left = chevron(*p(10 - 6.0 * math.cos(a), 11.2 + 6.0 * math.sin(a)), -tx, ty, 2.2 * k)
+    return union(ring_, shank, stock, arms, right, left)
+
+def anchorFree():
+    # The anchor button, free: its anchor (docs/next-bag-anchor.md).
+    return anchorShape()
+
+def anchorShown():
+    # The anchor button, its anchor shown: the anchor inside the corners of the square it is placed by.
+    corners = []
+    for (x, y, dx, dy) in ((2.2, 2.2, 1, 1), (17.8, 2.2, -1, 1), (2.2, 17.8, 1, -1), (17.8, 17.8, -1, -1)):
+        corners.append(stroke([(x, y + dy * 4.0), (x, y), (x + dx * 4.0, y)]))
+    return union(anchorShape(10, 10.2, 0.66), *corners)
+
+def lock():
+    # The anchor button, locked: a padlock, its shackle over its body, a keyhole in it.
+    shackle = stroke([(6.4, 9.8)] + arc_points(10, 7.2, 3.6, 180, 360, 16) + [(13.6, 9.8)])
+    body = stroke([(4.2, 9.8), (15.8, 9.8), (15.8, 17.6), (4.2, 17.6)], True)
+    keyhole = union(lambda x, y: math.hypot(x - 10, y - 12.9) - 1.1, line(10, 13.4, 10, 15.6, 1.2))
+    return union(shackle, body, keyhole)
 
 def bag():
     # A backpack, as Blizzard's backpack button: its body, its handle, its pocket.
@@ -233,7 +254,8 @@ def circle():
     return lambda x, y: math.hypot(x - 10, y - 10) - (10 - PX)
 
 GLYPHS = {
-    "settings": gear, "close": close, "sort": sort, "bags": bag, "small": shrink, "full": expand,
+    "settings": gear, "close": close, "anchor": anchorFree, "anchorshown": anchorShown, "lock": lock, "bags": bag,
+    "small": shrink, "full": expand,
     "banktabs": tabs, "deposit": deposit, "depositgold": depositGold, "withdrawgold": withdrawGold,
     "filter": filt, "selljunk": tag, "repair": repair, "guildrepair": guildRepair,
     "chevron": chevronDown, "back": chevronLeft, "check": check, "search": magnifier, "plus": plus,

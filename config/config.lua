@@ -41,7 +41,7 @@ function config:RegisterSettings()
   end)
 
   LibStub('AceConsole-3.0'):RegisterChatCommand("bbanchor", function()
-    -- A BetterBags Next bag has no anchor.
+    -- The classic bags' anchors: a BetterBags Next bag's is its header's anchor button (docs/next-bag-anchor.md).
     if addon.Bags.Backpack.anchor then
       addon.Bags.Backpack.anchor:Activate()
       addon.Bags.Backpack.anchor:Show()

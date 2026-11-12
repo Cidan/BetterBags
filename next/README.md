@@ -40,8 +40,19 @@ tabs, the title and its ribbon, the sparkles, the header buttons and the footer.
 prototype with `NextPanel:Extend(proto, name)` and overrides what differs: `GetHeaderButtons`,
 `CreateMoney`, `RefreshTabs`, `OnTabClicked`, `OnTabDragged`, `GetCurrentTabID`, `OnShowing`,
 `OnSlidOut`, `WatchKind`, `Refresh` and `Sort` (and `watchesCooldowns`), and what a right click on
-its title does with `OnTitleRightClick` and `TitleRightClickHint` (the backpack sorts; the others do
+its title does with `OnTitleRightClick` and `TitleRightClickHint` (the backpack and the bank sort; the others do
 nothing).
+
+## A small panel's place and its anchor
+
+A small panel holds a corner (`HeldCorner`, saved as `nextSmallCorners`: its side and its edge), so it grows away from it:
+dragged by its title, the bottom left or bottom right, by the half of the screen it was placed on; dragged by its anchor
+square, any of the four, by the square's quadrant (up from a bottom corner, down from a top one). `SmallPlace` works its top
+left out from the corner and its size; chained bags line up by the edge their anchor holds. The backpack's and the bank's
+anchor button (where their sort
+button was; their titles sort on a right click) cycles free, shown (the classic bags' blue square, `Anchor:CreateSquare`, on
+the corner: dragged, the bag follows it) and locked (it neither moves nor resizes, nor does the bag chained beside it,
+`Held`). The rules are in `.claude/rules/next-bag-anchor.md` §30.
 
 ## How it takes over
 
@@ -107,8 +118,8 @@ With **Autosize Bags** on (the default) a small panel is as tall as what it show
 Space as last laid out (the scroll box's `FitHeight`, kept by the render root) and its footer, so nothing scrolls; never
 shorter than its tab rail nor past the screen (`NextPanel:RestingHeight`, `FittedHeight`). It takes that height as it opens
 and glides to it a frame after anything it shows changes (`FollowHeight`, which waits as `FollowNames` does, and glides with
-the grips' snap, `snapTo`, its width as it is). Its top stays where it was left, or centered at its default place, and its
-bottom stays on the screen (`clampPlace`, saving nothing). Its grips size it both ways, and as they let go its height bounces
+the grips' snap, `snapTo`, its width as it is). Its bottom stays where it holds it, and its top stays on the screen
+(`clampPlace`, saving nothing: it goes back up as it shrinks). Its grips size it both ways, and as they let go its height bounces
 back to what it shows, its width saved alone. It keeps as much room below its last section, down to its footer's line, as
 between its sections.
 Off, it is the height the player gave it with its grips, or a share of the screen. The rules are in

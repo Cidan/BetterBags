@@ -395,6 +395,10 @@ Frame anchoring and positioning system.
 - Draggable anchors
 - Position persistence
 
+`Anchor:CreateSquare(name, label)` makes the anchor as it shows: a blue square 72 across, its label at its top and where it
+is at its bottom, over everything. The classic bags' anchor (`Anchor:New`) and BetterBags Next's (`.claude/rules/next-bag-anchor.md`
+§30c) both use it, so they look the same; each wires its own dragging and saving.
+
 ### Money Frame (`money.lua`)
 
 Gold/silver/copper display.

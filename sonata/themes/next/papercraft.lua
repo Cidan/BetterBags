@@ -191,7 +191,9 @@ sonataNext:RegisterTheme({
     -- The glyphs, drawn by hand: what every button and control draws them with.
     IconSettings = TEXTURES .. "icon_settings.png",
     IconClose = TEXTURES .. "icon_close.png",
-    IconSort = TEXTURES .. "icon_sort.png",
+    IconAnchor = TEXTURES .. "icon_anchor.png",
+    IconAnchorShown = TEXTURES .. "icon_anchorshown.png",
+    IconLock = TEXTURES .. "icon_lock.png",
     IconBags = TEXTURES .. "icon_bags.png",
     IconSmall = TEXTURES .. "icon_small.png",
     IconFull = TEXTURES .. "icon_full.png",

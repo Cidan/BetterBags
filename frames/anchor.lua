@@ -138,16 +138,21 @@ function anchorFrame:Load()
   self.anchorPoint = quadrant
 end
 
----@param kind BagKind
----@param anchorFor Frame
+---@class (exact) AnchorSquare: Frame
+---@field label FontString
+---@field positionLabel FontString
+
+-- CreateSquare makes a bag's anchor as it shows, the one look of both designs' anchors (the classic bags' and BetterBags
+-- Next's, docs/next-bag-anchor.md): a square 72 across on UIParent, Blizzard's tooltip background in blue with a black
+-- straight edge, its label at its top and where it is at its bottom, over everything (FULLSCREEN_DIALOG), movable by a
+-- left-button drag, hidden. What dragging it does is its owner's.
+---@param name? string
 ---@param label string
----@return AnchorFrame
-function anchor:New(kind, anchorFor, label)
-  local af = setmetatable({}, { __index = anchorFrame })
-  af.frame = CreateFrame('Frame', anchorFor:GetName() .. "Anchor", UIParent, "BackdropTemplate") --[[@as Frame]]
-  af.frame:SetSize(72, 72)
-  af.frame:SetPoint('CENTER', UIParent, 'CENTER')
-  af.frame:SetBackdrop({
+---@return AnchorSquare
+function anchor:CreateSquare(name, label)
+  local frame = CreateFrame('Frame', name, UIParent, "BackdropTemplate") --[[@as AnchorSquare]]
+  frame:SetSize(72, 72)
+  frame:SetBackdrop({
     bgFile = "Interface/Tooltips/UI-Tooltip-Background",
     -- Pick a straight edge.
     edgeFile = "Interface/Tooltips/UI-Tooltip-Background",
@@ -161,7 +166,39 @@ function anchor:New(kind, anchorFor, label)
       bottom = 1
     }
   })
-  af.frame:RegisterForDrag("LeftButton")
+  frame:RegisterForDrag("LeftButton")
+  frame:SetBackdropColor(48 / 255, 168 / 255, 255 / 255, 1)
+  frame:SetBackdropBorderColor(0, 0, 0, 1)
+  frame:SetMovable(true)
+
+  frame.label = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  frame.label:SetTextColor(0.9, 0.9, 0.9)
+  frame.label:SetPoint("TOP", frame, "TOP", 0, -4)
+  frame.label:SetWidth(frame:GetWidth())
+  frame.label:SetText(label)
+
+  frame.positionLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  frame.positionLabel:SetTextColor(0.9, 0.9, 0.9)
+  frame.positionLabel:SetPoint("BOTTOM", frame, "BOTTOM", 0, 4)
+  frame.positionLabel:SetWidth(frame:GetWidth())
+  frame.positionLabel:SetText("")
+
+  frame:SetFrameStrata("FULLSCREEN_DIALOG")
+  frame:Hide()
+  return frame
+end
+
+---@param kind BagKind
+---@param anchorFor Frame
+---@param label string
+---@return AnchorFrame
+function anchor:New(kind, anchorFor, label)
+  local af = setmetatable({}, { __index = anchorFrame })
+  local square = self:CreateSquare(anchorFor:GetName() .. "Anchor", label)
+  af.frame = square
+  af.label = square.label
+  af.positionLabel = square.positionLabel
+  af.frame:SetPoint('CENTER', UIParent, 'CENTER')
   af.frame:SetScript("OnDragStart", function()
     af:OnDragStart()
   end)
@@ -179,25 +216,7 @@ function anchor:New(kind, anchorFor, label)
     end
   end)
 
-  af.frame:SetBackdropColor(48 / 255, 168 / 255, 255 / 255, 1)
-  af.frame:SetBackdropBorderColor(0, 0, 0, 1)
-  af.frame:SetMovable(true)
   af.frame:EnableMouse(false)
-
-  af.label = af.frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-  af.label:SetTextColor(0.9, 0.9, 0.9)
-  af.label:SetPoint("TOP", af.frame, "TOP", 0, -4)
-  af.label:SetWidth(af.frame:GetWidth())
-  af.label:SetText(label)
-
-  af.positionLabel = af.frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-  af.positionLabel:SetTextColor(0.9, 0.9, 0.9)
-  af.positionLabel:SetPoint("BOTTOM", af.frame, "BOTTOM", 0, 4)
-  af.positionLabel:SetWidth(af.frame:GetWidth())
-  af.positionLabel:SetText("")
-
-  af.frame:SetFrameStrata("FULLSCREEN_DIALOG")
-  af.frame:Hide()
 
   af.anchorFor = anchorFor
   af.kind = kind
