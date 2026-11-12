@@ -285,6 +285,9 @@ to a multiple of 4, which is 4 for an empty keyring. `IncludeBagInFreeSpace` now
 keyring out of the backpack's free space, so neither shows. Coverage: `spec/items_spec.lua` ("Free
 slots shown one by one": "leaves the keyring out").
 
+**Show Bags shows only its open slots, last.** The read takes only the keyring's `GetKeyRingSize()` slots, so Show Bags
+no longer draws the padlocked ones, and its section comes after every bag's: keyring.md.
+
 A Camelot bank that renders blank usually means the character owns no tab yet (the Purchase
 Bank button, §10, shows then). If it renders blank with tabs that *do* have slots, look at the
 read after the tab arrived (there is no bank read on `BANK_TABS_CHANGED`), **not** at a missing

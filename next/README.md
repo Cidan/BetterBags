@@ -16,7 +16,7 @@ next/
 ├── style.lua     # NextStyle: sizes, palette, timings and fonts, in one place
 ├── tween.lua     # NextTween: one tween per key on a single OnUpdate (slide, fades, glides)
 ├── sparkles.lua  # NextSparkles: a pooled particle emitter of star sprites
-├── tabs.lua      # NextTabs: the tab rail down a panel's inner edge
+├── tabs.lua      # NextTabs: the tab rail down a panel's inner edge (a tab's icon against the body, its name past it)
 ├── content.lua   # NextContent: the canvas: sections in one column, laid out through Motion
 ├── drag.lua      # NextDrag: moving sections by their headers: reorder, to a tab, to the other bag
 ├── chain.lua     # NextChain: the backpack and its companion apart on opposite edges, or chained on one

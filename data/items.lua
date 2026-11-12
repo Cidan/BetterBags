@@ -2793,6 +2793,11 @@ function items:Harvest(kind, bagList, includeEquipment, previousItems, rereadEqu
   -- 1. Sweep physical container bags
   for bagid in pairs(bagList) do
     local size = C_Container.GetContainerNumSlots(bagid)
+    -- The keyring (Classic Era, WoW: Forever) reports about 32 slots, but the game opens only GetKeyRingSize()'s
+    -- (every key is in one of them); Blizzard's bags padlock the rest (ContainerFrame_GetContainerNumSlots).
+    if bagid == Enum.BagIndex.Keyring and const.BACKPACK_BAGS[bagid] ~= nil then
+      size = GetKeyRingSize()
+    end
     if size and size > 0 then
       for slotid = 1, size do
         local slotkey = self:GetSlotKeyFromBagAndSlot(bagid, slotid)

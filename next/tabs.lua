@@ -239,11 +239,13 @@ function railProto:styleTab(tab)
   self:placeContent(tab)
 end
 
--- placeContent puts a tab's name and icon on whole pixels (docs/next-pixel-perfect.md): the name the padding
--- in from its edge side, the icon after the name's text (its width rounded up), each by its corner,
--- centered on the tab's height by its font's height and its own. Anchored by their middles they would
--- sit between two pixels on a tab an odd number of pixels tall. Its name's width changes with its text
--- and its state's font (paint), so it is placed again then.
+-- placeContent puts a tab's icon and name on whole pixels (docs/next-pixel-perfect.md), each by its corner on
+-- the body's side, centered on the tab's height by its own height (the name by its font's): the icon the
+-- padding in from that side, the name past the icon and its gap (the padding in, with no icon). Next to the
+-- body, every icon down the rail is in one column; after the name it moved out with the name's width (asked:
+-- "the icon for shown bag tabs, should be on the right of the text (so they align top to bottom)"). Anchored by
+-- their middles they would sit between two pixels on a tab an odd number of pixels tall. Its name's width
+-- changes with its text and its state's font (paint), so it is placed again then.
 ---@private
 ---@param tab NextTab
 function railProto:placeContent(tab)
@@ -260,15 +262,18 @@ function railProto:placeContent(tab)
   local _, fontHeight = text:GetFont()
   local textTop = -pixel:Floor(button, (height - (fontHeight or 0)) / 2)
   local iconTop = -pixel:Floor(button, (height - icon:GetHeight()) / 2)
-  local iconX = pad + pixel:Ceil(button, text:GetStringWidth()) + gap
+  local textX = pad
+  if icon:IsShown() then
+    textX = pad + pixel:Length(button, style.TAB_ICON) + gap
+  end
   text:ClearAllPoints()
   icon:ClearAllPoints()
   if self.side == "LEFT" then
-    pixel:Point(text, "TOPLEFT", button, "TOPLEFT", pad, textTop)
-    icon:SetPoint("TOPLEFT", button, "TOPLEFT", iconX, iconTop)
+    icon:SetPoint("TOPLEFT", button, "TOPLEFT", pad, iconTop)
+    pixel:Point(text, "TOPLEFT", button, "TOPLEFT", textX, textTop)
   else
-    pixel:Point(text, "TOPRIGHT", button, "TOPRIGHT", -pad, textTop)
-    icon:SetPoint("TOPRIGHT", button, "TOPRIGHT", -iconX, iconTop)
+    icon:SetPoint("TOPRIGHT", button, "TOPRIGHT", -pad, iconTop)
+    pixel:Point(text, "TOPRIGHT", button, "TOPRIGHT", -textX, textTop)
   end
 end
 
