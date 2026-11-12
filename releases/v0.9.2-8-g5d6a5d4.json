@@ -1,0 +1,17 @@
+{
+  "id": 1794471233,
+  "version": "v0.9.2-8-g5d6a5d4",
+  "channel": "alpha",
+  "date": "2026-11-12",
+  "from": "016406ec29ef0888767107718c076d54ec448903",
+  "to": "5d6a5d482eaf728596590591c352f1136b1fc5c4",
+  "headline": "This build fixes an issue where the vendor junk coin icon did not reliably update on items when interacting with vendors.",
+  "entries": [
+    {
+      "category": "Fixed",
+      "title": "Reliable vendor junk coin icon display",
+      "details": "Junk items now consistently show Blizzard's gold coin icon while interacting with a vendor, and properly hide it when the vendor window is closed without needing to move the items.",
+      "clients": []
+    }
+  ]
+}
