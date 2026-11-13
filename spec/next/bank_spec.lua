@@ -713,12 +713,19 @@ describe("NextBank", function()
       assert.are.equal(2, db.active)
     end)
 
-    it("lists the groups again when they change, and shows the default bank group when its group goes", function()
+    -- As Groups:DeleteGroup sends it (#1265): the database has already moved to the default bank group,
+    -- and the message says whether the deleted group was the one shown.
+    it("lists the groups again when they change, and shows the default bank group, drawn, when its group goes", function()
       local bank = opened()
       bank:SwitchToGroup(ctx(), 4)
       allGroups[4] = nil
-      messages["groups/Deleted"](ctx(), 4, nil, BANK)
+      db.active = 2
+      messages["groups/Deleted"](ctx(), 4, "Herbs", BANK, true)
       assert.are.equal(2, db.active)
+      assert.are.equal(2, bank.tabs.selected)
+      assert.are.equal("Cloth", bank.content.order[1].name, "the default bank group's items")
+      assert.are.equal("Bank", bank.title:GetText())
+      assert.are.equal(CHAR, calls.bankTypes[#calls.bankTypes])
       assert.are.same({ 2, 3, 5, 0 }, tabIDs(bank))
       allGroups[6] = { id = 6, name = "Leather", bankType = CHAR }
       messages["groups/Created"](ctx(), { kind = BANK })
@@ -727,6 +734,18 @@ describe("NextBank", function()
       allGroups[6].name = "Hides"
       messages["groups/Changed"](ctx(), 6, nil, nil, BANK)
       assert.are.equal("Hides", tabOf(bank, 6).text:GetText())
+    end)
+
+    it("keeps the group it shows when another group goes", function()
+      local bank = opened()
+      bank:SwitchToGroup(ctx(), 5)
+      allGroups[4] = nil
+      messages["groups/Deleted"](ctx(), 4, "Herbs", BANK, false)
+      assert.are.equal(5, db.active)
+      assert.are.equal(5, bank.tabs.selected)
+      assert.are.equal("Gems", bank.content.order[1].name)
+      assert.are.equal("Gems", bank.title:GetText())
+      assert.are.same({ 2, 3, 5, 0 }, tabIDs(bank))
     end)
 
     -- Classic has no Enum.BankType: no group is the Warbank's there.

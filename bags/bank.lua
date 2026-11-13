@@ -350,10 +350,9 @@ function bank.proto:RegisterEvents()
 		end
 	end)
 
-	events:RegisterMessage("groups/Deleted", function(ctx, groupID, _, kind)
+	events:RegisterMessage("groups/Deleted", function(ctx, _, _, kind, wasActive)
 		if kind ~= const.BAG_KIND.BANK then return end
-		local activeGroup = database:GetActiveGroup(const.BAG_KIND.BANK)
-		if activeGroup == groupID then
+		if wasActive then
 			local defaultBankGroup = groups:GetDefaultBankGroup()
 			if defaultBankGroup then
 				behavior:SwitchToGroup(ctx, defaultBankGroup.id)
@@ -546,6 +545,9 @@ function bank.proto:ShowDeleteGroupConfirm(groupID)
 		function()
 			local ctx = context:New("DeleteGroup")
 			groups:DeleteGroup(ctx, const.BAG_KIND.BANK, groupID)
+			-- Its categories are the default group's now, and which tab a category is on is worked
+			-- out when the bank is recalculated.
+			events:SendMessage(ctx, 'bags/Rederive', { backpack = false, bank = true, resetLayout = true })
 		end,
 		function() end
 	)

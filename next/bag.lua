@@ -369,11 +369,11 @@ function bagProto:WatchKind()
       self:RefreshTabs()
     end
   end)
-  events:RegisterMessage("groups/Deleted", function(ctx, groupID, _, kind)
+  events:RegisterMessage("groups/Deleted", function(ctx, _, _, kind, wasActive)
     if kind ~= self.kind then
       return
     end
-    if database:GetActiveGroup(self.kind) == groupID then
+    if wasActive then
       self:SwitchToGroup(ctx, 1)
     end
     self:RefreshTabs()

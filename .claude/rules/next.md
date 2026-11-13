@@ -270,7 +270,9 @@ section dragged out of a panel returns to the panel's strata (next-drag.md §7).
   sticking out over the feather like bookmarks. The selected one is brighter, with a gold bar that
   glides to it; a hovered one slides out a little. Left click switches group (the same data, drawn
   for that tab), right click opens the group menu (rename, delete) and "+" creates a group, both
-  through the classic backpack behavior's dialogs. Hidden when groups are off.
+  through the classic backpack behavior's dialogs. Hidden when groups are off. Deleting the group shown
+  switches to Backpack, drawn; the delete's confirmation recalculates the bag so its categories are on
+  Backpack's tab (groups.md §1; the bank does the same with its default group).
   - **A tab's icon** (`NextTabEntry.icon` or `atlas`: the bag slots in Show Blizzard Bags, the bank's tabs, the
     Warbank's) is against the body, the padding in from the tab's body side, and its name past it and the icon gap
     (`placeContent`): on the backpack's rail the icon is right of the name, on the bank's and the guild bank's

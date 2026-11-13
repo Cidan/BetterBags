@@ -46,7 +46,8 @@ function groups:CreateGroup(ctx, kind, name, bankType)
   return group
 end
 
--- DeleteGroup deletes a group and moves its categories back to Backpack.
+-- DeleteGroup deletes a group and moves its categories back to Backpack. groups/Deleted says
+-- whether the group was the one shown: the database has already made the default group active.
 ---@param ctx Context
 ---@param kind BagKind
 ---@param groupID number
@@ -64,9 +65,10 @@ function groups:DeleteGroup(ctx, kind, groupID)
   end
 
   local groupName = group.name
+  local wasActive = database:GetActiveGroup(kind) == groupID
   database:DeleteGroup(kind, groupID)
   debug:Log("groups", "Deleted group: %s (ID: %d)", groupName, groupID)
-  events:SendMessage(ctx, 'groups/Deleted', groupID, groupName, kind)
+  events:SendMessage(ctx, 'groups/Deleted', groupID, groupName, kind, wasActive)
 end
 
 -- RenameGroup renames a group.

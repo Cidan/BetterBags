@@ -176,11 +176,9 @@ function backpack.proto:RegisterEvents()
 		end
 	end)
 
-	events:RegisterMessage("groups/Deleted", function(ctx, groupID, _, kind)
+	events:RegisterMessage("groups/Deleted", function(ctx, _, _, kind, wasActive)
 		if kind ~= const.BAG_KIND.BACKPACK then return end
-		-- If the deleted group was active, switch to Backpack
-		local activeGroup = database:GetActiveGroup(const.BAG_KIND.BACKPACK)
-		if activeGroup == groupID then
+		if wasActive then
 			behavior:SwitchToGroup(ctx, 1) -- Switch to Backpack
 		end
 		behavior:GenerateGroupTabs(ctx)
@@ -273,9 +271,13 @@ function backpack.proto:GenerateGroupTabs(ctx)
 	-- Move "+" tab to end
 	self.bag.tabs:MoveToEnd(L:G("New Group"))
 
-	-- Ensure tab 1 (Backpack) is selected with proper highlight
-	self.bag.tabs:SetTabByID(ctx, 1)
-	database:SetActiveGroup(const.BAG_KIND.BACKPACK, 1)
+	-- Select the group shown, or Backpack when it is gone
+	local activeGroup = database:GetActiveGroup(const.BAG_KIND.BACKPACK)
+	if not allGroups[activeGroup] then
+		activeGroup = 1
+		database:SetActiveGroup(const.BAG_KIND.BACKPACK, activeGroup)
+	end
+	self.bag.tabs:SetTabByID(ctx, activeGroup)
 end
 
 -- OnTabClicked handles tab click events.
@@ -486,6 +488,9 @@ function backpack.proto:ShowDeleteGroupConfirm(groupID)
 			OnAccept = function(f)
 				local ctx = context:New("DeleteGroup")
 				groups:DeleteGroup(ctx, const.BAG_KIND.BACKPACK, f.data.groupID)
+				-- Its categories are Backpack's now, and which tab a category is on is worked out
+				-- when the bag is recalculated.
+				events:SendMessage(ctx, 'bags/Rederive', { backpack = true, bank = false, resetLayout = true })
 			end,
 			timeout = 0,
 			whileDead = true,

@@ -300,6 +300,19 @@ only when acting on it (`StillThere`).
 - **Left alone** (`BlockedReason`): items whose data has not loaded, whose upgrade state is unknown, in
   an equipment set, or still refundable
 
+### Groups (`groups.lua`)
+
+A bag's tabs of categories (`.claude/rules/groups.md`): creating, renaming and deleting groups,
+assigning a category to one, and the group shown. The data is saved by `core/database.lua`; which tab
+each category is on is worked out when a bag is recalculated (`items:Phase10_PartitionIntoTabs`).
+
+#### Messages
+- `groups/Created (ctx, group)`, `groups/Changed (ctx, groupID, name, oldName, kind)`
+- `groups/Deleted (ctx, groupID, groupName, kind, wasActive)`: sent once the database has deleted the
+  group and, if it was shown, made the default group active; `wasActive` says whether it was the one
+  shown, so a bag switches to the default group
+- `groups/CategoryAssigned`, `groups/CategoryRemoved`, `groups/ActiveChanged`
+
 ## Usage Examples
 
 ### Refreshing Bags

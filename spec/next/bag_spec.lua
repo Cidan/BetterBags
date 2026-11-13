@@ -1327,15 +1327,33 @@ describe("NextBag", function()
       assert.are.equal(1, activeGroup)
     end)
 
-    it("lists the groups again when they change, and goes back to Backpack when its group goes", function()
+    -- As Groups:DeleteGroup sends it (#1265): the database has already moved to the Backpack group,
+    -- and the message says whether the deleted group was the one shown.
+    it("lists the groups again when they change, and shows Backpack, drawn, when the group it shows goes", function()
       local bag = opened()
       bag:SwitchToGroup(ctx(), 2)
       allGroups[2] = nil
-      messages["groups/Deleted"](ctx(), 2, nil, BACKPACK)
+      activeGroup = 1
+      messages["groups/Deleted"](ctx(), 2, "Herbs", BACKPACK, true)
       assert.are.equal(1, activeGroup)
+      assert.are.equal(1, bag.tabs.selected)
+      assert.are.equal("Weapons", bag.content.order[1].name, "the Backpack group's items")
       assert.are.equal(2, #bag.tabs.tabs)
       allGroups[3] = { id = 3, name = "Ore" }
       messages["groups/Created"](ctx(), { kind = BACKPACK })
+      assert.are.equal(3, #bag.tabs.tabs)
+    end)
+
+    it("keeps the group it shows when another group goes", function()
+      allGroups[3] = { id = 3, name = "Ore" }
+      slotInfo.tabs[3] = { categories = { { name = "Ore" } }, items = { item("0_9", "Ore") } }
+      local bag = opened()
+      bag:SwitchToGroup(ctx(), 3)
+      allGroups[2] = nil
+      messages["groups/Deleted"](ctx(), 2, "Herbs", BACKPACK, false)
+      assert.are.equal(3, activeGroup)
+      assert.are.equal(3, bag.tabs.selected)
+      assert.are.equal("Ore", bag.content.order[1].name)
       assert.are.equal(3, #bag.tabs.tabs)
     end)
   end)
