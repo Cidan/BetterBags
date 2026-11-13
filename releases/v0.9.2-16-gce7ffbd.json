@@ -1,0 +1,17 @@
+{
+  "id": 1794583242,
+  "version": "v0.9.2-16-gce7ffbd",
+  "channel": "alpha",
+  "date": "2026-11-13",
+  "from": "f1c64182b3649ae0b352a7fafcae8b5bd5a1ac03",
+  "to": "ce7ffbd89ac7f38e1a89ed585a3b7b57033fdd09",
+  "headline": "This build fixes an alignment issue when dragging chained bag windows past the screen edge.",
+  "entries": [
+    {
+      "category": "Fixed",
+      "title": "Chained bag alignment when dragged past screen edges",
+      "details": "Chained bag windows no longer detach or lose alignment from their anchor window when dragged past the edge of the screen with Clamp Bags to Screen disabled.",
+      "clients": []
+    }
+  ]
+}
