@@ -36,15 +36,21 @@ describe("BetterBags Next's settings window on the whole addon", function()
     end
   end
 
-  -- builtEveryTab opens every page and tab the design in use has and returns them, "page > tab".
+  -- builtEveryTab opens every page and tab the design in use has and returns them, "page > tab". The Categories page's
+  -- tabs show for what is chosen: the Blizzard category the backpack shows for its own tab (category-lifecycle.md §11),
+  -- the player's category for the rest.
   local function builtEveryTab(addon)
     local settings = addon:GetModule("NextSettings")
     local pages = addon:GetModule("NextSettingsPages")
+    local editor = addon:GetModule("NextSettingsCategories")
     local built = {}
     for _, page in ipairs(pages:List()) do
       -- Every tab for the bags in use, those shown only once something is chosen included.
       for _, tab in ipairs(page.tabs) do
         if pages:InDesign(tab) then
+          if page.id == "categories" then
+            editor:Show(tab.id == "blizzard" and "Junk" or "Spec Mats")
+          end
           settings:Open(page.id, tab.id)
           assert.are.same({}, handle.errors, page.id .. " > " .. tab.id)
           assert.are.equal(page.id, settings.pageId)
@@ -57,10 +63,20 @@ describe("BetterBags Next's settings window on the whole addon", function()
     return built
   end
 
-  -- A category of the player's, so the Categories page shows its Rule and Added Items tabs too.
+  -- A category of the player's, so the Categories page shows its Rule and Added Items tabs too; and a Blizzard category
+  -- the backpack shows, so it shows its own tab: a poor item the backpack's last read put in Junk, where Blizzard's data
+  -- puts it.
   local function makeCategory(addon)
     addon:GetModule("Categories"):CreateCategory(ctx(addon), { name = "Spec Mats", itemList = { [2589] = true },
       save = true, searchCategory = { query = "type = trade goods" } })
+    local items, const = addon:GetModule("Items"), addon:GetModule("Constants")
+    local junk = { slotkey = "spec_1", kind = const.BAG_KIND.BACKPACK, itemInfo = { itemID = 2590 },
+      containerInfo = { quality = const.ITEM_QUALITY.Poor } }
+    junk.itemInfo.category = "Junk"
+    assert.are.equal("Junk", items:BuiltInCategory(junk))
+    local slotInfo = items.slotInfo[const.BAG_KIND.BACKPACK]
+    slotInfo.itemsBySlotKey["spec_1"] = junk
+    slotInfo.visibleItemsBySlotKey["spec_1"] = junk
   end
 
   -- On the real database: a bag nobody has set anything on.
@@ -100,7 +116,7 @@ describe("BetterBags Next's settings window on the whole addon", function()
     assert.is_nil(addon:GetModule("Config").configFrame, "no classic window")
     assert.are.same({ "general > main", "appearance > theme", "appearance > size", "appearance > animation",
       "itemcolors > main",
-      "categories > settings",
+      "categories > blizzard", "categories > settings",
       "categories > rule", "categories > items", "categories > ignored", "categories > automation",
       "currencies > tracked", "currencies > currencies", "currencies > items", "currencies > display",
       "backpack > layout", "backpack > items", "backpack > categories", "backpack > order", "bank > layout", "bank > items",
@@ -223,8 +239,8 @@ describe("BetterBags Next's settings window on the whole addon", function()
     local settings = addon:GetModule("NextSettings")
     addon:GetModule("Events"):SendMessage(ctx(addon), "config/Open")
     assert.is_true(settings:IsShown())
-    assert.are.same({ "general > main", "appearance > theme", "itemcolors > main", "categories > settings",
-      "categories > rule", "categories > items", "categories > ignored", "categories > automation", "currency > main",
+    assert.are.same({ "general > main", "appearance > theme", "itemcolors > main", "categories > blizzard",
+      "categories > settings", "categories > rule", "categories > items", "categories > ignored", "categories > automation", "currency > main",
       "backpack > layout", "backpack > items", "backpack > categories", "backpack > order", "bank > layout", "bank > items",
       "bank > categories", "bank > order", "profiles > profiles", "profiles > transfer", "quickfind > main" }, builtEveryTab(addon))
     settings:Open("backpack", "layout")

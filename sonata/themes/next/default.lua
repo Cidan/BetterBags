@@ -154,7 +154,8 @@ sonataNext:RegisterTheme({
     TopTabSelected = { Size = 13, Color = "White", Shadow = true },
     -- The settings window (next-settings.md): the brand, the sidebar's headings and pages (under the
     -- pointer, chosen), the version; a page's title and description; a section's title and note; a
-    -- setting's name; text on a page (a paragraph, "nothing found"); a search result's page.
+    -- setting's name; text on a page (a paragraph, "nothing found"); a search result's page; a lead
+    -- paragraph, larger, that a tab is about (a Blizzard category's explanation).
     SettingsBrand = { Size = 20, Color = "White", Shadow = true },
     SettingsNavGroup = { Size = 11, Color = "Gold" },
     SettingsNav = { Size = 13, Color = "Muted" },
@@ -168,6 +169,7 @@ sonataNext:RegisterTheme({
     SettingsLabel = { Size = 13, Color = "Text" },
     SettingsText = { Size = 12, Color = "Muted" },
     SettingsLink = { Size = 12, Color = "Gold" },
+    SettingsLead = { Size = 15, Color = "Text" },
     -- The currencies at the bottom of the backpack and on the tracker dragged out of it (currency.md): a count, one at a
     -- cap, one you have none of; a name (the tracker's list); a gain rising off it and a loss sinking; "+N" (what does
     -- not fit).
@@ -737,6 +739,8 @@ sonataNext:RegisterTheme({
       GroupFont = "SettingsSection", Font = "SettingsLabel", NoteFont = "SettingsSectionNote",
       LabelFont = "SettingsText", TextFont = "SettingsText", SectionFont = "SettingsSection",
       HintFont = "SettingsSectionNote",
+      -- A Blizzard category's tab: its explanation in LeadFont, at most LeadWidth wide.
+      LeadFont = "SettingsLead", LeadWidth = 480,
     },
     -- A bag's categories, on its Order tab: over its Fill, Pad inside; rows RowHeight tall (headings
     -- GroupHeight), Indent in; the light under the pointer; the fonts. A dragged row is lifted as a bag's

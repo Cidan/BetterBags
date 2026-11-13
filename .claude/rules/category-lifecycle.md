@@ -1,9 +1,13 @@
 ---
 paths:
   - "data/categories.lua"
+  - "data/items.lua"
   - "core/database.lua"
+  - "views/views.lua"
+  - "frames/section.lua"
   - "next/settings/categories.lua"
   - "next/settings/bagcategories.lua"
+  - "next/settings/content.lua"
   - "spec/categories_spec.lua"
   - "spec/database_migration_spec.lua"
   - "spec/next/settings/categories_spec.lua"
@@ -281,9 +285,9 @@ it should." docs/next-batch-2.md §8.
   - else a plugin's category: nothing: `"plugin"` (a plugin fills it; adding would make a category of
     yours with its name, hiding the plugin's);
   - else: added to the category's Added Items (`AddPermanentItemToCategory`, which takes it from the
-    category it was in), the category no longer ignoring it (§8): `"added"`. A built-in category's name
-    gets a category of yours with that name, which shows in the same section, as the classic title's
-    Shift drop always made one.
+    category it was in), the category no longer ignoring it (§8): `"added"`. A Blizzard category's name
+    (one no saved category has) is made yours first (`Convert`, §11), so it shows in the same section; the
+    classic title's Shift drop does the same (`sectionFrame:OnTitleClickOrDrop`).
 - **The panel** (`panelProto:FileCursorItem`, `next/panel.lua`): a gear set's section ("Gear: ", no
   category of that name) takes nothing ("Gear sets are made in the Equipment Manager."); a plugin's
   says "A plugin fills X: items can't be added to it."; in both the item stays on the cursor.
@@ -305,7 +309,7 @@ In, asking first, and the bag's footer saying how many items are hidden.
   plugin's in its saved state (`saveState`, restored by `CreateCategory` and `DB:CreateOrUpdateCategory`), as its color is.
 - **API:** `categories:UpdateCategory(ctx, name, { hidden = { [kind] = true|false } })` (the bags named are set, the others
   kept; recalculates the bags, with `categories/Changed`) and `categories:HiddenIn(name, kind)` (a group by's sections as
-  their category; a built-in category is never hidden).
+  their category; a built-in category is never hidden, and neither is a category in a bag that does not use it: §11).
 - **Different from Used In:** off, a category does not apply in that bag and its items fall through to what they would be
   otherwise; hidden, they are its items and nothing shows them. A category not used in a bag has nothing to hide there, so
   its switch is off (`SetEnabled`).
@@ -324,3 +328,92 @@ In, asking first, and the bag's footer saying how many items are hidden.
 - **Coverage:** `spec/categories_spec.lua`, `spec/database_spec.lua`, `spec/refresh_pipeline_spec.lua` ("hiding a category in
   a bag"), `spec/next/bag_spec.lua`, `spec/frames/bag_draw_ownership_spec.lua`, `spec/next/settings/categories_spec.lua`
   ("hiding it in a bag").
+
+## 11. Blizzard categories, and making one yours (issue #1278)
+
+The issue: categories BetterBags builds from Blizzard's item data ("Junk", "Armor - Cloth", an equipment slot,
+"Everything") never showed on the Categories page, so a player could only change one by first dragging an item onto
+it. Asked (2026-11-12): list them, "only for categories currently visible in the backpack", marked as Blizzard's, in
+the same scroll list ("it's one big scroll list, not two"); clicking one shows a short explanation and a button that
+turns it into a category of the player's, whose Blizzard items keep landing in it.
+
+- **What a Blizzard category is.** `items:BlizzardCategory(data)` names the items no category of the player's or a
+  plugin's takes: Junk for poor quality, else the equipment slot, else type, subtype, trade skill and expansion as the
+  bag's filters say (§5). `items:BuiltInCategory(data)` is where such an item shows: that name, or Everything for an
+  ignored one (below). `items:GetCategory` falls through to it. The Categories page lists a backpack section as a
+  Blizzard category when the items it shows are where `BuiltInCategory` puts them and no category has the name
+  (next-settings-categories.md §5).
+- **A Blizzard category groups nothing.** A longer Blizzard name ("Consumable - Potion") is never a section of a
+  shorter one ("Consumable"), converted or not: the page's and the category picker's `isShownIn` take the "name - ..."
+  prefix only for a category of that name that is not `blizzard`.
+- **Converting** (`categories:Convert(ctx, name)`): makes a saved category with that exact name, marked
+  `blizzard = true`, with no rule and no items, on top of the order (like any new category, §7). Since a section and
+  its settings are found by name, Blizzard's items keep landing in it and take its color, Hide In, automation and so
+  on. It returns false for a name a category already has. Like `CreateCategory`, it leaves recalculating the bags to the
+  caller. The Categories page's button, an item dropped on a Blizzard header in BetterBags Next (`FileItem`, §9) and
+  the classic title's Shift drop all convert this way, so there is one kind of converted category however it was
+  made. Categories a player made by dropping onto a Blizzard header before this change are not marked (nothing at load
+  can tell them apart); they behave as ordinary categories.
+- **It never groups** (asked: "disable group by on Blizzard converted categories ... including on search strings! we
+  just ignore the group clause"). The Settings tab hides Group By for one, and `normalizeRule` (`DB:NormalizeCategories`,
+  every load) strips a trailing "group by <word>" clause from its rule without setting `groupBy`, and never copies the
+  group by a plugin left in its rule (`searchCategory.groupBy`, the old place) onto it. The data never holds a
+  group by for one, so the runtime group-by readers (`GroupedCategory`, `RefreshSearchCache`, the vendor) are unchanged.
+- **Ignored Items go to Everything** (asked: "yes, send to everything"). An item a converted category ignores has no
+  other Blizzard category to fall to, so `BuiltInCategory` sends it to "Everything" (what BetterBags names an item with
+  no category) when the category of its Blizzard name, used in its bag, ignores it. Items the category takes by its rule
+  or Added Items are passed over as for any category (§8) and then reach this check too.
+- **Named after a Blizzard category, a category is a converted one** (asked: "naming something onto a blizzard name
+  should work as a converted one"). A Blizzard category's name is one Blizzard's data gives an item in the bags read
+  (`items:KnowsBlizzardCategory(name)`: `BlizzardCategory` of every item read, whatever section shows it now, the
+  backpack's, the bank's once opened, the guild bank's). `CreateCategory` marks a new category of yours (`save`, not a
+  plugin's) with such a name `blizzard` and drops its group by: New Category, Enter to Make Category, the picker's new
+  category, a plugin adding an item to a new saved category. `RenameCategory` sets `blizzard` by the new name: renamed
+  onto one it becomes converted (its group by dropped; the page asks first when it groups), renamed away from one it
+  becomes ordinary.
+- **Renaming makes an ordinary category** (asked: "accept with a warning that it's making a new category
+  technically"), unless the new name is a Blizzard category's (above); Blizzard's items stay in the Blizzard section of
+  the old name. The rename dialog says so. Pins and tab assignments move with the rename (`DB:RenameCategory`), as for
+  any category.
+- **A category of yours becomes converted when Blizzard's data starts giving items its name** (asked, of a name not
+  known when the category was made: "the thing we need to make sure is we have uniform behavior ... i would prefer
+  hidden changes to non-uniform behavior"). Phase 6 keeps each item's Blizzard name with its own category
+  (`derived.blizzard`, worked out again only when the own category is: data-loader.md §18). Once a read commits (Phase
+  11, before `items/Refresh<Kind>/Done`), `categories:ConvertNamed(ctx, names)` gets the set of those names. Each saved
+  category of yours with one of them that is not converted yet becomes converted: `blizzard = true`, its group by
+  dropped and its group by's sections forgotten (`forgetSections`: in memory, saved, and their pins and tabs). A
+  change starts a new generation, sends `categories/Changed` and queues one `bags/Rederive { resetLayout, buttons }`
+  (requests made during a read wait their turn: refresh-scheduler.md). So a Blizzard name always means a converted
+  category, whether the name was known when the category was made or learned later; the cost of the uniform rule is
+  that a Group By the player set can be turned off without asking when it happens on a read (on Rename the page asks).
+  An item read before its data loaded names no Blizzard category (its expansion reads 0: data-loader.md §19), here and
+  in `KnowsBlizzardCategory`, so a wrong name never converts a category. Cost (not measured in game): one more
+  `BlizzardCategory` call per item whose own category is worked out again (none on a `categoriesUnchanged` derive),
+  and one pass over the committed items per read with a lookup per distinct name.
+- **Coverage of naming and converting on sight:** `spec/categories_spec.lua` (made, renamed, `ConvertNamed` with its
+  sections forgotten), `spec/refresh_pipeline_spec.lua` (`KnowsBlizzardCategory`; the names a read hands over, held
+  items included, kept, worked out again with the filters, none read cold), `spec/database_migration_spec.lua` (the
+  rule's old group by), `spec/next/settings/categories_spec.lua` (the rename question).
+- **Deleting** turns it back into a Blizzard category. The delete scrub (§2) also clears the pins and tab assignment
+  saved under its name, which the Blizzard section had before converting.
+- **Whether a bag uses a category decides everything it does there** (asked: "we don't want dual behavior for
+  options"). A converted category turned off in a bag leaves that bag's section of its name to Blizzard: no color, no
+  Hide In, no automation, no Ignored Items. `categories:CategoryIn(name, kind)` is the one lookup: the category of that
+  name (a group by's section resolves to its category) while `enabled[kind]` is on, else nil. `AutomationOf`,
+  `SkipsRecentOf`, `HiddenIn`, `ConfirmsSaleOf` and `DepositOf` take `(name, kind)` and go through it; the classic
+  sections' color (`views.lua` `GetOrCreateSection`, the view's kind) and the ignore check above do too. Automation
+  passes the backpack's kind (it acts on backpack items only). For a category that is not converted nothing changes:
+  items only land in it in bags that use it. The Categories page counts an item under a category only in bags that use
+  it (next-settings-categories.md §5).
+- **The page:** next-settings-categories.md §5.
+- **Coverage:** `spec/categories_spec.lua` ("CategoryIn", "Blizzard categories made yours (Convert)", "does nothing in a
+  bag that does not use the category", FileItem), `spec/refresh_pipeline_spec.lua` ("an item a category of its Blizzard
+  category's name ignores", BuiltInCategory against a real read), `spec/database_migration_spec.lua` (the group by
+  clause), `spec/automation_spec.lua` ("asks what a category does in the backpack"), `spec/views/views_spec.lua` (a
+  section's color per bag), `spec/frames/bag_draw_ownership_spec.lua` (the classic Shift drop),
+  `spec/next/categorypicker_spec.lua` (a converted category's exact name), and the page's specs.
+- **Reviews** (CLAUDE.md, Prime Directive #2). The first found a deleted or renamed category shown as Blizzard's until
+  the bags were recalculated, and a converted category counting longer Blizzard names; the second, piles a merged stack
+  hides listed, Everything never listed, and unconverted Blizzard rows counting longer names. All fixed test-first.
+  New Category, the picker's new category and renaming onto a Blizzard category's name used to make an unmarked
+  category; the user chose converting them (above).

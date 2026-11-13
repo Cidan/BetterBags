@@ -109,6 +109,7 @@ sonataNext:RegisterTheme({
     SettingsLabel = { Color = "Ink" },
     SettingsText = { Color = "InkSoft" },
     SettingsLink = { Color = "Seal" },
+    SettingsLead = { Color = "Ink" },
   },
 
   Panel = {

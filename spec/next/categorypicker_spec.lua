@@ -133,6 +133,12 @@ describe("NextCategoryPicker", function()
       return names
     end)
     override(categories, "GetCategoryByName", function(_, name) return filters[name] end)
+    -- As the real one: the category of that name while the bag uses it (every bag unless the spec says otherwise).
+    override(categories, "CategoryIn", function(_, name, kind)
+      local f = filters[name]
+      if f == nil or (f.enabled ~= nil and not f.enabled[kind]) then return nil end
+      return f
+    end)
     override(categories, "DoesCategoryExist", function(_, name) return filters[name] ~= nil or name == "Toys - Pets" end)
     override(categories, "FileItem", function(_, c, itemID, name, natural)
       assert.is_not_nil(c)
@@ -267,6 +273,27 @@ describe("NextCategoryPicker", function()
     open()
     typeText("t")
     assert.is_nil(row("Back to Travel"), "only while nothing is typed")
+  end)
+
+  -- A category made from a Blizzard category never groups (category-lifecycle.md §11): a longer Blizzard name ("Toys -
+  -- Pets") is not one of its sections, for its count, its check, or the way back.
+  it("takes no longer name for a section of a category made from a Blizzard category", function()
+    filters.Toys.blizzard = true
+    open(held({ data = bagItem(2222, "Toys - Pets"), natural = "Toys - Pets" }))
+    assert.are.equal("1 item", row("Toys").item.note, "the bank's, not the backpack's Toys - Pets")
+    assert.is_falsy(row("Toys").item.selected)
+    nextMenu:Close()
+    home = "Toys"
+    open(held({ data = bagItem(2222, "Toys"), natural = "Toys - Pets" }))
+    assert.is_not_nil(row("Back to Toys - Pets"), "it lands elsewhere without its Added Items")
+  end)
+
+  -- As the settings list counts (category-lifecycle.md §11): in a bag that does not use a category, a section of its name
+  -- is Blizzard's.
+  it("counts a category's items only in the bags that use it", function()
+    filters.Toys.enabled = { [BACKPACK] = true, [BANK] = false }
+    open()
+    assert.are.equal("1 item", row("Toys").item.note, "the backpack's Toys - Pets, not the bank's Toys")
   end)
 
   it("offers no way back where the item would land in the category it was added to anyway", function()

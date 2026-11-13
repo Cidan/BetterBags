@@ -109,6 +109,10 @@ end
 LoadBetterBagsModule("data/categories.lua")
 local categories = addon:GetModule("Categories")
 
+-- The Blizzard categories the bags' items have (Items:KnowsBlizzardCategory): none unless a test says so.
+local itemsModule = StubBetterBagsModule("Items")
+local knownBlizzard, savedKnows
+
 describe("Categories", function()
 
   before_each(function()
@@ -116,8 +120,15 @@ describe("Categories", function()
     for k in pairs(dbCategories) do dbCategories[k] = nil end
     for k in pairs(dbEphemeralCategories) do dbEphemeralCategories[k] = nil end
     for k in pairs(dbCategoryOptions) do dbCategoryOptions[k] = nil end
+    knownBlizzard = {}
+    savedKnows = rawget(itemsModule, "KnowsBlizzardCategory")
+    itemsModule.KnowsBlizzardCategory = function(_, name) return knownBlizzard[name] == true end
     -- Re-initialize module
     categories:Init()
+  end)
+
+  after_each(function()
+    itemsModule.KnowsBlizzardCategory = savedKnows
   end)
 
   -- The bags keep each item's category until something it reads changes (data-loader.md §18), so
@@ -610,8 +621,9 @@ describe("Categories", function()
 
     it("says whether a category is hidden in a bag, a group by's sections as their category is", function()
       local ctx = context:New("Test")
-      dbCategories["Ore"] = { name = "Ore", itemList = {}, save = true, hidden = { [const.BAG_KIND.BANK] = true } }
-      dbCategories["Mats"] = { name = "Mats", itemList = {}, save = true }
+      dbCategories["Ore"] = { name = "Ore", itemList = {}, save = true, hidden = { [const.BAG_KIND.BANK] = true },
+        enabled = { [0] = true, [1] = true, [2] = true } }
+      dbCategories["Mats"] = { name = "Mats", itemList = {}, save = true, enabled = { [0] = true, [1] = true, [2] = true } }
       categories:CreateCategory(ctx, { name = "Ore - Copper", itemList = {}, dynamic = true,
         isGroupBySubcategory = true, groupByParent = "Ore" })
       assert.is_true(categories:HiddenIn("Ore", const.BAG_KIND.BANK))
@@ -648,53 +660,212 @@ describe("Categories", function()
   end)
 
   describe("AutomationOf", function()
+    local BACKPACK = const.BAG_KIND.BACKPACK
+    local function everywhere()
+      return { [0] = true, [1] = true, [2] = true }
+    end
+
     it("gives a category's automation, a group by's sections their category's", function()
       local ctx = context:New("Test")
-      dbCategories["Mats"] = { name = "Mats", itemList = {}, save = true, automation = "sell" }
-      dbCategories["Plain"] = { name = "Plain", itemList = {}, save = true }
+      dbCategories["Mats"] = { name = "Mats", itemList = {}, save = true, automation = "sell", enabled = everywhere() }
+      dbCategories["Plain"] = { name = "Plain", itemList = {}, save = true, enabled = everywhere() }
       categories:CreateCategory(ctx, { name = "Mats - Cloth", itemList = {}, dynamic = true,
         isGroupBySubcategory = true, groupByParent = "Mats" })
-      assert.are.equal("sell", categories:AutomationOf("Mats"))
-      assert.are.equal("sell", categories:AutomationOf("Mats - Cloth"))
-      assert.is_nil(categories:AutomationOf("Plain"))
-      assert.is_nil(categories:AutomationOf("Armor"), "a built-in category has none")
+      assert.are.equal("sell", categories:AutomationOf("Mats", BACKPACK))
+      assert.are.equal("sell", categories:AutomationOf("Mats - Cloth", BACKPACK))
+      assert.is_nil(categories:AutomationOf("Plain", BACKPACK))
+      assert.is_nil(categories:AutomationOf("Armor", BACKPACK), "a built-in category has none")
     end)
 
     it("skips Recent Items when turned on, a group by's sections as their category does", function()
       local ctx = context:New("Test")
-      dbCategories["Ore"] = { name = "Ore", itemList = {}, save = true, skipRecent = true }
-      dbCategories["Mats"] = { name = "Mats", itemList = {}, save = true }
+      dbCategories["Ore"] = { name = "Ore", itemList = {}, save = true, skipRecent = true, enabled = everywhere() }
+      dbCategories["Mats"] = { name = "Mats", itemList = {}, save = true, enabled = everywhere() }
       categories:CreateCategory(ctx, { name = "Ore - Copper", itemList = {}, dynamic = true,
         isGroupBySubcategory = true, groupByParent = "Ore" })
-      assert.is_true(categories:SkipsRecentOf("Ore"))
-      assert.is_true(categories:SkipsRecentOf("Ore - Copper"))
-      assert.is_false(categories:SkipsRecentOf("Mats"))
-      assert.is_false(categories:SkipsRecentOf("Armor"), "a built-in category has none")
-      assert.is_false(categories:SkipsRecentOf("Recent Items"))
+      assert.is_true(categories:SkipsRecentOf("Ore", BACKPACK))
+      assert.is_true(categories:SkipsRecentOf("Ore - Copper", BACKPACK))
+      assert.is_false(categories:SkipsRecentOf("Mats", BACKPACK))
+      assert.is_false(categories:SkipsRecentOf("Armor", BACKPACK), "a built-in category has none")
+      assert.is_false(categories:SkipsRecentOf("Recent Items", BACKPACK))
     end)
 
     it("confirms a sale unless turned off, a group by's sections as their category does", function()
       local ctx = context:New("Test")
-      dbCategories["Mats"] = { name = "Mats", itemList = {}, save = true, automation = "sell" }
-      dbCategories["Ore"] = { name = "Ore", itemList = {}, save = true, automation = "sell", confirmSale = false }
+      dbCategories["Mats"] = { name = "Mats", itemList = {}, save = true, automation = "sell", enabled = everywhere() }
+      dbCategories["Ore"] = { name = "Ore", itemList = {}, save = true, automation = "sell", confirmSale = false,
+        enabled = everywhere() }
       categories:CreateCategory(ctx, { name = "Ore - Copper", itemList = {}, dynamic = true,
         isGroupBySubcategory = true, groupByParent = "Ore" })
-      assert.is_true(categories:ConfirmsSaleOf("Mats"))
-      assert.is_false(categories:ConfirmsSaleOf("Ore"))
-      assert.is_false(categories:ConfirmsSaleOf("Ore - Copper"))
-      assert.is_true(categories:ConfirmsSaleOf("Armor"))
+      assert.is_true(categories:ConfirmsSaleOf("Mats", BACKPACK))
+      assert.is_false(categories:ConfirmsSaleOf("Ore", BACKPACK))
+      assert.is_false(categories:ConfirmsSaleOf("Ore - Copper", BACKPACK))
+      assert.is_true(categories:ConfirmsSaleOf("Armor", BACKPACK))
     end)
 
     it("deposits where its category does, a group by's sections as their category does", function()
       local ctx = context:New("Test")
-      dbCategories["Ore"] = { name = "Ore", itemList = {}, save = true, deposit = "warbank" }
-      dbCategories["Mats"] = { name = "Mats", itemList = {}, save = true }
+      dbCategories["Ore"] = { name = "Ore", itemList = {}, save = true, deposit = "warbank", enabled = everywhere() }
+      dbCategories["Mats"] = { name = "Mats", itemList = {}, save = true, enabled = everywhere() }
       categories:CreateCategory(ctx, { name = "Ore - Copper", itemList = {}, dynamic = true,
         isGroupBySubcategory = true, groupByParent = "Ore" })
-      assert.are.equal("warbank", categories:DepositOf("Ore"))
-      assert.are.equal("warbank", categories:DepositOf("Ore - Copper"))
-      assert.is_nil(categories:DepositOf("Mats"))
-      assert.is_nil(categories:DepositOf("Armor"), "a built-in category has none")
+      assert.are.equal("warbank", categories:DepositOf("Ore", BACKPACK))
+      assert.are.equal("warbank", categories:DepositOf("Ore - Copper", BACKPACK))
+      assert.is_nil(categories:DepositOf("Mats", BACKPACK))
+      assert.is_nil(categories:DepositOf("Armor", BACKPACK), "a built-in category has none")
+    end)
+
+    -- Asked (issue #1278): "we don't want dual behavior for options". A category of yours named like a Blizzard
+    -- category, turned off in a bag, leaves that bag's section of its name to Blizzard: none of its settings apply there.
+    it("does nothing in a bag that does not use the category", function()
+      dbCategories["Junk"] = { name = "Junk", itemList = {}, save = true, blizzard = true, automation = "sell",
+        confirmSale = false, deposit = "bank", skipRecent = true, hidden = { [0] = true, [1] = true },
+        enabled = { [0] = false, [1] = true, [2] = true } }
+      assert.is_nil(categories:AutomationOf("Junk", 0))
+      assert.is_true(categories:ConfirmsSaleOf("Junk", 0))
+      assert.is_nil(categories:DepositOf("Junk", 0))
+      assert.is_false(categories:SkipsRecentOf("Junk", 0))
+      assert.is_false(categories:HiddenIn("Junk", 0))
+      assert.are.equal("sell", categories:AutomationOf("Junk", 1))
+      assert.is_false(categories:ConfirmsSaleOf("Junk", 1))
+      assert.are.equal("bank", categories:DepositOf("Junk", 1))
+      assert.is_true(categories:SkipsRecentOf("Junk", 1))
+      assert.is_true(categories:HiddenIn("Junk", 1))
+    end)
+  end)
+
+  -- CategoryIn is the one place a section's name finds the category whose settings it takes in a bag (its color, Hide
+  -- In, what it does on its own, the items it ignores).
+  describe("CategoryIn", function()
+    it("is the category of that name where a bag uses it, a group by's section its category's, none elsewhere", function()
+      local ctx = context:New("Test")
+      dbCategories["Ore"] = { name = "Ore", itemList = {}, save = true, enabled = { [0] = true, [1] = false, [2] = true } }
+      categories:CreateCategory(ctx, { name = "Ore - Copper", itemList = {}, dynamic = true, isGroupBySubcategory = true,
+        groupByParent = "Ore", enabled = { [0] = true, [1] = true, [2] = true } })
+      categories:CreateCategory(ctx, { name = "Openable", itemList = {}, enabled = { [0] = false, [1] = true, [2] = true } })
+      assert.are.equal(dbCategories["Ore"], categories:CategoryIn("Ore", 0))
+      assert.is_nil(categories:CategoryIn("Ore", 1), "a bag that does not use it")
+      assert.are.equal(dbCategories["Ore"], categories:CategoryIn("Ore - Copper", 0))
+      assert.is_nil(categories:CategoryIn("Ore - Copper", 1), "its category's bags, not its own")
+      assert.is_nil(categories:CategoryIn("Openable", 0))
+      assert.are.equal("Openable", categories:CategoryIn("Openable", 1).name)
+      assert.is_nil(categories:CategoryIn("Armor", 0), "a Blizzard category has none")
+    end)
+  end)
+
+  -- Asked (issue #1278): Blizzard's categories can be made yours: "convert them to managed categories ... blizzard items
+  -- will still appear in the category, but custom changes can also be made to them". One made yours never groups ("i
+  -- don't think it makes sense to group by on blizzard categories"), and renaming it makes a new category.
+  describe("Blizzard categories made yours (Convert)", function()
+    local ctx
+    before_each(function()
+      ctx = context:New("Test")
+    end)
+
+    it("makes a category of yours of a Blizzard category's name, made from it, on top, used in every bag", function()
+      categories:CreateCategory(ctx, { name = "Mats", itemList = {}, save = true, priority = 3 })
+      assert.is_true(categories:Convert(ctx, "Armor - Cloth"))
+      local made = dbCategories["Armor - Cloth"]
+      assert.is_true(made.save)
+      assert.is_true(made.blizzard)
+      assert.are.same({}, made.itemList)
+      assert.is_nil(made.searchCategory)
+      assert.is_nil(made.groupBy)
+      assert.are.same({ [0] = true, [1] = true, [2] = true }, made.enabled)
+      assert.are.equal("Armor - Cloth", categories:GetOrder()[1])
+    end)
+
+    it("makes nothing of a name a category has", function()
+      categories:CreateCategory(ctx, { name = "Mats", itemList = {}, save = true })
+      categories:CreateCategory(ctx, { name = "Openable", itemList = {} })
+      assert.is_false(categories:Convert(ctx, "Mats"))
+      assert.is_nil(dbCategories["Mats"].blizzard)
+      assert.is_false(categories:Convert(ctx, "Openable"))
+      assert.is_nil(dbCategories["Openable"], "a plugin's stays the plugin's")
+    end)
+
+    -- Asked: "accept with a warning that it's making a new category technically": Blizzard's items stay in their own.
+    it("makes it a category like any other when it is renamed", function()
+      categories:Convert(ctx, "Junk")
+      assert.is_true(categories:RenameCategory(ctx, "Junk", "Trash"))
+      assert.is_nil(dbCategories["Junk"])
+      assert.is_nil(dbCategories["Trash"].blizzard)
+    end)
+
+    -- Asked: "naming something onto a blizzard name should work as a converted one": a Blizzard category's name is one
+    -- Blizzard's data gives an item in your bags (Items:KnowsBlizzardCategory), whatever shows it now.
+    it("makes a category of yours made with a Blizzard category's name one made from it, never grouping", function()
+      knownBlizzard = { Junk = true }
+      categories:CreateCategory(ctx, { name = "Junk", itemList = {}, save = true,
+        searchCategory = { query = "x", groupBy = 1 } })
+      assert.is_true(dbCategories.Junk.blizzard)
+      assert.is_nil(dbCategories.Junk.groupBy)
+      categories:CreateCategory(ctx, { name = "Mats", itemList = {}, save = true })
+      assert.is_nil(dbCategories.Mats.blizzard, "a name Blizzard does not give")
+    end)
+
+    it("leaves a plugin's category of a Blizzard category's name alone", function()
+      knownBlizzard = { Junk = true }
+      categories:CreateCategory(ctx, { name = "Junk", itemList = {} })
+      assert.is_nil(categories:GetCategoryByName("Junk").blizzard)
+    end)
+
+    -- Asked, of a category of yours whose name Blizzard's data starts giving items: "i would prefer hidden changes to
+    -- non-uniform behavior": it becomes one made from it, as if named so, its group by and its sections gone.
+    describe("named as a Blizzard category the bags' items have now (ConvertNamed)", function()
+      local sent, savedSend
+
+      before_each(function()
+        sent = {}
+        savedSend = events.SendMessage
+        events.SendMessage = function(_, _, message, ...) table.insert(sent, { message, ... }) end
+      end)
+
+      after_each(function()
+        events.SendMessage = savedSend
+      end)
+
+      it("makes it one made from it, its group by and its sections gone, the bags recalculated once", function()
+        categories:CreateCategory(ctx, { name = "Cloth", itemList = {}, save = true, groupBy = 3,
+          enabled = { [0] = true, [1] = true, [2] = true } })
+        categories:CreateCategory(ctx, { name = "Junk", itemList = {}, save = true })
+        categories:CreateCategory(ctx, { name = "Cloth - Classic", itemList = { [5] = true }, dynamic = true,
+          isGroupBySubcategory = true, groupByParent = "Cloth" })
+        categories.ephemeralCategoryByItemID[5] = categories.ephemeralCategories["Cloth - Classic"]
+        categories:CreateCategory(ctx, { name = "Cloth - Pets", itemList = {} })
+        sent = {}
+        local before = categories:GetGeneration()
+        assert.is_true(categories:ConvertNamed(ctx, { Cloth = true, Junk = true, Leather = true }))
+        assert.is_true(dbCategories.Cloth.blizzard)
+        assert.is_nil(dbCategories.Cloth.groupBy)
+        assert.is_true(dbCategories.Junk.blizzard)
+        assert.is_nil(categories:GetCategoryByName("Cloth - Classic"), "its group by's section goes")
+        assert.is_nil(dbEphemeralCategories["Cloth - Classic"], "saved too, with what bags saved for it")
+        assert.is_nil(categories.ephemeralCategoryByItemID[5])
+        assert.is_not_nil(categories:GetCategoryByName("Cloth - Pets"), "a plugin's category of a longer name stays")
+        assert.is_nil(dbCategories.Leather, "no category is made")
+        assert.is_true(categories:GetGeneration() > before)
+        assert.are.same({ { "categories/Changed" }, { "bags/Rederive", { resetLayout = true, buttons = true } } }, sent)
+      end)
+
+      it("changes nothing for one made from it already, a plugin's, or a name no category has", function()
+        categories:Convert(ctx, "Junk")
+        categories:CreateCategory(ctx, { name = "Openable", itemList = {} })
+        sent = {}
+        assert.is_false(categories:ConvertNamed(ctx, { Junk = true, Openable = true, Trash = true }))
+        assert.is_nil(categories:GetCategoryByName("Openable").blizzard)
+        assert.are.same({}, sent)
+      end)
+    end)
+
+    it("makes a category renamed to a Blizzard category's name one made from it, its group by gone", function()
+      knownBlizzard = { ["Armor - Cloth"] = true }
+      categories:CreateCategory(ctx, { name = "Mats", itemList = {}, save = true, groupBy = 1 })
+      assert.is_true(categories:RenameCategory(ctx, "Mats", "Armor - Cloth"))
+      assert.is_true(dbCategories["Armor - Cloth"].blizzard)
+      assert.is_nil(dbCategories["Armor - Cloth"].groupBy)
+      assert.is_true(categories:RenameCategory(ctx, "Armor - Cloth", "Cloth"))
+      assert.is_nil(dbCategories.Cloth.blizzard, "renamed away from it: a category like any other")
     end)
   end)
 
@@ -1137,11 +1308,14 @@ describe("Categories", function()
       assert.is_false(categories:IgnoresItem("Mats", 106))
     end)
 
-    -- The classic title's Shift drop did the same: a category of that name, which shows in its section.
-    it("makes a category of a built-in category's name for an item that does not land there", function()
+    -- A Blizzard category's header makes it yours as Convert does (issue #1278: one kind of category from a Blizzard
+    -- one, whatever made it), the item added to it.
+    it("makes a Blizzard category yours for an item that does not land there", function()
       assert.are.equal("added", categories:FileItem(ctx, 107, "Armor", "Junk"))
       assert.is_true(dbCategories["Armor"].save)
+      assert.is_true(dbCategories["Armor"].blizzard)
       assert.is_true(dbCategories["Armor"].itemList[107])
+      assert.is_nil(dbCategories["Mats"].blizzard, "a category that was one already stays as it was")
     end)
 
     it("adds nothing to a plugin's category the item does not land in", function()

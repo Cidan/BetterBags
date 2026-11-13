@@ -160,6 +160,7 @@ sonataNext:RegisterTheme({
     SettingsLabel = mono(13, "Text"),
     SettingsText = mono(12, "Muted"),
     SettingsLink = mono(12, "Gold"),
+    SettingsLead = mono(15, "Text"),
     CurrencyCapped = mono(12, "Capped", true),
     CurrencyNone = mono(12, "Muted"),
     CurrencyName = mono(12, "Text"),

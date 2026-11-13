@@ -44,6 +44,7 @@ local context = addon:GetModule('Context')
 ---@field skipRecent? boolean Its items skip Recent Items (Skip Recent Items, docs/next-batch-2.md §1).
 ---@field hidden? table<BagKind, boolean> The bags its items are not shown in (Hide In, category-lifecycle.md §10).
 ---@field ignoredItems? table<number, boolean> Items that never land in it, by item ID (Ignored Items, docs/next-batch-2.md §2).
+---@field blizzard? boolean Made from a Blizzard category (Convert): Blizzard's items of its name show in it, and it never groups (category-lifecycle.md §11).
 
 ---@class (exact) Categories: AceModule
 ---@field private itemsWithNoCategory table<number, boolean>
@@ -398,7 +399,14 @@ function categories:CreateCategory(ctx, category)
   if new then
     category.priority = self:topPriority()
   end
-  if category.groupBy == nil and type(category.searchCategory) == "table" then
+  -- A new category of yours with a name Blizzard's data gives an item in your bags is one made from it (§11), which
+  -- never groups.
+  if new and category.save and addon:GetModule('Items'):KnowsBlizzardCategory(category.name) then
+    category.blizzard = true
+  end
+  if category.blizzard then
+    category.groupBy = nil
+  elseif category.groupBy == nil and type(category.searchCategory) == "table" then
     category.groupBy = category.searchCategory.groupBy
   end
 
@@ -660,27 +668,41 @@ function categories:UpdateCategory(ctx, name, fields)
   return true
 end
 
--- AutomationOf returns what a category does with its items on its own ("sell", "destroy" or nil;
--- automation.md): a group by's sections do what their category does. A built-in category has none.
+-- CategoryIn returns the category whose settings a section of this name takes in a bag (its color, Hide In, what it
+-- does on its own, the items it ignores): the category of that name, a group by's section its category, while the bag
+-- uses it. A Blizzard category has none, and neither has a category in a bag that does not use it: a section of its
+-- name there is Blizzard's (category-lifecycle.md §11).
 ---@param name string
----@return string?
-function categories:AutomationOf(name)
+---@param kind BagKind
+---@return CustomCategoryFilter?
+function categories:CategoryIn(name, kind)
   local filter = self:GetCategoryByName(name)
   if filter and filter.isGroupBySubcategory and filter.groupByParent then
     filter = self:GetCategoryByName(filter.groupByParent)
   end
+  if filter == nil or filter.enabled == nil or not filter.enabled[kind] then
+    return nil
+  end
+  return filter
+end
+
+-- AutomationOf returns what a category does with its items in a bag on its own ("sell", "destroy" or nil;
+-- automation.md): a group by's sections do what their category does. A built-in category has none.
+---@param name string
+---@param kind BagKind
+---@return string?
+function categories:AutomationOf(name, kind)
+  local filter = self:CategoryIn(name, kind)
   return filter and filter.automation or nil
 end
 
--- SkipsRecentOf says whether a category's items skip Recent Items (Skip Recent Items; a group by's
+-- SkipsRecentOf says whether a category's items in a bag skip Recent Items (Skip Recent Items; a group by's
 -- sections as their category). A built-in category does not.
 ---@param name string
+---@param kind BagKind
 ---@return boolean
-function categories:SkipsRecentOf(name)
-  local filter = self:GetCategoryByName(name)
-  if filter and filter.isGroupBySubcategory and filter.groupByParent then
-    filter = self:GetCategoryByName(filter.groupByParent)
-  end
+function categories:SkipsRecentOf(name, kind)
+  local filter = self:CategoryIn(name, kind)
   return filter ~= nil and filter.skipRecent == true
 end
 
@@ -690,10 +712,7 @@ end
 ---@param kind BagKind
 ---@return boolean
 function categories:HiddenIn(name, kind)
-  local filter = self:GetCategoryByName(name)
-  if filter and filter.isGroupBySubcategory and filter.groupByParent then
-    filter = self:GetCategoryByName(filter.groupByParent)
-  end
+  local filter = self:CategoryIn(name, kind)
   return filter ~= nil and filter.hidden ~= nil and filter.hidden[kind] == true
 end
 
@@ -807,8 +826,8 @@ end
 --   forgotten and nothing is added (asked: "just strip it's manual assignment and let it land where it
 --   should");
 -- - "added": it is added to the category's Added Items (taken from the one it was in), and the
---   category no longer ignores it; a name no category has (a built-in category's) gets a category of
---   that name, which shows in the same section, as the classic title's Shift drop makes one;
+--   category no longer ignores it; a name no category has (a Blizzard category's) is made yours first
+--   (Convert), so it shows in the same section, as the classic title's Shift drop does;
 -- - "plugin": nothing: a plugin fills its own category.
 ---@param ctx Context
 ---@param itemID number
@@ -827,6 +846,9 @@ function categories:FileItem(ctx, itemID, name, natural)
   if database:GetItemCategory(target) == nil and self.ephemeralCategories[target] ~= nil then
     return "plugin"
   end
+  if database:GetItemCategory(target) == nil then
+    self:Convert(ctx, target)
+  end
   if self:IgnoresItem(target, itemID) then
     self:UnignoreItem(ctx, itemID, target)
   end
@@ -834,28 +856,84 @@ function categories:FileItem(ctx, itemID, name, natural)
   return "added"
 end
 
--- ConfirmsSaleOf says whether Auto Sell waits for the player to confirm a category's sale in the
--- vendor's dock (true unless turned off; automation.md §3): a group by's sections as their category does.
+-- ConfirmsSaleOf says whether Auto Sell waits for the player to confirm the sale of a category's items in a bag
+-- in the vendor's dock (true unless turned off; automation.md §3): a group by's sections as their category does.
 ---@param name string
+---@param kind BagKind
 ---@return boolean
-function categories:ConfirmsSaleOf(name)
-  local filter = self:GetCategoryByName(name)
-  if filter and filter.isGroupBySubcategory and filter.groupByParent then
-    filter = self:GetCategoryByName(filter.groupByParent)
-  end
+function categories:ConfirmsSaleOf(name, kind)
+  local filter = self:CategoryIn(name, kind)
   return not (filter and filter.confirmSale == false)
 end
 
--- DepositOf returns where Auto Deposit puts a category's items when the bank opens ("bank", "warbank" or
--- nil; automation.md §7): a group by's sections where their category does. A built-in category has none.
+-- DepositOf returns where Auto Deposit puts a category's items in a bag when the bank opens ("bank", "warbank"
+-- or nil; automation.md §7): a group by's sections where their category does. A built-in category has none.
 ---@param name string
+---@param kind BagKind
 ---@return string?
-function categories:DepositOf(name)
-  local filter = self:GetCategoryByName(name)
-  if filter and filter.isGroupBySubcategory and filter.groupByParent then
-    filter = self:GetCategoryByName(filter.groupByParent)
-  end
+function categories:DepositOf(name, kind)
+  local filter = self:CategoryIn(name, kind)
   return filter and filter.deposit or nil
+end
+
+-- forgetSections forgets the sections a category's group by made (its sub-categories), in memory and saved, with what
+-- each bag saved for them (pins, tabs).
+---@private
+---@param name string
+function categories:forgetSections(name)
+  local sections = {}
+  for sub, filter in pairs(self.ephemeralCategories) do
+    if filter.isGroupBySubcategory and filter.groupByParent == name then
+      table.insert(sections, sub)
+    end
+  end
+  for _, sub in ipairs(sections) do
+    for id in pairs(self.ephemeralCategories[sub].itemList or {}) do
+      self.ephemeralCategoryByItemID[id] = nil
+    end
+    self.ephemeralCategories[sub] = nil
+    database:DeleteItemCategory(sub)
+  end
+end
+
+-- ConvertNamed makes each category of yours named in names (a set of the Blizzard category names the items of a read
+-- have, Items:BlizzardCategory) one made from it, as if it had been named so (category-lifecycle.md §11; asked: "i
+-- would prefer hidden changes to non-uniform behavior"): it never groups, so its group by and its sections go. With one
+-- changed, the bags are recalculated. It returns whether it changed one.
+---@param ctx Context
+---@param names table<string, boolean>
+---@return boolean
+function categories:ConvertNamed(ctx, names)
+  local converted = false
+  for name in pairs(names) do
+    local filter = database:GetItemCategory(name)
+    if filter and not filter.blizzard then
+      filter.blizzard = true
+      filter.groupBy = nil
+      self:forgetSections(name)
+      converted = true
+    end
+  end
+  if converted then
+    self:changed()
+    events:SendMessage(ctx, 'categories/Changed')
+    events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
+  end
+  return converted
+end
+
+-- Convert makes a Blizzard category yours (category-lifecycle.md §11): a category of yours of its name, so Blizzard's
+-- items of that name keep showing in it, made from it (blizzard: it never groups). Like CreateCategory, it leaves
+-- recalculating the bags to the caller. It returns false for a name a category has.
+---@param ctx Context
+---@param name string
+---@return boolean
+function categories:Convert(ctx, name)
+  if self:DoesCategoryExist(name) then
+    return false
+  end
+  self:CreateCategory(ctx, { name = name, itemList = {}, save = true, blizzard = true })
+  return true
 end
 
 -- GetSortedSearchCategories returns the categories with a rule in the order (category-lifecycle.md §7):
@@ -959,6 +1037,16 @@ function categories:RenameCategory(ctx, oldName, newName)
   if not success then
     debug:Log("categories", "Failed to rename category in database: %s -> %s", oldName, newName)
     return false
+  end
+
+  -- Renamed, a category is made from a Blizzard category when Blizzard's data gives an item in your bags its new name,
+  -- and never groups; else it is an ordinary one, Blizzard's items staying in their own (§11).
+  local renamed = database:GetItemCategory(newName)
+  if renamed then
+    renamed.blizzard = addon:GetModule('Items'):KnowsBlizzardCategory(newName) or nil
+    if renamed.blizzard then
+      renamed.groupBy = nil
+    end
   end
 
   debug:Log("categories", "Renamed category: %s -> %s", oldName, newName)

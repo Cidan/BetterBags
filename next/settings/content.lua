@@ -475,7 +475,13 @@ function content:Init()
     heading = function() return categoryEditor:Heading() end,
     actions = function(parent, window) return categoryEditor:CreateActions(parent, window) end,
     tabs = {
-      { id = "settings", title = L:G("Settings"), sections = { tabSection(L:G("Category Settings"),
+      -- A Blizzard category chosen shows what it is and a button that makes it yours, instead of every tab (asked,
+      -- issue #1278: "help text + button to convert to a permanent managed category").
+      { id = "blizzard", title = L:G("Blizzard Category"), shown = function() return categoryEditor:BlizzardChosen() end,
+        sections = { tabSection(L:G("Blizzard Category"), { "blizzard", "convert", "built-in", "category" },
+          function(parent, window) return categoryEditor:CreateBlizzardTab(parent, window) end) } },
+      { id = "settings", title = L:G("Settings"), shown = function() return categoryEditor:SettingsTabShown() end,
+        sections = { tabSection(L:G("Category Settings"),
         { "category", "categories", "custom", "priority", "color", "group by", "bags", "used in" },
         function(parent, window) return categoryEditor:CreateSettingsTab(parent, window, shownBags) end) } },
       { id = "rule", title = L:G("Search Rule"), shown = function() return categoryEditor:RuleTabShown() end,

@@ -19,7 +19,7 @@ local pages = addon:NewModule('NextSettingsPages')
 ---@class (exact) NextSettingsRowDef
 ---@field setting? string A settings catalog id.
 ---@field option? NextSettingsOption
----@field text? string
+---@field text? string|fun(): string Read again with every refresh when a function.
 ---@field buttons? {text: string|fun(): string, style?: NextButtonStyle, onClick: fun(ctx: Context), tooltip?: string, disabled?: fun(): boolean}[] A button's text and disabled are read again with every refresh.
 ---@field block? fun(parent: Frame, owner: Frame): NextSettingsRow A row of the page's own making (wide).
 ---@field title? string A block's name, for search.

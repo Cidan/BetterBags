@@ -183,6 +183,7 @@ sonataNext:RegisterTheme({
     SettingsLabel = { Object = NORMAL, Size = 13, Color = "Text" },
     SettingsText = { Object = NORMAL, Size = 12, Color = "Muted" },
     SettingsLink = { Object = NORMAL, Size = 12, Color = "Gold" },
+    SettingsLead = { Object = NORMAL, Size = 15, Color = "Text" },
   },
 
   Layout = {

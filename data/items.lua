@@ -1357,6 +1357,10 @@ function items:Phase6_EnrichData(ctx, kind, itemData, emptySlotsByBag)
       -- and Skip Recent Items sees it).
       if d.category ~= stamp then
         d.ownCategory = self:GetCategory(ctx, currentItem, true, true)
+        -- Its Blizzard category, wherever it shows: a category of yours of that name becomes one made from it once the
+        -- read commits (Categories:ConvertNamed, category-lifecycle.md §11). None for an item read before its data
+        -- loaded, whose expansion reads 0 (data-loader.md §19): it is read again once loaded.
+        d.blizzard = not currentItem.harvestIncomplete and self:BlizzardCategory(currentItem) or nil
         d.category, d.base, d.final = stamp, nil, nil
         currentItem.itemInfo.category = d.ownCategory
         d.indexPending = true
@@ -1613,7 +1617,7 @@ end
 function items:SkipRecent(ctx, item, category)
   -- Not on a guess: a rule can take an item with no upgrade state yet (NOT upgrade = true), and what this
   -- ends cannot be given back when the answer says otherwise.
-  if item.upgradeUnknown or not (item.stackRecent or self:IsNewItem(item)) or not categories:SkipsRecentOf(category) then
+  if item.upgradeUnknown or not (item.stackRecent or self:IsNewItem(item)) or not categories:SkipsRecentOf(category, item.kind) then
     return false
   end
   item.stackRecent = nil
@@ -2231,6 +2235,17 @@ function items:Phase11_CommitAndDispatch(ctx, kind, itemData, equipmentData, pre
     end
   end
   realSlotInfo.sortedCategories = categoryOrder
+
+  -- A category of yours named as a Blizzard category these items have becomes one made from it (category-lifecycle.md
+  -- §11; asked: "i would prefer hidden changes to non-uniform behavior"). A change queues a recalculation.
+  local blizzard = {}
+  for _, item in pairs(realSlotInfo.itemsBySlotKey) do
+    local name = item.derived and item.derived.blizzard
+    if name then
+      blizzard[name] = true
+    end
+  end
+  categories:ConvertNamed(ctx, blizzard)
 
   local ev = "items/RefreshBackpack/Done"
   if kind == const.BAG_KIND.BANK then
@@ -4267,6 +4282,45 @@ function items:GetCategory(ctx, data, own, ignoreRecent, withoutAdded)
     return self:GroupedCategory(ctx, customCategory, customFilter, data)
   end
 
+  return self:BuiltInCategory(data)
+end
+
+-- BuiltInCategory returns the category an item no category of yours or a plugin's takes shows in: Blizzard's
+-- (BlizzardCategory), or Everything, where an item with no category goes, for one that a category of yours of that
+-- name ignores where the bag uses it: it has no other Blizzard category (category-lifecycle.md §11).
+---@param data ItemData
+---@return string
+function items:BuiltInCategory(data)
+  local name = self:BlizzardCategory(data)
+  local owner = categories:CategoryIn(name, data.kind)
+  if owner and owner.ignoredItems and owner.ignoredItems[data.itemInfo.itemID] then
+    return L:G("Everything")
+  end
+  return name
+end
+
+-- KnowsBlizzardCategory says whether Blizzard's data gives an item in the bags read a category of this name
+-- (BlizzardCategory), wherever the item shows now: a category of yours made or renamed with it is one made from it
+-- (category-lifecycle.md §11). An item read before its data loaded names none (data-loader.md §19).
+---@param name string
+---@return boolean
+function items:KnowsBlizzardCategory(name)
+  for _, slotInfo in pairs(self.slotInfo or {}) do
+    for _, data in pairs(slotInfo.itemsBySlotKey or {}) do
+      if not data.isItemEmpty and data.itemInfo and not data.harvestIncomplete and self:BlizzardCategory(data) == name then
+        return true
+      end
+    end
+  end
+  return false
+end
+
+-- BlizzardCategory returns the category Blizzard's item data names for an item no category of yours takes: Junk for
+-- poor quality, else its equipment location, else its type, subtype, trade skill and expansion as the bag's filters
+-- say, joined with " - ".
+---@param data ItemData
+---@return string
+function items:BlizzardCategory(data)
   local quality = data.containerInfo and data.containerInfo.quality
   if quality == const.ITEM_QUALITY.Poor then
     return L:G("Junk")

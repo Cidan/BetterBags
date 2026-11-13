@@ -108,6 +108,8 @@ local function stubModules()
   override(categories, "GetCustomCategory", function() return nil, nil end)
   override(categories, "SkipsRecentOf", function() return false end)
   override(categories, "HiddenIn", function() return false end)
+  override(categories, "CategoryIn", function() return nil end)
+  override(categories, "ConvertNamed", function() return false end)
   override(categories, "DoesCategoryExist", function() return false end)
   override(categories, "IsCategoryShown", function() return true end)
   override(categories, "CreateCategory", function() end)
@@ -4097,6 +4099,131 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       rules({ { "Alpha Items", "alpha", 1, { [101] = true }, const.SEARCH_CATEGORY_GROUP_BY.TYPE } })
       local slotInfo = refreshBackpack({ wipe = true })
       assert.is_nil(categoryOf(slotInfo, "0_1"):find("Alpha Items", 1, true))
+    end)
+  end)
+
+  -- Asked (issue #1278): an item a category made from a Blizzard category ignores goes to Everything ("yes, send to
+  -- everything"); in a bag that does not use the category, the section of its name is Blizzard's, as before ("we don't
+  -- want dual behavior for options").
+  describe("an item a category of its Blizzard category's name ignores", function()
+    local used
+
+    before_each(function()
+      used = { [const.BAG_KIND.BACKPACK] = true }
+      override(categories, "CategoryIn", function(_, name, kind)
+        if name == "Junk" and used[kind] then
+          return { name = "Junk", ignoredItems = { [101] = true } }
+        end
+        return nil
+      end)
+      mockContainer[0] = { { itemID = 101, guid = "g101", count = 1, info = { quality = 0 } },
+        { itemID = 202, guid = "g202", count = 1, info = { quality = 0 } } }
+    end)
+
+    local function categoryOf(slotInfo, slotkey)
+      return slotInfo.itemsBySlotKey[slotkey].itemInfo.category
+    end
+
+    it("goes to Everything, where an item with no category goes; the others stay", function()
+      local slotInfo = refreshBackpack({ wipe = true })
+      assert.equal("Everything", categoryOf(slotInfo, "0_1"))
+      assert.equal("Junk", categoryOf(slotInfo, "0_2"))
+    end)
+
+    -- The Categories page lists a section as Blizzard's when its items are where BuiltInCategory puts them.
+    it("shows every item no category takes where BuiltInCategory says, the ignored one too", function()
+      local slotInfo = refreshBackpack({ wipe = true })
+      for _, key in ipairs({ "0_1", "0_2" }) do
+        local data = slotInfo.itemsBySlotKey[key]
+        assert.equal(items:BuiltInCategory(data), data.itemInfo.category, key)
+      end
+      assert.equal("Junk", items:BlizzardCategory(slotInfo.itemsBySlotKey["0_1"]), "Blizzard's name, before the ignore")
+    end)
+
+    -- A category of yours made or renamed with a name Blizzard's data gives an item in your bags is one made from it.
+    it("knows the Blizzard categories of the items read, those your categories hold included", function()
+      override(categories, "GetCustomCategory", function(_, _, _, data)
+        if data.itemInfo.itemID == 202 then return "Mats", 10, { save = true } end
+        return nil, nil
+      end)
+      local slotInfo = refreshBackpack({ wipe = true })
+      assert.equal("Mats", slotInfo.itemsBySlotKey["0_2"].itemInfo.category)
+      assert.is_true(items:KnowsBlizzardCategory("Junk"), "both items are Blizzard's Junk, wherever they show")
+      assert.is_false(items:KnowsBlizzardCategory("Mats"))
+      assert.is_false(items:KnowsBlizzardCategory("Everything"), "where an ignored item goes, not a Blizzard name")
+    end)
+
+    -- Asked: "i would prefer hidden changes to non-uniform behavior": once a read commits, a category of yours named as
+    -- a Blizzard category its items have becomes one made from it (Categories:ConvertNamed).
+    it("names the Blizzard categories of the items read once the read commits, those your categories hold included", function()
+      -- 202 is common: Blizzard's Everything with no filter on, and held by Mats.
+      mockContainer[0][2] = { itemID = 202, guid = "g202", count = 1 }
+      override(categories, "GetCustomCategory", function(_, _, _, data)
+        if data.itemInfo.itemID == 202 then return "Mats", 10, { save = true } end
+        return nil, nil
+      end)
+      local asked = {}
+      override(categories, "ConvertNamed", function(_, c, names)
+        assert.is_not_nil(c)
+        table.insert(asked, { names = names, committed = items.slotInfo[const.BAG_KIND.BACKPACK].itemsBySlotKey["0_1"] })
+        return false
+      end)
+      local slotInfo = refreshBackpack({ wipe = true })
+      assert.equal("Mats", slotInfo.itemsBySlotKey["0_2"].itemInfo.category)
+      assert.are.equal(1, #asked)
+      assert.are.same({ Junk = true, Everything = true }, asked[1].names)
+      assert.is_not_nil(asked[1].committed, "after the read committed")
+      refreshBackpack({ derive = true, categoriesUnchanged = true })
+      assert.are.same({ Junk = true, Everything = true }, asked[2].names, "kept categories keep their Blizzard name")
+      -- The type filter turned on: the bags are recalculated with their categories worked out again.
+      override(database, "GetCategoryFilter", function(_, _, filter) return filter == "Type" end)
+      refreshBackpack({ derive = true })
+      assert.are.same({ Junk = true, Misc = true }, asked[3].names, "worked out again with the filters")
+    end)
+
+    -- Found by the bug review: an item read before its data loaded reads expansion 0, so its Blizzard name can be wrong
+    -- ("Consumable - Classic"); it is read again once loaded (data-loader.md §19), and names nothing until then.
+    it("names no Blizzard category for an item read before its data loaded", function()
+      local getItemInfo = _G.C_Item.GetItemInfo
+      local cold = true
+      override(_G.C_Item, "GetItemInfo", function(id)
+        if cold then return nil end
+        return getItemInfo(id)
+      end)
+      local asked = {}
+      override(categories, "ConvertNamed", function(_, _, names)
+        table.insert(asked, names)
+        return false
+      end)
+      local slotInfo = refreshBackpack({ wipe = true })
+      assert.is_true(slotInfo.itemsBySlotKey["0_1"].harvestIncomplete)
+      assert.are.same({}, asked[1])
+      assert.is_false(items:KnowsBlizzardCategory(items:BlizzardCategory(slotInfo.itemsBySlotKey["0_1"])),
+        "nor does a category made or renamed meanwhile learn one from it")
+      cold = false
+      refreshBackpack({ derive = true })
+      assert.are.same({ Junk = true }, asked[2], "once loaded")
+    end)
+
+    it("stays in Blizzard's category in a bag that does not use the category", function()
+      used = {}
+      local slotInfo = refreshBackpack({ wipe = true })
+      assert.equal("Junk", categoryOf(slotInfo, "0_1"))
+    end)
+
+    it("asks whether a category skips Recent Items in the item's bag", function()
+      local kinds = {}
+      override(categories, "SkipsRecentOf", function(_, _, kind)
+        table.insert(kinds, kind)
+        return false
+      end)
+      newSlots["0_2"] = true
+      override(database, "GetCategoryFilter", function(_, _, filter) return filter == "RecentItems" end)
+      refreshBackpack({ wipe = true })
+      assert.is_true(#kinds > 0)
+      for _, kind in ipairs(kinds) do
+        assert.are.equal(const.BAG_KIND.BACKPACK, kind)
+      end
     end)
   end)
 

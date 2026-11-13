@@ -9,11 +9,13 @@ local const = StubBetterBagsModule("Constants")
 const.BAG_KIND = const.BAG_KIND or { UNDEFINED = -1, BACKPACK = 0, BANK = 1 }
 const.BAG_KIND.GUILD = const.BAG_KIND.GUILD or 2
 const.SEARCH_CATEGORY_GROUP_BY = const.SEARCH_CATEGORY_GROUP_BY or { NONE = 0, TYPE = 1, SUBTYPE = 2, EXPANSION = 3 }
+const.BAG_VIEW = const.BAG_VIEW or { SECTION_GRID = 2, SECTION_ALL_BAGS = 4 }
 
 LoadBetterBagsModule("core/context.lua")
 local L = StubBetterBagsModule("Localization")
 L.G = L.G or function(_, key) return key end
 local events = StubBetterBagsModule("Events")
+local database = StubBetterBagsModule("Database")
 local categories = StubBetterBagsModule("Categories")
 local items = StubBetterBagsModule("Items")
 local search = StubBetterBagsModule("Search")
@@ -45,7 +47,7 @@ local GOLD = { 1, 0.82, 0 }
 local CONTENT_HEIGHT = 530
 
 describe("NextSettingsCategories", function()
-  local owner, filters, committed, sent, handlers, calls, saved, bags, matches, reselected, itemNames, refreshed
+  local owner, filters, committed, sent, handlers, calls, saved, bags, matches, reselected, itemNames, refreshed, bagView
 
   local function override(tbl, key, value)
     table.insert(saved, { tbl, key, rawget(tbl, key) })
@@ -130,7 +132,7 @@ describe("NextSettingsCategories", function()
       [BACKPACK] = {
         ["0_1"] = item(50, "Potions - Flask", { itemName = "Flask" }),
         ["0_2"] = item(51, "Potions", { itemName = "Bandage", currentItemCount = 5 }),
-        ["0_3"] = item(52, "Recent Items", { itemName = "Crab" }),
+        ["0_3"] = item(52, "Recent Items", { itemName = "Crab", blizzard = "Consumable" }),
         ["0_4"] = item(11, "Junk", { itemName = "Ore" }),
         ["0_5"] = { isItemEmpty = true, itemInfo = {} },
         ["0_6"] = item(51, "Potions", { itemName = "Bandage", currentItemCount = 3 }),
@@ -185,6 +187,23 @@ describe("NextSettingsCategories", function()
       return true
     end)
     override(categories, "DoesCategoryExist", function(_, name) return filters[name] ~= nil end)
+    -- As the real one: the category of that name (a group by's section, its category) while the bag uses it.
+    override(categories, "CategoryIn", function(_, name, kind)
+      local f = filters[name]
+      if f and f.isGroupBySubcategory and f.groupByParent then f = filters[f.groupByParent] end
+      if f == nil or f.enabled == nil or not f.enabled[kind] then return nil end
+      return f
+    end)
+    -- As the real one: a category of yours of the name, made from Blizzard's, on top; none for a name taken.
+    override(categories, "Convert", function(_, _, name)
+      table.insert(calls, { "Convert", name })
+      if filters[name] then return false end
+      filters[name] = { name = name, save = true, blizzard = true, priority = 0, itemList = {},
+        enabled = { [BACKPACK] = true, [BANK] = true, [GUILD] = true } }
+      return true
+    end)
+    bagView = const.BAG_VIEW.SECTION_GRID
+    override(database, "GetBagView", function() return bagView end)
     override(categories, "RuleOf", function(_, f)
       local q = f and f.searchCategory and f.searchCategory.query
       return q ~= nil and strtrim(q) ~= "" and strtrim(q) or nil
@@ -271,6 +290,9 @@ describe("NextSettingsCategories", function()
     end)
     override(items, "slotInfo", { [BACKPACK] = { itemsBySlotKey = committed[BACKPACK] },
       [BANK] = { itemsBySlotKey = committed[BANK] } })
+    -- The category BetterBags gives an item no category takes (Items:BuiltInCategory): the one it shows in, unless the
+    -- spec says otherwise (an item shown in a category of yours, in Recent Items or a gear set).
+    override(items, "BuiltInCategory", function(_, data) return data.itemInfo.blizzard or data.itemInfo.category end)
     override(search, "Search", function(_, query)
       if query == "broken (" then error("unexpected end") end
       if query == "type = consumable" then return matches end
@@ -359,7 +381,189 @@ describe("NextSettingsCategories", function()
         "Mats | 0 items matching",
         "Empty | 0 items matching",
         "Potions | 3 items matching",
+        "# Blizzard Categories",
+        "Junk | Blizzard · 1 item matching",
       }, listed(), "a group by's sub-categories are not listed")
+    end)
+
+    -- Found by the bug review: a category made from a Blizzard category never groups, so a longer Blizzard name
+    -- ("Consumable - Potion") is not one of its sections.
+    it("counts for a category made from a Blizzard category only the items of its own name", function()
+      filters.Consumable = { name = "Consumable", save = true, blizzard = true, priority = 0, itemList = {},
+        enabled = { [BACKPACK] = true, [BANK] = true, [GUILD] = true } }
+      committed[BACKPACK]["0_7"] = { slotkey = "0_7", itemInfo = { itemID = 70, category = "Consumable - Potion" } }
+      committed[BACKPACK]["0_8"] = { slotkey = "0_8", itemInfo = { itemID = 71, category = "Consumable" } }
+      list:RefreshRows()
+      assert.are.equal("1 item matching", list:RowFor("Consumable").detail:GetText())
+    end)
+
+    -- Asked (issue #1278): a category of yours counts only the items of the bags that use it: elsewhere a section of
+    -- its name is Blizzard's ("we don't want dual behavior for options").
+    it("counts an item only in a bag that uses its category", function()
+      filters.Potions.enabled[BANK] = false
+      list:RefreshRows()
+      assert.are.equal("2 items matching", list:RowFor("Potions").detail:GetText(), "not the bank's Antidote")
+    end)
+
+    -- Asked (issue #1278): Blizzard's categories show in the list, "only for categories currently visible in the
+    -- backpack", marked as Blizzard's, under a heading in the same list: "it's one big scroll list, not two".
+    describe("Blizzard's categories", function()
+      before_each(function()
+        committed[BACKPACK]["0_7"] = { slotkey = "0_7", itemInfo = { itemID = 60, category = "Armor - Cloth" } }
+        committed[BACKPACK]["0_8"] = { slotkey = "0_8", itemInfo = { itemID = 61, category = "Gear: Tank",
+          blizzard = "Armor - Plate" } }
+        committed[BACKPACK]["0_9"] = { slotkey = "0_9", itemInfo = { itemID = 62, category = "Armor - Cloth" } }
+        committed[BACKPACK]["0_11"] = { slotkey = "0_11", isItemEmpty = true, itemInfo = { category = "Bags" } }
+        list:RefreshRows()
+      end)
+
+      -- Found by the second bug review: a merged stack shows its largest pile (in Recent Items while any pile is new);
+      -- the piles it hides keep their own category, which no section shows.
+      it("lists only what the backpack's sections show, not the piles a stack hides", function()
+        committed[BACKPACK]["0_12"] = { slotkey = "0_12", itemInfo = { itemID = 64, category = "Trade Goods" } }
+        local visible = {}
+        for key, data in pairs(committed[BACKPACK]) do
+          if key ~= "0_12" then visible[key] = data end
+        end
+        items.slotInfo[BACKPACK].visibleItemsBySlotKey = visible
+        list:RefreshRows()
+        for _, line in ipairs(listed()) do
+          assert.is_nil(line:find("Trade Goods", 1, true), line)
+        end
+      end)
+
+      -- Found by the second bug review: Everything can hold only items a category made from a Blizzard category ignores
+      -- (with the type filter on, every item has a type), and the backpack shows it.
+      it("lists Everything when it holds items a category made from a Blizzard category ignores", function()
+        committed[BACKPACK]["0_12"] = { slotkey = "0_12", itemInfo = { itemID = 64, category = "Everything" } }
+        list:RefreshRows()
+        assert.are.equal("Everything | Blizzard · 1 item matching", listed()[9])
+      end)
+
+      -- Found by the second bug review: a Blizzard category groups nothing, so a longer Blizzard name ("Armor - Cloth -
+      -- Plate"... or a bank's own filters) is not one of its sections.
+      it("counts for each only the items of its own name", function()
+        committed[BACKPACK]["0_12"] = { slotkey = "0_12", itemInfo = { itemID = 64, category = "Junk - Gray" } }
+        list:RefreshRows()
+        assert.are.equal("Blizzard · 1 item matching", list:RowFor("Junk").detail:GetText())
+        assert.are.equal("Blizzard · 1 item matching", list:RowFor("Junk - Gray").detail:GetText(), "its own row")
+      end)
+
+      -- Found by the bug review: a category just deleted or renamed still names the backpack's items until the bags are
+      -- recalculated, and is not Blizzard's: its items are not where Blizzard's data puts them.
+      it("never takes a category just deleted or renamed for Blizzard's", function()
+        committed[BACKPACK]["0_12"] = { slotkey = "0_12", itemInfo = { itemID = 12, category = "Mats",
+          blizzard = "Trade Goods" } }
+        list.frame:GetParent():Show()
+        list.frame:Show()
+        editor.selected = "Mats"
+        filters.Mats = nil
+        handlers["categories/Changed"][1](ctx())
+        assert.are.equal("Openable", editor.selected)
+        assert.is_false(editor:BlizzardChosen())
+        list:RefreshRows()
+        for _, line in ipairs(listed()) do
+          assert.is_nil(line:find("Mats", 1, true), line)
+        end
+      end)
+
+      it("lists those the backpack shows under their own heading, after yours, marked and counted", function()
+        assert.are.same({
+          "Openable | 0 items matching",
+          "Midnight | 0 items matching",
+          "Ores | 0 items matching",
+          "Mats | 0 items matching",
+          "Empty | 0 items matching",
+          "Potions | 3 items matching",
+          "# Blizzard Categories",
+          "Armor - Cloth | Blizzard · 2 items matching",
+          "Junk | Blizzard · 1 item matching",
+        }, listed(), "not Recent Items, a gear set, a category's sections, or the bank's")
+      end)
+
+      it("keeps them in the list's own scroll, below yours", function()
+        local K = style.Theme.Settings.Categories
+        local heading = list.rows[7]
+        assert.are.equal("BLIZZARD CATEGORIES", heading.label:GetText())
+        assert.are.equal(list.content, heading.frame:GetParent())
+        assert.are.equal(list.content, list:RowFor("Junk").frame:GetParent())
+        assert.are.equal(6 * K.RowHeight, yOf("Potions") + K.RowHeight)
+        assert.are.equal(6 * K.RowHeight + K.GroupHeight, yOf("Armor - Cloth"))
+        assert.are.equal(8 * K.RowHeight + K.GroupHeight, list.content:GetHeight(), "one list, every row in it")
+        assert.is_false(heading.frame:IsMouseEnabled())
+        assert.is_false(heading.dot:IsShown())
+      end)
+
+      it("filters them with yours, the heading only while one of them shows", function()
+        list.filter.frame:SetText("arm")
+        list.filter.frame:GetScript("OnTextChanged")(list.filter.frame, true)
+        assert.are.same({ "# Blizzard Categories", "Armor - Cloth | Blizzard · 2 items matching" }, listed())
+        list.filter.frame:SetText("mid")
+        list.filter.frame:GetScript("OnTextChanged")(list.filter.frame, true)
+        assert.are.same({ "Midnight | 0 items matching" }, listed())
+      end)
+
+      it("lists none in the Show Bags view, where the backpack's sections are its bags", function()
+        bagView = const.BAG_VIEW.SECTION_ALL_BAGS
+        list:RefreshRows()
+        assert.are.equal("Potions | 3 items matching", listed()[#listed()])
+      end)
+
+      it("lists one no longer once a category of yours has its name", function()
+        filters.Junk = { name = "Junk", save = true, blizzard = true, priority = 0, itemList = {},
+          enabled = { [BACKPACK] = false, [BANK] = true, [GUILD] = true } }
+        list:RefreshRows()
+        local lines = listed()
+        assert.are.equal("Junk | 0 items matching", lines[1], "yours, on top, counting no item of a bag not using it")
+        assert.are.equal("Armor - Cloth | Blizzard · 2 items matching", lines[#lines])
+      end)
+
+      it("drags none of them, and lands none of yours among them", function()
+        local K = style.Theme.Settings.Categories
+        list.box:_SetRect(0, 0, 232, 600)
+        list.content.GetLeft, list.content.GetTop = function() return 0 end, function() return 600 end
+        local junk = list:RowFor("Junk")
+        _G._mouseButtonsDown = { LeftButton = true }
+        junk.frame:GetScript("OnDragStart")(junk.frame)
+        assert.is_false(list.drag:IsDragging(), "a Blizzard category has no place in the order")
+        local row = list:RowFor("Openable")
+        row.frame:_SetRect(0, 600 - K.RowHeight, 232, K.RowHeight)
+        -- Far under every row: the last place it may land is after the last of yours.
+        _G._cursorX, _G._cursorY = 20, 600 - 20 * K.RowHeight
+        row.frame:GetScript("OnDragStart")(row.frame)
+        assert.is_true(list.drag:IsDragging())
+        list.drag:Update(0.016)
+        motion:Step(1)
+        local _, _, _, _, headingY = list.rows[7].frame:GetPoint(1)
+        assert.are.equal(6 * K.RowHeight, -headingY, "its room opens above the heading, not among Blizzard's")
+        _G._mouseButtonsDown = {}
+        list.drag:Update(0.016)
+        finishTweens()
+        _G._cursorX, _G._cursorY = 0, 0
+        assert.are.same({ "MoveCategory", "Openable", "Potions" }, calls[#calls])
+      end)
+
+      it("chooses one when clicked, and keeps it chosen", function()
+        local row = list:RowFor("Junk")
+        row.frame:GetScript("OnClick")(row.frame, "LeftButton")
+        assert.are.equal("Junk", editor.selected)
+        assert.is_true(editor:BlizzardChosen())
+        list:Refresh(ctx())
+        assert.are.equal("Junk", editor.selected, "not taken for a category gone")
+        assert.is_true(list:RowFor("Junk").indicator:IsShown())
+      end)
+
+      it("chooses another once the one chosen leaves the backpack", function()
+        list.frame:GetParent():Show()
+        list.frame:Show()
+        editor.selected = "Junk"
+        committed[BACKPACK]["0_4"] = nil
+        handlers["items/RefreshBackpack/Done"][1](ctx())
+        assert.are.equal("Openable", editor.selected)
+        assert.are.equal(1, reselected)
+        handlers["items/RefreshBackpack/Done"][1](ctx())
+        assert.are.equal(1, reselected, "not again while one of yours is chosen")
+      end)
     end)
 
     -- The count is the Settings tab's Current Items in this Group: each item once (two Bandage stacks
@@ -618,6 +822,101 @@ describe("NextSettingsCategories", function()
       assert.are.equal(1, reselected)
     end)
 
+    -- Asked (issue #1278): a Blizzard category chosen shows "help text + button to convert to a permanent managed
+    -- category", not the tabs of yours.
+    it("shows a Blizzard category as Made by Blizzard, with no tab of yours and no Rename or Delete", function()
+      editor.selected = "Junk"
+      assert.is_true(editor:BlizzardChosen())
+      assert.are.same({ "Junk", "Made by Blizzard" }, { editor:Heading() })
+      assert.is_false(editor:SettingsTabShown())
+      assert.is_false(editor:RuleTabShown())
+      assert.is_false(editor:ItemsTabShown())
+      assert.is_false(editor:AutomationTabShown())
+      local actions = editor:CreateActions(CreateFrame("Frame"), owner)
+      actions:Refresh(ctx())
+      assert.is_false(actions.rename.frame:IsShown() or actions.delete.frame:IsShown())
+      editor.selected = "Elixirs"
+      assert.is_false(editor:BlizzardChosen(), "the bank's: only the backpack's are listed")
+      editor.selected = "Mats"
+      assert.is_false(editor:BlizzardChosen())
+      assert.is_true(editor:SettingsTabShown())
+    end)
+
+    it("says what a Blizzard category is and what making it yours does", function()
+      editor.selected = "Junk"
+      local help = editor:BlizzardHelp()
+      assert.is_truthy(help:find("Junk", 1, true))
+      assert.is_truthy(help:find("Its items will still show up in it", 1, true))
+    end)
+
+    it("makes a Blizzard category yours: a category made from it, chosen, the bags recalculated", function()
+      editor.selected = "Junk"
+      editor:Convert(ctx())
+      assert.are.same({ "Convert", "Junk" }, calls[#calls])
+      assert.are.same({ "bags/Rederive", { resetLayout = true, buttons = true } }, sent[#sent])
+      assert.are.equal("Junk", editor.selected)
+      assert.is_false(editor:BlizzardChosen())
+      assert.are.equal(1, reselected)
+      assert.are.same({ "Junk", "Converted from Blizzard · Nothing added yet" }, { editor:Heading() })
+    end)
+
+    -- Asked: "accept with a warning that it's making a new category technically".
+    it("warns that renaming a category made from a Blizzard category makes a new one", function()
+      filters.Junk = { name = "Junk", save = true, blizzard = true, itemList = {},
+        enabled = { [BACKPACK] = true, [BANK] = true, [GUILD] = true } }
+      local actions = editor:CreateActions(CreateFrame("Frame"), owner)
+      editor.selected = "Mats"
+      actions:Refresh(ctx())
+      click(actions.rename)
+      assert.are.equal("Rename the category 'Mats' to:", nextDialog.text:GetText())
+      answer("Cancel")
+      editor.selected = "Junk"
+      actions:Refresh(ctx())
+      click(actions.rename)
+      local text = nextDialog.text:GetText()
+      assert.is_truthy(text:find("separate category", 1, true))
+      assert.is_truthy(text:find("go back to the built-in 'Junk' category", 1, true))
+      nextDialog.input.frame:SetText("Trash")
+      answer("Rename")
+      assert.are.same({ "RenameCategory", "Junk", "Trash" }, calls[#calls])
+      assert.are.equal("Trash", editor.selected)
+    end)
+
+    -- Asked: "naming something onto a blizzard name should work as a converted one", which never groups: renaming a
+    -- category that groups onto one says its Group By goes first; one that does not group has nothing to lose.
+    it("asks before renaming a grouping category onto a Blizzard category's name", function()
+      override(items, "KnowsBlizzardCategory", function(_, name) return name == "Junk" end)
+      local actions = editor:CreateActions(CreateFrame("Frame"), owner)
+      local function renames()
+        local list = {}
+        for _, call in ipairs(calls) do
+          if call[1] == "RenameCategory" then table.insert(list, call) end
+        end
+        return list
+      end
+      editor.selected = "Potions"
+      actions:Refresh(ctx())
+      click(actions.rename)
+      nextDialog.input.frame:SetText("Junk")
+      answer("Rename")
+      assert.is_truthy(nextDialog.text:GetText():find("can't be grouped", 1, true))
+      answer("Cancel")
+      assert.are.same({}, renames())
+      click(actions.rename)
+      nextDialog.input.frame:SetText("Junk")
+      answer("Rename")
+      answer("Rename")
+      assert.are.same({ { "RenameCategory", "Potions", "Junk" } }, renames())
+      assert.are.equal("Junk", editor.selected)
+      editor.selected = "Mats"
+      actions:Refresh(ctx())
+      filters.Junk = nil
+      click(actions.rename)
+      nextDialog.input.frame:SetText("Junk")
+      answer("Rename")
+      assert.are.same({ "RenameCategory", "Mats", "Junk" }, calls[#calls], "nothing to lose: no question")
+    end)
+
     it("deletes after asking, choosing the first category left", function()
       local actions = editor:CreateActions(CreateFrame("Frame"), owner)
       editor.selected = "Mats"
@@ -629,6 +928,80 @@ describe("NextSettingsCategories", function()
       assert.are.same({ "DeleteCategory", "Mats" }, calls[#calls])
       assert.are.equal("Openable", editor.selected, "the first in the order")
       assert.are.equal(1, reselected)
+    end)
+  end)
+
+  -- Asked (issue #1278): a Blizzard category's explanation "bigger", and its button "in the middle of that panel
+  -- entirely": a tab of its own filling the content, the text in the lead font, the text and the button centered.
+  describe("the Blizzard tab", function()
+    local tab, K
+
+    before_each(function()
+      K = style.Theme.Settings.Categories
+      editor.selected = "Junk"
+      tab = editor:CreateBlizzardTab(CreateFrame("Frame"), owner)
+      place(tab)
+    end)
+
+    it("fills the page's content without scrolling, as a wide row", function()
+      local C = style.Theme.Settings.Content
+      assert.is_true(tab.wide)
+      assert.are.equal(CONTENT_HEIGHT - C.Top - C.Bottom, tab:Measure(700))
+    end)
+
+    it("says what the category is in the lead font, bigger than the page's text, centered", function()
+      assert.are.equal(editor:BlizzardHelp(), tab.text:GetText())
+      assert.are.equal("CENTER", tab.text:GetJustifyH())
+      local text = style:CreateText(CreateFrame("Frame"), K.TextFont)
+      assert.is_true(select(2, tab.text:GetFont()) > select(2, text:GetFont()))
+      assert.are.equal(K.LeadWidth, tab.text:GetWidth(), "no wider than LeadWidth on a wide page")
+    end)
+
+    it("centers the text and its button together in the middle of the tab", function()
+      local textHeight = math.ceil(tab.text:GetStringHeight())
+      local buttonWidth, buttonHeight = tab.convert.frame:GetWidth(), tab.convert.frame:GetHeight()
+      local gap = 2 * K.FieldGap
+      local top = math.floor((tab.height - (textHeight + gap + buttonHeight)) / 2)
+      local _, _, _, textX, textY = tab.text:GetPoint(1)
+      local _, _, _, buttonX, buttonY = tab.convert.frame:GetPoint(1)
+      -- A text's anchor carries the offset that puts its glyphs on whole pixels (docs/next-pixel-perfect.md).
+      local q = addon:GetModule("NextPixel"):TextOffset(tab.text)
+      assert.are.same({ math.floor((720 - K.LeadWidth) / 2) + q, -top + q }, { textX, textY })
+      assert.are.same({ math.floor((720 - buttonWidth) / 2), -(top + textHeight + gap) }, { buttonX, buttonY })
+    end)
+
+    it("keeps its text inside a narrow tab", function()
+      tab:Place(0, 0, 300, tab:Measure(300))
+      local m = { pad = K.Pad }
+      assert.are.equal(300 - 2 * m.pad, tab.text:GetWidth())
+    end)
+
+    it("says it again for the category chosen next, centered again for its text", function()
+      local pixel = addon:GetModule("NextPixel")
+      editor.selected = string.rep("Armor ", 60)
+      tab:Refresh(ctx())
+      assert.is_truthy(tab.text:GetText():find("^Armor"))
+      local textHeight = pixel:Ceil(tab.frame, tab.text:GetStringHeight())
+      local top = pixel:Middle(tab.frame, tab.height, textHeight + 2 * K.FieldGap + tab.convert.frame:GetHeight())
+      local _, _, _, _, y = tab.text:GetPoint(1)
+      assert.are.equal(-top + pixel:TextOffset(tab.text), y)
+    end)
+
+    -- Found by the bug review: themes restyle their widgets in no set order, so the tab's layout could read the button's
+    -- width from before the new theme sized it.
+    it("centers its button for the new theme whatever is restyled first", function()
+      local pixel = addon:GetModule("NextPixel")
+      local B = controls:Theme("Button")
+      override(B, "Padding", (B.Padding or 0) + 40)
+      editor:ApplyStyle()
+      addon:GetModule("NextButton"):ApplyStyle()
+      local _, _, _, x = tab.convert.frame:GetPoint(1)
+      assert.are.equal(pixel:Middle(tab.frame, tab.width, tab.convert.frame:GetWidth()), x)
+    end)
+
+    it("makes the category yours when its button is clicked", function()
+      click(tab.convert)
+      assert.are.same({ "Convert", "Junk" }, calls[#calls])
     end)
   end)
 
@@ -787,6 +1160,39 @@ describe("NextSettingsCategories", function()
       place(tab)
       assert.is_false(tab.groupBy.frame:IsShown())
       assert.is_true(tab.swatch.frame:IsShown())
+    end)
+
+    -- Asked (issue #1278): "let's disable group by on Blizzard converted categories".
+    it("has no group by for a category made from a Blizzard category", function()
+      filters.Junk = { name = "Junk", save = true, blizzard = true, itemList = {},
+        enabled = { [BACKPACK] = true, [BANK] = true, [GUILD] = true } }
+      editor.selected = "Junk"
+      place(tab)
+      assert.is_false(tab.groupBy.frame:IsShown())
+      assert.is_false(tab.labels.groupBy:IsShown())
+      assert.is_true(tab.swatch.frame:IsShown())
+      assert.is_true(tab.toggles[BACKPACK].frame:IsShown())
+    end)
+
+    it("shows for a category made from a Blizzard category only the items of its own name", function()
+      filters.Consumable = { name = "Consumable", save = true, blizzard = true, itemList = {},
+        enabled = { [BACKPACK] = true, [BANK] = true, [GUILD] = true } }
+      committed[BACKPACK]["0_7"] = { slotkey = "0_7", itemInfo = { itemID = 70, category = "Consumable - Potion",
+        itemName = "Potion" } }
+      committed[BACKPACK]["0_8"] = { slotkey = "0_8", itemInfo = { itemID = 71, category = "Consumable",
+        itemName = "Bread" } }
+      editor.selected = "Consumable"
+      place(tab)
+      assert.are.same({ 71 }, ids(tab.grid))
+    end)
+
+    -- A category of yours holds the items of the bags that use it: elsewhere a section of its name is Blizzard's.
+    it("shows the items only of the bags that use it", function()
+      filters.Potions.enabled[BANK] = false
+      editor.selected = "Potions"
+      place(tab)
+      assert.are.equal("Backpack: 2 items", tab.inBags:GetText())
+      assert.are.same({ 51, 50 }, ids(tab.grid))
     end)
 
     it("shows what of your bags shows in it now (its group by's sections too), an item a cell", function()

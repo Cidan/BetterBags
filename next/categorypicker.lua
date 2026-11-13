@@ -54,12 +54,20 @@ picker.counts = {}
 -- A category's dot without a color of its own: the settings list's.
 local GOLD = { 1, 0.82, 0 }
 
--- isShownIn says whether a section name is a category's own or one of its group by's.
+-- isShownIn says whether a section name is a category's own or one of its group by's. A Blizzard category, and one made
+-- from it, never groups: a longer Blizzard name is not one of its sections (category-lifecycle.md §11).
 ---@param name string
 ---@param section string
 ---@return boolean
 local function isShownIn(name, section)
-  return section == name or section:sub(1, #name + 3) == name .. " - "
+  if section == name then
+    return true
+  end
+  if section:sub(1, #name + 3) ~= name .. " - " then
+    return false
+  end
+  local filter = categories:GetCategoryByName(name)
+  return filter ~= nil and not filter.blizzard
 end
 
 ---@param n number
@@ -69,7 +77,8 @@ local function count(n)
 end
 
 -- countItems counts the items in the backpack and the bank each category holds, as the settings list does: each item
--- once, its group by's sections with it (an item in "Potions - Flask" counts for Potions).
+-- once, its group by's sections with it (an item in "Potions - Flask" counts for Potions), in the bags that use it
+-- (elsewhere a section of its name is Blizzard's, category-lifecycle.md §11).
 ---@return table<string, number>
 local function countItems()
   local seen, counts = {}, {}
@@ -78,10 +87,12 @@ local function countItems()
     local info = slots[kind]
     for _, data in pairs(info and info.itemsBySlotKey or {}) do
       if not data.isItemEmpty and data.itemInfo then
-        local id, name = data.itemInfo.itemID, data.itemInfo.category
+        local id, section = data.itemInfo.itemID, data.itemInfo.category
+        local name = section
         while name ~= nil and name ~= "" do
           seen[name] = seen[name] or {}
-          if not seen[name][id] then
+          local holds = categories:GetCategoryByName(name) == nil or categories:CategoryIn(name, kind) ~= nil
+          if not seen[name][id] and isShownIn(name, section) and holds then
             seen[name][id] = true
             counts[name] = (counts[name] or 0) + 1
           end

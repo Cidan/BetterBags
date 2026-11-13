@@ -262,6 +262,7 @@ sonataNext:RegisterTheme({
     SettingsLabel = hand(15, "Ink"),
     SettingsText = hand(15, "InkSoft"),
     SettingsLink = hand(15, "PencilBlue"),
+    SettingsLead = hand(18, "Ink"),
     CurrencyCapped = hand(15, "Capped"),
     CurrencyNone = hand(15, "InkMuted"),
     CurrencyName = hand(14, "Ink"),

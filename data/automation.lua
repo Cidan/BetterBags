@@ -153,7 +153,7 @@ function automation:Entries(ctx, only)
   for _, data in pairs(source) do
     if not data.isItemEmpty and data.itemInfo and const.BACKPACK_BAGS[data.bagid] ~= nil then
       local category = items:GetCategory(ctx, data, false, true)
-      local action = categories:AutomationOf(category)
+      local action = categories:AutomationOf(category, const.BAG_KIND.BACKPACK)
       if action then
         table.insert(list, { data = data, category = category, action = action,
           blocked = self:BlockedReason(data, action) })
@@ -177,7 +177,7 @@ function automation:DepositList(ctx)
   for _, data in pairs(slotInfo and slotInfo.itemsBySlotKey or {}) do
     if not data.isItemEmpty and data.itemInfo and const.BACKPACK_BAGS[data.bagid] ~= nil then
       local category = items:GetCategory(ctx, data, false, true)
-      local target = categories:DepositOf(category)
+      local target = categories:DepositOf(category, const.BAG_KIND.BACKPACK)
       -- A client without a Warbank can hold a retail category's "warbank" (Import Categories).
       if target == self.WARBANK and not addon.hasWarbank then
         target = self.BANK
@@ -235,7 +235,7 @@ end
 function automation:SaleOffer(ctx, only)
   local list = {}
   for _, entry in ipairs(self:SellList(ctx, only)) do
-    if categories:ConfirmsSaleOf(entry.category) and self:StillThere(entry, true) then
+    if categories:ConfirmsSaleOf(entry.category, const.BAG_KIND.BACKPACK) and self:StillThere(entry, true) then
       table.insert(list, entry)
     end
   end
@@ -296,7 +296,7 @@ end
 function automation:saleNow(ctx)
   local list = {}
   for _, entry in ipairs(self:SellList(ctx)) do
-    if not categories:ConfirmsSaleOf(entry.category) then
+    if not categories:ConfirmsSaleOf(entry.category, const.BAG_KIND.BACKPACK) then
       table.insert(list, entry)
     end
   end

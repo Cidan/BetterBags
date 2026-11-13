@@ -122,6 +122,8 @@ local function stubModules()
   override(categories, "DoesCategoryExist", function() return false end)
   override(categories, "IsCategoryShown", function() return true end)
   override(categories, "HiddenIn", function() return false end)
+  override(categories, "CategoryIn", function() return nil end)
+  override(categories, "ConvertNamed", function() return false end)
   override(categories, "CreateCategory", function() end)
 
   local sort = stubModule("Sort")

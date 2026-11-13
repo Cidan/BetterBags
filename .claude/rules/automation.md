@@ -30,15 +30,16 @@ Vendor rule.
 - **Set** with `categories:UpdateCategory(ctx, name, { automation = "sell" | "destroy" | false })`. It
   sends `categories/Changed` and, when automation is the only field, no `bags/Rederive`: it changes no
   item's category.
-- **Read** with `categories:AutomationOf(name)`: a group by's sections (`isGroupBySubcategory`) do what
-  their category does; a built-in category ("Armor", "Junk") has none.
+- **Read** with `categories:AutomationOf(name, kind)` (the backpack's, `const.BAG_KIND.BACKPACK`): a group by's
+  sections (`isGroupBySubcategory`) do what their category does; a built-in category ("Armor", "Junk") has none, and
+  neither has a category in a bag that does not use it (`CategoryIn`, category-lifecycle.md §11).
 - **Confirm Auto Sell** (asked: "another toggle that defaults to on: 'Confirm autosell' which makes the
   sell box for the category appear at the vendor (double click to sell, etc) -- exact same box, instead
   of just yolo selling. turning this off does yolo sell"): stored as `confirmSale = false` only when
   turned off (on, the default, is no field), set with `UpdateCategory { confirmSale = true | false }`
   (no `bags/Rederive` either), a plugin's in its saved state as its automation is (one `saveState`
   helper writes both, from `UpdateCategory` and `setPriority`), read with `categories:ConfirmsSaleOf
-  (name)` (a group by's sections as their category).
+  (name, kind)` (a group by's sections as their category; the backpack's).
 - **No limit.** A sale used to stop at 12 items (what buyback keeps), behind a setting, `autoSellLimit`.
   Asked: "just keep selling past that limit in waves, don't block there. that's pointless." The setting
   is gone, and `DB:Migrate` drops its saved value.
@@ -307,8 +308,8 @@ dragged into the bank moves.
 - **The setting.** `deposit = "bank" | "warbank"` on the category, nil for none
   (`CustomCategoryFilter.deposit`), beside `automation`, not a value of it. Set with `categories:UpdateCategory(ctx,
   name, { deposit = "bank" | "warbank" | false })`, which, alone or with the other automation fields, sends
-  no `bags/Rederive` (it changes no item's category). Read with `categories:DepositOf(name)`, a group by's
-  sections as their category. A plugin's is in its saved state (`saveState`, `DB:UpdateEphemeralItemCategory`,
+  no `bags/Rederive` (it changes no item's category). Read with `categories:DepositOf(name, kind)` (the
+  backpack's), a group by's sections as their category. A plugin's is in its saved state (`saveState`, `DB:UpdateEphemeralItemCategory`,
   kept by `DB:CreateOrUpdateCategory` and winning in `categories:CreateCategory`), as its automation is (§1).
 - **The tab** (§5): a section **Bank** between Merchants and Recent Items. **Auto Deposit** (a switch: on
   saves `"bank"`, off `false`) and **Deposit Into** (a dropdown, Bank or Warbank, disabled while Auto

@@ -3,6 +3,7 @@ paths:
   - "next/settings/categories.lua"
   - "next/settings/bagcategories.lua"
   - "next/settings/reorder.lua"
+  - "next/settings/content.lua"
   - "spec/next/settings/categories_spec.lua"
   - "spec/next/settings/bagcategories_spec.lua"
   - "spec/next/settings/reorder_spec.lua"
@@ -29,26 +30,54 @@ page's `Content.Top` and `Bottom`).
   items matching'"). The count is the Settings tab's Current Items in this Group: each item once, its
   group by's sections with it, in the bags the settings show (`matchingCounts`, one pass over the
   items, each counted for its category and every name its category is a section of: `isShownIn`'s
-  rule). It is counted again on `items/Refresh<Kind>/Done` (every bag) while the list shows. New
+  rule), only in the bags that use the category (`holds`: elsewhere a section of its name is Blizzard's,
+  category-lifecycle.md §11). It is counted again on `items/Refresh<Kind>/Done` (every bag) while the list shows. New
   Category at the bottom where the version is (`{ name, itemList = {}, save = true }`, chosen, on top).
+- **Blizzard categories in the same list** (issue #1278; asked: "only for categories currently visible in the
+  backpack", "it's one big scroll list, not two"): after the categories, a heading "Blizzard Categories" (drawn as a
+  bag's Order tab draws its headings: `Categories.GroupFont`, `GroupHeight` tall, upper case, no mouse) and one row per
+  section the backpack shows that no category has and whose items are where BetterBags puts what no category takes
+  (`items:BuiltInCategory(data)` is the section's name: so not Recent Items or a gear set, and not a category just
+  deleted or renamed, whose items keep its name until the bags are recalculated), read from the items its sections show
+  (`visibleItemsBySlotKey`: a merged stack's largest pile, not the piles it hides), none in Show Bags, by name, filtered
+  like the rest. Each says "Blizzard · N items matching". A Blizzard category, converted or not, never groups, so it
+  counts and shows only the items of its exact name (`isShownIn`: "Consumable - Potion" is not a section of
+  "Consumable"; the category picker's `isShownIn` and its counts follow the same rule). They are rows of the same content and scroll box (the heading's row is
+  keyed by a table of its own, `HEADING`, so no name can take it). They cannot be dragged (no place in the order), and
+  a dragged category never lands below the heading: the list passes `last = function() return list.managed end` to
+  `NextListReorder`, and `Drop` reads only the first `managed` entries.
   Dragging a row moves its category (`listProto:Drop` → `categories:MoveCategory`): after the row above
   where it is let go, or right before the first row shown when let go above them; the categories a
   filter hides keep their places. The rows are arranged and dragged by `NextListReorder` (below). No
   tooltip (asked: no help text yet). The first category is chosen when
-  none is (`EnsureChosen`); clicking one chooses it (`Choose`, then `Reselect`). On `categories/Changed` while
-  it shows, the page shows again, the first chosen for one that is gone.
-- **The header**: the chosen category's name, and its line (a plugin's starts "Made by a plugin");
+  none is (`EnsureChosen`; a Blizzard category the backpack shows stays chosen, `BlizzardChosen`); clicking one chooses
+  it (`Choose`, then `Reselect`). On `categories/Changed` while it shows, the page shows again, the first chosen for one
+  that is gone; on a bag read, the same when the Blizzard category chosen has left the backpack.
+- **A Blizzard category chosen** shows one tab instead of the others (asked: "help text + button to convert to a
+  permanent managed category"): tab `blizzard` in `next/settings/content.lua`, a wide block filling the content as the
+  other tabs are (`editor:CreateBlizzardTab`): what it is (`editor:BlizzardHelp()`) in the lead font
+  (`Categories.LeadFont`, `SettingsLead`, larger than the page's text; asked: "make this text bigger"), centered and at
+  most `LeadWidth` wide, and **Convert to Category** centered under it two `FieldGap`s down, the two centered together
+  in the tab (asked: "center the button in the middle of that panel entirely"). The button: `editor:Convert`
+  (`categories:Convert`, the bags recalculated, the new category chosen with every tab). One tab, so no tab bar. The Settings tab shows for anything
+  else (`SettingsTabShown`); the other tabs hide already (`Chosen` is nil). The heading is its name and "Made by
+  Blizzard"; no Rename or Delete.
+- **The header**: the chosen category's name, and its line (a plugin's starts "Made by a plugin", a converted
+  one's "Converted from Blizzard", with "Nothing added yet" for nothing added: Blizzard's items are in it);
   "Categories" and "Make a category to sort your items your way." for none. Rename and Delete for your
   categories; for a plugin's or none they hide and the buttons' frame shrinks so the title takes the
-  room.
+  room. Renaming a converted category warns that it becomes a separate category and Blizzard's items go back to the
+  built-in one (asked: "accept with a warning that it's making a new category technically"). Renaming a category that
+  groups onto a Blizzard category's name (`items:KnowsBlizzardCategory`) asks first, in a second `NextDialog`, since it
+  becomes a converted category and its Group By goes (category-lifecycle.md §11).
 - **The two item boxes stay put** (asked: boxes a few pixels apart made switching tabs messy): the
   Settings and Search Rule tabs put their box's name row and their box at the same place
   (`boxRows`: under three rows of settings, a row for the name, the box down to the tab's bottom).
 - **Settings tab**: four rows, Used In (a switch per bag the settings show, the guild bank like any),
   Hide In (a switch per bag, off where it is not used, asking in a `NextDialog` before hiding; turning it off asks nothing;
-  category-lifecycle.md §10), Group By (yours only; the row stays empty for a plugin's), Color (and
-  Reset Color: none, drawn in gold); then **Current Items in this Group** (the player's wording): how
-  many items each bag shows in it (its group by's sections too) and those items in a read-only grid,
+  category-lifecycle.md §10), Group By (yours only; the row stays empty for a plugin's and a converted one, which never
+  groups), Color (and Reset Color: none, drawn in gold); then **Current Items in this Group** (the player's wording): how
+  many items each bag that uses it shows in it (its group by's sections too) and those items in a read-only grid,
   one cell per item with how many there are, by name, or "There are no current items in your
   inventory that match this category". With no category it says to make one.
 - **Search Rule tab** (asked: "Search Rule" everywhere; yours, and a plugin's that has a rule): the
@@ -143,7 +172,8 @@ section does (next-drag.md §7), through the same code:
   following the cursor. The list keeps a room the row's height where it was. One drag at a time, and
   none while NextLift holds another frame (a section waiting in the vendor's dock).
 - **Making room**: every frame the room goes before the first other row whose middle is below the cursor
-  (counting what the list is scrolled), never before `first`, and the rows slide out of its way. Near the
+  (counting what the list is scrolled), never before `first` nor after `last()` (read each move: the Categories page
+  keeps its categories above the Blizzard heading), and the rows slide out of its way. Near the
   list's top or bottom (40 pixels) the list scrolls toward the edge, faster closer (`NextLift:AutoScroll`,
   the bags' auto-scroll).
 - **Letting go** (the left button found up): the row lands into its room over `Time.Land`, back to full
