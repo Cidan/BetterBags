@@ -478,6 +478,10 @@ function sectionFrame:OnTitleClickOrDrop(ctx, section)
   ---@cast itemID number
   if cursorType ~= "item" then return end
   local category = section:GetTitle()
+  -- A Blizzard category's title makes it yours first, as BetterBags Next's header does (category-lifecycle.md §11).
+  if not categories:DoesCategoryExist(category) then
+    categories:Convert(ctx, category)
+  end
   categories:AddPermanentItemToCategory(ctx, itemID, category)
   ClearCursor()
   events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })

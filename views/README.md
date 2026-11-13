@@ -42,7 +42,7 @@ The base View class that all view types inherit from:
 - `Wipe(ctx)` - Clear all view contents
 
 **Section Management:**
-- `GetOrCreateSection(ctx, category, onlyCreate)` - Get or create a section by category
+- `GetOrCreateSection(ctx, category, onlyCreate)` - Get or create a section by category, titled in the category's color in the view's bag (`categories:CategoryIn(category, view.kind)`: none where the bag does not use it)
 - `GetSection(category)` - Get an existing section
 - `RemoveSection(category)` - Remove a section from the view
 - `GetAllSections()` - Get all sections in the view

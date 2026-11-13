@@ -12,6 +12,9 @@ local events = addon:GetModule('Events')
 ---@class Categories: AceModule
 local categories = addon:GetModule('Categories')
 
+---@class Database: AceModule
+local database = addon:GetModule('Database')
+
 ---@class Items: AceModule
 local items = addon:GetModule('Items')
 
@@ -85,7 +88,9 @@ local itemsTab = addon:GetModule('NextSettingsItemsTab')
 -- - Added Items: the items added to it by hand, as a grid that holds thousands (NextItemGrid), filtered
 --   by name; an item dropped anywhere on it is added, a right click removes one, Remove All asks first.
 -- A plugin's category can be used in bags, colored, ordered and automated; its rule (when it has one)
--- and its items show read-only.
+-- and its items show read-only. Under the categories, a heading and the Blizzard categories the backpack
+-- shows now, in the same list (category-lifecycle.md §11): one chosen shows what it is and Convert to
+-- Category, which makes it yours.
 ---@class NextSettingsCategories: AceModule
 ---@field selected? string The category chosen.
 ---@field pendingRule? string A search to make a new category of, the next time the list shows.
@@ -184,6 +189,9 @@ local function describe(filter)
   local line = what
   if isPlugins(filter) then
     line = L:G("Made by a plugin") .. " · " .. line
+  elseif filter.blizzard then
+    -- Blizzard's items show in it whatever was added: nothing added is not nothing in it.
+    line = L:G("Converted from Blizzard") .. " · " .. (what == L:G("Nothing in it yet") and L:G("Nothing added yet") or what)
   end
   if DOES[filter.automation] then
     line = line .. " · " .. DOES[filter.automation]
@@ -199,12 +207,20 @@ local function describe(filter)
   return line
 end
 
--- isShownIn says whether a section name is a category's own or one of its group by's.
+-- isShownIn says whether a section name is a category's own or one of its group by's. A Blizzard category, and one
+-- made from it, never groups: a longer Blizzard name ("Consumable - Potion") is not one of its sections.
 ---@param name string
 ---@param category string
 ---@return boolean
 local function isShownIn(name, category)
-  return category == name or category:sub(1, #name + 3) == name .. " - "
+  if category == name then
+    return true
+  end
+  if category:sub(1, #name + 3) ~= name .. " - " then
+    return false
+  end
+  local filter = categories:GetCategoryByName(name)
+  return filter ~= nil and not filter.blizzard
 end
 
 -- ordered returns every category's name in their order (categories:GetOrder: not a group by's
@@ -221,15 +237,66 @@ local function ordered(needle)
   return names
 end
 
+-- eachBlizzard calls fn with the Blizzard category of every item the backpack shows in one (asked, issue #1278: "only
+-- for categories currently visible in the backpack"), until fn returns true: a section no category has, holding items
+-- where BetterBags puts what no category takes (Items:BuiltInCategory). Not Recent Items or a gear set, nor a category
+-- just deleted or renamed, whose items keep its name until the bags are recalculated. Only the items the backpack's
+-- sections show (a stack's largest pile, not those it hides: SlotInfo:GetVisibleItems), none in Show Bags, whose
+-- sections are the bags.
+---@param fn fun(name: string): boolean?
+local function eachBlizzard(fn)
+  local kind = const.BAG_KIND.BACKPACK
+  local slotInfo = items.slotInfo and items.slotInfo[kind]
+  if slotInfo == nil or database:GetBagView(kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
+    return
+  end
+  for _, data in pairs(slotInfo.visibleItemsBySlotKey or slotInfo.itemsBySlotKey or {}) do
+    local name = not data.isItemEmpty and data.itemInfo and data.itemInfo.category
+    if name and name ~= "" and items:BuiltInCategory(data) == name and not categories:DoesCategoryExist(name) then
+      if fn(name) then
+        return
+      end
+    end
+  end
+end
+
+-- blizzardNames returns the Blizzard categories the backpack shows, by name, those whose name has needle.
+---@param needle string
+---@return string[]
+local function blizzardNames(needle)
+  local set, names = {}, {}
+  eachBlizzard(function(name)
+    if not set[name] and (needle == "" or name:lower():find(needle, 1, true)) then
+      set[name] = true
+      table.insert(names, name)
+    end
+  end)
+  table.sort(names)
+  return names
+end
+
 -- Chosen returns the category chosen.
 ---@return CustomCategoryFilter?
 function editor:Chosen()
   return self.selected and categories:GetCategoryByName(self.selected) or nil
 end
 
+-- BlizzardChosen says whether the one chosen is a Blizzard category the backpack shows.
+---@return boolean
+function editor:BlizzardChosen()
+  local found = false
+  if self.selected ~= nil then
+    eachBlizzard(function(name)
+      found = name == self.selected
+      return found
+    end)
+  end
+  return found
+end
+
 -- EnsureChosen chooses the first category when none is, or the one chosen is gone.
 function editor:EnsureChosen()
-  if self:Chosen() ~= nil then
+  if self:Chosen() ~= nil or self:BlizzardChosen() then
     return
   end
   self.selected = ordered()[1]
@@ -261,9 +328,40 @@ end
 function editor:Heading()
   local filter = self:Chosen()
   if filter == nil then
+    if self:BlizzardChosen() then
+      return self.selected, L:G("Made by Blizzard")
+    end
     return L:G("Categories"), L:G("Make a category to sort your items your way.")
   end
   return self.selected, describe(filter)
+end
+
+-- SettingsTabShown says whether the Settings tab shows: for anything but a Blizzard category, which shows what it is
+-- instead (BlizzardHelp, Convert).
+---@return boolean
+function editor:SettingsTabShown()
+  return not self:BlizzardChosen()
+end
+
+-- BlizzardHelp says what the Blizzard category chosen is, and what making it yours does.
+---@return string
+function editor:BlizzardHelp()
+  return format(L:G("%s is a built-in category that BetterBags creates from Blizzard's item types. Convert it to your "
+    .. "own category to customize it. Its items will still show up in it, and you'll be able to change its color, hide "
+    .. "it, auto-sell or auto-deposit its items, add or ignore items, and give it a search rule. Converted categories "
+    .. "can't be grouped."), self.selected or "")
+end
+
+-- Convert makes the Blizzard category chosen yours (Categories:Convert), the bags recalculated, and shows it.
+---@param ctx Context
+function editor:Convert(ctx)
+  local name = self.selected
+  if name == nil then
+    return
+  end
+  categories:Convert(ctx, name)
+  rederive(ctx)
+  self:Choose(ctx, name)
 end
 
 -- RuleTabShown says whether the Search Rule tab shows: for your categories, and a plugin's with a rule.
@@ -468,20 +566,31 @@ local function bagItemsOf(bags, fn)
   end
 end
 
+-- holds says whether an item shown in a bag under a name is that name's: a category of yours holds the items of the
+-- bags that use it (elsewhere a section of its name is Blizzard's, category-lifecycle.md §11), a Blizzard category
+-- every item of its name.
+---@param name string
+---@param bag SettingBag
+---@return boolean
+local function holds(name, bag)
+  return categories:GetCategoryByName(name) == nil or categories:CategoryIn(name, bag.kind) ~= nil
+end
+
 -- matchingCounts returns how many items each category holds in bags, as its Settings tab's Current Items
 -- in this Group lists them: each item once, its group by's sections with it (isShownIn: an item in
--- "Potions - Flask" counts for Potions). One pass: an item counts for its category and for every name
--- that category is a section of.
+-- "Potions - Flask" counts for Potions), in the bags that use it (holds). One pass: an item counts for its
+-- category and for every name that category is a section of.
 ---@param bags SettingBag[]
 ---@return table<string, number>
 local function matchingCounts(bags)
   local seen, counts = {}, {}
-  bagItemsOf(bags, function(_, _, data)
+  bagItemsOf(bags, function(bag, _, data)
     local id = data.itemInfo.itemID
-    local name = data.itemInfo.category
+    local category = data.itemInfo.category
+    local name = category
     while name ~= nil and name ~= "" do
       seen[name] = seen[name] or {}
-      if not seen[name][id] then
+      if not seen[name][id] and isShownIn(name, category) and holds(name, bag) then
         seen[name][id] = true
         counts[name] = (counts[name] or 0) + 1
       end
@@ -515,13 +624,24 @@ local byName = itemsTab.ByName
 ---@field content Frame
 ---@field newCategory NextButtonFrame
 ---@field bags fun(): SettingBag[] The bags the settings show.
----@field entries table[] { name }, in their order
+---@field entries table[] { name } for each category in their order, then { header = true, title } and { name, blizzard = true } for each Blizzard category
+---@field managed number How many of the entries are categories (the ones that can be dragged), before the Blizzard ones.
 ---@field rows NextCategoryListRow[] The rows of the entries, in the same order.
----@field byName table<string, NextCategoryListRow> Each category's own row: moved in the order, it slides.
+---@field byName table<string|table, NextCategoryListRow> Each category's own row (moved in the order, it slides), and the heading's.
 ---@field free NextCategoryListRow[] Rows no category has, hidden, to reuse.
 ---@field drag NextListReorderList Arranges the rows; dragging one moves its category in the order.
 local listProto = {}
 addon:GetModule('Perf'):RegisterPrototype(listProto, 'NextCategoryList')
+
+-- The Blizzard categories' heading's row is kept under a table of its own, a key no category's name can be.
+local HEADING = {}
+
+-- keyOf returns the key of the row an entry has: its category's name, or the heading's.
+---@param entry table
+---@return string|table
+local function keyOf(entry)
+  return entry.header and HEADING or entry.name
+end
 
 -- CreateList makes the page's list (pages.lua sidebar).
 ---@param parent Frame
@@ -531,8 +651,8 @@ addon:GetModule('Perf'):RegisterPrototype(listProto, 'NextCategoryList')
 function editor:CreateList(parent, owner, bags)
   local frame = CreateFrame("Frame", nil, parent)
   ---@type NextCategoryList
-  local list = setmetatable({ frame = frame, owner = owner, bags = bags, entries = {}, rows = {}, byName = {},
-    free = {} }, { __index = listProto })
+  local list = setmetatable({ frame = frame, owner = owner, bags = bags, entries = {}, managed = 0, rows = {},
+    byName = {}, free = {} }, { __index = listProto })
   list.filter = nextInput:Create(frame, {
     help = L:G("Find a category"),
     onChange = function() list:RefreshRows() end,
@@ -552,11 +672,16 @@ function editor:CreateList(parent, owner, bags)
   list.bar = nextScrollBar:Create(box)
   list.bar:Bind(box)
   list.box, list.content = box, content
+  -- A category lands among the categories, never among Blizzard's under them: they have no place in the order.
   list.drag = reorder:Create({
     box = box, content = content,
     entries = function() return list.entries end,
-    rowOf = function(entry) return list.byName[entry.name].frame end,
-    heightOf = function() return pixel:Length(frame, style.Theme.Settings.Categories.RowHeight) end,
+    rowOf = function(entry) return list.byName[keyOf(entry)].frame end,
+    heightOf = function(entry)
+      local K = style.Theme.Settings.Categories
+      return pixel:Length(frame, entry.header and K.GroupHeight or K.RowHeight)
+    end,
+    last = function() return list.managed end,
     onDrop = function(name, after) list:Drop(name, after) end,
   })
   list.newCategory = nextButton:Create(frame, {
@@ -570,11 +695,17 @@ function editor:CreateList(parent, owner, bags)
       settings:Reselect(ctx)
     end
   end)
-  -- A bag's items were read: what each category holds may have changed.
+  -- A bag's items were read: what each category holds may have changed, and the Blizzard category chosen may
+  -- have left the backpack, another one chosen for it.
   for _, message in ipairs(BAG_READ) do
-    events:RegisterMessage(message, function()
+    events:RegisterMessage(message, function(ctx)
       if frame:IsVisible() then
+        local chosen = editor.selected
+        editor:EnsureChosen()
         list:RefreshRows()
+        if editor.selected ~= chosen then
+          settings:Reselect(ctx)
+        end
       end
     end)
   end
@@ -638,11 +769,22 @@ function listProto:Refresh(ctx)
   end
 end
 
--- RefreshRows lists the categories whose name has the filter's text, in their order.
+-- RefreshRows lists the categories whose name has the filter's text, in their order, then under a heading the
+-- Blizzard categories the backpack shows whose name has it, by name, in the same list (asked, issue #1278: "it's one
+-- big scroll list, not two").
 function listProto:RefreshRows()
+  local needle = strtrim(self.filter:GetText() or ""):lower()
   local entries = {}
-  for _, name in ipairs(ordered(strtrim(self.filter:GetText() or ""):lower())) do
+  for _, name in ipairs(ordered(needle)) do
     table.insert(entries, { name = name })
+  end
+  self.managed = #entries
+  local blizzard = blizzardNames(needle)
+  if #blizzard > 0 then
+    table.insert(entries, { header = true, title = L:G("Blizzard Categories") })
+    for _, name in ipairs(blizzard) do
+      table.insert(entries, { name = name, blizzard = true })
+    end
   end
   self.entries = entries
   self:layoutRows()
@@ -655,7 +797,8 @@ end
 ---@param after number
 function listProto:Drop(name, after)
   local shown = {}
-  for i, entry in ipairs(self.entries) do
+  for i = 1, self.managed do
+    local entry = self.entries[i]
     if entry.name == name then
       if i <= after then
         after = after - 1
@@ -687,15 +830,16 @@ function listProto:RowFor(name)
   return self.byName[name]
 end
 
--- rowFor returns a category's own row, taking one no category has, or making one, the first time.
+-- rowFor returns an entry's own row, taking one no entry has, or making one, the first time.
 ---@private
----@param name string
+---@param entry table
 ---@return NextCategoryListRow
-function listProto:rowFor(name)
-  local row = self.byName[name]
+function listProto:rowFor(entry)
+  local key = keyOf(entry)
+  local row = self.byName[key]
   if row == nil then
     row = table.remove(self.free) or self:newRow()
-    self.byName[name] = row
+    self.byName[key] = row
   end
   return row
 end
@@ -738,16 +882,18 @@ function listProto:newRow()
     row.hovered = false
     self:paintRow(row)
   end)
+  -- A Blizzard category has no place in the order to drag it to.
   addon.SetScript(frame, "OnDragStart", function()
-    if row.entry and row.entry.name then
+    if row.entry and row.entry.name and not row.entry.blizzard then
       self.drag:Start(row.entry.name)
     end
   end)
   return row
 end
 
--- layoutRows shows each category listed in its own row, RowHeight tall, saying how many of the shown bags'
--- items it holds (asked: "x items matching"), and puts the rows of those no longer listed away; the list's arrangement places them (NextListReorder: a row that moved slides).
+-- layoutRows shows each entry listed in its own row: a category RowHeight tall, saying how many of the shown bags'
+-- items it holds (asked: "x items matching"), a Blizzard category marked as Blizzard's, the heading GroupHeight tall;
+-- and puts the rows of those no longer listed away; the list's arrangement places them (NextListReorder: a row that moved slides).
 ---@private
 function listProto:layoutRows()
   local K = style.Theme.Settings.Categories
@@ -755,16 +901,24 @@ function listProto:layoutRows()
   local counts = matchingCounts(self.bags())
   self.rows = {}
   for i, entry in ipairs(self.entries) do
-    local row = self:rowFor(entry.name)
-    listed[entry.name] = true
+    local row = self:rowFor(entry)
+    listed[keyOf(entry)] = true
     self.rows[i] = row
     row.entry = entry
-    row.frame:SetHeight(pixel:Length(self.frame, K.RowHeight))
-    local filter = categories:GetCategoryByName(entry.name)
-    row.label:SetText(entry.name)
-    row.detail:SetText(count(counts[entry.name] or 0, L:G("%d item matching"), L:G("%d items matching")))
-    local c = filter and filter.color or GOLD
-    row.dot:SetColorTexture(c[1], c[2], c[3], 1)
+    row.frame:EnableMouse(entry.header ~= true)
+    if entry.header then
+      row.frame:SetHeight(pixel:Length(self.frame, K.GroupHeight))
+      row.label:SetText(string.upper(entry.title))
+      row.detail:SetText("")
+    else
+      row.frame:SetHeight(pixel:Length(self.frame, K.RowHeight))
+      local filter = categories:GetCategoryByName(entry.name)
+      row.label:SetText(entry.name)
+      local matching = count(counts[entry.name] or 0, L:G("%d item matching"), L:G("%d items matching"))
+      row.detail:SetText(entry.blizzard and (L:G("Blizzard") .. " · " .. matching) or matching)
+      local c = filter and filter.color or GOLD
+      row.dot:SetColorTexture(c[1], c[2], c[3], 1)
+    end
     row.frame:Show()
     self:paintRow(row)
   end
@@ -779,7 +933,8 @@ function listProto:layoutRows()
   self.drag:Arrange()
 end
 
--- paintRow draws a row: its category chosen, under the pointer, or neither.
+-- paintRow draws a row: its category chosen, under the pointer, or neither; the heading as a bag's Order tab draws
+-- its headings, its name above its bottom.
 ---@private
 ---@param row NextCategoryListRow
 function listProto:paintRow(row)
@@ -787,12 +942,16 @@ function listProto:paintRow(row)
   local entry = row.entry
   row.label:ClearAllPoints()
   row.detail:ClearAllPoints()
-  if entry == nil then
+  if entry == nil or entry.header then
     row.fill:Hide()
     row.hover:Hide()
     row.indicator:Hide()
     row.dot:Hide()
     row.detail:Hide()
+    if entry ~= nil then
+      style:SetFont(row.label, K.GroupFont)
+      pixel:Point(row.label, "BOTTOMLEFT", row.frame, "BOTTOMLEFT", pixel:Snap(row.frame, SB.Pad), pixel:Snap(row.frame, 4))
+    end
     return
   end
   local chosen = entry.name == editor.selected
@@ -883,13 +1042,20 @@ function actionsProto:Refresh(ctx)
   self:Style()
 end
 
--- AskRename renames the chosen category, keeping it chosen, or says why it cannot.
+-- AskRename renames the chosen category, keeping it chosen, or says why it cannot. Renaming one made from a Blizzard
+-- category makes it a new category (asked: "accept with a warning that it's making a new category technically").
 function actionsProto:AskRename()
   local current = editor.selected
   if current == nil then
     return
   end
-  askName(self.owner, L:G("Rename Category"), format(L:G("Rename the category '%s' to:"), current), L:G("Rename"),
+  local filter = editor:Chosen()
+  local text = format(L:G("Rename the category '%s' to:"), current)
+  if filter and filter.blizzard then
+    text = format(L:G("Renaming '%s' turns it into a separate category. Blizzard's items will go back to the built-in "
+      .. "'%s' category, and only your changes move to the new name. Rename it to:"), current, current)
+  end
+  askName(self.owner, L:G("Rename Category"), text, L:G("Rename"),
     current, current, function(ctx, name)
       if name == current then
         return
@@ -1184,8 +1350,9 @@ function settingsTabProto:Refresh(ctx)
   for _, part in ipairs({ self.labels.bags, self.labels.hide, self.labels.color, self.swatch.frame, self.resetColor.frame, self.labels.inBags, self.inBags, self.grid.frame }) do
     part:SetShown(filter ~= nil)
   end
+  -- A category made from a Blizzard category never groups (asked, issue #1278).
   for _, part in ipairs({ self.labels.groupBy, self.groupBy.frame, self.groupByHint }) do
-    part:SetShown(yours)
+    part:SetShown(yours and not filter.blizzard)
   end
   if filter ~= nil then
     local c = filter.color
@@ -1198,15 +1365,15 @@ function settingsTabProto:Refresh(ctx)
   end
 end
 
--- showInBags shows what of your bags shows in a category now (its group by's sections too): how many
--- items in each bag, and the items, one cell per item with how many there are.
+-- showInBags shows what of your bags shows in a category now (its group by's sections too), in the bags
+-- that use it (holds): how many items in each bag, and the items, one cell per item with how many there are.
 ---@private
 ---@param name string
 function settingsTabProto:showInBags(name)
   local perBag, order, byItem, list = {}, {}, {}, {}
   bagItemsOf(self.bags(), function(bag, _, data)
     local info = data.itemInfo
-    if not isShownIn(name, info.category or "") then
+    if not isShownIn(name, info.category or "") or not holds(name, bag) then
       return
     end
     if perBag[bag.kind] == nil then

@@ -293,8 +293,8 @@ end
 ---@return Section
 function views.viewProto:GetOrCreateSection(ctx, category, onlyCreate)
   local section = self.sections[category]
-  -- Look up category color
-  local filter = categories:GetCategoryByName(category)
+  -- The category's color in this view's bag: none where the bag does not use it (category-lifecycle.md §11).
+  local filter = categories:CategoryIn(category, self.kind)
   local color = filter and filter.color or nil
 
   if section == nil then

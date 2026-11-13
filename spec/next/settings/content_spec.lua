@@ -195,7 +195,8 @@ describe("NextSettingsContent", function()
       local made = {}
       local editor = addon:GetModule("NextSettingsCategories")
       local rows = addon:GetModule("NextSettingsRows")
-      local chosen, rule = true, true
+      local chosen, rule, blizzard = true, true, false
+      override(editor, "BlizzardChosen", function() return blizzard end)
       override(editor, "CreateList", function(_, parent, owner)
         made.list = { parent = parent, owner = owner }
         local list = { frame = CreateFrame("Frame", nil, parent) }
@@ -288,6 +289,27 @@ describe("NextSettingsContent", function()
       settings:Select("categories", "rule")
       assert.are.equal("settings", settings.tabId)
       assert.is_false(settings.tabs.frame:IsShown(), "one tab: no tab bar")
+      -- Issue #1278: a Blizzard category chosen shows what it is and a button that makes it yours, in settings rows,
+      -- instead of every tab.
+      blizzard = true
+      local converted = 0
+      override(editor, "BlizzardHelp", function() return "Junk is a Blizzard category." end)
+      override(editor, "Convert", function() converted = converted + 1 end)
+      settings:Select("categories", "settings")
+      assert.are.equal("blizzard", settings.tabId)
+      assert.is_false(settings.tabs.frame:IsShown(), "one tab: no tab bar")
+      local tab
+      for _, t in ipairs(pages:Get("categories").tabs) do
+        if t.id == "blizzard" then tab = t end
+      end
+      local blizzardRows = pages:Sections(tab)[1].rows
+      assert.are.equal("Junk is a Blizzard category.", blizzardRows[1].text())
+      assert.are.equal("Convert to Category", blizzardRows[2].buttons[1].text)
+      blizzardRows[2].buttons[1].onClick(addon:GetModule("Context"):New("spec"))
+      assert.are.equal(1, converted)
+      blizzard = false
+      settings:Select("categories", "blizzard")
+      assert.are.equal("settings", settings.tabId, "only for a Blizzard category")
     end)
 
     -- The classic bags' currency icons (frames/currency.lua): on clients with currencies (retail, WoW:

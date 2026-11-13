@@ -19,7 +19,7 @@ local motion = addon:GetModule("Motion")
 local style = addon:GetModule("NextStyle")
 
 describe("NextListReorder", function()
-  local box, content, entries, rows, drops, drag, first
+  local box, content, entries, rows, drops, drag, first, last
 
   local function finishTweens()
     for _ = 1, 400 do
@@ -40,7 +40,7 @@ describe("NextListReorder", function()
 
   local function make()
     drag = reorder:Create({
-      box = box, content = content, first = first,
+      box = box, content = content, first = first, last = last,
       entries = function() return entries end,
       rowOf = function(entry) return rows[keyOf(entry)] end,
       heightOf = function(entry) return entry.header and 20 or 40 end,
@@ -63,7 +63,7 @@ describe("NextListReorder", function()
       rows[keyOf(entry)] = CreateFrame("Button", nil, content)
     end
     drops = {}
-    first = nil
+    first, last = nil, nil
     make()
     _G._mouseButtonsDown = { LeftButton = true }
   end)
@@ -188,6 +188,22 @@ describe("NextListReorder", function()
       at(1)
       step()
       assert.are.same({ 0, 60, 100 }, { yOf("# Pinned"), yOf("A"), yOf("C") }, "after the heading")
+    end)
+
+    -- The Categories page keeps its own categories above Blizzard's (issue #1278): how many may come before the room is
+    -- read at every move, as the list changes.
+    it("never puts its room after the last place it may land", function()
+      local limit = 3
+      last = function() return limit end
+      make()
+      drag:Arrange(280)
+      start("A")
+      at(500)
+      step()
+      assert.are.same({ 20, 100 }, { yOf("B"), yOf("C") }, "before the third other row (C) at most")
+      limit = 4
+      step()
+      assert.are.same({ 20, 60 }, { yOf("B"), yOf("C") }, "read again: after C")
     end)
 
     it("goes by where the list is on screen, as it scrolls", function()

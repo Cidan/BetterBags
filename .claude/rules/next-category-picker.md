@@ -74,7 +74,9 @@ speaking, micro windows with tiny interactions for lots of elements is bad"):
     next/settings/categories.lua `askName`). Lit: the first category that matches and can be picked, else the new one.
   - Each category: its color's dot (gold without one, as the settings list), checked when the item shows in it or in one
     of its group by's sections, its note how many items of the backpack and bank it holds (each item once, its group by's
-    sections with it: the settings list's count, counted once as the picker opens). A plugin's (`filter.save ~= true`)
+    sections with it, only in bags that use it: the settings list's count, counted once as the picker opens). A category
+    made from a Blizzard category never groups, so a longer name ("Toys - Pets") is not one of its sections, for the
+    check, the count or the way back (`isShownIn`, category-lifecycle.md §11). A plugin's (`filter.save ~= true`)
     is disabled, its note "Made by a plugin": a plugin fills its own category (`FileItem` returns "plugin").
 - **Picking** (`Pick`), then `bags/Rederive` (refresh-scheduler.md §10):
   - a category: `categories:FileItem(ctx, itemID, name, natural)`, exactly the header drop's filing (natural: the

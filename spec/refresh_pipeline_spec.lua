@@ -108,6 +108,7 @@ local function stubModules()
   override(categories, "GetCustomCategory", function() return nil, nil end)
   override(categories, "SkipsRecentOf", function() return false end)
   override(categories, "HiddenIn", function() return false end)
+  override(categories, "CategoryIn", function() return nil end)
   override(categories, "DoesCategoryExist", function() return false end)
   override(categories, "IsCategoryShown", function() return true end)
   override(categories, "CreateCategory", function() end)
@@ -4097,6 +4098,66 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       rules({ { "Alpha Items", "alpha", 1, { [101] = true }, const.SEARCH_CATEGORY_GROUP_BY.TYPE } })
       local slotInfo = refreshBackpack({ wipe = true })
       assert.is_nil(categoryOf(slotInfo, "0_1"):find("Alpha Items", 1, true))
+    end)
+  end)
+
+  -- Asked (issue #1278): an item a category made from a Blizzard category ignores goes to Everything ("yes, send to
+  -- everything"); in a bag that does not use the category, the section of its name is Blizzard's, as before ("we don't
+  -- want dual behavior for options").
+  describe("an item a category of its Blizzard category's name ignores", function()
+    local used
+
+    before_each(function()
+      used = { [const.BAG_KIND.BACKPACK] = true }
+      override(categories, "CategoryIn", function(_, name, kind)
+        if name == "Junk" and used[kind] then
+          return { name = "Junk", ignoredItems = { [101] = true } }
+        end
+        return nil
+      end)
+      mockContainer[0] = { { itemID = 101, guid = "g101", count = 1, info = { quality = 0 } },
+        { itemID = 202, guid = "g202", count = 1, info = { quality = 0 } } }
+    end)
+
+    local function categoryOf(slotInfo, slotkey)
+      return slotInfo.itemsBySlotKey[slotkey].itemInfo.category
+    end
+
+    it("goes to Everything, where an item with no category goes; the others stay", function()
+      local slotInfo = refreshBackpack({ wipe = true })
+      assert.equal("Everything", categoryOf(slotInfo, "0_1"))
+      assert.equal("Junk", categoryOf(slotInfo, "0_2"))
+    end)
+
+    -- The Categories page lists a section as Blizzard's when its items are where BuiltInCategory puts them.
+    it("shows every item no category takes where BuiltInCategory says, the ignored one too", function()
+      local slotInfo = refreshBackpack({ wipe = true })
+      for _, key in ipairs({ "0_1", "0_2" }) do
+        local data = slotInfo.itemsBySlotKey[key]
+        assert.equal(items:BuiltInCategory(data), data.itemInfo.category, key)
+      end
+      assert.equal("Junk", items:BlizzardCategory(slotInfo.itemsBySlotKey["0_1"]), "Blizzard's name, before the ignore")
+    end)
+
+    it("stays in Blizzard's category in a bag that does not use the category", function()
+      used = {}
+      local slotInfo = refreshBackpack({ wipe = true })
+      assert.equal("Junk", categoryOf(slotInfo, "0_1"))
+    end)
+
+    it("asks whether a category skips Recent Items in the item's bag", function()
+      local kinds = {}
+      override(categories, "SkipsRecentOf", function(_, _, kind)
+        table.insert(kinds, kind)
+        return false
+      end)
+      newSlots["0_2"] = true
+      override(database, "GetCategoryFilter", function(_, _, filter) return filter == "RecentItems" end)
+      refreshBackpack({ wipe = true })
+      assert.is_true(#kinds > 0)
+      for _, kind in ipairs(kinds) do
+        assert.are.equal(const.BAG_KIND.BACKPACK, kind)
+      end
     end)
   end)
 

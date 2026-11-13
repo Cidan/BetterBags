@@ -27,7 +27,7 @@ The main item management module that handles all item data operations including 
 - **Item Level Tracking**: Updates per-character max item level and notifies listeners for dynamic color scaling
 - **Bag Type Detection**: Identifies different bag types (normal, profession, reagent, keyring). The keyring (Classic Era, and WoW: Forever) is read with the backpack, only the slots the game opens (`GetKeyRingSize()`; the rest are padlocked), its slots are not free space, and Show Bags names it "Keyring", numbered after the last bag (`GetBagName`) and listed after every bag (`.claude/rules/keyring.md`)
 - **Item Hashing**: Generates unique hashes for item stacking
-- **Category Assignment**: Determines item categories based on filters. Items no custom or search category claims are named from the enabled filters joined with " - ": item type, subtype, trade skill, expansion (`GetCategory`). A subtype equal to the type before it is skipped, so quest items read "Quest", not "Quest - Quest" (settings saved under old names are moved by `DB:RenameRepeatedTypeCategories`, `.claude/rules/category-lifecycle.md` §5)
+- **Category Assignment**: Determines item categories based on filters. Items no custom or search category claims get their built-in category (`BuiltInCategory`), Blizzard's (`BlizzardCategory`): Junk, their equipment location, or the enabled filters joined with " - ": item type, subtype, trade skill, expansion. A subtype equal to the type before it is skipped, so quest items read "Quest", not "Quest - Quest" (settings saved under old names are moved by `DB:RenameRepeatedTypeCategories`, `.claude/rules/category-lifecycle.md` §5). An item that a category of the player's with that Blizzard name ignores, in a bag that uses the category, goes to "Everything" instead (`.claude/rules/category-lifecycle.md` §11)
 - **New Item Tracking**: Manages "new item" status with timers
 - **Junk Mark**: Every sweep marks each item with whether Blizzard's junk coin shows on it (`junkMarked`: poor, sells for something, `MerchantFrame:IsShown()`), so opening or closing a vendor redraws only the junk (`.claude/rules/item-drawing.md` §7b)
 - **Equipment Data**: Handles equipped item information
@@ -76,7 +76,8 @@ Manages both custom user-defined categories and dynamic search categories.
 - **Custom Categories**: User-defined item groups
 - **Search Categories**: Dynamic categories based on search queries
 - **Priority System**: Categories can have priorities for ordering
-- **Per-Bag Enable/Disable**: Categories can be toggled per bag type
+- **Per-Bag Enable/Disable**: Categories can be toggled per bag type. Whether a bag uses a category decides everything it does there: its color, Hide In, automation and Ignored Items are looked up through `CategoryIn(name, kind)`, which finds nothing in a bag that does not use it
+- **Blizzard Categories Made Yours**: `Convert(ctx, name)` makes a Blizzard category (one BetterBags names from item data) a category of the player's with the same name, marked `blizzard`, so Blizzard's items keep landing in it; it never groups, and renaming it makes an ordinary category (`.claude/rules/category-lifecycle.md` §11)
 - **Ephemeral Categories**: Temporary runtime categories
 - **Category Functions**: Plugin system for dynamic categorization
 
@@ -99,13 +100,20 @@ categories:RegisterCategoryFunction(id, func)
 -- Get all categories
 categories:GetAllCategories()
 
--- What a category does on its own (a group by's sections as their category): Auto Sell ("sell",
--- "destroy" or nil), whether its sale waits for the player, and where Auto Deposit puts its items
--- ("bank", "warbank" or nil)
-categories:AutomationOf(name)
-categories:ConfirmsSaleOf(name)
-categories:DepositOf(name)
+-- The category whose settings a section of this name takes in a bag (a group by's section: its
+-- category), or nil for a Blizzard category or a bag that does not use it
+categories:CategoryIn(name, kind)
+
+-- What a category does on its own in a bag (a group by's sections as their category): Auto Sell
+-- ("sell", "destroy" or nil), whether its sale waits for the player, and where Auto Deposit puts its
+-- items ("bank", "warbank" or nil)
+categories:AutomationOf(name, kind)
+categories:ConfirmsSaleOf(name, kind)
+categories:DepositOf(name, kind)
 categories:UpdateCategory(ctx, name, { automation = "sell", confirmSale = false, deposit = "warbank" })
+
+-- Make a Blizzard category the player's (false for a name a category has); the caller recalculates the bags
+categories:Convert(ctx, name)
 ```
 
 ### Search (`search.lua`)

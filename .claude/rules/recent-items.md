@@ -87,8 +87,8 @@ leaves on the following close once it is old enough.
 - **Skip Recent Items** (a category setting; asked: "makes items that get assigned that category skip
   the recent items list (it gets unmarked as a new item, goes right to the category) -- this is 100%
   independent of autosell"; docs/next-batch-2.md §1): stored as `skipRecent = true` on the category (a
-  plugin's in its saved state), read with `categories:SkipsRecentOf(name)` (a group by's sections as
-  their category). In Phase 8, once this sweep's search categories are matched,
+  plugin's in its saved state), read with `categories:SkipsRecentOf(name, kind)` in the item's bag (a group by's
+  sections as their category; none in a bag that does not use it, category-lifecycle.md §11). In Phase 8, once this sweep's search categories are matched,
   `items:SkipRecent` unmarks each new item whose category without Recent Items (`derived.base`,
   data-loader.md §18: its own category with its search categories, worked out only when one of those
   changes) skips Recent Items: `ClearNewItemFromData` ends its timer and removes the client's new-item

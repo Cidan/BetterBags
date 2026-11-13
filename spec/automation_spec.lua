@@ -204,6 +204,36 @@ describe("Automation", function()
       assert.is_falsy(asked[1].own, "search categories count")
     end)
 
+    -- A category does nothing in a bag that does not use it (issue #1278: a category of yours named like a Blizzard
+    -- category, turned off in the backpack): what it does is asked of the backpack.
+    it("asks what a category does in the backpack", function()
+      local lookups = {}
+      local function record(what, answer)
+        return function(_, name, kind)
+          table.insert(lookups, what .. ":" .. tostring(kind))
+          return answer(name)
+        end
+      end
+      override(categories, "AutomationOf", record("AutomationOf", function(name) return actions[name] end))
+      override(categories, "DepositOf", record("DepositOf", function(name) return deposits[name] end))
+      local confirming = true
+      override(categories, "ConfirmsSaleOf", record("ConfirmsSaleOf", function() return confirming end))
+      put(0, 1, 11, "Junk")
+      put(0, 2, 12, "Herbs")
+      automation:Entries(ctx())
+      automation:DepositList(ctx())
+      automation:SaleOffer(ctx(), { slots["0_1"].data })
+      confirming = false
+      automation:saleNow(ctx())
+      local seen = {}
+      for _, call in ipairs(lookups) do
+        seen[call] = true
+        assert.are.equal(tostring(BACKPACK), call:match(":(.*)$"), call)
+      end
+      assert.is_true(seen["AutomationOf:" .. BACKPACK] and seen["DepositOf:" .. BACKPACK]
+        and seen["ConfirmsSaleOf:" .. BACKPACK] or false)
+    end)
+
     -- What a docked section holds to sell and to destroy (BetterBags Next's vendor, automation.md §4):
     -- the same rules, over the items given.
     it("lists only the items given, when given", function()

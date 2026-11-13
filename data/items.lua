@@ -1613,7 +1613,7 @@ end
 function items:SkipRecent(ctx, item, category)
   -- Not on a guess: a rule can take an item with no upgrade state yet (NOT upgrade = true), and what this
   -- ends cannot be given back when the answer says otherwise.
-  if item.upgradeUnknown or not (item.stackRecent or self:IsNewItem(item)) or not categories:SkipsRecentOf(category) then
+  if item.upgradeUnknown or not (item.stackRecent or self:IsNewItem(item)) or not categories:SkipsRecentOf(category, item.kind) then
     return false
   end
   item.stackRecent = nil
@@ -4267,6 +4267,29 @@ function items:GetCategory(ctx, data, own, ignoreRecent, withoutAdded)
     return self:GroupedCategory(ctx, customCategory, customFilter, data)
   end
 
+  return self:BuiltInCategory(data)
+end
+
+-- BuiltInCategory returns the category an item no category of yours or a plugin's takes shows in: Blizzard's
+-- (BlizzardCategory), or Everything, where an item with no category goes, for one that a category of yours of that
+-- name ignores where the bag uses it: it has no other Blizzard category (category-lifecycle.md §11).
+---@param data ItemData
+---@return string
+function items:BuiltInCategory(data)
+  local name = self:BlizzardCategory(data)
+  local owner = categories:CategoryIn(name, data.kind)
+  if owner and owner.ignoredItems and owner.ignoredItems[data.itemInfo.itemID] then
+    return L:G("Everything")
+  end
+  return name
+end
+
+-- BlizzardCategory returns the category Blizzard's item data names for an item no category of yours takes: Junk for
+-- poor quality, else its equipment location, else its type, subtype, trade skill and expansion as the bag's filters
+-- say, joined with " - ".
+---@param data ItemData
+---@return string
+function items:BlizzardCategory(data)
   local quality = data.containerInfo and data.containerInfo.quality
   if quality == const.ITEM_QUALITY.Poor then
     return L:G("Junk")

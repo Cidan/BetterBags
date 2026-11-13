@@ -72,6 +72,7 @@ if not ok or not categories then
 end
 categories.IsCategoryShown = function() return true end
 categories.GetCategoryByName = function() return nil end
+categories.CategoryIn = categories.CategoryIn or function() return nil end
 categories.GetCategoryFilter = function() return nil end
 categories.CreateCategory = function() end
 

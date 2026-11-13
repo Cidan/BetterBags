@@ -207,6 +207,7 @@ local function stubModules()
   local categories = stubModule("Categories")
   override(categories, "IsCategoryShown", function() return true end)
   override(categories, "GetCategoryByName", function() return nil end)
+  override(categories, "CategoryIn", function() return nil end)
   override(categories, "GetGroupForCategory", function() return nil end)
 
   local groups = stubModule("Groups")
@@ -1533,22 +1534,35 @@ describe("Bag Draw: shared item button ownership across global sections and view
       assert.are.same({ { kind = const.BAG_KIND.BANK, bankTab = 7 } }, placements)
     end)
 
-    it("still adds the item to the title's category with Shift", function()
+    -- Issue #1278: a Blizzard category's title makes it yours first, as BetterBags Next's header and the Categories
+    -- page's Convert do; a category's title adds to it.
+    it("still adds the item to the title's category with Shift, a Blizzard category's made yours first", function()
       local sectionFrame = addon:GetModule("SectionFrame")
+      local categories = addon:GetModule("Categories")
       local added = {}
-      override(addon:GetModule("Categories"), "AddPermanentItemToCategory", function(_, _, itemID, category)
+      override(categories, "AddPermanentItemToCategory", function(_, _, itemID, category)
         table.insert(added, { itemID = itemID, category = category })
       end)
+      override(categories, "DoesCategoryExist", function(_, name) return name == "Mats" end)
+      override(categories, "Convert", function(_, _, name)
+        table.insert(added, { convert = name })
+        return true
+      end)
       override(addon, "GetBagFromKind", function() return watchedBag() end)
+      local title = "Armor"
       local section = {
         GetKind = function() return const.BAG_KIND.BACKPACK end,
-        GetTitle = function() return "Armor" end,
+        GetTitle = function() return title end,
       }
       holdItem()
       _G._isShiftKeyDown = true
       sectionFrame:OnTitleClickOrDrop(context:New("drop"), section)
-      assert.are.same({ { itemID = 1001, category = "Armor" } }, added)
+      assert.are.same({ { convert = "Armor" }, { itemID = 1001, category = "Armor" } }, added)
       assert.are.same({}, placements)
+      added, title = {}, "Mats"
+      holdItem()
+      sectionFrame:OnTitleClickOrDrop(context:New("drop"), section)
+      assert.are.same({ { itemID = 1001, category = "Mats" } }, added)
     end)
   end)
 

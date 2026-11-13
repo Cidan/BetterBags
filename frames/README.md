@@ -114,7 +114,7 @@ Container for grouping items into categorized sections.
 **Key Features:**
 - Category-based item grouping
 - Drag-and-drop category assignment (backpack and bank, with cross-type constraints)
-- Item drops on the title: with Shift the item is added to the section's category; without Shift the drop goes to the title's bag window (`bag:PlaceCursorItem()`)
+- Item drops on the title: with Shift the item is added to the section's category (a Blizzard category is first made the player's with `categories:Convert`, as BetterBags Next's header does); without Shift the drop goes to the title's bag window (`bag:PlaceCursorItem()`)
 - Right-click section actions
 - Automatic sorting
 

@@ -25,6 +25,7 @@ itemFrame.GetButton = function() return {} end
 
 local categories = StubBetterBagsModule("Categories")
 categories.GetCategoryByName = function() return nil end
+categories.CategoryIn = function() return nil end
 
 -- views.lua names an item's section with Localization and repairs anchors with Debug. Stubs
 -- this file creates are removed after it, so a later spec file can load the real modules.
@@ -60,6 +61,37 @@ describe("Views Module - Pure Presentation", function()
     local section = view:GetOrCreateSection(ctx, "TestCategory")
     assert.is_not_nil(section)
     assert.is_false(createCategoryCalled, "categories:CreateCategory should NOT be called in GetOrCreateSection during draw phase")
+  end)
+
+  -- Issue #1278: a section takes its category's color in the view's bag; in a bag that does not use the category, the
+  -- section of its name is Blizzard's, uncolored.
+  it("colors a section as its category in the view's bag", function()
+    local savedCreate, savedIn = sectionFrame.Create, categories.CategoryIn
+    local colors = {}
+    sectionFrame.Create = function()
+      return { frame = { SetParent = function() end }, SetTitle = function(_, text, color) colors[text] = color or false end }
+    end
+    categories.CategoryIn = function(_, name, kind)
+      if name == "Junk" and kind == 1 then return { name = "Junk", color = { 1, 0, 0 } } end
+      return nil
+    end
+    local view = views:NewBlankView()
+    view.bagview = const.BAG_VIEW.SECTION_GRID
+    view.sections = {}
+    view.content = {
+      GetScrollView = function() return {} end,
+      AddCell = function() end,
+      GetCell = function() return nil end,
+    }
+    view.kind = 1
+    view:GetOrCreateSection(ctx, "Junk")
+    local used = colors.Junk
+    view.sections = {}
+    view.kind = 0
+    view:GetOrCreateSection(ctx, "Junk")
+    sectionFrame.Create, categories.CategoryIn = savedCreate, savedIn
+    assert.are.same({ 1, 0, 0 }, used)
+    assert.is_false(colors.Junk)
   end)
 end)
 

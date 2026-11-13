@@ -1038,7 +1038,8 @@ local function normalizeEnabled(enabled)
 end
 
 -- normalizeRule makes group by the category's own (from its rule, or a "group by" clause left at the
--- end of its search) and drops a rule whose search is empty.
+-- end of its search) and drops a rule whose search is empty. A category made from a Blizzard category
+-- never groups: its clause is dropped (category-lifecycle.md §11).
 ---@param filter CustomCategoryFilter
 local function normalizeRule(filter)
   local rule = filter.searchCategory
@@ -1050,7 +1051,9 @@ local function normalizeRule(filter)
   local lower = query:lower()
   local from, _, word = lower:find("group%s+by%s+(%w+)%s*$")
   if from ~= nil and (from == 1 or lower:sub(from - 1, from - 1):match("%s")) and GROUP_BY_WORDS[word] then
-    filter.groupBy = GROUP_BY_WORDS[word]
+    if not filter.blizzard then
+      filter.groupBy = GROUP_BY_WORDS[word]
+    end
     query = strtrim(query:sub(1, from - 1))
   elseif filter.groupBy == nil and rule.groupBy ~= nil then
     filter.groupBy = rule.groupBy

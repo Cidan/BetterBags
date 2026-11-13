@@ -567,6 +567,21 @@ describe("Database Migration", function()
       assert.are.same({ query = "name = regroup by type" }, f.Word.searchCategory)
     end)
 
+    -- Asked (issue #1278): a category made from a Blizzard category never groups, "including on search strings! we just
+    -- ignore the group clause".
+    it("drops a group by clause from a category made from a Blizzard category, without grouping it", function()
+      profile.customCategoryFilters = {
+        Junk = { name = "Junk", itemList = {}, blizzard = true, searchCategory = { query = "rarity = poor group by type" } },
+        Only = { name = "Only", itemList = {}, blizzard = true, searchCategory = { query = "group by expansion" } },
+      }
+      DB:Migrate()
+      local f = profile.customCategoryFilters
+      assert.are.same({ query = "rarity = poor" }, f.Junk.searchCategory)
+      assert.is_nil(f.Junk.groupBy)
+      assert.is_nil(f.Only.searchCategory)
+      assert.is_nil(f.Only.groupBy)
+    end)
+
     it("files every listed item where its list says, as the real profiles needed", function()
       profile.customCategoryFilters = {
         Midnight = { name = "Midnight", itemList = { [202395] = true }, priority = 2 },

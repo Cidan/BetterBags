@@ -34,6 +34,7 @@ local reorder = addon:NewModule('NextListReorder')
 ---@field rowOf fun(entry: table): Frame The row frame that shows an entry, its own.
 ---@field heightOf fun(entry: table): number How tall an entry's row is.
 ---@field first? number The first place among the other rows a row may land (default 1).
+---@field last? fun(): number The last place among the other rows a row may land (default: after every one), read at every move.
 ---@field onDrop fun(name: string, after: number) A row let go after the entry at after in the list as it
 --- was, counted with the row itself (0: before the first).
 
@@ -160,8 +161,8 @@ function listProto:Start(name)
 end
 
 -- IndexAt returns where among the other rows a row let go where the cursor is would land: before the
--- first whose middle is below the cursor, kept from the first place it may land; nil while the list has
--- no place on screen.
+-- first whose middle is below the cursor, kept between the first and the last places it may land; nil
+-- while the list has no place on screen.
 ---@return number?
 function listProto:IndexAt()
   -- The cursor is on the screen; the list in its own units (the settings window scales down to fit a
@@ -183,7 +184,11 @@ function listProto:IndexAt()
       y = y + height
     end
   end
-  return math.max(self.opts.first or 1, index or (others + 1))
+  index = math.max(self.opts.first or 1, index or (others + 1))
+  if self.opts.last ~= nil then
+    index = math.min(index, self.opts.last())
+  end
+  return index
 end
 
 -- Update runs a frame of the drag: the row follows the cursor, its room moves under the cursor (the

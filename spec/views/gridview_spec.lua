@@ -66,6 +66,7 @@ debug.WalkAndFixAnchorGraph = function() end
 local categories = StubBetterBagsModule("Categories")
 categories.IsCategoryShown = function() return true end
 categories.GetCategoryByName = function() return nil end
+categories.CategoryIn = function() return nil end
 categories.CreateCategory = function() end
 
 local groups = StubBetterBagsModule("Groups")
