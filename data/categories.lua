@@ -876,6 +876,52 @@ function categories:DepositOf(name, kind)
   return filter and filter.deposit or nil
 end
 
+-- forgetSections forgets the sections a category's group by made (its sub-categories), in memory and saved, with what
+-- each bag saved for them (pins, tabs).
+---@private
+---@param name string
+function categories:forgetSections(name)
+  local sections = {}
+  for sub, filter in pairs(self.ephemeralCategories) do
+    if filter.isGroupBySubcategory and filter.groupByParent == name then
+      table.insert(sections, sub)
+    end
+  end
+  for _, sub in ipairs(sections) do
+    for id in pairs(self.ephemeralCategories[sub].itemList or {}) do
+      self.ephemeralCategoryByItemID[id] = nil
+    end
+    self.ephemeralCategories[sub] = nil
+    database:DeleteItemCategory(sub)
+  end
+end
+
+-- ConvertNamed makes each category of yours named in names (a set of the Blizzard category names the items of a read
+-- have, Items:BlizzardCategory) one made from it, as if it had been named so (category-lifecycle.md §11; asked: "i
+-- would prefer hidden changes to non-uniform behavior"): it never groups, so its group by and its sections go. With one
+-- changed, the bags are recalculated. It returns whether it changed one.
+---@param ctx Context
+---@param names table<string, boolean>
+---@return boolean
+function categories:ConvertNamed(ctx, names)
+  local converted = false
+  for name in pairs(names) do
+    local filter = database:GetItemCategory(name)
+    if filter and not filter.blizzard then
+      filter.blizzard = true
+      filter.groupBy = nil
+      self:forgetSections(name)
+      converted = true
+    end
+  end
+  if converted then
+    self:changed()
+    events:SendMessage(ctx, 'categories/Changed')
+    events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
+  end
+  return converted
+end
+
 -- Convert makes a Blizzard category yours (category-lifecycle.md §11): a category of yours of its name, so Blizzard's
 -- items of that name keep showing in it, made from it (blizzard: it never groups). Like CreateCategory, it leaves
 -- recalculating the bags to the caller. It returns false for a name a category has.

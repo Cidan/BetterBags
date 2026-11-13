@@ -114,6 +114,10 @@ categories:UpdateCategory(ctx, name, { automation = "sell", confirmSale = false,
 
 -- Make a Blizzard category the player's (false for a name a category has); the caller recalculates the bags
 categories:Convert(ctx, name)
+
+-- After every committed read: categories of the player's named as a Blizzard category the read's items have
+-- become converted ones (their group by and its sections go), the bags recalculated once if any did
+categories:ConvertNamed(ctx, names)
 ```
 
 ### Search (`search.lua`)

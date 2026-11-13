@@ -45,6 +45,7 @@ else
 end
 categories.HiddenIn = categories.HiddenIn or function() return false end
 categories.CategoryIn = categories.CategoryIn or function() return nil end
+categories.ConvertNamed = categories.ConvertNamed or function() return false end
 categories.GetSortedSearchCategories = categories.GetSortedSearchCategories or function() return {} end
 categories.GetCustomCategory = categories.GetCustomCategory or function() return nil, nil end
 categories.DoesCategoryExist = categories.DoesCategoryExist or function() return false end

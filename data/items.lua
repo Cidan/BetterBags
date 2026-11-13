@@ -1357,6 +1357,10 @@ function items:Phase6_EnrichData(ctx, kind, itemData, emptySlotsByBag)
       -- and Skip Recent Items sees it).
       if d.category ~= stamp then
         d.ownCategory = self:GetCategory(ctx, currentItem, true, true)
+        -- Its Blizzard category, wherever it shows: a category of yours of that name becomes one made from it once the
+        -- read commits (Categories:ConvertNamed, category-lifecycle.md §11). None for an item read before its data
+        -- loaded, whose expansion reads 0 (data-loader.md §19): it is read again once loaded.
+        d.blizzard = not currentItem.harvestIncomplete and self:BlizzardCategory(currentItem) or nil
         d.category, d.base, d.final = stamp, nil, nil
         currentItem.itemInfo.category = d.ownCategory
         d.indexPending = true
@@ -2231,6 +2235,17 @@ function items:Phase11_CommitAndDispatch(ctx, kind, itemData, equipmentData, pre
     end
   end
   realSlotInfo.sortedCategories = categoryOrder
+
+  -- A category of yours named as a Blizzard category these items have becomes one made from it (category-lifecycle.md
+  -- §11; asked: "i would prefer hidden changes to non-uniform behavior"). A change queues a recalculation.
+  local blizzard = {}
+  for _, item in pairs(realSlotInfo.itemsBySlotKey) do
+    local name = item.derived and item.derived.blizzard
+    if name then
+      blizzard[name] = true
+    end
+  end
+  categories:ConvertNamed(ctx, blizzard)
 
   local ev = "items/RefreshBackpack/Done"
   if kind == const.BAG_KIND.BANK then
@@ -4286,13 +4301,13 @@ end
 
 -- KnowsBlizzardCategory says whether Blizzard's data gives an item in the bags read a category of this name
 -- (BlizzardCategory), wherever the item shows now: a category of yours made or renamed with it is one made from it
--- (category-lifecycle.md §11).
+-- (category-lifecycle.md §11). An item read before its data loaded names none (data-loader.md §19).
 ---@param name string
 ---@return boolean
 function items:KnowsBlizzardCategory(name)
   for _, slotInfo in pairs(self.slotInfo or {}) do
     for _, data in pairs(slotInfo.itemsBySlotKey or {}) do
-      if not data.isItemEmpty and data.itemInfo and self:BlizzardCategory(data) == name then
+      if not data.isItemEmpty and data.itemInfo and not data.harvestIncomplete and self:BlizzardCategory(data) == name then
         return true
       end
     end

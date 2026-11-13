@@ -810,6 +810,54 @@ describe("Categories", function()
       assert.is_nil(categories:GetCategoryByName("Junk").blizzard)
     end)
 
+    -- Asked, of a category of yours whose name Blizzard's data starts giving items: "i would prefer hidden changes to
+    -- non-uniform behavior": it becomes one made from it, as if named so, its group by and its sections gone.
+    describe("named as a Blizzard category the bags' items have now (ConvertNamed)", function()
+      local sent, savedSend
+
+      before_each(function()
+        sent = {}
+        savedSend = events.SendMessage
+        events.SendMessage = function(_, _, message, ...) table.insert(sent, { message, ... }) end
+      end)
+
+      after_each(function()
+        events.SendMessage = savedSend
+      end)
+
+      it("makes it one made from it, its group by and its sections gone, the bags recalculated once", function()
+        categories:CreateCategory(ctx, { name = "Cloth", itemList = {}, save = true, groupBy = 3,
+          enabled = { [0] = true, [1] = true, [2] = true } })
+        categories:CreateCategory(ctx, { name = "Junk", itemList = {}, save = true })
+        categories:CreateCategory(ctx, { name = "Cloth - Classic", itemList = { [5] = true }, dynamic = true,
+          isGroupBySubcategory = true, groupByParent = "Cloth" })
+        categories.ephemeralCategoryByItemID[5] = categories.ephemeralCategories["Cloth - Classic"]
+        categories:CreateCategory(ctx, { name = "Cloth - Pets", itemList = {} })
+        sent = {}
+        local before = categories:GetGeneration()
+        assert.is_true(categories:ConvertNamed(ctx, { Cloth = true, Junk = true, Leather = true }))
+        assert.is_true(dbCategories.Cloth.blizzard)
+        assert.is_nil(dbCategories.Cloth.groupBy)
+        assert.is_true(dbCategories.Junk.blizzard)
+        assert.is_nil(categories:GetCategoryByName("Cloth - Classic"), "its group by's section goes")
+        assert.is_nil(dbEphemeralCategories["Cloth - Classic"], "saved too, with what bags saved for it")
+        assert.is_nil(categories.ephemeralCategoryByItemID[5])
+        assert.is_not_nil(categories:GetCategoryByName("Cloth - Pets"), "a plugin's category of a longer name stays")
+        assert.is_nil(dbCategories.Leather, "no category is made")
+        assert.is_true(categories:GetGeneration() > before)
+        assert.are.same({ { "categories/Changed" }, { "bags/Rederive", { resetLayout = true, buttons = true } } }, sent)
+      end)
+
+      it("changes nothing for one made from it already, a plugin's, or a name no category has", function()
+        categories:Convert(ctx, "Junk")
+        categories:CreateCategory(ctx, { name = "Openable", itemList = {} })
+        sent = {}
+        assert.is_false(categories:ConvertNamed(ctx, { Junk = true, Openable = true, Trash = true }))
+        assert.is_nil(categories:GetCategoryByName("Openable").blizzard)
+        assert.are.same({}, sent)
+      end)
+    end)
+
     it("makes a category renamed to a Blizzard category's name one made from it, its group by gone", function()
       knownBlizzard = { ["Armor - Cloth"] = true }
       categories:CreateCategory(ctx, { name = "Mats", itemList = {}, save = true, groupBy = 1 })

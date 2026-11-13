@@ -375,9 +375,25 @@ turns it into a category of the player's, whose Blizzard items keep landing in i
   technically"), unless the new name is a Blizzard category's (above); Blizzard's items stay in the Blizzard section of
   the old name. The rename dialog says so. Pins and tab assignments move with the rename (`DB:RenameCategory`), as for
   any category.
-- **A Blizzard name nothing in the bags has yet** cannot be known: a category of yours named so stays ordinary, and if
-  Blizzard's data later gives items that name, they land in it by name (its settings apply). See the report of
-  2026-11-12: what to do then is the user's call.
+- **A category of yours becomes converted when Blizzard's data starts giving items its name** (asked, of a name not
+  known when the category was made: "the thing we need to make sure is we have uniform behavior ... i would prefer
+  hidden changes to non-uniform behavior"). Phase 6 keeps each item's Blizzard name with its own category
+  (`derived.blizzard`, worked out again only when the own category is: data-loader.md §18). Once a read commits (Phase
+  11, before `items/Refresh<Kind>/Done`), `categories:ConvertNamed(ctx, names)` gets the set of those names. Each saved
+  category of yours with one of them that is not converted yet becomes converted: `blizzard = true`, its group by
+  dropped and its group by's sections forgotten (`forgetSections`: in memory, saved, and their pins and tabs). A
+  change starts a new generation, sends `categories/Changed` and queues one `bags/Rederive { resetLayout, buttons }`
+  (requests made during a read wait their turn: refresh-scheduler.md). So a Blizzard name always means a converted
+  category, whether the name was known when the category was made or learned later; the cost of the uniform rule is
+  that a Group By the player set can be turned off without asking when it happens on a read (on Rename the page asks).
+  An item read before its data loaded names no Blizzard category (its expansion reads 0: data-loader.md §19), here and
+  in `KnowsBlizzardCategory`, so a wrong name never converts a category. Cost (not measured in game): one more
+  `BlizzardCategory` call per item whose own category is worked out again (none on a `categoriesUnchanged` derive),
+  and one pass over the committed items per read with a lookup per distinct name.
+- **Coverage of naming and converting on sight:** `spec/categories_spec.lua` (made, renamed, `ConvertNamed` with its
+  sections forgotten), `spec/refresh_pipeline_spec.lua` (`KnowsBlizzardCategory`; the names a read hands over, held
+  items included, kept, worked out again with the filters, none read cold), `spec/database_migration_spec.lua` (the
+  rule's old group by), `spec/next/settings/categories_spec.lua` (the rename question).
 - **Deleting** turns it back into a Blizzard category. The delete scrub (§2) also clears the pins and tab assignment
   saved under its name, which the Blizzard section had before converting.
 - **Whether a bag uses a category decides everything it does there** (asked: "we don't want dual behavior for

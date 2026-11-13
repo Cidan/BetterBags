@@ -206,7 +206,9 @@ whatever an input every item shares (a setting, the gear, the open window) chang
   nothing is kept for it):
   - `ownCategory` (Phase 6: `GetCategory` with `own`, no search categories), with `category` (the
     stamp it was worked out under: `items:categoryStamp(kind)`, the kind's category generation and
-    the Categories module's) and `recent` (`IsNewItem`).
+    the Categories module's) and `recent` (`IsNewItem`). With it, `blizzard` (`BlizzardCategory`,
+    nil for an item read cold), which a committed read hands to `Categories:ConvertNamed`
+    (category-lifecycle.md §11).
   - `base` (Phase 8: its category without Recent Items, `GetCategory` with `ignoreRecent`), with
     `searchCategory` and `searchPriority` (its slot's entries in the search cache, rebuilt every
     sweep). Worked out again when its own category was (Phase 6 drops it) or its search entries
