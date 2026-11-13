@@ -121,9 +121,16 @@ before, pushed up to keep its bottom on the screen (`clampPlace`, `saveSized`'s 
   - A grip let go also takes the place it is put at from the bottom it holds before `clampPlace` (`StopSizing`), so a
     pushed-down bag the grip made shorter goes back up at once (the mirror of the second bug review's). A Shift-click keeps the
     bottom it holds the same way (`ResetSize`).
-  - A chained bag is placed beside its anchor, bottoms level (`ChainedPlace`), and then through `clampPlace` with its own height:
-    one taller than its anchor near the screen's top is pushed down alone, its bottom off its anchor's, as Clamp Bags to Screen
-    already did with it on. Left as it is: nobody has seen it, and it is the clamp's existing behaviour.
+  - A chained bag is placed beside its anchor, lined up by the edge the anchor holds (`ChainedPlace`). With Clamp Bags to Screen
+    off it hangs from its anchor, never kept on the screen by itself (`clampPlace`, through `SmallPair`): kept so, it stopped at
+    the screen's edge while the client moved the anchor the player dragged past it, the pair apart (#1267, reported 2026-11-07
+    from Discord: "When windows are linked/chained together in BetterBags Next with 'Clamp Bags to Screen' disabled, dragging the
+    windows around causes them to become misaligned with each other"). So one taller than its anchor near the screen's top hangs
+    past it, level with its anchor, and keeps where it stands as its anchor closes (`chain:Released`) until something places it
+    again (its height changing, a drag, opening). With the clamp on, the screen holds each bag, as before: one taller than its
+    anchor near the top is pushed down alone. Coverage: `spec/next/small_spec.lua` ("a chained pair dragged past the screen's
+    edge, Clamp Bags to Screen off (#1267)": beside its anchor at every frame of a drag past the bottom and past the top, a
+    taller one, and once dropped; "goes back up to its spot beside a companion once that closes": the clamp off, as it closes).
 - **The backpack beside a companion that closes stays where it stands** (`chain:Released`, once a close: from `Hide` as the
   companion starts to close, which marks it `released`, and from `OnHidden` for a hide with no mark, Escape's at once): the backpack
   beside a companion (layout "companion") has an anchor only while a companion is open (`chain:Companion`), and then reads its

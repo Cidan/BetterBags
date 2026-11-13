@@ -2434,7 +2434,9 @@ end
 -- Autosize Bags on, all of its height stays on the screen either way: a bag holding its bottom (HeldCorner) grows up, so its
 -- top is pushed down no further than the screen's top (the mirror of "move the bag up just enough", asked when it held its
 -- top); one holding its top (from its anchor square) grows down, and is pushed up no further than keeps its bottom on the
--- screen; either goes back to where it was left as it shrinks.
+-- screen; either goes back to where it was left as it shrinks. The bag beside an open anchor hangs from it, never kept on the
+-- screen by itself: it stopped at the screen's edge while the client moved the anchor the player dragged past it, the pair
+-- apart (#1267, reported: "dragging the windows around causes them to become misaligned with each other").
 ---@private
 ---@param x number
 ---@param y number
@@ -2442,7 +2444,8 @@ end
 function panelProto:clampPlace(x, y)
   local s = self:Scale()
   if not database:GetClampBagsToScreen() then
-    if database:GetNextAutosize() then
+    local _, chained = chain:SmallPair()
+    if database:GetNextAutosize() and chained ~= self then
       local screen = UIParent:GetHeight()
       y = math.max(math.min(y, screen), math.min(screen, self:SmallHeight() * s))
     end
