@@ -1,0 +1,17 @@
+{
+  "id": 1794529597,
+  "version": "v0.9.2-14-g55385c2",
+  "channel": "alpha",
+  "date": "2026-11-13",
+  "from": "28259a5f43674937222860f4c6bb042bed9a723e",
+  "to": "55385c2b76ce6aae96e7575029df6a74a04b9547",
+  "headline": "Deleting the currently viewed tab now cleanly returns your bag or bank to the default view.",
+  "entries": [
+    {
+      "category": "Fixed",
+      "title": "Deleting an active tab now switches to the default tab",
+      "details": "Deleting the tab your backpack or bank is currently viewing now immediately switches back to the default tab and restores its categories to that view. In addition, the classic backpack now remembers your active tab instead of resetting the selection when tabs update.",
+      "clients": []
+    }
+  ]
+}
