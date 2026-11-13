@@ -4204,6 +4204,81 @@ describe("BetterBags Next's small mode", function()
         return { sortedItems = {}, tabs = { [bank:GetCurrentTabID()] = { categories = { { name = "Ore" } }, items = items } } }
       end
 
+      -- Reported (#1267): "When windows are linked/chained together in BetterBags Next with 'Clamp Bags to Screen' disabled,
+      -- dragging the windows around causes them to become misaligned with each other." The bag beside an anchor was kept on the
+      -- screen by itself (clampPlace), while the client moved the anchor the player dragged past the screen's edge.
+      describe("a chained pair dragged past the screen's edge, Clamp Bags to Screen off (#1267)", function()
+        -- pair opens the backpack holding nBag items, the bank holding nBank chained beside it, the backpack the anchor.
+        local function pair(nBag, nBank)
+          db.clamp = false
+          db.smallChain = "backpack"
+          local bag = holds(nBag)
+          local bank = nextBank:Create(ctx())
+          bank:Show(ctx())
+          bank:Draw(ctx(), bankTab(bank, nBank), function() end)
+          settle()
+          assert.are.equal(bag, chain:SmallAnchorOf(bank), "the bank chained beside the backpack")
+          return bag, bank
+        end
+
+        -- stands is where panel's top left is on the screen: where the client moves it while dragged (its rect), else where it
+        -- is anchored.
+        local function stands(panel)
+          local s = panel:Scale()
+          if panel.moving then
+            return panel.frame:GetLeft() * s, panel.frame:GetTop() * s
+          end
+          local x, y = topLeft(panel)
+          return x * s, y * s
+        end
+
+        -- off is how far the bank stands from its spot beside the backpack as the backpack stands now.
+        local function off(bag, bank)
+          local x, y = chain:ChainedPlace(bank, bag, stands(bag))
+          local bx, by = stands(bank)
+          return math.max(math.abs(bx - x), math.abs(by - y))
+        end
+
+        -- drag drags panel by its title row through each top in tops at x, a frame at each, and drops it.
+        local function drag(panel, x, tops, each)
+          panel.mover:GetScript("OnDragStart")(panel.mover, "LeftButton")
+          local f, s = panel.frame, panel:Scale()
+          for _, y in ipairs(tops) do
+            f:_SetRect(x / s, y / s - f:GetHeight(), f:GetWidth(), f:GetHeight())
+            panel.mover:GetScript("OnUpdate")(panel.mover, 1 / 60)
+            each(y)
+          end
+          panel.mover:GetScript("OnDragStop")(panel.mover)
+        end
+
+        it("keeps the bag beside an anchor dragged past the screen's bottom beside it, and both on the screen once dropped", function()
+          local bag, bank = pair(8, 4)
+          dragTo(bag, 1200, 700)
+          settle()
+          assert.is_true(off(bag, bank) < 1, "beside it")
+          drag(bag, 1200, { 400, 200, 60, 20 }, function(y)
+            assert.is_true(off(bag, bank) < 1, "beside it, its top at " .. y .. ": " .. off(bag, bank))
+          end)
+          settle()
+          assert.is_true(off(bag, bank) < 1, "beside it once dropped")
+          for _, panel in ipairs({ bag, bank }) do
+            assert.is_true(top(panel) - panel.frame:GetHeight() >= -0.5, "its bottom on the screen")
+          end
+        end)
+
+        it("keeps a taller bag beside an anchor dragged past the screen's top beside it, dropped there too", function()
+          local bag, bank = pair(8, 80)
+          assert.is_true(bank.frame:GetHeight() > bag.frame:GetHeight(), "the bank the taller")
+          local screen = UIParent:GetHeight()
+          drag(bag, 1200, { screen - 300, screen - 50, screen + 100, screen + 300 }, function(y)
+            assert.is_true(off(bag, bank) < 1, "beside it, its top at " .. y .. ": " .. off(bag, bank))
+          end)
+          settle()
+          assert.is_true(off(bag, bank) < 1, "beside it once dropped")
+          assert.is_true(top(bag) <= screen + 0.5, "the backpack's top on the screen")
+        end)
+      end)
+
       -- Never placed, it holds its own side's bottom corner where a bag of the default size has it (docs/next-bag-anchor.md).
       it("opens as tall as its header, what it holds and its footer, as wide as it was, over the bottom it holds", function()
         local bag = holds(20)
@@ -4794,7 +4869,13 @@ describe("BetterBags Next's small mode", function()
               holding(bag, 80)
             end
             settle()
-            assert.is_true(top(bag) - bag.frame:GetHeight() < spot, "pushed down")
+            if clamp or how ~= "as it closes" then
+              assert.is_true(top(bag) - bag.frame:GetHeight() < spot, "pushed down")
+            else
+              -- Clamp Bags to Screen off, the backpack beside the bank hung from it, never pushed down alone (#1267), its top past
+              -- the screen's; it keeps where it stood as the bank closes, until something places it again.
+              assert.are.equal(spot, top(bag) - bag.frame:GetHeight(), "where it stood, its bottom beside the bank's")
+            end
             holding(bag, 8)
             settle()
             assert.are.equal(spot, top(bag) - bag.frame:GetHeight(), "back up to its spot beside the bank")
