@@ -34,8 +34,20 @@ end
 database.GetGroup = function(_, kind, groupID)
   return dbGroups[kind] and dbGroups[kind][groupID]
 end
+-- As core/database.lua's DB:DeleteGroup: the active group moves to the default (Backpack, or the
+-- character bank's default group) before Groups says the group went.
 database.DeleteGroup = function(_, kind, groupID)
   if dbGroups[kind] then dbGroups[kind][groupID] = nil end
+  if dbActiveGroups[kind] == groupID then
+    dbActiveGroups[kind] = 1
+    if kind == const.BAG_KIND.BANK then
+      for id, g in pairs(dbGroups[kind] or {}) do
+        if g.isDefault and g.bankType == Enum.BankType.Character then
+          dbActiveGroups[kind] = id
+        end
+      end
+    end
+  end
 end
 database.RenameGroup = function(_, kind, groupID, name)
   if dbGroups[kind] and dbGroups[kind][groupID] then
@@ -130,6 +142,33 @@ describe("Groups", function()
     it("does nothing for non-existent groups", function()
       local ctx = context:New("Test")
       groups:DeleteGroup(ctx, const.BAG_KIND.BACKPACK, 999) -- should not error
+    end)
+
+    -- The bags read whether to show the default group from the message (#1265): by the time it
+    -- is sent, the active group is already the default.
+    it("says the deleted group was the one shown, though the active group is already the default", function()
+      local ctx = context:New("Test")
+      local group = groups:CreateGroup(ctx, const.BAG_KIND.BACKPACK, "Shown")
+      database:SetActiveGroup(const.BAG_KIND.BACKPACK, group.id)
+      local heard
+      events:RegisterMessage("groups/Deleted", function(_, ...)
+        heard = { args = { ... }, active = database:GetActiveGroup(const.BAG_KIND.BACKPACK) }
+      end)
+      groups:DeleteGroup(ctx, const.BAG_KIND.BACKPACK, group.id)
+      assert.are.same({ group.id, "Shown", const.BAG_KIND.BACKPACK, true }, heard.args)
+      assert.are.equal(1, heard.active)
+    end)
+
+    it("says a deleted group that was not shown was not", function()
+      local ctx = context:New("Test")
+      local shown = groups:CreateGroup(ctx, const.BAG_KIND.BACKPACK, "Shown")
+      local other = groups:CreateGroup(ctx, const.BAG_KIND.BACKPACK, "Other")
+      database:SetActiveGroup(const.BAG_KIND.BACKPACK, shown.id)
+      local heard
+      events:RegisterMessage("groups/Deleted", function(_, ...) heard = { ... } end)
+      groups:DeleteGroup(ctx, const.BAG_KIND.BACKPACK, other.id)
+      assert.are.same({ other.id, "Other", const.BAG_KIND.BACKPACK, false }, heard)
+      assert.are.equal(shown.id, database:GetActiveGroup(const.BAG_KIND.BACKPACK))
     end)
   end)
 

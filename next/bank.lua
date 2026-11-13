@@ -711,11 +711,11 @@ function bankProto:WatchKind()
       self:RefreshTabs()
     end
   end)
-  events:RegisterMessage("groups/Deleted", function(ctx, groupID, _, kind)
+  events:RegisterMessage("groups/Deleted", function(ctx, _, _, kind, wasActive)
     if kind ~= self.kind then
       return
     end
-    if database:GetActiveGroup(self.kind) == groupID then
+    if wasActive then
       local default = groups:GetDefaultBankGroup()
       if default then
         self:SwitchToGroup(ctx, default.id)
