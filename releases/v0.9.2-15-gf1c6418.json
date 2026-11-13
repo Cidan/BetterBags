@@ -1,0 +1,17 @@
+{
+  "id": 1794545387,
+  "version": "v0.9.2-15-gf1c6418",
+  "channel": "alpha",
+  "date": "2026-11-13",
+  "from": "55385c2b76ce6aae96e7575029df6a74a04b9547",
+  "to": "f1c64182b3649ae0b352a7fafcae8b5bd5a1ac03",
+  "headline": "Blizzard categories can now be viewed and converted into custom categories on the Categories settings page.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "Manage and convert Blizzard categories",
+      "details": "The Categories settings page now lists built-in Blizzard categories and allows you to convert them into customizable categories. Converted categories let you adjust colors, automation, bag visibility, and ignored items while continuing to collect matching items. Creating or renaming a category to match a Blizzard category name also automatically converts it.",
+      "clients": []
+    }
+  ]
+}
