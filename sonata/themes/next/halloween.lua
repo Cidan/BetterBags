@@ -182,6 +182,7 @@ sonataNext:RegisterTheme({
     SettingsLabel = { Color = "Ink" },
     SettingsText = { Color = "InkSoft" },
     SettingsLink = { Color = "Night" },
+    SettingsLead = { Color = "Ink" },
   },
 
   Motion = {

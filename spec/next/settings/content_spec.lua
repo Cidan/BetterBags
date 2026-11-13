@@ -214,7 +214,7 @@ describe("NextSettingsContent", function()
       override(editor, "RuleTabShown", function() return rule end)
       override(editor, "ItemsTabShown", function() return chosen end)
       override(editor, "AutomationTabShown", function() return chosen end)
-      for _, name in ipairs({ "CreateSettingsTab", "CreateRuleTab", "CreateItemsTab" }) do
+      for _, name in ipairs({ "CreateSettingsTab", "CreateRuleTab", "CreateItemsTab", "CreateBlizzardTab" }) do
         override(editor, name, function(_, parent, owner, bags, mode)
           made[mode and (name .. ":" .. mode) or name] = { owner = owner, bags = bags }
           return rows:CreateText(parent, name)
@@ -289,24 +289,18 @@ describe("NextSettingsContent", function()
       settings:Select("categories", "rule")
       assert.are.equal("settings", settings.tabId)
       assert.is_false(settings.tabs.frame:IsShown(), "one tab: no tab bar")
-      -- Issue #1278: a Blizzard category chosen shows what it is and a button that makes it yours, in settings rows,
-      -- instead of every tab.
+      -- Issue #1278: a Blizzard category chosen shows what it is and a button that makes it yours, a tab of its own
+      -- filling the content, instead of every tab.
       blizzard = true
-      local converted = 0
-      override(editor, "BlizzardHelp", function() return "Junk is a Blizzard category." end)
-      override(editor, "Convert", function() converted = converted + 1 end)
       settings:Select("categories", "settings")
       assert.are.equal("blizzard", settings.tabId)
       assert.is_false(settings.tabs.frame:IsShown(), "one tab: no tab bar")
-      local tab
-      for _, t in ipairs(pages:Get("categories").tabs) do
-        if t.id == "blizzard" then tab = t end
+      assert.are.equal(settings.frame, made.CreateBlizzardTab.owner)
+      local shownTitles = {}
+      for _, title in ipairs(settings.page.titles) do
+        if title:IsShown() then table.insert(shownTitles, title:GetText()) end
       end
-      local blizzardRows = pages:Sections(tab)[1].rows
-      assert.are.equal("Junk is a Blizzard category.", blizzardRows[1].text())
-      assert.are.equal("Convert to Category", blizzardRows[2].buttons[1].text)
-      blizzardRows[2].buttons[1].onClick(addon:GetModule("Context"):New("spec"))
-      assert.are.equal(1, converted)
+      assert.are.same({}, shownTitles, "no section title over it")
       blizzard = false
       settings:Select("categories", "blizzard")
       assert.are.equal("settings", settings.tabId, "only for a Blizzard category")

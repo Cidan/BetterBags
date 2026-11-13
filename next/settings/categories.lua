@@ -1158,6 +1158,91 @@ local function placeTab(tab, x, y, width, height)
   itemsTab:PlaceTab(tab, x, y, width, height)
 end
 
+-- The Blizzard tab: what a Blizzard category is and the button that makes it yours, centered in the whole tab
+-- (asked, issue #1278: the text "bigger", the button "in the middle of that panel entirely").
+
+---@class NextCategoryBlizzardTab
+---@field frame Frame
+---@field wide boolean
+---@field text FontString
+---@field convert NextButtonFrame
+---@field width? number
+---@field height? number
+local blizzardTabProto = {}
+addon:GetModule('Perf'):RegisterPrototype(blizzardTabProto, 'NextCategoryBlizzardTab')
+
+---@param parent Frame
+---@param owner Frame
+---@return NextCategoryBlizzardTab
+function editor:CreateBlizzardTab(parent, owner)
+  local _ = owner
+  local tab = makeTab(parent, blizzardTabProto, {})
+  tab.text = style:CreateText(tab.frame, style.Theme.Settings.Categories.LeadFont)
+  tab.text:SetJustifyH("CENTER")
+  tab.text:SetWordWrap(true)
+  tab.convert = nextButton:Create(tab.frame, {
+    text = L:G("Convert to Category"), onClick = function(ctx) editor:Convert(ctx) end,
+  })
+  tab:Style()
+  return tab
+end
+
+-- Style draws the tab from the theme, its button sized for it first: it is centered by its width, and themes restyle
+-- their widgets in no set order.
+function blizzardTabProto:Style()
+  style:SetFont(self.text, style.Theme.Settings.Categories.LeadFont)
+  self.convert:Style()
+  if self.width then
+    self:layout()
+  end
+end
+
+---@param width number
+---@return number
+function blizzardTabProto:Measure(width)
+  local _ = width
+  return tabHeight(self.frame)
+end
+
+---@param x number
+---@param y number
+---@param width number
+---@param height number
+function blizzardTabProto:Place(x, y, width, height)
+  placeTab(self, x, y, width, height)
+  self:layout()
+end
+
+-- Refresh says what the Blizzard category chosen is.
+---@param ctx? Context
+function blizzardTabProto:Refresh(ctx)
+  local _ = ctx
+  self.text:SetText(editor:BlizzardHelp())
+  if self.width then
+    self:layout()
+  end
+end
+
+-- layout centers the text, at most LeadWidth wide, and the button under it, two FieldGaps apart, across the tab and
+-- together down it, in whole pixels (docs/next-pixel-perfect.md).
+---@private
+function blizzardTabProto:layout()
+  local frame = self.frame
+  local K = style.Theme.Settings.Categories
+  local m = metricsOf(frame)
+  local width = pixel:Floor(frame, math.max(1, math.min(self.width - 2 * m.pad, K.LeadWidth)))
+  self.text:SetWidth(width)
+  local textHeight = pixel:Ceil(frame, self.text:GetStringHeight())
+  local button = self.convert.frame
+  local gap = 2 * m.gap
+  local top = pixel:Middle(frame, self.height, textHeight + gap + button:GetHeight())
+  self.text:ClearAllPoints()
+  pixel:Point(self.text, "TOPLEFT", frame, "TOPLEFT", pixel:Middle(frame, self.width, width), -top)
+  button:ClearAllPoints()
+  pixel:Point(button, "TOPLEFT", frame, "TOPLEFT", pixel:Middle(frame, self.width, button:GetWidth()),
+    -(top + textHeight + gap))
+end
+
 -- The Settings tab.
 
 ---@class NextCategorySettingsTab

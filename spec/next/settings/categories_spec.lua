@@ -896,6 +896,80 @@ describe("NextSettingsCategories", function()
     end)
   end)
 
+  -- Asked (issue #1278): a Blizzard category's explanation "bigger", and its button "in the middle of that panel
+  -- entirely": a tab of its own filling the content, the text in the lead font, the text and the button centered.
+  describe("the Blizzard tab", function()
+    local tab, K
+
+    before_each(function()
+      K = style.Theme.Settings.Categories
+      editor.selected = "Junk"
+      tab = editor:CreateBlizzardTab(CreateFrame("Frame"), owner)
+      place(tab)
+    end)
+
+    it("fills the page's content without scrolling, as a wide row", function()
+      local C = style.Theme.Settings.Content
+      assert.is_true(tab.wide)
+      assert.are.equal(CONTENT_HEIGHT - C.Top - C.Bottom, tab:Measure(700))
+    end)
+
+    it("says what the category is in the lead font, bigger than the page's text, centered", function()
+      assert.are.equal(editor:BlizzardHelp(), tab.text:GetText())
+      assert.are.equal("CENTER", tab.text:GetJustifyH())
+      local text = style:CreateText(CreateFrame("Frame"), K.TextFont)
+      assert.is_true(select(2, tab.text:GetFont()) > select(2, text:GetFont()))
+      assert.are.equal(K.LeadWidth, tab.text:GetWidth(), "no wider than LeadWidth on a wide page")
+    end)
+
+    it("centers the text and its button together in the middle of the tab", function()
+      local textHeight = math.ceil(tab.text:GetStringHeight())
+      local buttonWidth, buttonHeight = tab.convert.frame:GetWidth(), tab.convert.frame:GetHeight()
+      local gap = 2 * K.FieldGap
+      local top = math.floor((tab.height - (textHeight + gap + buttonHeight)) / 2)
+      local _, _, _, textX, textY = tab.text:GetPoint(1)
+      local _, _, _, buttonX, buttonY = tab.convert.frame:GetPoint(1)
+      -- A text's anchor carries the offset that puts its glyphs on whole pixels (docs/next-pixel-perfect.md).
+      local q = addon:GetModule("NextPixel"):TextOffset(tab.text)
+      assert.are.same({ math.floor((720 - K.LeadWidth) / 2) + q, -top + q }, { textX, textY })
+      assert.are.same({ math.floor((720 - buttonWidth) / 2), -(top + textHeight + gap) }, { buttonX, buttonY })
+    end)
+
+    it("keeps its text inside a narrow tab", function()
+      tab:Place(0, 0, 300, tab:Measure(300))
+      local m = { pad = K.Pad }
+      assert.are.equal(300 - 2 * m.pad, tab.text:GetWidth())
+    end)
+
+    it("says it again for the category chosen next, centered again for its text", function()
+      local pixel = addon:GetModule("NextPixel")
+      editor.selected = string.rep("Armor ", 60)
+      tab:Refresh(ctx())
+      assert.is_truthy(tab.text:GetText():find("^Armor"))
+      local textHeight = pixel:Ceil(tab.frame, tab.text:GetStringHeight())
+      local top = pixel:Middle(tab.frame, tab.height, textHeight + 2 * K.FieldGap + tab.convert.frame:GetHeight())
+      local _, _, _, _, y = tab.text:GetPoint(1)
+      assert.are.equal(-top + pixel:TextOffset(tab.text), y)
+    end)
+
+    -- Found by the bug review: themes restyle their widgets in no set order, so the tab's layout could read the button's
+    -- width from before the new theme sized it.
+    it("centers its button for the new theme whatever is restyled first", function()
+      local pixel = addon:GetModule("NextPixel")
+      local B = controls:Theme("Button")
+      override(B, "Padding", (B.Padding or 0) + 40)
+      editor:ApplyStyle()
+      addon:GetModule("NextButton"):ApplyStyle()
+      local _, _, _, x = tab.convert.frame:GetPoint(1)
+      assert.are.equal(pixel:Middle(tab.frame, tab.width, tab.convert.frame:GetWidth()), x)
+    end)
+
+    it("makes the category yours when its button is clicked", function()
+      click(tab.convert)
+      assert.are.same({ "Convert", "Junk" }, calls[#calls])
+    end)
+  end)
+
   describe("the Settings tab", function()
     local tab
 

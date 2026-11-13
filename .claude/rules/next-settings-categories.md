@@ -54,9 +54,12 @@ page's `Content.Top` and `Bottom`).
   it (`Choose`, then `Reselect`). On `categories/Changed` while it shows, the page shows again, the first chosen for one
   that is gone; on a bag read, the same when the Blizzard category chosen has left the backpack.
 - **A Blizzard category chosen** shows one tab instead of the others (asked: "help text + button to convert to a
-  permanent managed category"): tab `blizzard` in `next/settings/content.lua`, a settings section of a text row
-  (`editor:BlizzardHelp()`) and a buttons row, **Convert to Category** (`editor:Convert`: `categories:Convert`, the bags
-  recalculated, the new category chosen with every tab). One tab, so no tab bar. The Settings tab shows for anything
+  permanent managed category"): tab `blizzard` in `next/settings/content.lua`, a wide block filling the content as the
+  other tabs are (`editor:CreateBlizzardTab`): what it is (`editor:BlizzardHelp()`) in the lead font
+  (`Categories.LeadFont`, `SettingsLead`, larger than the page's text; asked: "make this text bigger"), centered and at
+  most `LeadWidth` wide, and **Convert to Category** centered under it two `FieldGap`s down, the two centered together
+  in the tab (asked: "center the button in the middle of that panel entirely"). The button: `editor:Convert`
+  (`categories:Convert`, the bags recalculated, the new category chosen with every tab). One tab, so no tab bar. The Settings tab shows for anything
   else (`SettingsTabShown`); the other tabs hide already (`Chosen` is nil). The heading is its name and "Made by
   Blizzard"; no Rename or Delete.
 - **The header**: the chosen category's name, and its line (a plugin's starts "Made by a plugin", a converted

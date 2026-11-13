@@ -4,6 +4,7 @@ paths:
   - "next/{style,panel,ornaments,frameart,fill,menubutton,tween}.lua"
   - "next/{glitch,rain,shatter,snow,threads,smoke,bats,beam,paper,stopmotion}.lua"
   - "next/controls/*.lua"
+  - "next/settings/categories.lua"
   - "spec/next/shipped_themes_spec.lua"
   - "spec/sonata/next_themes_spec.lua"
   - "spec/helpers/ui_source.lua"
@@ -208,3 +209,14 @@ A theme that draws art where its parent draws a faint color (`{ Texture = "Butto
 (`Alpha` above all), and a spec over every shipped theme compares what a theme sets with what it resolves to
 (`spec/sonata/next_themes_spec.lua`, "draws the art each theme sets at the alpha it sets"). `false` removes an
 inherited table entirely (it resolves to nil).
+
+## Restyle a Control Before Laying Out by Its Size
+**Problem**: `sonataNext:RestyleWidgets` restyles the registered modules in `pairs` order, so on a theme change a
+page's `ApplyStyle` can run before `NextButton`'s. A layout that places a control by its own size (centering a
+button by its width) then reads the old theme's size, and the control resizes afterwards: the Categories page's
+Convert to Category button sat 40 units off center after a theme with wider button padding.
+
+**Rule**: A block that centers or right-aligns a control by its size restyles that control in its own `Style` before
+laying out (`blizzardTabProto:Style`, next/settings/categories.lua: `self.convert:Style()`). Anchoring by the
+control's left edge does not need it: a width change does not move it. Test it by restyling the page first and the
+controls after, then checking the position.

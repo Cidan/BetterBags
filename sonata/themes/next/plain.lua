@@ -227,6 +227,7 @@ sonataNext:RegisterTheme({
     SettingsLabel = { Copy = "GameFontNormal" },
     SettingsText = { Copy = "GameFontHighlightSmall" },
     SettingsLink = { Copy = "GameFontNormal" },
+    SettingsLead = { Copy = "GameFontHighlight" },
   },
 
   -- Default's sizes (asked: "scale for Plain should be the same as our Default"), but what the frame's art fixes.

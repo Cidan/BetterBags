@@ -478,10 +478,8 @@ function content:Init()
       -- A Blizzard category chosen shows what it is and a button that makes it yours, instead of every tab (asked,
       -- issue #1278: "help text + button to convert to a permanent managed category").
       { id = "blizzard", title = L:G("Blizzard Category"), shown = function() return categoryEditor:BlizzardChosen() end,
-        sections = { { title = L:G("Blizzard Category"), rows = {
-          { text = function() return categoryEditor:BlizzardHelp() end },
-          { buttons = { { text = L:G("Convert to Category"), onClick = function(ctx) categoryEditor:Convert(ctx) end } } },
-        } } } },
+        sections = { tabSection(L:G("Blizzard Category"), { "blizzard", "convert", "built-in", "category" },
+          function(parent, window) return categoryEditor:CreateBlizzardTab(parent, window) end) } },
       { id = "settings", title = L:G("Settings"), shown = function() return categoryEditor:SettingsTabShown() end,
         sections = { tabSection(L:G("Category Settings"),
         { "category", "categories", "custom", "priority", "color", "group by", "bags", "used in" },
