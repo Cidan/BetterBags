@@ -1055,19 +1055,37 @@ function actionsProto:AskRename()
     text = format(L:G("Renaming '%s' turns it into a separate category. Blizzard's items will go back to the built-in "
       .. "'%s' category, and only your changes move to the new name. Rename it to:"), current, current)
   end
+  local function rename(ctx, name)
+    if not categories:RenameCategory(ctx, current, name) then
+      nextDialog:Show(self.owner, {
+        title = L:G("Rename Category"), text = format(L:G("The category '%s' could not be renamed."), current),
+        buttons = { { text = L:G("OK"), onClick = function() end } },
+      })
+      return
+    end
+    editor:Choose(ctx, name)
+  end
   askName(self.owner, L:G("Rename Category"), text, L:G("Rename"),
     current, current, function(ctx, name)
       if name == current then
         return
       end
-      if not categories:RenameCategory(ctx, current, name) then
+      -- Named after a Blizzard category, it becomes a converted one, which can't be grouped (category-lifecycle.md §11):
+      -- one that groups says so first.
+      local groups = filter and filter.groupBy ~= nil and filter.groupBy ~= GROUP_BY.NONE
+      if groups and items:KnowsBlizzardCategory(name) then
         nextDialog:Show(self.owner, {
-          title = L:G("Rename Category"), text = format(L:G("The category '%s' could not be renamed."), current),
-          buttons = { { text = L:G("OK"), onClick = function() end } },
+          title = L:G("Rename Category"),
+          text = format(L:G("'%s' is a built-in Blizzard category, so renaming to it converts this category. Converted "
+            .. "categories can't be grouped, so its Group By will be turned off."), name),
+          buttons = {
+            { text = L:G("Cancel"), onClick = function() end },
+            { text = L:G("Rename"), style = "Primary", onClick = function(c) rename(c, name) end },
+          },
         })
         return
       end
-      editor:Choose(ctx, name)
+      rename(ctx, name)
     end)
 end
 

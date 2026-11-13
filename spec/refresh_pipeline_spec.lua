@@ -4139,6 +4139,19 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       assert.equal("Junk", items:BlizzardCategory(slotInfo.itemsBySlotKey["0_1"]), "Blizzard's name, before the ignore")
     end)
 
+    -- A category of yours made or renamed with a name Blizzard's data gives an item in your bags is one made from it.
+    it("knows the Blizzard categories of the items read, those your categories hold included", function()
+      override(categories, "GetCustomCategory", function(_, _, _, data)
+        if data.itemInfo.itemID == 202 then return "Mats", 10, { save = true } end
+        return nil, nil
+      end)
+      local slotInfo = refreshBackpack({ wipe = true })
+      assert.equal("Mats", slotInfo.itemsBySlotKey["0_2"].itemInfo.category)
+      assert.is_true(items:KnowsBlizzardCategory("Junk"), "both items are Blizzard's Junk, wherever they show")
+      assert.is_false(items:KnowsBlizzardCategory("Mats"))
+      assert.is_false(items:KnowsBlizzardCategory("Everything"), "where an ignored item goes, not a Blizzard name")
+    end)
+
     it("stays in Blizzard's category in a bag that does not use the category", function()
       used = {}
       local slotInfo = refreshBackpack({ wipe = true })

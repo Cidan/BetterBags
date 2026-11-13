@@ -109,6 +109,10 @@ end
 LoadBetterBagsModule("data/categories.lua")
 local categories = addon:GetModule("Categories")
 
+-- The Blizzard categories the bags' items have (Items:KnowsBlizzardCategory): none unless a test says so.
+local itemsModule = StubBetterBagsModule("Items")
+local knownBlizzard, savedKnows
+
 describe("Categories", function()
 
   before_each(function()
@@ -116,8 +120,15 @@ describe("Categories", function()
     for k in pairs(dbCategories) do dbCategories[k] = nil end
     for k in pairs(dbEphemeralCategories) do dbEphemeralCategories[k] = nil end
     for k in pairs(dbCategoryOptions) do dbCategoryOptions[k] = nil end
+    knownBlizzard = {}
+    savedKnows = rawget(itemsModule, "KnowsBlizzardCategory")
+    itemsModule.KnowsBlizzardCategory = function(_, name) return knownBlizzard[name] == true end
     -- Re-initialize module
     categories:Init()
+  end)
+
+  after_each(function()
+    itemsModule.KnowsBlizzardCategory = savedKnows
   end)
 
   -- The bags keep each item's category until something it reads changes (data-loader.md §18), so
@@ -779,6 +790,34 @@ describe("Categories", function()
       assert.is_true(categories:RenameCategory(ctx, "Junk", "Trash"))
       assert.is_nil(dbCategories["Junk"])
       assert.is_nil(dbCategories["Trash"].blizzard)
+    end)
+
+    -- Asked: "naming something onto a blizzard name should work as a converted one": a Blizzard category's name is one
+    -- Blizzard's data gives an item in your bags (Items:KnowsBlizzardCategory), whatever shows it now.
+    it("makes a category of yours made with a Blizzard category's name one made from it, never grouping", function()
+      knownBlizzard = { Junk = true }
+      categories:CreateCategory(ctx, { name = "Junk", itemList = {}, save = true,
+        searchCategory = { query = "x", groupBy = 1 } })
+      assert.is_true(dbCategories.Junk.blizzard)
+      assert.is_nil(dbCategories.Junk.groupBy)
+      categories:CreateCategory(ctx, { name = "Mats", itemList = {}, save = true })
+      assert.is_nil(dbCategories.Mats.blizzard, "a name Blizzard does not give")
+    end)
+
+    it("leaves a plugin's category of a Blizzard category's name alone", function()
+      knownBlizzard = { Junk = true }
+      categories:CreateCategory(ctx, { name = "Junk", itemList = {} })
+      assert.is_nil(categories:GetCategoryByName("Junk").blizzard)
+    end)
+
+    it("makes a category renamed to a Blizzard category's name one made from it, its group by gone", function()
+      knownBlizzard = { ["Armor - Cloth"] = true }
+      categories:CreateCategory(ctx, { name = "Mats", itemList = {}, save = true, groupBy = 1 })
+      assert.is_true(categories:RenameCategory(ctx, "Mats", "Armor - Cloth"))
+      assert.is_true(dbCategories["Armor - Cloth"].blizzard)
+      assert.is_nil(dbCategories["Armor - Cloth"].groupBy)
+      assert.is_true(categories:RenameCategory(ctx, "Armor - Cloth", "Cloth"))
+      assert.is_nil(dbCategories.Cloth.blizzard, "renamed away from it: a category like any other")
     end)
   end)
 

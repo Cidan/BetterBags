@@ -356,15 +356,28 @@ turns it into a category of the player's, whose Blizzard items keep landing in i
   can tell them apart); they behave as ordinary categories.
 - **It never groups** (asked: "disable group by on Blizzard converted categories ... including on search strings! we
   just ignore the group clause"). The Settings tab hides Group By for one, and `normalizeRule` (`DB:NormalizeCategories`,
-  every load) strips a trailing "group by <word>" clause from its rule without setting `groupBy`. The data never holds a
+  every load) strips a trailing "group by <word>" clause from its rule without setting `groupBy`, and never copies the
+  group by a plugin left in its rule (`searchCategory.groupBy`, the old place) onto it. The data never holds a
   group by for one, so the runtime group-by readers (`GroupedCategory`, `RefreshSearchCache`, the vendor) are unchanged.
 - **Ignored Items go to Everything** (asked: "yes, send to everything"). An item a converted category ignores has no
   other Blizzard category to fall to, so `BuiltInCategory` sends it to "Everything" (what BetterBags names an item with
   no category) when the category of its Blizzard name, used in its bag, ignores it. Items the category takes by its rule
   or Added Items are passed over as for any category (§8) and then reach this check too.
+- **Named after a Blizzard category, a category is a converted one** (asked: "naming something onto a blizzard name
+  should work as a converted one"). A Blizzard category's name is one Blizzard's data gives an item in the bags read
+  (`items:KnowsBlizzardCategory(name)`: `BlizzardCategory` of every item read, whatever section shows it now, the
+  backpack's, the bank's once opened, the guild bank's). `CreateCategory` marks a new category of yours (`save`, not a
+  plugin's) with such a name `blizzard` and drops its group by: New Category, Enter to Make Category, the picker's new
+  category, a plugin adding an item to a new saved category. `RenameCategory` sets `blizzard` by the new name: renamed
+  onto one it becomes converted (its group by dropped; the page asks first when it groups), renamed away from one it
+  becomes ordinary.
 - **Renaming makes an ordinary category** (asked: "accept with a warning that it's making a new category
-  technically"). `RenameCategory` clears `blizzard`; Blizzard's items stay in the Blizzard section of the old name. The
-  rename dialog says so. Pins and tab assignments move with the rename (`DB:RenameCategory`), as for any category.
+  technically"), unless the new name is a Blizzard category's (above); Blizzard's items stay in the Blizzard section of
+  the old name. The rename dialog says so. Pins and tab assignments move with the rename (`DB:RenameCategory`), as for
+  any category.
+- **A Blizzard name nothing in the bags has yet** cannot be known: a category of yours named so stays ordinary, and if
+  Blizzard's data later gives items that name, they land in it by name (its settings apply). See the report of
+  2026-11-12: what to do then is the user's call.
 - **Deleting** turns it back into a Blizzard category. The delete scrub (§2) also clears the pins and tab assignment
   saved under its name, which the Blizzard section had before converting.
 - **Whether a bag uses a category decides everything it does there** (asked: "we don't want dual behavior for
@@ -386,5 +399,5 @@ turns it into a category of the player's, whose Blizzard items keep landing in i
 - **Reviews** (CLAUDE.md, Prime Directive #2). The first found a deleted or renamed category shown as Blizzard's until
   the bags were recalculated, and a converted category counting longer Blizzard names; the second, piles a merged stack
   hides listed, Everything never listed, and unconverted Blizzard rows counting longer names. All fixed test-first.
-  Left open, for the user: New Category, the picker's new category and renaming onto a Blizzard category's name make
-  an unmarked category (it can group), not a converted one.
+  New Category, the picker's new category and renaming onto a Blizzard category's name used to make an unmarked
+  category; the user chose converting them (above).

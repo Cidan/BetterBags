@@ -399,7 +399,14 @@ function categories:CreateCategory(ctx, category)
   if new then
     category.priority = self:topPriority()
   end
-  if category.groupBy == nil and type(category.searchCategory) == "table" then
+  -- A new category of yours with a name Blizzard's data gives an item in your bags is one made from it (§11), which
+  -- never groups.
+  if new and category.save and addon:GetModule('Items'):KnowsBlizzardCategory(category.name) then
+    category.blizzard = true
+  end
+  if category.blizzard then
+    category.groupBy = nil
+  elseif category.groupBy == nil and type(category.searchCategory) == "table" then
     category.groupBy = category.searchCategory.groupBy
   end
 
@@ -986,10 +993,14 @@ function categories:RenameCategory(ctx, oldName, newName)
     return false
   end
 
-  -- Renamed, a category made from a Blizzard category is a new one: Blizzard's items stay in their own (§11).
+  -- Renamed, a category is made from a Blizzard category when Blizzard's data gives an item in your bags its new name,
+  -- and never groups; else it is an ordinary one, Blizzard's items staying in their own (§11).
   local renamed = database:GetItemCategory(newName)
   if renamed then
-    renamed.blizzard = nil
+    renamed.blizzard = addon:GetModule('Items'):KnowsBlizzardCategory(newName) or nil
+    if renamed.blizzard then
+      renamed.groupBy = nil
+    end
   end
 
   debug:Log("categories", "Renamed category: %s -> %s", oldName, newName)

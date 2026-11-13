@@ -67,7 +67,9 @@ page's `Content.Top` and `Bottom`).
   "Categories" and "Make a category to sort your items your way." for none. Rename and Delete for your
   categories; for a plugin's or none they hide and the buttons' frame shrinks so the title takes the
   room. Renaming a converted category warns that it becomes a separate category and Blizzard's items go back to the
-  built-in one (asked: "accept with a warning that it's making a new category technically").
+  built-in one (asked: "accept with a warning that it's making a new category technically"). Renaming a category that
+  groups onto a Blizzard category's name (`items:KnowsBlizzardCategory`) asks first, in a second `NextDialog`, since it
+  becomes a converted category and its Group By goes (category-lifecycle.md §11).
 - **The two item boxes stay put** (asked: boxes a few pixels apart made switching tabs messy): the
   Settings and Search Rule tabs put their box's name row and their box at the same place
   (`boxRows`: under three rows of settings, a row for the name, the box down to the tab's bottom).

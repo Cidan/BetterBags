@@ -4284,6 +4284,22 @@ function items:BuiltInCategory(data)
   return name
 end
 
+-- KnowsBlizzardCategory says whether Blizzard's data gives an item in the bags read a category of this name
+-- (BlizzardCategory), wherever the item shows now: a category of yours made or renamed with it is one made from it
+-- (category-lifecycle.md §11).
+---@param name string
+---@return boolean
+function items:KnowsBlizzardCategory(name)
+  for _, slotInfo in pairs(self.slotInfo or {}) do
+    for _, data in pairs(slotInfo.itemsBySlotKey or {}) do
+      if not data.isItemEmpty and data.itemInfo and self:BlizzardCategory(data) == name then
+        return true
+      end
+    end
+  end
+  return false
+end
+
 -- BlizzardCategory returns the category Blizzard's item data names for an item no category of yours takes: Junk for
 -- poor quality, else its equipment location, else its type, subtype, trade skill and expansion as the bag's filters
 -- say, joined with " - ".

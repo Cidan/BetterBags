@@ -882,6 +882,41 @@ describe("NextSettingsCategories", function()
       assert.are.equal("Trash", editor.selected)
     end)
 
+    -- Asked: "naming something onto a blizzard name should work as a converted one", which never groups: renaming a
+    -- category that groups onto one says its Group By goes first; one that does not group has nothing to lose.
+    it("asks before renaming a grouping category onto a Blizzard category's name", function()
+      override(items, "KnowsBlizzardCategory", function(_, name) return name == "Junk" end)
+      local actions = editor:CreateActions(CreateFrame("Frame"), owner)
+      local function renames()
+        local list = {}
+        for _, call in ipairs(calls) do
+          if call[1] == "RenameCategory" then table.insert(list, call) end
+        end
+        return list
+      end
+      editor.selected = "Potions"
+      actions:Refresh(ctx())
+      click(actions.rename)
+      nextDialog.input.frame:SetText("Junk")
+      answer("Rename")
+      assert.is_truthy(nextDialog.text:GetText():find("can't be grouped", 1, true))
+      answer("Cancel")
+      assert.are.same({}, renames())
+      click(actions.rename)
+      nextDialog.input.frame:SetText("Junk")
+      answer("Rename")
+      answer("Rename")
+      assert.are.same({ { "RenameCategory", "Potions", "Junk" } }, renames())
+      assert.are.equal("Junk", editor.selected)
+      editor.selected = "Mats"
+      actions:Refresh(ctx())
+      filters.Junk = nil
+      click(actions.rename)
+      nextDialog.input.frame:SetText("Junk")
+      answer("Rename")
+      assert.are.same({ "RenameCategory", "Mats", "Junk" }, calls[#calls], "nothing to lose: no question")
+    end)
+
     it("deletes after asking, choosing the first category left", function()
       local actions = editor:CreateActions(CreateFrame("Frame"), owner)
       editor.selected = "Mats"

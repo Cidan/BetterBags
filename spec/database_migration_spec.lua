@@ -582,6 +582,17 @@ describe("Database Migration", function()
       assert.is_nil(f.Only.groupBy)
     end)
 
+    -- Found by the bug review: a plugin may still pass group by where it was, in the rule (searchCategory.groupBy); a
+    -- category made from a Blizzard category must not take it back at the next load.
+    it("never gives a category made from a Blizzard category the group by left in its rule", function()
+      profile.customCategoryFilters = {
+        Junk = { name = "Junk", itemList = {}, blizzard = true, searchCategory = { query = "x", groupBy = 1 } },
+      }
+      DB:Migrate()
+      assert.is_nil(profile.customCategoryFilters.Junk.groupBy)
+      assert.are.same({ query = "x" }, profile.customCategoryFilters.Junk.searchCategory)
+    end)
+
     it("files every listed item where its list says, as the real profiles needed", function()
       profile.customCategoryFilters = {
         Midnight = { name = "Midnight", itemList = { [202395] = true }, priority = 2 },

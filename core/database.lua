@@ -1055,7 +1055,7 @@ local function normalizeRule(filter)
       filter.groupBy = GROUP_BY_WORDS[word]
     end
     query = strtrim(query:sub(1, from - 1))
-  elseif filter.groupBy == nil and rule.groupBy ~= nil then
+  elseif filter.groupBy == nil and rule.groupBy ~= nil and not filter.blizzard then
     filter.groupBy = rule.groupBy
   end
   if query == "" then
