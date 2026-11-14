@@ -40,8 +40,15 @@ tabs, the title and its ribbon, the sparkles, the header buttons and the footer.
 prototype with `NextPanel:Extend(proto, name)` and overrides what differs: `GetHeaderButtons`,
 `CreateMoney`, `RefreshTabs`, `OnTabClicked`, `OnTabDragged`, `GetCurrentTabID`, `OnShowing`,
 `OnSlidOut`, `WatchKind`, `Refresh` and `Sort` (and `watchesCooldowns`), and what a right click on
-its title does with `OnTitleRightClick` and `TitleRightClickHint` (the backpack and the bank sort; the others do
-nothing).
+its title does with `OnTitleRightClick`, `TitleRightClickHint` and `TitleRightClickLabel` (the backpack and the bank sort;
+the others do nothing). In a theme with a bag button (Plain), a right click on the button does the same, and its menu lists,
+after the header's buttons, what only it offers (`MenuEntries`: that right click's action, and the switch to small bags,
+`SizeEntry`, on a panel with no size button).
+
+Docked at full height, a panel stands from the screen's top to its bottom, unless its theme keeps it clear of both
+(`Panel.DockMargin`, the Plain theme): it stands in by what its art reaches past its body there (`NextFrameArt:Reach`,
+`NextMenuButton:Reach`) and the margin, so the gap seen is the margin at both (`NextPanel:DockInsets`). The rules are in
+`.claude/rules/next.md` §3.
 
 ## A small panel's place and its anchor
 
@@ -124,6 +131,12 @@ back to what it shows, its width saved alone. It keeps as much room below its la
 between its sections.
 Off, it is the height the player gave it with its grips, or a share of the screen. The rules are in
 `.claude/rules/next-small-autosize.md` §14i.
+
+With **Clamp Bags to Screen** on, a small panel is kept on the screen with its tabs, which hang past its body on its inner
+side (`NextPanel:TabReach`): every place it is given keeps them on the screen (`clampPlace`), its clamp rect takes them in
+so the client keeps them there as it is dragged (`ApplyClamp`), and as its tabs change it glides to where its place puts it
+with them, pushed in by tabs that grow at the screen's edge and back as they shrink or hide (`FollowTabs`). The rules are in
+`.claude/rules/next-small-mode.md` §14c.
 
 ## Moving sections
 

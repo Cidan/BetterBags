@@ -160,6 +160,30 @@ backpack's call `Sort`, the sort button's own `onClick` (the sort sound and `bag
 "Right-click to sort your bags.". The bank, guild bank and vendor keep the default: a right click on their titles
 does nothing, as before (the button took no right clicks then).
 
+**A theme can keep a docked panel clear of the screen's top and bottom** (`Panel.DockMargin`; the Plain theme). Docked at
+full height, the panel stood from the screen's top to its bottom, and Plain's art past its body was cut off by the screen:
+Blizzard's frame 16 above and 3 below (8 on WoW: Forever), the bag button 17 above. Asked: the bag button "in a better place
+... equal on both sides" (the gap seen, 8 agreed; the side at the screen edge stays against it). `styleBody` measures, as the
+theme is drawn, what reaches past the body at the top and at the bottom (`NextFrameArt:Reach` of `Panel.Frame` on the client
+played, `NextMenuButton:Reach` of the bag button, the most of every panel's own so docked panels line up), each in whole pixels
+of the screen as the art is drawn there (a docked panel's scale is 1), and keeps it and the margin as `dockTop` and
+`dockBottom`; `DockInsets` rounds them up to whole pixels of the screen, so the gap seen is the margin rounded up at both.
+**Failure mode (fixed, found by the bug review, measuring the drawn art):** the reach measured without the art's rounding left
+the gap above a pixel off the gap below at some UI scales (15 and 16 pixels at 3840x2160 and 0.65; 10 and 11 at 1920x1080 and
+0.9). The theme is applied again when the screen's pixel grid changes (`pixel:OnGridChanged`), which measures again. A full panel is anchored that
+far in from the screen's top and bottom (`setOffset`), its body and height follow (`BodyRect`, `Height`, so a size switch's
+morph lands there and the content lays out for the height left), and the gap seen is the margin at both. A theme without
+one (Default's `false`) stands from the top to the bottom as before. Measured: the frame's pieces and the bag button; the
+header's buttons are not (in every shipped theme they sit inside the body, or under the bag button's reach: Classic's
+32-square close reaches 4 above the body, the bag button 17). The measure lives on the panel, not `NextStyle`: the style is
+made before either module loads, and a spec applying every shipped theme without the bag button's module found the
+dependency. Coverage: `spec/next/theme_panel_spec.lua` ("the Plain theme": docked on Retail, WoW: Forever and Era, both
+panels, its height and body; the gaps seen measured off the drawn art with the layout resolver, `spec/helpers/layout.lua`,
+equal and whole at four screens and UI scales on every client and side; back at both edges under Default; a switch to small
+and back), `spec/next/frameart_spec.lua` and
+`spec/next/menubutton_spec.lua` ("its reach"), `spec/sonata/next_themes_spec.lua`, `spec/sonata/next_engine_spec.lua`, and
+`spec/next/pixel_perfect_spec.lua` (every shipped theme on every client at both sizes, at 0.65: on whole pixels).
+
 **A theme can hold the header's buttons in a bag button's menu** (next-themes-menubutton.md §19; the Plain theme): every button
 not pinned leaves the header for the original bags' drop-down on a button at a corner of the body (the vendor's
 portrait on the vendor), and the title is centered between that button and the close.

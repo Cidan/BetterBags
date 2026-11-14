@@ -146,6 +146,16 @@ function bankProto:TitleRightClickHint()
   return nil
 end
 
+-- TitleRightClickLabel names the sort, as the original bank's button's right click did (frames/menubutton.lua), where the
+-- client can sort the bank.
+---@return string?
+function bankProto:TitleRightClickLabel()
+  if self:CanSort() then
+    return L:G("Sort Bank")
+  end
+  return nil
+end
+
 -- CreateMoney makes the money frame the classic bank shows: the Warbank's gold on retail with a
 -- Warbank, the character's on WoW: Forever, none on Classic.
 ---@return Money?

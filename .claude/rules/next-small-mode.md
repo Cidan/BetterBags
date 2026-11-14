@@ -47,7 +47,8 @@ they show (§14i, Autosize Bags: next-small-autosize.md).
 
 One function shapes a panel for its size and places it at its offset, run when it is made and at the
 end of a switch. `BuildPanel` only makes the parts.
-- **Full** is unchanged (next.md §3): the frame on its screen edge, top to bottom; the body inside the
+- **Full** is unchanged (next.md §3): the frame on its screen edge, top to bottom (less a theme's dock insets,
+  `DockInsets`, next.md §3); the body inside the
   feather; no clicks over the feather (hit rect insets); the fill and the wash reaching past the
   screen edge while docked (`SetDocked`).
 - **Small:** the frame is the body, its size `SmallSize`: the size the player gave it (next-small-resize.md §14g), else
@@ -55,7 +56,8 @@ end of a switch. `BuildPanel` only makes the parts.
   minimum nor past the screen; with Autosize Bags on, as tall as what it shows (`RestingHeight`, next-small-autosize.md §14i). It is anchored by its top left at its place (`SmallPlace`: over the
   corner it holds at its size now, next-bag-anchor.md §30a, so it grows up and away from its held side; where it was left,
   else a margin in from its own screen edge, its bottom where a bag of the default height centered has it; kept on the
-  screen while Clamp Bags to Screen is on, `clampPlace`, for its own width, and on whole pixels either way). No feather, clicks everywhere, a 1-pixel lavender edge all round (`edges`), the
+  screen while Clamp Bags to Screen is on, `clampPlace`, for its own width and what it reaches past its inner side, `TabReach`
+  in §14c, and on whole pixels either way). No feather, clicks everywhere, a 1-pixel lavender edge all round (`edges`), the
   shorter beam, a grip on each bottom corner (next-small-resize.md §14g). `SetDocked` does nothing to a small panel (it is
   never at its screen edge). The render root hands the content the body's width less its padding
   (`BodyWidth`: the full body's at full size, a small panel's own) and the panel's height less its
@@ -94,6 +96,85 @@ end of a switch. `BuildPanel` only makes the parts.
     the screen on whole pixels, opening off it, a screen change, turning it on (saved; a closed one as it
     opens), turning it off (nothing moves, also a panel the screen's edge put back), a chained bag beside its
     anchor, a full panel untouched).
+  - **Its tabs stay on the screen with it** (#1248, reported from Discord: dragged or placed near the screen's
+    edge, a small bag's tabs went off the screen, its body kept on it). The tab rail hangs outside the body on
+    its inner side (the backpack's left, a companion's right, next/tabs.lua), and the panel's side never
+    changes as it moves, so the backpack at the left edge lost 112 units of tabs and the bank at the right 76.
+    `TabReach` is how far a small panel reaches past its body on that side, in its own units: a side rail
+    outside it (`RAIL_OUT`), then, while the rail shows, its widest tab and the hover slide (`TAB_HOVER`), as
+    `chain:SmallGap` counts them. Groups off hide the rail and keep its tabs (`RefreshTabs`), so a hidden rail
+    counts for nothing.
+    - `clampPlace` keeps that reach on the screen (times the panel's scale, rounded up to a whole pixel: the
+      clamp rect below takes it exactly, and rounded to the nearest pixel it stood up to 0.4 pixels past the
+      screen at Bag Scales whose hover slide is no whole pixel, found by the bug review), so every place it
+      gives (a drop, opening, a screen change, turning the setting on, a chained spot) keeps the tabs on it.
+      Where the screen cannot hold the body and its tabs both (a bag sized nearly as wide as the screen: its
+      grips go up to it), the body stays on it, as it did before (the bug review found the backpack losing
+      62 units of body past the far edge to keep its tabs on).
+    - `ApplyClamp` sets the frame's clamp rect to take the reach in (`SetClampRectInsets(-reach, 0, 0, 0)` on
+      the backpack, `(0, reach, 0, 0)` on a companion: a negative left or a positive right keeps that much
+      more of the frame on the screen, warcraft.wiki.gg Frame:SetClampRectInsets), so the client keeps the
+      tabs on the screen while the player drags the bag, as `clampPlace` does where it lands. The insets are
+      in the frame's own units (Blizzard's and GW2_UI's use: a child's width, unscaled;
+      `EditModeSystemTemplates.lua` sets them in the frame's units), so the Bag Scale needs nothing more. A
+      full panel gets the insets too, unclamped, where they do nothing. `ApplyClamp` runs from
+      `ApplyGeometry`, `chain:ClampChanged`, `FitSmall` (tabs set, shown or hidden while the bag was closed),
+      the rail's resize handler (after every `SetTabs`), and its `OnShow` and `OnHide` (groups turned on or
+      off while it is open). Not looked at in game: what the client does with a clamp rect wider than the
+      screen (the case above); `clampPlace` puts the body on the screen as the drag ends either way. Nor
+      whether the client pushes a clamped frame in as its clamp rect widens, before `FollowTabs` glides it
+      (raised by the second bug review): the place it ends at is the same either way.
+    - Tabs that change while the bag is open (the resize handler after every `SetTabs`, and the rail's
+      `OnHide`: groups turned off hide it with its tabs kept, and set nothing; its `OnShow` only follows a
+      `SetTabs`, so it applies the clamp alone) move it to
+      where its place puts it with them: `FollowTabs(later)`, a frame on (the rail shows after its tabs are
+      set, `RefreshTabs`), and each frame while the bag is not `Settled` (an open slide, a glide, a drag, a
+      grip, a size switch), as `FollowHeight` waits (`tabsLater`, a zero-length tween on `tabsKey`; a try
+      while it waits is checks alone). Its place (`SmallPlace`, through `clampPlace`) keeps the tabs on the
+      screen, so tabs that grow at the screen's edge push the bag in, and tabs that shrink or hide let it
+      back to where it was left. It glides there (`GlideTo`), as a bag glides into its spot, and saves
+      nothing (the player did not move it). **Failure mode (fixed, found by the bug review):** the first
+      version pushed the bag in from where it stood and never let it back, so it stood off its place, and the
+      next thing that placed it from there moved it: Autosize Bags' height glide slid it 74 units sideways as
+      items came in, and a bag at the edge with groups turned on and off opened 82 units in from it. A bag
+      chained beside its anchor is the chain's to place (`"chained"`): its rail hangs into the gap between
+      the bags (`chain:SmallGap`), and `chain:Update` (the resize handler) settles it beside its anchor. An
+      anchor follows its own tabs: in a pair that fits, both rails face the gap and its place never moves for
+      them, but the anchor of a pair too wide for where it stands (dropped against the screen's edge, the bag
+      beside it held on the screen over it) faces the edge with its tabs (found by the second bug review: its
+      grown tabs stood 74 units off the screen). The bag beside it stays held there: its spot is past the edge
+      by the anchor's own reach and more (the gap counts it), so nothing settles it (a `chain:Update` after
+      the anchor's glide moved nothing, the third bug review found, and only let the braid go and knot again).
+      It returns what it did: `"closed"`, `"off"`, `"chained"`, `"owed"`, `"placed"` or `"gliding"`.
+    - **Left as it is: a close part way through the glide** (found by the second bug review). A close's slide
+      replaces the glide (`tween:Play` on the panel) and starts from the panel's place, which `GlideTo` sets to
+      the glide's end each frame, so a bag closed within `Time.Glide` (0.24 s) of its tabs changing at the
+      screen's edge stands at the glide's end for one frame at full alpha (47 units on, in the review's
+      repro) before it slides out. A chained bag closed part way through its glide into its spot has done the
+      same since `GlideTo` was written. Setting its place to where it was drawn as the glide stops (tried)
+      moved the jump to a reopen part way through the close (`FitSmall` puts it back on its place at once, 37
+      units) and left a bag a parent hid part way through the close (Alt+Z) off its place, its tabs off the
+      screen, when shown again (found by the third bug review), so it was taken out. A real fix glides through
+      the panel's offset, which every glide and the chain read: reported to the user, not built.
+    - The anchor square (next-bag-anchor.md) is clamped to the screen on its own: dragged to the bag's inner
+      edge, it reaches the edge while the bag stops a tab's reach in, as it already parts from the bag at the
+      far edge. Left as it is (found by the bug review, the same behaviour the far edge has had).
+    - Not covered: a rail longer than a bag shorter than it (Autosize Bags off, the bag sized short with its
+      grips; `MinHeight` does not count the rail) hangs below the bag, and the clamp keeps only the bag's
+      bottom on the screen. Left out: the bottom clamp inset would have to follow every height change (a
+      grip's live sizing among them); reported to the user with this change.
+    - Coverage: `spec/next/small_spec.lua` ("with Clamp Bags to Screen" → "its tabs (#1248)": kept on the
+      screen as either bag is dragged to its edge and saved there, at Bag Scale 150%, past a strip outside the
+      body, the clamp rect on either side in its own units, turning the setting on, left alone while it is
+      off, tabs grown at the edge (nothing saved), waiting for the open slide, the rail hidden, gliding back
+      as they shrink, groups turned on and off at the edge, hidden while closed, the clamp rect on the screen
+      at Bag Scales 90% to 140% on whole pixels, the body kept on a screen too narrow for both, gliding part
+      way there, a chained bag left to the chain and its anchor following its own, the anchor of a pair pushed
+      against the edge, within half a pixel of its place). The first bug review ran 14 mutations of the first
+      version against its specs; three survived (`later`, `FitSmall`'s `ApplyClamp`, and a `chain:Update` that
+      changed nothing on screen); the first two have specs now, the third is gone. The second found four more
+      gaps (the `"chained"` exit, the glide, the rail's `OnShow` follow, which was redundant and is gone, and
+      the half-pixel tolerance); the other three have specs now.
   - `StartMoving` flags a frame user-placed, and the client then restores a named frame's place from
     its layout cache at login (warcraft.wiki.gg Frame:StartMoving): `StartMove` clears the flag
     (`SetUserPlaced(false)`), as the wiki says to.

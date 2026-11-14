@@ -104,8 +104,20 @@ templates (its panels draw themselves, mirror, slide, morph and chain), so `Next
   (`OVERLAY`, over the art) and its header buttons above it, as Blizzard's title and close sit over its NineSlice (510
   over 500). A set drawn on another frame keeps its pieces there and hides them; a set given no such frame refuses
   `Above`. Ornaments that say `Above` are drawn on the overlay too (next-themes-ornaments.md §12).
+- **Its reach** (`frameArt:Reach(spec, unit)`): how far the frame reaches past its region's top and past its bottom, read
+  from the same layout `Apply` draws, on a grid of `unit` (`pixel:UnitAt`) with each offset and size in whole pixels of it as
+  `Apply` rounds them (`pixel:Point` rounds offsets to the nearest pixel, `pixel:Height` sizes; measured without, a docked
+  panel's gaps above and below came out a pixel apart at some UI scales, found by the bug review): each corner by its
+  offset off the region's top or bottom (a corner hung by its other side,
+  `Point` against `RelativePoint`, reaches its size further: `Height`, else its atlas's), the top and bottom edges by their
+  own `Y` and `Y1` off their corners (off the region in a three-slice layout), and the bands (`Top` negative). A corner hung
+  from the region's middle and the side edges never reach past it; no frame reaches nowhere. Blizzard's
+  `ButtonFrameTemplateNoPortrait` reaches 16 above and 3 below on retail, 16 and 8 on WoW: Forever (its
+  `NineSliceLayoutOverrides` put the bottom corners at -8), none on Classic. A docked panel keeps it clear of the screen's
+  top and bottom (`Panel.DockMargin`, next.md §3).
 - **Coverage**: `spec/next/frameart_spec.lua` (with Blizzard's layouts per client, `spec/fixtures/nineslice_layouts.lua`,
-  copied from each branch, Forever's adjustments applied by a copy of Blizzard's code), `spec/next/theme_panel_spec.lua`
+  copied from each branch, Forever's adjustments applied by a copy of Blizzard's code; "its reach": each client's layout,
+  a hung corner, edges' own offsets, a band, whole pixels of a grid, no frame), `spec/next/theme_panel_spec.lua`
   ("draws a frame round its body, mirrored on the bank", "draws a frame that says Above over its content"),
   `spec/next/settings/window_spec.lua`,
   `spec/next/controls/panel_controls_spec.lua`, `spec/sonata/next_engine_spec.lua` ("names what is wrong with a frame").

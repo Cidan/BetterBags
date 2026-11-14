@@ -341,6 +341,9 @@ end
 ---@field namesOwed? boolean Its names asked for another width while it was busy (FollowNames): it tries again each frame until it follows (followLater).
 ---@field namesKey table The tween key that tries, a frame on, what its names asked for while it was busy (followLater).
 ---@field heightKey table The tween key that fits its height a frame after it was laid out, and each frame it waits (heightLater).
+---@field dockTop number How far it stands in from the screen's top docked, before whole pixels (styleBody, DockInsets).
+---@field dockBottom number How far it stands in from the screen's bottom docked (styleBody, DockInsets).
+---@field tabsKey table The tween key that places it for its tabs a frame after they changed, and each frame it waits (tabsLater).
 ---@field released? boolean Its close (Hide) has saved the place of the backpack beside it (chain:Released): its slide's end does not again. Cleared as it hides and as it opens.
 ---@field contentHeight? number How tall what it shows was laid out last, in its own units: its scroll box's FitHeight (Autosize Bags, FittedHeight).
 ---@field glideCut? boolean Its size glide is being ended early (endSizeGlide): its end settles no chain.
@@ -431,6 +434,7 @@ function nextPanel:Create(proto, opts)
   p.sizeGlideKey = {}
   p.namesKey = {}
   p.heightKey = {}
+  p.tabsKey = {}
   p.size = database:GetNextSize()
   p:BuildPanel(opts.name)
   p:BuildMover()
@@ -600,8 +604,16 @@ function panelProto:HiddenOffset()
   return -self:Outward() * (style.WIDTH + style.OVERREACH)
 end
 
--- setOffset puts the panel x from where it rests: from its screen edge, top to bottom; a small
--- panel, x along from its place, fading as it leaves it (its slide in and out).
+-- DockInsets is how far a full panel stands in from the screen's top and from its bottom: as its theme was last drawn
+-- (styleBody: Panel.DockMargin, its art kept that far clear of each), rounded up to whole pixels of the screen; none for a theme
+-- whose full panels reach both.
+---@return number top, number bottom
+function panelProto:DockInsets()
+  return pixel:Ceil(UIParent, self.dockTop), pixel:Ceil(UIParent, self.dockBottom)
+end
+
+-- setOffset puts the panel x from where it rests: from its screen edge, from the screen's top to its bottom less its dock
+-- insets (DockInsets); a small panel, x along from its place, fading as it leaves it (its slide in and out).
 ---@private
 ---@param x number
 function panelProto:setOffset(x)
@@ -624,12 +636,13 @@ function panelProto:setOffset(x)
     return
   end
   x = pixel:SnapIn(unit, x)
+  local top, bottom = self:DockInsets()
   if self.side == "LEFT" then
-    frame:SetPoint("TOPLEFT", UIParent, "TOPLEFT", x, 0)
-    frame:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", x, 0)
+    frame:SetPoint("TOPLEFT", UIParent, "TOPLEFT", x, -top)
+    frame:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", x, bottom)
   else
-    frame:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", x, 0)
-    frame:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", x, 0)
+    frame:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", x, -top)
+    frame:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", x, bottom)
   end
 end
 
@@ -1834,6 +1847,20 @@ function panelProto:styleBody()
   self.glass:Style()
   -- Mirrored, as its ornaments are, on a panel whose inner side is on the right.
   self.frameArt:Apply(P.Frame, self.side == "LEFT")
+  -- How far it stands in from the screen's top and from its bottom docked (DockInsets, Panel.DockMargin): its art past its body
+  -- there (its frame's pieces, and the bag button of every panel, so docked panels line up), on the client played, in whole
+  -- pixels of the grid a docked panel is drawn on as its art is drawn (found by the bug review: measured off it, the gaps seen
+  -- above and below were a pixel apart at some UI scales), and the margin more, so the gap seen is the margin at both (asked of
+  -- the Plain theme: "equal on both sides").
+  if type(P.DockMargin) == "number" then
+    local unit = pixel:UnitAt(UIParent:GetEffectiveScale())
+    local frameTop, frameBottom = nextFrameArt:Reach(P.Frame, unit)
+    local menuTop, menuBottom = nextMenuButton:Reach(style.Theme.Header.Buttons.Menu, unit)
+    self.dockTop = math.max(frameTop, menuTop) + P.DockMargin
+    self.dockBottom = math.max(frameBottom, menuBottom) + P.DockMargin
+  else
+    self.dockTop, self.dockBottom = 0, 0
+  end
 end
 
 -- The masks that round a corner (tools/textures/next_masks.py), one image for each corner, cut round at it and opaque
@@ -2336,13 +2363,14 @@ function panelProto:ContentBottom()
   return style.FOOTER
 end
 
--- Height is how tall the panel is: the screen's height, or a small panel's.
+-- Height is how tall the panel is: the screen's height less its dock insets (DockInsets), or a small panel's.
 ---@return number
 function panelProto:Height()
   if self:IsSmall() then
     return self:SmallHeight()
   end
-  return UIParent:GetHeight()
+  local top, bottom = self:DockInsets()
+  return UIParent:GetHeight() - top - bottom
 end
 
 -- Width is how wide the panel's frame is: its body and its feather, or a small panel's body alone.
@@ -2428,8 +2456,22 @@ function panelProto:SparkSpreadBase()
   return self:IsSmall() and style.Small.SparkSpread or (R and R.Spread or 0)
 end
 
+-- TabReach is how far a small panel reaches past its body on its inner side, in its own units: a side rail standing outside the
+-- body (Header.Buttons.Rail.Outside), then its tabs while the rail shows, its widest tab and the hover slide (as chain:SmallGap
+-- counts them). Groups off hide the rail and keep its tabs (RefreshTabs): the strip alone then.
+---@return number
+function panelProto:TabReach()
+  local rail = self.tabs
+  local widest = rail:Width()
+  if not rail.frame:IsShown() or widest == 0 then
+    return style.RAIL_OUT
+  end
+  return style.RAIL_OUT + widest + style.TAB_HOVER
+end
+
 -- clampPlace keeps a small panel's place (its top left) on the screen while the bags are clamped to it
--- (Clamp Bags to Screen, window.md §3a), its size there its own times its scale; always on whole pixels of
+-- (Clamp Bags to Screen, window.md §3a), its size there its own times its scale, and its tabs past its inner side (TabReach;
+-- reported, #1248: "dragging or placing a small backpack near the screen edge clips tabs off-screen"); always on whole pixels of
 -- the screen (docs/next-pixel-perfect.md: its size is whole pixels at its scale, so its far edges are too). With
 -- Autosize Bags on, all of its height stays on the screen either way: a bag holding its bottom (HeldCorner) grows up, so its
 -- top is pushed down no further than the screen's top (the mirror of "move the bag up just enough", asked when it held its
@@ -2451,13 +2493,15 @@ function panelProto:clampPlace(x, y)
     end
     return pixel:Snap(UIParent, x), pixel:Snap(UIParent, y)
   end
-  -- A side rail outside the body (Header.Buttons.Rail.Outside) stays on the screen too, on the inner side.
-  local strip = style.RAIL_OUT * s
-  local left, right = strip, 0
+  -- What it reaches past its body stays on the screen too, on the inner side, in whole pixels past it (its clamp rect takes the
+  -- reach exactly, ApplyClamp, and must not stand past the screen's edge). Where the screen cannot hold both, its body stays on it.
+  local reach = pixel:Ceil(UIParent, self:TabReach() * s)
+  local left, right = reach, 0
   if self.side == "LEFT" then
-    left, right = 0, strip
+    left, right = 0, reach
   end
-  x = pixel:Snap(UIParent, math.max(left, math.min(UIParent:GetWidth() - self:SmallWidth() * s - right, x)))
+  local far = UIParent:GetWidth() - self:SmallWidth() * s
+  x = pixel:Snap(UIParent, math.max(0, math.min(far, math.max(left, math.min(far - right, x)))))
   y = pixel:Snap(UIParent, math.max(self:SmallHeight() * s, math.min(UIParent:GetHeight(), y)))
   return x, y
 end
@@ -2746,9 +2790,71 @@ function panelProto:ApplyGeometry()
 end
 
 -- ApplyClamp clamps a small panel to the screen while the bags are clamped to it (Clamp Bags to Screen,
--- window.md §3a); a full panel rests at its screen edge and is never clamped.
+-- window.md §3a); a full panel rests at its screen edge and is never clamped. Its clamp rect takes in what it reaches past its
+-- inner side (TabReach, in its own units: a negative left or a positive right keeps that much more of it on the screen,
+-- warcraft.wiki.gg Frame:SetClampRectInsets), so the client keeps its tabs on the screen as the player drags it, as clampPlace
+-- does where it is placed.
 function panelProto:ApplyClamp()
-  self.frame:SetClampedToScreen(self:IsSmall() and database:GetClampBagsToScreen())
+  local frame, reach = self.frame, self:TabReach()
+  frame:SetClampedToScreen(self:IsSmall() and database:GetClampBagsToScreen())
+  if self.side == "LEFT" then
+    frame:SetClampRectInsets(0, reach, 0, 0)
+  else
+    frame:SetClampRectInsets(-reach, 0, 0, 0)
+  end
+end
+
+-- FollowTabs keeps an open small panel where its place puts it as its tabs change while the bags are clamped to it (Clamp Bags to
+-- Screen, #1248): its place keeps its tabs on the screen (SmallPlace, through clampPlace), so tabs that grow at the screen's edge
+-- push it in and tabs that shrink or hide let it back to where it was left; it glides there (GlideTo), saving nothing, as a bag
+-- glides into its spot. Left off its place, the next thing that placed it from there moved it (found by the bug review: Autosize
+-- Bags' height glide slid it sideways as items came in). A bag chained beside its anchor is the chain's to place: its rail hangs
+-- into the gap between the bags (chain:SmallGap), and the chain settles it beside its anchor (chain:Update, the rail's resize
+-- handler). An anchor follows its own, as the anchor of a pair too wide for where it stands (dropped against the screen's edge,
+-- the bag beside it held on the screen over it) faces the edge with its tabs (found by the second bug review); the bag beside it
+-- stays held there (its spot is past the edge by the anchor's tabs and more). Asked with later (its tabs were just set: the rail
+-- shows after them, RefreshTabs), or while something moves, sizes or places it (Settled), it tries again a frame on, each frame,
+-- until it can (tabsLater), as FollowHeight does: a try while it waits is checks alone. Its clamp rect is its caller's
+-- (ApplyClamp). It returns what it did, for profiler traces: "closed" (not an open small panel), "off", "chained", "owed" (it
+-- waits), "placed" (it is where its place puts it) or "gliding".
+---@param later? boolean
+---@return string
+function panelProto:FollowTabs(later)
+  if not self:IsSmall() or not self.frame:IsShown() or self.closing then
+    return "closed"
+  end
+  if not database:GetClampBagsToScreen() then
+    return "off"
+  end
+  if chain:SmallAnchorOf(self) ~= nil then
+    return "chained"
+  end
+  if later or not self:Settled() then
+    self:tabsLater()
+    return "owed"
+  end
+  local x, y = self:SmallPlace()
+  local half = pixel:Unit(UIParent) / 2
+  if math.abs(x - self.placeX) < half and math.abs(y - self.placeY) < half then
+    return "placed"
+  end
+  self:GlideTo()
+  return "gliding"
+end
+
+-- tabsLater tries FollowTabs again a frame on (a zero-length tween, tabsKey), never at once, as heightLater does for
+-- FollowHeight: it stops once the bag is where its place puts it, closes, is chained, or the setting is turned off.
+---@private
+function panelProto:tabsLater()
+  tween:Play(self.tabsKey, {
+    duration = 0,
+    from = 0,
+    to = 1,
+    onUpdate = function() end,
+    onDone = function()
+      self:FollowTabs()
+    end,
+  })
 end
 
 -- FitSmall sizes a small panel for the screen as it is now and puts it at its place, kept on the
@@ -2759,6 +2865,8 @@ end
 function panelProto:FitSmall()
   self:endSizeGlide()
   self:takeScale()
+  -- Its tabs may have been set, shown or hidden while it was closed (ApplyClamp).
+  self:ApplyClamp()
   local width, height, fitted = self:SmallSize()
   if self.restingWidth ~= fitted and database:GetNextAutosize() then
     self.smallWidth, self.restingWidth = width, fitted
@@ -2791,7 +2899,8 @@ function panelProto:BodyRect()
   if self.side == "RIGHT" then
     left = UIParent:GetWidth() - style.WIDTH + self.offset
   end
-  return left + self:BodyLeft(), UIParent:GetHeight(), UIParent:GetHeight(), style.BODY_WIDTH, 1
+  local top = self:DockInsets()
+  return left + self:BodyLeft(), UIParent:GetHeight() - top, self:Height(), style.BODY_WIDTH, 1
 end
 
 -- PrepareResize switches the panel's size (nextPanel:SetSize). Not shown (a closing one finishes
@@ -5003,6 +5112,44 @@ function panelProto:TitleRightClickHint()
   return nil
 end
 
+-- TitleRightClickLabel names what a right click on the title does, as an action: the bag button's tooltip line (it runs the
+-- same right click) and its menu's entry for it (MenuEntries); nil when it does nothing.
+---@return string?
+function panelProto:TitleRightClickLabel()
+  return nil
+end
+
+-- SizeEntry is the switch between full and small bags (docs/next-small-mode.md), one for every bag (nextPanel:SetSize), as a
+-- header button's spec without its button: the backpack's size button (next/bag.lua) and the entry a bag button's menu lists on
+-- a panel without one (MenuEntries).
+---@return table
+function panelProto:SizeEntry()
+  return {
+    label = L:G("Small Bags"),
+    checked = function() return self:IsSmall() end,
+    menuTooltip = function() return L:G("Smaller bags you can move anywhere: drag a bag by its title.") end,
+    onClick = function(ctx) nextPanel:SetSize(ctx, self:IsSmall() and "full" or "small") end,
+  }
+end
+
+-- MenuEntries is what a bag button's menu (Header.Buttons.Menu, NextMenuButton) lists after the header's row, none of it a
+-- header button: what a right click on the title does (the backpack's and the bank's sort), and the switch to small bags on a
+-- panel with no size button of its own, so every bag's menu has it (asked of the Plain theme: "add the missing button
+-- interactions to the plain drop down menu ... minimize/maximize bags, etc, whatever is missing"). Each is a header button's
+-- spec without its button (label, checked, menuTooltip, onClick).
+---@return table[]
+function panelProto:MenuEntries()
+  local entries = {}
+  local sort = self:TitleRightClickLabel()
+  if sort ~= nil then
+    table.insert(entries, { label = sort, onClick = function(ctx) self:OnTitleRightClick(ctx) end })
+  end
+  if self.sizeButton == nil then
+    table.insert(entries, self:SizeEntry())
+  end
+  return entries
+end
+
 ---@private
 ---@param on boolean
 function panelProto:lightTitle(on)
@@ -5946,10 +6093,22 @@ function panelProto:BuildTabs()
     self:OnTabsReordered(ctx, ids)
   end)
   -- Chained, the gap between the bags follows their tabs' widths (next.md §12); autosized, its height follows the rail's
-  -- (FollowHeight, a frame on: the rail is shown after its tabs are set).
+  -- (FollowHeight, a frame on: the rail is shown after its tabs are set); clamped, its clamp rect takes in the rail's tabs at once
+  -- (ApplyClamp) and it goes where its place puts it with them (FollowTabs, a frame on too).
   self.tabs:SetResizeHandler(function(ctx)
     chain:Update(ctx)
     self:FollowHeight(true)
+    self:ApplyClamp()
+    self:FollowTabs(true)
+  end)
+  -- Shown (groups turned on: after its tabs are set, which follows them), its clamp rect takes them in at once; hidden (groups
+  -- turned off, its tabs kept and not set again), it lets them go and follows.
+  addon.HookScript(self.tabs.frame, "OnShow", function()
+    self:ApplyClamp()
+  end)
+  addon.HookScript(self.tabs.frame, "OnHide", function()
+    self:ApplyClamp()
+    self:FollowTabs(true)
   end)
   self:RefreshTabs()
 end

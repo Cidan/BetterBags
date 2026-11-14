@@ -262,6 +262,10 @@ sonataNext:RegisterTheme({
     Wash = false,
     Edge = false,
     DropGlow = { Color = "Gold", Alpha = 0.12, BlendMode = "ADD" },
+    -- Docked at full height, Blizzard's frame (16 above its body, 3 below; 8 below on WoW: Forever, none past it on Classic)
+    -- and the bag button (17 above) stood past the screen's top and bottom. Asked: the bag button "in a better place ... equal
+    -- on both sides", the gap seen (8 agreed): the art kept 8 clear of each.
+    DockMargin = 8,
   },
 
   Header = {

@@ -547,7 +547,9 @@ describe("NextVendor", function()
         for i = 2, #list do
           names[i - 1] = list[i].text
         end
-        assert.are.same({ "Filter", "Sell Junk", "Repair All", "Open Options Screen" }, names)
+        -- The switch to small bags too: the backpack's size button's, every bag's (asked: "add the missing button interactions to
+        -- the plain drop down menu").
+        assert.are.same({ "Filter", "Sell Junk", "Repair All", "Small Bags", "Open Options Screen" }, names)
         assert.is_true(list[4].disabled, "nothing to repair")
         assert.is_truthy(list[4].tooltipText:find("Nothing needs repair", 1, true))
         v:ApplyStyle(ctx())

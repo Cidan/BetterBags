@@ -312,4 +312,56 @@ describe("NextFrameArt", function()
       assert.is_false(piece:IsShown(), name)
     end
   end)
+
+  -- How far a frame reaches past its region above and below (Reach), placed as Apply places it: a docked panel keeps it clear
+  -- of the screen's top and bottom (Panel.DockMargin; asked of the Plain theme: "equal on both sides", the visible gap).
+  describe("its reach", function()
+    -- One unit a pixel, as the specs' screen draws it.
+    local PIXEL = 1
+
+    it("is how far each client's layout reaches above its region and below it", function()
+      for _, case in ipairs({ { "Retail", 16, 3 }, { "Forever", 16, 8 }, { "Classic", 0, 0 } }) do
+        UseNineSliceLayouts(case[1])
+        assert.are.same({ case[2], case[3] }, { frameArt:Reach({ Layout = "ButtonFrameTemplateNoPortrait" }, PIXEL) }, case[1])
+      end
+    end)
+
+    it("counts a corner hung by its other side at its size", function()
+      assert.are.same({ 7, 10 }, { frameArt:Reach({ Pieces = {
+        TopRightCorner = { Texture = "a", Width = 10, Height = 6, Point = "BOTTOMRIGHT", RelativePoint = "TOPRIGHT", Y = 1 },
+        BottomLeftCorner = { Texture = "a", Width = 10, Height = 12, Point = "TOPLEFT", RelativePoint = "BOTTOMLEFT", Y = 2 },
+      } }, PIXEL) })
+    end)
+
+    it("counts the top and bottom edges by their own offsets off their corners", function()
+      assert.are.same({ 9, 5 }, { frameArt:Reach({ Pieces = {
+        TopLeftCorner = { Texture = "a", Width = 10, Height = 10, Y = 4 },
+        TopEdge = { Texture = "e", Height = 8, Y = 5 },
+        BottomLeftCorner = { Texture = "a", Width = 10, Height = 10, Y = -3 },
+        BottomEdge = { Texture = "e", Height = 8, Y = -2 },
+      } }, PIXEL) })
+    end)
+
+    it("counts a band set above its region's top", function()
+      assert.are.same({ 6, 0 }, { frameArt:Reach({ Pieces = {}, Bands = { { Texture = "b", Height = 4, Top = -6 } } }, PIXEL) })
+    end)
+
+    -- Found by the bug review: Apply rounds each offset and size to whole pixels of the grid it draws on, and a reach that did
+    -- not left the gap seen above a docked panel a pixel off the gap below at some UI scales.
+    it("is in whole pixels of the grid it is drawn on, each offset and size rounded as Apply rounds them", function()
+      local unit = 0.6
+      local function near(a, b) return math.abs(a - b) < 1e-9 end
+      local top, bottom = frameArt:Reach({ Layout = "ButtonFrameTemplateNoPortrait" }, unit)
+      assert.is_true(near(16.2, top) and near(3, bottom), top .. ", " .. bottom)
+      top = frameArt:Reach({ Pieces = {
+        TopRightCorner = { Texture = "a", Width = 10, Height = 6, Point = "BOTTOMRIGHT", RelativePoint = "TOPRIGHT", Y = 1 },
+      } }, unit)
+      assert.is_true(near(7.2, top), "its offset and its size each in whole pixels: " .. top)
+    end)
+
+    it("reaches nowhere for no frame", function()
+      assert.are.same({ 0, 0 }, { frameArt:Reach(false, PIXEL) })
+      assert.are.same({ 0, 0 }, { frameArt:Reach(nil, PIXEL) })
+    end)
+  end)
 end)

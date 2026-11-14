@@ -127,6 +127,80 @@ local function layoutOf(spec)
   return layout
 end
 
+-- Reach is how far a frame drawn from spec reaches past its region's top and past its bottom, in its units, as Apply places it
+-- on a grid of unit (pixel:UnitAt), each offset and size in whole pixels of it as Apply rounds them: each corner by its offset
+-- off the region's top or bottom (one hung by its other side reaches its size further), the top and bottom edges by their own
+-- offsets off their corners (off the region in a three-slice layout), and the bands; none for no frame. A corner hung from the
+-- region's middle, and the side edges, never reach past it. A docked panel keeps it clear of the screen's top and bottom
+-- (Panel.DockMargin, NextPanel:DockInsets).
+---@param spec? table|false
+---@param unit number
+---@return number top, number bottom
+function frameArt:Reach(spec, unit)
+  if not spec then
+    return 0, 0
+  end
+  local layout = layoutOf(spec)
+  local function snap(v)
+    return pixel:SnapIn(unit, v or 0)
+  end
+  local function height(piece)
+    local h = piece.height
+    if h == nil then
+      local info = piece.atlas ~= nil and C_Texture.GetAtlasInfo(piece.atlas) or nil
+      h = info and info.height or 0
+    end
+    return pixel:LengthIn(unit, h)
+  end
+  -- Each corner's top and bottom off the region's edge it hangs from, up positive (an empty corner sits at its corner).
+  local corners = {}
+  for _, setup in ipairs(SETUP) do
+    if setup.corner then
+      local piece = layout[setup.name]
+      local hang = setup.point:sub(1, 3)
+      local at, top, bottom = hang, 0, 0
+      if piece ~= nil then
+        local point, h = piece.point or setup.point, height(piece)
+        at = (piece.relativePoint or setup.point):sub(1, 3)
+        top = snap(piece.y) + (point:sub(1, 3) == "TOP" and 0 or point:sub(1, 6) == "BOTTOM" and h or h / 2)
+        bottom = top - h
+      end
+      corners[setup.name] = { at = at, top = top, bottom = bottom }
+    end
+  end
+  local above, below = 0, 0
+  for _, c in pairs(corners) do
+    if c.at == "TOP" then
+      above = math.max(above, c.top)
+    elseif c.at == "BOT" then
+      below = math.max(below, -c.bottom)
+    end
+  end
+  local three = layout.threeSliceVertical or layout.threeSliceHorizontal
+  local function edge(name, first, second, top)
+    local piece = layout[name]
+    if piece == nil then
+      return
+    end
+    local a = three and { at = top and "TOP" or "BOT", top = 0, bottom = 0 } or corners[first]
+    local b = three and a or corners[second]
+    for _, tip in ipairs({ { a, snap(piece.y) }, { b, snap(piece.y1) } }) do
+      local c, y = tip[1], tip[2]
+      if top and c.at == "TOP" then
+        above = math.max(above, c.top + y)
+      elseif not top and c.at == "BOT" then
+        below = math.max(below, -(c.bottom + y))
+      end
+    end
+  end
+  edge("TopEdge", "TopLeftCorner", "TopRightCorner", true)
+  edge("BottomEdge", "BottomLeftCorner", "BottomRightCorner", false)
+  for _, band in ipairs(spec.Bands or {}) do
+    above = math.max(above, snap(-(band.Top or 0)))
+  end
+  return above, below
+end
+
 -- Apply draws spec round the region (false or nil: nothing), mirrored for a panel whose inner side is on the right.
 -- spec: Layout (a client layout's name) or Pieces; Color and Alpha tint every piece (white when unset); Layer and
 -- SubLevel are where they draw (ARTWORK 5 when unset: above the theme's ornaments, below the title); Above, on the frame

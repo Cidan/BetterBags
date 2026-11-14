@@ -1275,6 +1275,11 @@ function sonataNext:Check(key)
       end
     end
   end
+  -- How far a docked panel keeps its art from the screen's top and bottom (Panel.DockMargin): a margin, or false.
+  local dock = theme.Panel and theme.Panel.DockMargin
+  if dock ~= nil and dock ~= false and not (type(dock) == "number" and dock >= 0) then
+    table.insert(problems, "Panel.DockMargin: a margin, no less than nothing, or false")
+  end
   -- A section's row art may be shorter than its row (Sections.Header.Height).
   local header = theme.Sections and theme.Sections.Header
   if type(header) == "table" and header.Height ~= nil and not (type(header.Height) == "number" and header.Height > 0) then
