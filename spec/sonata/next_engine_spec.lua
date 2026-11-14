@@ -1482,6 +1482,19 @@ describe("SonataNext", function()
     assert.are.same({ "Header.Buttons.Menu.Point: no corner named nil" }, sonataNext:Check("NowhereMenu"))
   end)
 
+  -- How far a docked panel keeps its art from the screen's top and bottom (Panel.DockMargin): a margin, or false to reach both.
+  it("names what is wrong with a docked panel's margin", function()
+    for i, bad in ipairs({ -1, "8", true }) do
+      sonataNext:RegisterTheme({ Name = "BadDock" .. i, Panel = { DockMargin = bad } })
+      assert.are.same({ "Panel.DockMargin: a margin, no less than nothing, or false" }, sonataNext:Check("BadDock" .. i),
+        tostring(bad))
+    end
+    for i, good in ipairs({ 0, 8, false }) do
+      sonataNext:RegisterTheme({ Name = "GoodDock" .. i, Panel = { DockMargin = good } })
+      assert.are.same({}, sonataNext:Check("GoodDock" .. i), tostring(good))
+    end
+  end)
+
   -- Where an item dropped to file it in a category goes (Header.ItemDrop, issue #1270): the title, or the bag button,
   -- which only a theme with one has; its glow is a texture spec as any other.
   it("names what is wrong with where an item is dropped to file it", function()

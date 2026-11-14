@@ -670,6 +670,21 @@ describe("BetterBags Next's shipped themes", function()
         assert.is_nil(t.Panel.Ornaments, "the bag is the button now, not an ornament")
       end
     end)
+
+    -- Asked: docked, the bag button "in a better place ... equal on both sides" (the visible gap, 8 agreed): the art of a full
+    -- bag kept 8 clear of the screen's top and bottom on every client; every other theme reaches both.
+    it("keeps a docked bag's art 8 clear of the screen's top and bottom", function()
+      for client, flags in pairs(CLIENTS) do
+        for _, flag in ipairs(FLAGS) do addon[flag] = flags[flag] == true end
+        assert.are.equal(8, sonataNext:Resolve("Plain").Panel.DockMargin, client)
+      end
+      assert.is_false(sonataNext:Resolve("Default").Panel.DockMargin)
+      for key in pairs(sonataNext:GetThemes()) do
+        if key ~= "Plain" then
+          assert.is_false(sonataNext:Resolve(key).Panel.DockMargin, key)
+        end
+      end
+    end)
   end)
   -- Glitch (next-themes.md §21): asked for "flickers, glitched blinking textures that wobble suddenly and harshly, think
   -- green mesh".

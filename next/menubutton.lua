@@ -95,16 +95,11 @@ local function panelName(kind)
   return nil
 end
 
--- Spec returns the theme's menu button for the panel: Header.Buttons.Menu, with what its Panels entry for the panel
--- names over it (the vendor's portrait in place of the bag); nil for a theme without one.
----@return table?
-function buttonProto:Spec()
-  local M = style.Theme.Header.Buttons.Menu
-  if type(M) ~= "table" then
-    return nil
-  end
-  local name = panelName(self.panel.kind)
-  local own = M.Panels and name and M.Panels[name]
+-- over is a bag button's spec with what a panel's own entry (its Panels) names over it.
+---@param M table
+---@param own? table
+---@return table
+local function over(M, own)
   if own == nil then
     return M
   end
@@ -116,6 +111,58 @@ function buttonProto:Spec()
     spec[k] = v
   end
   return spec
+end
+
+-- Spec returns the theme's menu button for the panel: Header.Buttons.Menu, with what its Panels entry for the panel
+-- names over it (the vendor's portrait in place of the bag); nil for a theme without one.
+---@return table?
+function buttonProto:Spec()
+  local M = style.Theme.Header.Buttons.Menu
+  if type(M) ~= "table" then
+    return nil
+  end
+  local name = panelName(self.panel.kind)
+  return over(M, M.Panels and name and M.Panels[name] or nil)
+end
+
+-- Reach is how far a bag button (Header.Buttons.Menu) reaches past the body's top and past its bottom, in its units, as Style
+-- places it on a grid of unit (pixel:UnitAt), each offset and size in whole pixels of it as Style rounds them: from its corner
+-- by its own anchor, Y down, its height, and its art past it (its layers' and its highlight's insets, negative reaching past);
+-- the most of every panel's own (Panels: the vendor's portrait); none without one. A docked panel keeps it clear of the
+-- screen's top and bottom (Panel.DockMargin, NextPanel:DockInsets).
+---@param M? table|false
+---@param unit number
+---@return number top, number bottom
+function menuButton:Reach(M, unit)
+  if type(M) ~= "table" then
+    return 0, 0
+  end
+  local specs = { M }
+  for _, own in pairs(M.Panels or {}) do
+    table.insert(specs, over(M, own))
+  end
+  local above, below = 0, 0
+  for _, spec in ipairs(specs) do
+    local function past(side)
+      local most = 0
+      for _, layer in ipairs(spec.Layers or {}) do
+        most = math.max(most, -pixel:SnapIn(unit, (layer.Inset or {})[side] or 0))
+      end
+      if spec.Highlight then
+        most = math.max(most, -pixel:SnapIn(unit, (spec.Highlight.Inset or {})[side] or 0))
+      end
+      return most
+    end
+    -- Its anchor sits Y below its corner (Style: SetPoint(anchor, body, point, x, -y)).
+    local y, h = -pixel:SnapIn(unit, spec.Y or 0), pixel:LengthIn(unit, spec.Height)
+    local byTop = (spec.Anchor or spec.Point):sub(1, 3) == "TOP"
+    if spec.Point:sub(1, 3) == "TOP" then
+      above = math.max(above, y + (byTop and 0 or h) + past("Top"))
+    else
+      below = math.max(below, -(y - (byTop and h or 0)) + past("Bottom"))
+    end
+  end
+  return above, below
 end
 
 -- Room says how much of the title's row the button takes from the body's inner side and from its outer side: from its

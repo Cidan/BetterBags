@@ -4,7 +4,8 @@ Asked (2026-10-24): "a new theme: Plain. the Plain theme looks like the default 
 playing on. This will likely need some new things in Sonata to support different texture paths per wow version
 (classic, retail, etc). look at our Original betterbags default theme to figure out what we did there."
 Decisions (asked, answered): the tabs are left to me; header buttons without Blizzard art keep BetterBags' glyphs in
-Blizzard's colors; the full-height docked bag gets the whole frame, its top and bottom at the screen edge.
+Blizzard's colors; the full-height docked bag gets the whole frame, its top and bottom at the screen edge (since
+2026-11-14 its art kept 8 clear of both: "Docked clear of the screen's top and bottom", below).
 
 ## What the original Default did
 
@@ -395,3 +396,25 @@ offset by its direction (no shipped theme pins one outward but Plain).
 
 Not yet seen in game: all of it. The vendor's portrait in its ring was only checked in the specs (the preview cannot draw
 a unit's portrait).
+
+## Docked clear of the screen's top and bottom (2026-11-14, issue #1248)
+
+Triaged from Discord: docked at full height, the bag's frame and its bag button stood past the screen's edges. The first
+decision above put the docked bag's top and bottom at the screen's edges, and Blizzard's art reaches past its window:
+`ButtonFrameTemplateNoPortrait`'s corners 16 above it and 3 below (`Mainline/NineSliceLayouts.lua`; WoW: Forever's
+`Camelot/NineSliceLayoutOverrides.lua` puts the bottom corners 8 below, Classic's corners sit at their corners), and the bag
+button 15 above it, its art 2 more. So the screen cut off up to 17 at the top and 3 to 8 at the bottom.
+
+Asked: "maybe for the plain theme, we just don't dock at full size and the top (and at the bottom, so it's equal on both
+sides)".
+Agreed: equal is the gap seen, not the inset (the art reaches past the body by different amounts at the top and the bottom,
+and on each client), with a margin of 8, and the side at the screen edge left against it (its fill reaches past the edge for
+the opening bounce; standing in there would show the world beside the bag, and leaves the metal border's 4 there cut, 2 on
+Forever).
+
+`Panel.DockMargin = 8`: the panel measures what reaches past its body (the frame's pieces from the client's own layout, the
+bag button of every panel) and stands in from the screen's top and bottom by that and 8 (next.md §3): 25 at the top on every
+client, 11 at the bottom on retail, 16 on WoW: Forever, 8 on Classic, where one unit is one pixel. Each reach is measured in
+whole pixels of the screen, as the art is drawn there: measured without, the bug review found the gaps a pixel apart at some
+UI scales (15 above and 16 below at 3840x2160 and 0.65). A spec measures the drawn art's gaps with the layout resolver at four
+screens and scales on every client. Not seen in game.

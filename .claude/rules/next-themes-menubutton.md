@@ -52,12 +52,19 @@ should have their portrait for the bag button, not the bag texture" (docs/next-p
   highlight lights and its tooltip says what a drop does (`NextCategoryPicker:Hint`). Anything else held (a merchant's
   item) leaves it the menu button it is.
 - **Drawn again on each show** (`Paint`), so a vendor's portrait is the vendor now.
+- **Its reach** (`menuButton:Reach(M, unit)`): how far the theme's button reaches past the body's top and past its bottom,
+  as `Style` places it on a grid of `unit`, each offset and size in whole pixels of it as `Style` rounds them (`Y` and the
+  insets by `pixel:Snap`, the height by `pixel:Size`): its anchor `Y` below its corner (one anchored by its bottom at a top
+  corner reaches its `Height` further), and its art past it (each layer's and the highlight's `Inset`, negative reaching past); the most of every
+  panel's own (`Panels`, merged as `Spec` merges them, `over`), so every panel docks the same; none without a button.
+  Plain's reaches 17 above (15, its art 2 more). A docked panel keeps it clear of the screen's top and bottom
+  (`Panel.DockMargin`, next.md §3).
 - **Checked** (`SonataNext:Check`): a corner by its side, the size, art in every layer (its own and each panel's), the
   panels it names.
 - **Coverage**: `spec/next/menubutton_spec.lua` (hidden without one; its corner, mirrored, above the overlay; its room;
   layers inset and never flipped; a panel's own layers: a color, a portrait while there is a unit, a mask, a ring; layers
   put away; the highlight; the menu: the title, the order, Open Options Screen last, checked, disabled, tooltips, a click,
-  buttons not shown), `spec/next/theme_panel_spec.lua` ("a header row in a menu": the row out and back, the title centered
+  buttons not shown; its reach: above the top, a panel's own, its own anchor, a bottom corner, none), `spec/next/theme_panel_spec.lua` ("a header row in a menu": the row out and back, the title centered
   on either side, the backpack's entries, drawn on show; Plain's bag button on Retail and Era),
   `spec/next/vendor_spec.lua` ("in a bag button's menu": what the vendor offers, repair costs and the guild's repair, the
   filter's owner), `spec/next/bank_spec.lua` and `spec/next/guildbank_spec.lua` (their entries), `spec/sonata/next_engine_spec.lua`

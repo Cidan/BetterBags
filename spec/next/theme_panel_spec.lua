@@ -277,6 +277,7 @@ describe("BetterBags Next's panels and themes", function()
     local CLIENTS = {
       Retail = { flags = { isRetail = true }, layouts = "Retail", sizes = "Retail", corner = "UI-Frame-Metal-CornerTopLeft" },
       Era = { flags = { isClassic = true }, layouts = "Classic", sizes = "Era", corner = "UI-Frame-TopLeftCornerNoPortrait" },
+      Forever = { flags = { isForever = true }, layouts = "Forever", sizes = "Forever", corner = "UI-Frame-Metal-CornerTopLeft" },
     }
     local function plain(client)
       for _, flag in ipairs(FLAGS) do override(addon, flag, client.flags[flag] == true) end
@@ -369,6 +370,98 @@ describe("BetterBags Next's panels and themes", function()
         assert.are.same({ 0, 0.2 }, { ulx, urx }, "never flipped")
       end)
     end
+
+    -- Docked at full height, its art stood past the screen's top and bottom: Blizzard's frame 16 above its body and 3 below (8
+    -- on WoW: Forever, none on Classic), the bag button 17 above. Asked: the bag button "in a better place ... equal on both
+    -- sides", the visible gap (8 agreed): the body stands in from each edge by what reaches past it there, and 8 more.
+    local DOCKED = { Retail = { 25, 11 }, Forever = { 25, 16 }, Era = { 25, 8 } }
+    for _, name in ipairs({ "Retail", "Forever", "Era" }) do
+      it("docks its full bags with their art 8 clear of the screen's top and bottom on " .. name, function()
+        plain(CLIENTS[name])
+        db.size = "full"
+        local top, bottom = DOCKED[name][1], DOCKED[name][2]
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        local bank = opened(function(c) return nextBank:Create(c) end)
+        assert.are.same({ "TOPRIGHT", UIParent, "TOPRIGHT", 0, -top }, { bag.frame:GetPoint(1) })
+        assert.are.same({ "BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", 0, bottom }, { bag.frame:GetPoint(2) })
+        assert.are.same({ "TOPLEFT", UIParent, "TOPLEFT", 0, -top }, { bank.frame:GetPoint(1) })
+        assert.are.same({ "BOTTOMLEFT", UIParent, "BOTTOMLEFT", 0, bottom }, { bank.frame:GetPoint(2) })
+        assert.are.equal(1200 - top - bottom, bag:Height())
+        local _, y, h = bag:BodyRect()
+        assert.are.same({ 1200 - top, 1200 - top - bottom }, { y, h })
+      end)
+    end
+
+    -- Found by the bug review, measuring the art drawn: at some UI scales the gap above was a pixel off the gap below (15 and 16
+    -- at 3840x2160 and 0.65), the art drawn on whole pixels and its reach measured without them. The resolver measures where
+    -- each shown piece of the frame and of the bag button is on the screen, in screen pixels.
+    it("leaves the same gap seen above its art as below it, in whole pixels, at every UI scale", function()
+      local layout = dofile("spec/helpers/layout.lua")
+      local function gaps(panel)
+        local rects = {}
+        for _, pieces in pairs(panel.frameArt.hosts) do
+          for _, t in pairs(pieces) do
+            if t:IsShown() then table.insert(rects, layout.Rect(t)) end
+          end
+        end
+        for _, t in ipairs(panel.menuButton.layers) do
+          if t:IsShown() then table.insert(rects, layout.Rect(t)) end
+        end
+        if panel.menuButton.highlight:IsShown() then table.insert(rects, layout.Rect(panel.menuButton.highlight)) end
+        local screen, top, bottom = layout.Rect(UIParent), -math.huge, math.huge
+        for _, r in ipairs(rects) do
+          top, bottom = math.max(top, r.top), math.min(bottom, r.bottom)
+        end
+        local ppu = layout.PixelsPerUnit()
+        return (screen.top - top) * ppu, (bottom - screen.bottom) * ppu
+      end
+      for _, screen in ipairs({ { 3840, 2160, 0.65 }, { 1920, 1080, 0.9 }, { 3840, 2160, 0.53 }, { 1920, 1080, 1 } }) do
+        for _, name in ipairs({ "Retail", "Forever", "Era" }) do
+          local undo = layout.UseScreen(screen[1], screen[2], screen[3])
+          local ok, err = pcall(function()
+            plain(CLIENTS[name])
+            db.size = "full"
+            local bag = opened(function(c) return nextBag:Create(c) end)
+            local bank = opened(function(c) return nextBank:Create(c) end)
+            for _, panel in ipairs({ bag, bank }) do
+              local above, below = gaps(panel)
+              local where = name .. " " .. panel.side .. " at " .. table.concat(screen, ", ")
+              assert.is_true(math.abs(above - below) < 1e-6, where .. ": " .. above .. " above, " .. below .. " below")
+              assert.is_true(math.abs(above - math.floor(above + 0.5)) < 1e-6, where .. ": whole pixels")
+              assert.is_true(above >= 8 * screen[3] * screen[2] / 768 - 1e-6, where .. ": at least the margin")
+            end
+            bag:Hide(ctx())
+            bank:Hide(ctx())
+            finishTweens()
+          end)
+          undo()
+          if not ok then error(err, 0) end
+        end
+      end
+    end)
+
+    it("docks its full bags at the screen's top and bottom again for a theme that reaches both", function()
+      plain(CLIENTS.Retail)
+      db.size = "full"
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      backToDefault()
+      assert.are.same({ "TOPRIGHT", UIParent, "TOPRIGHT", 0, 0 }, { bag.frame:GetPoint(1) })
+      assert.are.same({ "BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", 0, 0 }, { bag.frame:GetPoint(2) })
+      assert.are.equal(1200, bag:Height())
+    end)
+
+    it("switches to small and back to where it docks, clear of the screen's top and bottom", function()
+      plain(CLIENTS.Retail)
+      db.size = "full"
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      local nextPanel = addon:GetModule("NextPanel")
+      nextPanel:SetSize(ctx(), "small")
+      finishTweens()
+      nextPanel:SetSize(ctx(), "full")
+      finishTweens()
+      assert.are.same({ "TOPRIGHT", UIParent, "TOPRIGHT", 0, -25 }, { bag.frame:GetPoint(1) })
+      assert.are.same({ "BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", 0, 11 }, { bag.frame:GetPoint(2) })
+    end)
   end)
 
   describe("the body", function()

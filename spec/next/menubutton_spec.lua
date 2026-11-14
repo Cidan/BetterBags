@@ -343,6 +343,45 @@ describe("NextMenuButton", function()
     end)
   end)
 
+  -- How far it reaches past the body's top and its bottom (Reach), placed as Style places it: a docked panel keeps it clear of
+  -- the screen's top and bottom with its frame (Panel.DockMargin; asked of the Plain theme: "the bag button is in a better
+  -- place" docked).
+  describe("its reach", function()
+    -- One unit a pixel, as the specs' screen draws it.
+    local PIXEL = 1
+
+    it("is its offset above the body's top and its art's past it, the most of every panel's own", function()
+      theme()
+      -- 15 above the top, the bag and its glow 2 above that; the vendor's portrait reaches no higher.
+      assert.are.same({ 17, 0 }, { menuButton:Reach(addon:GetModule("NextStyle").Theme.Header.Buttons.Menu, PIXEL) })
+      assert.are.same({ 32, 0 }, { menuButton:Reach({ Point = "TOPINNER", Y = -15, Width = 40, Height = 40,
+        Layers = { bag() }, Panels = { Vendor = { Y = -30 } } }, PIXEL) }, "a panel's own reaching higher")
+    end)
+
+    it("hangs from its own anchor, and at a bottom corner below the body's bottom", function()
+      assert.are.same({ 30, 0 }, { menuButton:Reach({ Point = "TOPINNER", Anchor = "BOTTOMINNER", Y = 10, Width = 40, Height = 40 },
+        PIXEL) })
+      assert.are.same({ 0, 9 }, { menuButton:Reach({ Point = "BOTTOMOUTER", Y = 5, Width = 40, Height = 40,
+        Layers = { { Texture = BAGSLOTS, Inset = { Bottom = -4 } } } }, PIXEL) })
+      assert.are.same({ 0, 0 }, { menuButton:Reach({ Point = "TOPINNER", Y = 4, Width = 40, Height = 40 }, PIXEL) }, "inside")
+    end)
+
+    -- Style rounds its offset, its size and its art's insets to whole pixels of the grid it draws on (found by the bug review:
+    -- a reach that did not left a docked panel's gaps a pixel apart at some UI scales).
+    it("is in whole pixels of the grid it is drawn on, each offset and size rounded as Style rounds them", function()
+      local function near(a, b) return math.abs(a - b) < 1e-9 end
+      local top = menuButton:Reach({ Point = "TOPINNER", Y = -15, Width = 40, Height = 40, Layers = { bag() } }, 0.6)
+      assert.is_true(near(16.8, top), "15 is 25 pixels, its art's 2 is 3: " .. top)
+      top = menuButton:Reach({ Point = "TOPINNER", Anchor = "BOTTOMINNER", Y = 1, Width = 40, Height = 41 }, 0.6)
+      assert.is_true(near(39.6, top), "41 is 68 pixels, less 1's 2: " .. top)
+    end)
+
+    it("reaches nowhere without a bag button", function()
+      assert.are.same({ 0, 0 }, { menuButton:Reach(nil, PIXEL) })
+      assert.are.same({ 0, 0 }, { menuButton:Reach(false, PIXEL) })
+    end)
+  end)
+
   teardown(function()
     for _, name in ipairs(addedKinds) do const.BAG_KIND[name] = nil end
     if createdConstants then ResetModuleStub("Constants") end

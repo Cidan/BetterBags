@@ -341,6 +341,8 @@ end
 ---@field namesOwed? boolean Its names asked for another width while it was busy (FollowNames): it tries again each frame until it follows (followLater).
 ---@field namesKey table The tween key that tries, a frame on, what its names asked for while it was busy (followLater).
 ---@field heightKey table The tween key that fits its height a frame after it was laid out, and each frame it waits (heightLater).
+---@field dockTop number How far it stands in from the screen's top docked, before whole pixels (styleBody, DockInsets).
+---@field dockBottom number How far it stands in from the screen's bottom docked (styleBody, DockInsets).
 ---@field tabsKey table The tween key that places it for its tabs a frame after they changed, and each frame it waits (tabsLater).
 ---@field released? boolean Its close (Hide) has saved the place of the backpack beside it (chain:Released): its slide's end does not again. Cleared as it hides and as it opens.
 ---@field contentHeight? number How tall what it shows was laid out last, in its own units: its scroll box's FitHeight (Autosize Bags, FittedHeight).
@@ -602,8 +604,16 @@ function panelProto:HiddenOffset()
   return -self:Outward() * (style.WIDTH + style.OVERREACH)
 end
 
--- setOffset puts the panel x from where it rests: from its screen edge, top to bottom; a small
--- panel, x along from its place, fading as it leaves it (its slide in and out).
+-- DockInsets is how far a full panel stands in from the screen's top and from its bottom: as its theme was last drawn
+-- (styleBody: Panel.DockMargin, its art kept that far clear of each), rounded up to whole pixels of the screen; none for a theme
+-- whose full panels reach both.
+---@return number top, number bottom
+function panelProto:DockInsets()
+  return pixel:Ceil(UIParent, self.dockTop), pixel:Ceil(UIParent, self.dockBottom)
+end
+
+-- setOffset puts the panel x from where it rests: from its screen edge, from the screen's top to its bottom less its dock
+-- insets (DockInsets); a small panel, x along from its place, fading as it leaves it (its slide in and out).
 ---@private
 ---@param x number
 function panelProto:setOffset(x)
@@ -626,12 +636,13 @@ function panelProto:setOffset(x)
     return
   end
   x = pixel:SnapIn(unit, x)
+  local top, bottom = self:DockInsets()
   if self.side == "LEFT" then
-    frame:SetPoint("TOPLEFT", UIParent, "TOPLEFT", x, 0)
-    frame:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", x, 0)
+    frame:SetPoint("TOPLEFT", UIParent, "TOPLEFT", x, -top)
+    frame:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", x, bottom)
   else
-    frame:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", x, 0)
-    frame:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", x, 0)
+    frame:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", x, -top)
+    frame:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", x, bottom)
   end
 end
 
@@ -1836,6 +1847,20 @@ function panelProto:styleBody()
   self.glass:Style()
   -- Mirrored, as its ornaments are, on a panel whose inner side is on the right.
   self.frameArt:Apply(P.Frame, self.side == "LEFT")
+  -- How far it stands in from the screen's top and from its bottom docked (DockInsets, Panel.DockMargin): its art past its body
+  -- there (its frame's pieces, and the bag button of every panel, so docked panels line up), on the client played, in whole
+  -- pixels of the grid a docked panel is drawn on as its art is drawn (found by the bug review: measured off it, the gaps seen
+  -- above and below were a pixel apart at some UI scales), and the margin more, so the gap seen is the margin at both (asked of
+  -- the Plain theme: "equal on both sides").
+  if type(P.DockMargin) == "number" then
+    local unit = pixel:UnitAt(UIParent:GetEffectiveScale())
+    local frameTop, frameBottom = nextFrameArt:Reach(P.Frame, unit)
+    local menuTop, menuBottom = nextMenuButton:Reach(style.Theme.Header.Buttons.Menu, unit)
+    self.dockTop = math.max(frameTop, menuTop) + P.DockMargin
+    self.dockBottom = math.max(frameBottom, menuBottom) + P.DockMargin
+  else
+    self.dockTop, self.dockBottom = 0, 0
+  end
 end
 
 -- The masks that round a corner (tools/textures/next_masks.py), one image for each corner, cut round at it and opaque
@@ -2338,13 +2363,14 @@ function panelProto:ContentBottom()
   return style.FOOTER
 end
 
--- Height is how tall the panel is: the screen's height, or a small panel's.
+-- Height is how tall the panel is: the screen's height less its dock insets (DockInsets), or a small panel's.
 ---@return number
 function panelProto:Height()
   if self:IsSmall() then
     return self:SmallHeight()
   end
-  return UIParent:GetHeight()
+  local top, bottom = self:DockInsets()
+  return UIParent:GetHeight() - top - bottom
 end
 
 -- Width is how wide the panel's frame is: its body and its feather, or a small panel's body alone.
@@ -2873,7 +2899,8 @@ function panelProto:BodyRect()
   if self.side == "RIGHT" then
     left = UIParent:GetWidth() - style.WIDTH + self.offset
   end
-  return left + self:BodyLeft(), UIParent:GetHeight(), UIParent:GetHeight(), style.BODY_WIDTH, 1
+  local top = self:DockInsets()
+  return left + self:BodyLeft(), UIParent:GetHeight() - top, self:Height(), style.BODY_WIDTH, 1
 end
 
 -- PrepareResize switches the panel's size (nextPanel:SetSize). Not shown (a closing one finishes

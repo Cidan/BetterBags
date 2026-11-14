@@ -78,7 +78,8 @@ paths:
   content; `UI-Background-Rock` 6, 21, 2 and 2 in and its `TopTileStreaks`; Classic's title band), the search box where
   the original put it with `SearchBoxTemplate`'s insides, the original menu button's `Bagslots2x` bag as the bag button
   holding the header's actions in the original bags' menu (next-themes-menubutton.md §19; the vendor's portrait in Bagslots2x's empty gold ring on
-  the vendor's), only the close button in the header, the title centered between them. The settings window is Default's
+  the vendor's), only the close button in the header, the title centered between them; docked at full height, the frame
+  and the bag button kept 8 clear of the screen's top and bottom (`Panel.DockMargin = 8`, next.md §3). The settings window is Default's
   in the same frame and stone, its name in the title bar, its sidebar Blizzard's inset (`InsetFrameTemplate` over its
   marble, 4 in, 24 down, 4 above the bottom), its pages in the settings list's art (`Options_CategoryHeader_*`,
   `Options_List_*`), its page tabs (`MinimalTab`) on a line across their column open under the chosen tab, its section

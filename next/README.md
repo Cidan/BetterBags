@@ -43,6 +43,11 @@ prototype with `NextPanel:Extend(proto, name)` and overrides what differs: `GetH
 its title does with `OnTitleRightClick` and `TitleRightClickHint` (the backpack and the bank sort; the others do
 nothing).
 
+Docked at full height, a panel stands from the screen's top to its bottom, unless its theme keeps it clear of both
+(`Panel.DockMargin`, the Plain theme): it stands in by what its art reaches past its body there (`NextFrameArt:Reach`,
+`NextMenuButton:Reach`) and the margin, so the gap seen is the margin at both (`NextPanel:DockInsets`). The rules are in
+`.claude/rules/next.md` §3.
+
 ## A small panel's place and its anchor
 
 A small panel holds a corner (`HeldCorner`, saved as `nextSmallCorners`: its side and its edge), so it grows away from it:

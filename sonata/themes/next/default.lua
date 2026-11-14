@@ -335,6 +335,9 @@ sonataNext:RegisterTheme({
     Edge = { Color = "Lavender", Alpha = 0.35, Size = 1, Full = false },
     -- Lit while a section from the other bag would drop on it.
     DropGlow = { Color = "Lavender", Alpha = 0.12, BlendMode = "ADD" },
+    -- A full panel docked to its screen edge: false reaches the screen's top and bottom; a margin keeps its art (its Frame's
+    -- pieces and its bag button, where they reach past its body) that far clear of each, the same gap seen at both.
+    DockMargin = false,
   },
 
   Header = {

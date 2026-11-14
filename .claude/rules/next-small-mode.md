@@ -47,7 +47,8 @@ they show (§14i, Autosize Bags: next-small-autosize.md).
 
 One function shapes a panel for its size and places it at its offset, run when it is made and at the
 end of a switch. `BuildPanel` only makes the parts.
-- **Full** is unchanged (next.md §3): the frame on its screen edge, top to bottom; the body inside the
+- **Full** is unchanged (next.md §3): the frame on its screen edge, top to bottom (less a theme's dock insets,
+  `DockInsets`, next.md §3); the body inside the
   feather; no clicks over the feather (hit rect insets); the fill and the wash reaching past the
   screen edge while docked (`SetDocked`).
 - **Small:** the frame is the body, its size `SmallSize`: the size the player gave it (next-small-resize.md §14g), else
