@@ -42,7 +42,8 @@ local COUNT_INSET = 2
 -- back or repair, the way Blizzard's merchant item buttons do. A left click never puts the item on
 -- the cursor, so it cannot be bought by dropping it on a bag slot past Blizzard's confirmations.
 -- An item dropped on it is sold, as on Blizzard's merchant item buttons. The buttons are plain
--- Buttons: nothing they call is protected.
+-- Buttons: nothing they call is protected. The same card shows a guild bank log entry (SetLog,
+-- guild-bank.md §5): it buys and sells nothing then.
 ---@class NextVendorButton: AceModule
 local vendorButton = addon:NewModule('NextVendorButton')
 
@@ -65,7 +66,21 @@ local function paintCard(texture, fill)
   end
 end
 
----@alias NextVendorButtonMode "buy"|"buyback"|"repair"
+---@alias NextVendorButtonMode "buy"|"buyback"|"repair"|"log"
+
+-- A log entry as a card shows it (the guild bank's logs): its icon, its title beside it, and its line, or its gold
+-- written as a price, along the bottom.
+---@class (exact) NextLogCard
+---@field key string What the canvas knows it by.
+---@field texture number|string
+---@field count? number A stack drawn on the icon.
+---@field quality? number Its title's color from Uncommon up, and the quality border.
+---@field title string Beside the icon, up to two lines.
+---@field line? string Along the bottom, in the price's role.
+---@field amount? number Gold along the bottom instead, written as a price.
+---@field link? string Its item: the tooltip shows it, and a modified click links it.
+---@field lines string[] What its tooltip says (after its item's, when it has one).
+---@field onDrop? fun() What an item dropped on it, or left-clicked onto it, does: its panel's own drop.
 
 ---@class NextVendorButtonFrame
 ---@field key string What the canvas knows it by.
@@ -92,6 +107,7 @@ end
 ---@field quantity? number How many a shopping list buys of it, in the vendor's Shopping List.
 ---@field buyback? NextBuybackItem
 ---@field repair? NextRepairEntry
+---@field log? NextLogCard
 local buttonProto = {}
 addon:GetModule('Perf'):RegisterPrototype(buttonProto, 'NextVendorButtonFrame')
 
@@ -354,7 +370,7 @@ function buttonProto:Release()
   self.frame:Hide()
   self.frame:ClearAllPoints()
   self.frame:SetParent(nil)
-  self.mode, self.item, self.buyback, self.repair = nil, nil, nil, nil
+  self.mode, self.item, self.buyback, self.repair, self.log = nil, nil, nil, nil, nil
   self.priceAmount, self.priceCosts = nil, nil
   self:placeCosts()
   table.insert(vendorButton.pool, self)
@@ -550,6 +566,24 @@ function buttonProto:SetRepair(entry)
   self:showPrice(entry.cost, {})
 end
 
+-- SetLog shows a guild bank log entry: its icon and stack, its title beside it in its quality's color, and its line
+-- (or its gold, written as a price) along the bottom.
+---@param entry NextLogCard
+function buttonProto:SetLog(entry)
+  self.mode, self.log = "log", entry
+  self.key = entry.key
+  self:reset(entry.texture, entry.quality)
+  self:setCount(entry.count)
+  self:setName(entry.title, entry.quality)
+  if entry.amount ~= nil then
+    self:showPrice(entry.amount, {})
+  else
+    self.priceAmount, self.priceCosts = nil, nil
+    self.price:SetText(entry.line or "")
+    self:placeCosts()
+  end
+end
+
 -- SetSearchMatch dims the button when a search leaves it out.
 ---@param match boolean
 function buttonProto:SetSearchMatch(match)
@@ -605,6 +639,18 @@ function buttonProto:OnEnter()
     GameTooltip:AddLine(format(L:G("Durability: %d / %d"), entry.durability, entry.maxDurability), 1, 1, 1)
     GameTooltip:AddLine(L:G("Repair: ") .. GetMoneyString(entry.cost, true), 1, 1, 1)
     GameTooltip:AddLine(L:G("Click to repair"), 0.8, 0.8, 0.8)
+  elseif self.mode == "log" then
+    local entry, first = self.log, 1
+    if entry.link then
+      GameTooltip:SetHyperlink(entry.link)
+      GameTooltip:AddLine(" ")
+    else
+      GameTooltip:SetText(entry.lines[1] or "", 1, 1, 1, 1, true)
+      first = 2
+    end
+    for i = first, #entry.lines do
+      GameTooltip:AddLine(entry.lines[i], 0.8, 0.8, 0.8, true)
+    end
   end
   GameTooltip:Show()
 end
@@ -615,8 +661,15 @@ function buttonProto:OnLeave()
   ResetCursor()
 end
 
--- OnReceiveDrag sells the item dropped on the card, as Blizzard's merchant item buttons do.
+-- OnReceiveDrag sells the item dropped on the card, as Blizzard's merchant item buttons do; a log entry passes it to its
+-- panel.
 function buttonProto:OnReceiveDrag()
+  if self.mode == "log" then
+    if self.log.onDrop then
+      self.log.onDrop()
+    end
+    return
+  end
   merchant:SellCursorItem()
 end
 
@@ -667,14 +720,16 @@ end
 
 -- OnClick runs a click as Blizzard's merchant buttons do: a left click holding an item sells it, a
 -- modified click Blizzard handles (a chat link, a preview) goes to it, Shift asks a quantity, a right
--- click buys; a buyback is bought back and a damaged item repaired on any click.
+-- click buys; a buyback is bought back and a damaged item repaired on any click. A log entry only
+-- links its item, and passes an item left-clicked onto it to its panel.
 ---@param mouse string
 function buttonProto:OnClick(mouse)
   if mouse == "LeftButton" and CursorHasItem() then
-    merchant:SellCursorItem()
+    self:OnReceiveDrag()
     return
   end
   local link = self.item and self.item.link or (self.buyback and self.buyback.link) or (self.repair and self.repair.link)
+    or (self.log and self.log.link)
   if IsModifiedClick() and link and HandleModifiedItemClick(link) then
     return
   end

@@ -63,6 +63,8 @@ nextContent.MIN_COLUMN_CELLS = 2
 ---@field cells Frame The item buttons hang from it.
 ---@field header Button Across the title row: dragging it moves the section (next.md §7).
 ---@field entries NextSectionEntry[]
+---@field block? NextCanvasBlock A frame of its caller's it holds in place of buttons (BindSections).
+---@field heldBlock? NextCanvasBlock The block it held, while a pass binds it again (hidden as the pass ends unless given again).
 ---@field isNew boolean It was not drawn in the previous pass.
 ---@field rise number How far below its place it is, in pixels.
 ---@field y number Where the last render put it, from the canvas's top.
@@ -479,11 +481,28 @@ function canvasProto:section(name, kind)
   section.name = name
   section.kind = kind
   section.entries = {}
+  -- A block it held is held again only if this pass gives it (BindSections); one it is not given is hidden as the pass
+  -- ends (finishBind), never one given again: hidden and shown again, a text box the player types in could lose its
+  -- focus (not seen in game).
+  if section.block ~= nil then
+    section.heldBlock = section.block
+    section.block = nil
+  end
   style:SetFont(section.title, titleRole(kind))
   section.title:SetText(name)
   self.byName[name] = section
   table.insert(self.order, section)
   return section
+end
+
+-- hideBlock hides a block a section no longer holds, unless another section took it this pass (it hangs from that one's
+-- cells: BindSections moved it there).
+---@param section NextSection
+---@param block NextCanvasBlock
+local function hideBlock(section, block)
+  if block.frame:GetParent() == section.cells then
+    block.frame:Hide()
+  end
 end
 
 ---@private
@@ -509,6 +528,14 @@ function canvasProto:release(section)
   section.frame:Hide()
   section.frame:ClearAllPoints()
   section.entries = {}
+  if section.block ~= nil then
+    hideBlock(section, section.block)
+    section.block = nil
+  end
+  if section.heldBlock ~= nil then
+    hideBlock(section, section.heldBlock)
+    section.heldBlock = nil
+  end
   table.insert(self.pool, section)
 end
 
@@ -582,9 +609,19 @@ function canvasProto:beginBind()
   self.binds = (self.binds or 0) + 1
 end
 
--- finishBind hides and pools last pass's sections that were not drawn again.
+-- finishBind hides and pools last pass's sections that were not drawn again, and hides a block a section drawn again no
+-- longer holds.
 ---@private
 function canvasProto:finishBind()
+  for _, section in ipairs(self.order) do
+    local held = section.heldBlock
+    if held ~= nil then
+      section.heldBlock = nil
+      if held ~= section.block then
+        hideBlock(section, held)
+      end
+    end
+  end
   for name, section in pairs(self.stale) do
     self.stale[name] = nil
     self.leaving[name] = nil
@@ -755,26 +792,43 @@ function canvasProto:NameCells(layoutWidth, most, short)
   return nil
 end
 
+-- A frame of the caller's a section holds in place of buttons (the guild bank's Info view: a tab's text), across the
+-- section under its header. Height says how tall it is at a width and moves nothing; Layout lays it out at that width.
+---@class (exact) NextCanvasBlock
+---@field frame Frame
+---@field Height fun(self: NextCanvasBlock, width: number): number
+---@field Layout fun(self: NextCanvasBlock, width: number)
+
 ---@class (exact) NextCanvasSection
 ---@field name string
----@field buttons {key: string, frame: Frame}[] Drawn already, in order.
+---@field buttons? {key: string, frame: Frame}[] Drawn already, in order.
+---@field block? NextCanvasBlock Held in place of buttons.
 ---@field count? string What its header counts, the number of buttons by default.
 
--- BindSections puts sections of buttons the caller drew (the vendor's) into the canvas, in their
--- order. The buttons are the caller's to release.
+-- BindSections puts sections of buttons the caller drew (the vendor's), or of a frame of its own (a block), into the
+-- canvas, in their order. The buttons and blocks are the caller's to release; a block whose section goes, or holds it no
+-- longer, is hidden.
 ---@param sections NextCanvasSection[]
 function canvasProto:BindSections(sections)
   self:beginBind()
   for _, s in ipairs(sections) do
     local section = self:section(s.name, "category")
-    for _, button in ipairs(s.buttons) do
+    local block = s.block
+    if block ~= nil then
+      section.block = block
+      if block.frame:GetParent() ~= section.cells then
+        block.frame:SetParent(section.cells)
+      end
+      block.frame:Show()
+    end
+    for _, button in ipairs(s.buttons or {}) do
       if button.frame:GetParent() ~= section.cells then
         button.frame:SetParent(section.cells)
       end
       table.insert(section.entries, { item = button })
       self.buttons[button.key] = button
     end
-    section.count:SetText(s.count or tostring(#s.buttons))
+    section.count:SetText(s.count or tostring(#(s.buttons or {})))
   end
   self:finishBind()
 end
@@ -1552,7 +1606,13 @@ function canvasProto:LayoutSection(section, width, layoutWidth)
   section.height = height
   section.frame:SetSize(width, height)
   section.inner:SetSize(width, height)
-  section.cells:SetSize(width, rows * rowStep)
+  section.cells:SetSize(width, m.blockHeight or (rows * rowStep))
+  if section.block ~= nil then
+    local block = section.block.frame
+    block:ClearAllPoints()
+    block:SetPoint("TOPLEFT", section.cells, "TOPLEFT", 0, 0)
+    section.block:Layout(width)
+  end
   for j, entry in ipairs(section.entries) do
     local item = entry.item
     if item ~= nil then
@@ -1593,15 +1653,24 @@ end
 ---@param grid Region
 ---@param width number
 ---@param layoutWidth number
----@return {width: number, perRow: number, cellWidth: number, cellHeight: number, step: number, rowStep: number, rows: number, height: number}
+---@return {width: number, perRow: number, cellWidth: number, cellHeight: number, step: number, rowStep: number, rows: number, height: number, blockHeight?: number}
 function canvasProto:MeasureSection(section, grid, width, layoutWidth)
   width = pixel:Floor(grid, width)
   local perRow = self:PerRow(layoutWidth)
   local cellWidth, gap = self:gridLengths(grid, section.gridCells or perRow)
   local cellHeight, header = pixel:Lengths(grid, self.cards and style.CARD_HEIGHT or style.ICON, style.SECTION_HEADER)
-  local rows = math.max(1, math.ceil(#section.entries / perRow))
-  return { width = width, perRow = perRow, cellWidth = cellWidth, cellHeight = cellHeight, step = cellWidth + gap,
-    rowStep = cellHeight + gap, rows = rows, height = header + rows * (cellHeight + gap) - gap }
+  local m = { width = width, perRow = perRow, cellWidth = cellWidth, cellHeight = cellHeight, step = cellWidth + gap,
+    rowStep = cellHeight + gap }
+  -- A block is as tall as it says, under the header.
+  if section.block ~= nil then
+    m.rows = 0
+    m.blockHeight = pixel:Ceil(grid, section.block:Height(width))
+    m.height = header + m.blockHeight
+    return m
+  end
+  m.rows = math.max(1, math.ceil(#section.entries / perRow))
+  m.height = header + m.rows * (cellHeight + gap) - gap
+  return m
 end
 
 -- Cascade fades sections in one after the other, rising into place: every section with all,

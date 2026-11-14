@@ -82,6 +82,29 @@ nothing.
   client): `GUILDBANK_DEPOSIT`, `GUILDBANK_WITHDRAW` (only when `CanWithdrawGuildBankMoney()`),
   `CONFIRM_BUY_GUILDBANK_TAB` (the guild leader, while fewer than `MAX_BUY_GUILDBANK_TABS` are bought;
   the dialog reads the cost itself). `Close` is `CloseGuildBankFrame`.
+- **The logs and the tabs' info text** (issue #1302; what Blizzard's Log, Money Log and Info tabs show,
+  `GuildBankFrameTabMixin:OnClick`). They come from the server as tabs do:
+  - **Asking** (`LoadLogs(ids)`, `LoadTexts(tabs)`, private `ask`/`askNext`): one at a time, each with
+    `QUERY_TIMEOUT` (2 s), after which it counts as received anyway. A log is a tab, or `MoneyLogID()`
+    (`MAX_GUILDBANK_TABS + 1`, as Blizzard asks for the gold) for the money log; `QueryGuildBankLog` is
+    answered by `GUILDBANKLOG_UPDATE`, which names no log, so each answer is the log asked for last
+    (`OnLogUpdate`; one with nothing asked says `guildbank/LogChanged`). `QueryGuildBankText(tab)` is
+    answered by `GUILDBANK_UPDATE_TEXT(tab)`, which names its tab (`OnTextUpdate`: one for a tab not waited
+    on is taken without losing the list's place). A new list takes the place of what was still to ask for,
+    and the one waited on is not asked again. `Answered` marks it received (`IsLogLoaded`, `IsTextLoaded`)
+    and says `guildbank/LogLoaded` or `guildbank/TextLoaded` with it. `GUILDBANK_TEXT_CHANGED(tab)` (another
+    member saved it) asks again for a text this visit received (`OnTextChanged`). Opening and closing forget
+    all of it (`forget`).
+  - **Reading** (`ItemLog(tab)`, `MoneyLog()`), newest first (higher indices are newer,
+    warcraft.wiki.gg API_GetGuildBankTransaction): `GuildBankLogEntry` holds Blizzard's type (items:
+    `deposit`, `withdraw`, `move`, the only ones its frame shows; gold: `deposit`, `withdraw`, `repair`,
+    `withdrawForTab`, `buyTab`, `depositSummary`, `buyRename`, `refundRename`), who (nil when the client
+    does not know), the item, count and tabs, or the gold, and how long ago in the client's parts and in
+    hours (`age`: a month of thirty days, a year of twelve, as `TimeUtil.lua` counts them). The money log is
+    read only up to `GetNumGuildBankMoneyTransactions()`: asked for an index past it,
+    `GetGuildBankMoneyTransaction` crashes the client (warcraft.wiki.gg; the mock raises).
+  - **The text** (`Text`, `CanEditText`: `CanEditGuildTabInfo(tab)`, `SaveText`: `SetGuildBankText`, only
+    while open), as Blizzard's Info tab and its Save button use them.
 
 ## 3. Reading it (`data/items.lua`, `data/refresh.lua`, `data/loader.lua`, `data/tooltip.lua`)
 
@@ -184,6 +207,57 @@ tabs' accent `style.Color.Guild`).
 - **Footer:** free slots; the guild's gold.
 - **Search:** the guild kind's in-bag box (`searchBox:CreateBox(GUILD)`, "Search Guild Bank"); typing
   searches only the guild bank (`SearchBox:BagOfKind`).
+- **Views** (issue #1302: "I can't see the guild bank money log and I have to disable the addon"; asked, of
+  where Blizzard's Log, Money Log and Info tabs go: "maybe tabs for this on the bottom of the rail instead
+  of the top?"). Four tabs at the rail's foot (`NextTabEntry.foot`, next.md §3 "Tabs at the rail's foot"),
+  under the guild's tabs: **Items** (all of the above), **Log**, **Money Log**, **Info**, the last three
+  in Blizzard's words (`GUILD_BANK_LOG`, `GUILD_BANK_MONEY_LOG`, `GUILD_BANK_TAB_INFO`). The view is chosen
+  apart from the tab (`self.view`, `SelectFoot`), as on Blizzard's frame its side tabs pick the tab and its
+  bottom tabs the mode; the tab chosen still says what a log or Info shows, and where deposits go. It opens
+  on Items, as Blizzard's frame does (`OnShowing`, `GuildBankFrameMixin:OnShow`).
+  - **Switching** (`ShowView`): to a log or Info, the guild buttons drawn are let go (`releaseItems`) and
+    what the view shows is asked of the server (`loadView`; every time, as Blizzard's tab click asks); back
+    to Items, the items are drawn from the last read, a read that came meanwhile having waited (`Draw` keeps
+    it), and dimmed by what the search box holds now (`searchItems`, as `SearchBox` applies a search: each
+    guild button takes its dimming from the read it is drawn from). Nothing travels between views
+    (`Motion:ForgetShown`). A tab clicked in a log or Info shows that tab's (`shown`).
+  - **Log and Money Log** (`buildLog`, `DrawView`) are the vendor's cards (`NextVendorButton:SetLog`,
+    next-vendor.md §10b), `SetCards(true)`, in one column of sections (`SectionColumns` returns 1 for every
+    view but Items), a section for each "how long ago" in Blizzard's words
+    (`TimeUtil.GetRecentTimeDate`, "%s ago"), newest first. Log shows the tabs shown (`viewTabs`: the tab
+    shown by itself, else every tab the player can view, in the rail's order), their entries merged by age;
+    a card is the item and its stack, its name in its quality's color, and "Deposited by", "Withdrawn by" or
+    "Moved by" who, its tooltip the item's then how many, which tab ("Into", "Out of", "From ... to"), and
+    when. Money Log is the whole guild's: a coin, "%s deposited", "withdrew", "repaired", "withdrew for a tab",
+    "bought a tab" (or "unlocked a tab" for none), "Guild perks deposited", "renamed the guild", "was refunded
+    a guild rename", the gold written as the vendor writes a price. Who the client does not know is `UNKNOWN`,
+    as on Blizzard's frame. The footer counts the entries. Empty: "Loading..." until a log shown has arrived,
+    then "Nothing logged yet" / "No gold has moved yet"; with no tab to view, "This guild has no tabs you can
+    view". A log arriving (`guildbank/LogLoaded` for one shown, `guildbank/LogChanged`) draws it again. The
+    money log is asked for again when the guild's gold changes while it shows (`logMoney`: not for the
+    withdrawal limit, `GUILDBANK_UPDATE_WITHDRAWMONEY`, which says the same message); Blizzard's asks only on
+    a click.
+  - **Info** (`buildInfo`): a section a tab shown, its body a block of the canvas's (`NextCanvasBlock`,
+    next.md §2), a text area (`NextInput:CreateArea`, 120 tall as the settings' are, `maxLetters` 500 as
+    Blizzard's `GuildBankTabInfoEditBox`) and, for a member `CanEditGuildTabInfo` lets edit it, a Primary
+    Save button under it, as a settings page puts its button under its text area (`SaveInfo`: only a
+    change, `SetGuildBankText`). The others see it read only (`SetReadOnly`, drawn as ever, as Blizzard's
+    takes no focus). Its header's count says "Loading..." until its text arrives. A text that arrives
+    replaces the box's unless the box holds what a member who may edit it typed and did not save
+    (`refreshInfo`, `loaded`); one who may no longer edit sees the tab's text again. Two tabs named alike are
+    told apart by their number ("Gear (tab 2)"): the canvas keeps sections by name. The visit's end forgets
+    what was typed (`forgetInfo`, from `OnGuildBankClosed`: the guild bank can open again while the panel
+    slides out), the text staying on screen through the slide (`forgotten`). Every switch and redraw lets go
+    of a box's focus only when it hides; a text arriving for another tab never hides the box being typed in
+    (the canvas keeps a block given again, next.md §2).
+  - **Tabs changing** while a log or Info shows (`OnTabsChanged`): drawn again (names, permissions), and a tab
+    come into view (bought, or opened to the player's rank) is asked for (`loadMissing`: only what this visit
+    has not received). A tab moved on the rail redraws them in its order (`OnTabsReordered`).
+  - **Search** in a log dims the cards whose title and tooltip do not hold the box's text (`applyLogSearch`),
+    as the vendor's Buyback and Repair tabs dim theirs by name.
+  - **Sections** of a log or Info hold no items: their headers neither drag (`OnHeaderDragStart`), withdraw
+    nor file; an item dropped or clicked onto one, or onto a card (`onDrop`), goes into the guild bank as a
+    drop on the panel does (`PlaceCursorItem`). A backpack section dropped on the panel still deposits.
 - **Drops:** an item dropped on the panel goes to the tab shown by itself, else the current tab
   (`GuildBank:PlaceCursorItem`); a free slot takes it too (§5, buttons).
 - **Closing:** every way ends the visit once: the close button at once (`CloseGuildBankFrame`);
@@ -300,12 +374,29 @@ None of it has been seen in a client. Per data-driven.md, the first visit should
   and out of combat. `Logs/taint.log` should have no BetterBags entries blocking an action.
 - Whether the server answers a query for every tab with `GUILDBANKBAGSLOTS_CHANGED` (Syndicator relies
   on it), and whether Blizzard's tab item buttons, under the hidden frame, ever show.
+- **The views** (§5): a capture of opening Log on All Tabs, Money Log, and Info, with
+  `GuildBank.Answered` (each log's and text's `"answered"` or `"timeout"`), `GuildBank.OnLogUpdate` and
+  `NextGuildBankPanel.DrawView`. It shows whether every `QueryGuildBankLog` is answered by one
+  `GUILDBANKLOG_UPDATE` (the one-at-a-time asking relies on it), whether a text asked for is answered by
+  `GUILDBANK_UPDATE_TEXT`, and whether `GUILDBANK_UPDATE_MONEY` ever fires as the money log arrives (it
+  would ask for the log again only if the gold changed, `logMoney`, so no loop either way). Also by eye:
+  the sections' "how long ago" titles (Blizzard's `LASTONLINE_*` strings carry `|4` plural escapes the
+  client draws), and a read-only text area's text, which should read as the editable one's.
 
 ## 8. Not done
 
-- The guild bank's item and money logs and its tab info text (Blizzard's frame has Log, Money Log and
-  Info tabs).
-- Changing a tab's icon (renaming keeps it).
+- Changing a tab's icon (renaming keeps it). Not a view; on retail Blizzard's icon picker
+  (`GuildBankPopupFrame`) is a child of its hidden guild bank frame, so it would need a design of its own.
+- **Left as it is (bug reviews of the views, §5):**
+  - A money log asked for again while the last question is still unanswered is not asked again (`ask`
+    leaves the one waited on), and `logMoney` takes the new gold: if the answer predates the change, the
+    newest entry shows only after the next change, or a click. It needs server timing nobody has seen.
+  - A log's late answer after its timeout counts for the log asked for next; it reads as received until its
+    own answer arrives and draws it again. It comes with asking one at a time, which the answers' naming no
+    log forces.
+  - A read-only text area takes the wheel only while focused, as every text area does, and refuses focus: a
+    long text scrolls by its bar.
+  - The log's cards come from the vendor's pool, so Masque skins them in its Vendor group.
 - Dimming bag items the guild bank would refuse (issue #768): Blizzard has no item context for the
   guild bank (`ItemButtonUtil.ItemContextEnum` stops at `BankDepositing`, while its own `BankPanel`
   shows), so it would be a rule of BetterBags' own.
@@ -315,7 +406,10 @@ None of it has been seen in a client. Per data-driven.md, the first visit should
 
 `spec/core/constants_spec.lua` ("guild bank"), `spec/database_spec.lua` (`showGuildBankTabs`),
 `spec/guildbank_spec.lua` (the data source: visits, tabs, loading and its timeout, changes, actions on
-the item's tab, placing the cursor's item, moving many items, gold and tabs),
+the item's tab, placing the cursor's item, moving many items, gold and tabs, "the logs", "the tabs' info
+text"), `spec/next/guildbank_spec.lua` ("its views": every view, switching, reads kept, the search
+again, tabs coming into view, the rail's order, same-named tabs, editing lost, the visit ending,
+the box being typed in), `spec/integration/guild_bank_spec.lua` ("shows the money log from the rail's foot"),
 `spec/guildbank_pipeline_spec.lua` (reading, kept slots, cold reads, binding, derive, both views,
 stacking across tabs, empty slots in place, the shared index, an ended read), `spec/tooltip_spec.lua`
 ("guild bank items"), `spec/loader_spec.lua` (`PrimeGuildBank`), `spec/refresh_spec.lua` ("the guild

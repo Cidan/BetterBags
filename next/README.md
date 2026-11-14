@@ -85,6 +85,11 @@ quantity: one purchase's worth to start, `-` and `+` a purchase's worth at a tim
 at once, the currencies held counted too where the client lists the merchant's (`NextMerchant:MaxPurchasable`,
 `.claude/rules/next-vendor.md` §10d).
 
+The guild bank's rail has four views at its foot (`NextTabEntry.foot`, `tabs.lua`), under its tabs: Items, and
+Blizzard's Log, Money Log and Info. A log is the vendor's cards (`NextVendorButton:SetLog`) in sections by how long ago;
+Info is each tab's text, a text area (`NextInput:CreateArea`) the canvas holds as a section's block
+(`NextContent:BindSections` with `block`), with Save for a member who may edit it (`.claude/rules/guild-bank.md` §5).
+
 Each companion names the frame of Blizzard's it stands in for (`opts.standIn`: `MerchantFrame`, `BankFrame`,
 `GuildBankFrame`). Blizzard's UI panel manager still lays that frame out, shown and never seen, so `uipanels.lua`
 (`NextUIPanels`) tells the manager where BetterBags Next really is: while a full companion is open, its frame takes no

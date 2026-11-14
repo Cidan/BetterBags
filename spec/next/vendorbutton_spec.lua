@@ -859,4 +859,104 @@ describe("NextVendorButton", function()
       assert.is_false(b.durability:IsShown())
     end)
   end)
+
+  -- The guild bank's logs (guild-bank.md §5): each entry a card, its item (or a coin) with what happened beside it.
+  describe("a log entry", function()
+    local function entry(opts)
+      local e = { key = "log:2:5", texture = 99, count = 20, quality = 2, title = "Linen Cloth",
+        line = "Deposited by Arthas", link = "|Hitem:2589|h[Linen Cloth]|h", lines = { "Arthas deposited 20", "3 hours ago" } }
+      for k, v in pairs(opts or {}) do e[k] = v end
+      return e
+    end
+
+    -- gold is a money log entry: a coin, no item.
+    local function gold(lines)
+      return { key = "money:3", texture = "Interface\\Icons\\INV_Misc_Coin_01", title = "Arthas deposited",
+        amount = 1234567, lines = lines or { "Arthas deposited 123g", "2 days ago" } }
+    end
+
+    local function tooltipLines()
+      local text = {}
+      for _, line in ipairs(GameTooltip.lines) do table.insert(text, line.text) end
+      return text
+    end
+
+    it("shows its icon and count, its title in its quality's color, and its line where a price goes", function()
+      local b = vendorButton:Acquire()
+      b:SetLog(entry())
+      assert.are.equal("log:2:5", b.key)
+      assert.are.equal(99, b.icon:GetTexture())
+      assert.are.equal("20", b.count:GetText())
+      assert.is_true(b.count:IsShown())
+      assert.are.equal("Linen Cloth", b.name:GetText())
+      assert.are.same(const.ITEM_QUALITY_COLOR[2], { b.name:GetTextColor() })
+      assert.are.equal("Deposited by Arthas", b.price:GetText())
+      assert.are.equal(style:Font(style.Theme.Vendor.PriceFont), b.price:GetFontObject())
+      assert.is_false(b.stock:IsShown())
+    end)
+
+    it("writes gold on its line as the vendor writes a price", function()
+      local b = vendorButton:Acquire()
+      b:SetLog(gold())
+      assert.are.equal(vendorButton:PriceText(1234567, {}), b.price:GetText())
+      assert.is_false(b.count:IsShown())
+    end)
+
+    it("shows its item's tooltip, then what it says", function()
+      local b = vendorButton:Acquire()
+      b:SetLog(entry())
+      enter(b)
+      assert.are.equal("|Hitem:2589|h[Linen Cloth]|h", GameTooltip._hyperlink)
+      assert.are.same({ " ", "Arthas deposited 20", "3 hours ago" }, tooltipLines())
+    end)
+
+    it("says what it says for gold, its first line the title", function()
+      local b = vendorButton:Acquire()
+      b:SetLog(gold({ "Arthas deposited 12g", "2 days ago" }))
+      GameTooltip._hyperlink = nil
+      enter(b)
+      assert.is_nil(GameTooltip._hyperlink)
+      assert.are.equal("Arthas deposited 12g", GameTooltip._text)
+      assert.are.same({ "2 days ago" }, tooltipLines())
+    end)
+
+    it("links its item on a modified click, and buys, buys back, repairs and sells nothing", function()
+      local sold = 0
+      override(stubs.merchant, "SellCursorItem", function() sold = sold + 1 end)
+      local b = vendorButton:Acquire()
+      b:SetLog(entry())
+      _G._isShiftKeyDown, _G._modifiedClickHandled = true, true
+      click(b, "LeftButton")
+      _G._isShiftKeyDown, _G._modifiedClickHandled = false, false
+      click(b, "LeftButton")
+      click(b, "RightButton")
+      assert.are.same({}, calls.purchase)
+      assert.are.same({}, calls.buyback)
+      assert.are.same({}, calls.repair)
+      assert.are.equal(0, sold)
+    end)
+
+    it("passes an item dropped or left-clicked onto it to its panel, never selling it", function()
+      local sold, dropped = 0, 0
+      override(stubs.merchant, "SellCursorItem", function() sold = sold + 1 end)
+      local b = vendorButton:Acquire()
+      b:SetLog(entry({ onDrop = function() dropped = dropped + 1 end }))
+      b.card:GetScript("OnReceiveDrag")(b.card)
+      _G._cursorHasItem = true
+      click(b, "LeftButton")
+      _G._cursorHasItem = false
+      assert.are.equal(2, dropped)
+      assert.are.equal(0, sold)
+    end)
+
+    it("forgets its entry once released, as a buy after it shows a sale again", function()
+      local b = vendorButton:Acquire()
+      b:SetLog(entry())
+      b:Release()
+      assert.is_nil(b.log)
+      b = vendorButton:Acquire()
+      b:SetBuy(item())
+      assert.are.equal("buy", b.mode)
+    end)
+  end)
 end)

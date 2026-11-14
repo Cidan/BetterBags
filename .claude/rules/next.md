@@ -119,6 +119,16 @@ drew that nobody claimed are released afterwards. A draw on a hidden panel is de
 
 Sections are kept by name across passes and reused; one not drawn again is hidden and pooled.
 
+**Sections of a caller's** (`NextContent:BindSections`): the vendor's cards, the guild bank's log cards, or a frame of
+the caller's in place of buttons (`NextCanvasSection.block`, a `NextCanvasBlock`: `frame`, `Height(width)` that moves
+nothing, `Layout(width)`; the guild bank's Info, each tab's text, guild-bank.md §5). A block hangs across its section
+under the header, the section as tall as both (`MeasureSection`, `LayoutSection`); it takes no cells, so a small panel's
+width is its buttons' (`Widest`). A block its section is given again is never hidden in between (`heldBlock`, hidden
+in `finishBind` only when not given again: hidden and shown again, a text box the player types in could lose its
+focus, not seen in game), nor one another
+section took this pass (`hideBlock`: only one still hanging from that section's cells; a tab renamed moves its block to a
+section of the new name). Released, a section hides its blocks.
+
 **Layout** (`NextContent:Render`): one column here, or several (next-columns.md §7a). A section is a header (its name, its count, a fading
 line) and its cells in rows of as many 44-pixel icons as fit the width given, 6 apart; sections 16
 apart. Item buttons are sized to 44 (`item:SetSize`) when they are not already. Every placement goes
@@ -341,6 +351,17 @@ section dragged out of a panel returns to the panel's strata (next-drag.md §7).
     not moved.
   - Coverage: `spec/next/tabs_spec.lua` ("moving a tab", "a saved order"), and each panel's spec
     ("lists ... in the order saved"), `spec/database_spec.lua`.
+- **Tabs at the rail's foot** (`NextTabEntry.foot`, listed after the others; the guild bank's views, guild-bank.md §5;
+  asked: "maybe tabs for this on the bottom of the rail instead of the top?"): they hang from the body's bottom, the
+  foot's last tab ending where the content does (the footer's height above it, `NextPanel:ContentBottom`), and follow it
+  as the body changes height (`PlaceFoot`, from the body's `OnSizeChanged`); on a body too short, right under the tabs
+  above, the group gap (`TAB_GROUP_GAP`) between, never over them. The rail stays as tall as its tabs stacked, whatever the
+  body's height: an autosized small panel fits the rail (`FittedHeight`), and a rail as tall as the body would grow it
+  for ever. The foot is chosen apart from the tabs above (`SelectFoot`, `footSelected`), with a bar of its own
+  (`footIndicator`, styled and accented as the other); both bars go through `selectOn`. Foot tabs never move nor let a
+  moved tab pass them (`movable` false, `Ordered` leaves them, `layout` keeps their place through a move); they count in
+  the rail's width (a chained bag's gap). Rails without foot tabs lay out as before. Coverage: `spec/next/tabs_spec.lua`
+  ("tabs at its foot").
 - **Show Blizzard Bags** (asked: "the 'Switch to Classic Bags' icon now becomes 'Show Blizzard Bags',
   with our left tabs replaced with the bag icons for the Blizzard Bags, so users can swap out their bags
   -- the view of items switches to the full stack of bags, just like in our Original bags view, same
@@ -594,6 +615,6 @@ strings no template has; they now use the templates' font (`GameFontHighlightSma
 
 With BetterBags Next on, a panel on the left stands in for Blizzard's guild bank frame: every tab's
 items in the bags' categories (All Tabs) or a tab by itself in slot order, its slots Blizzard's own
-guild bank item buttons, gold in and out, buying and renaming tabs, and sections dragged in
-(deposited) and out (withdrawn). Blizzard's frame stays shown but is never seen. Everything about it,
+guild bank item buttons, gold in and out, buying and renaming tabs, sections dragged in
+(deposited) and out (withdrawn), and its Log, Money Log and Info at its rail's foot (issue #1302). Blizzard's frame stays shown but is never seen. Everything about it,
 from the data engine's third kind of bag to the takeover, is in guild-bank.md.

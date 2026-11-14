@@ -34,6 +34,9 @@ local stubs = {
   question = trackStub("Question"),
   guildBank = trackStub("GuildBank"),
   color = trackStub("Color"),
+  merchant = trackStub("NextMerchant"),
+  dialog = trackStub("NextDialog"),
+  search = trackStub("Search"),
 }
 
 local replaced = {}
@@ -53,9 +56,10 @@ LoadBetterBagsModule("render/drawable.lua")
 LoadBetterBagsModule("render/scrollbox.lua")
 local modules = { { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.lua" },
   { "NextFrameArt", "next/frameart.lua" }, { "NextFill", "next/fill.lua" }, { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
+  { "NextButton", "next/controls/button.lua" }, { "NextInput", "next/controls/input.lua" },
   { "NextSparkles", "next/sparkles.lua" }, { "NextLift", "next/lift.lua" }, { "NextTabs", "next/tabs.lua" }, { "NextContent", "next/content.lua" },
   { "NextDockCard", "next/dockcard.lua" }, { "NextDock", "next/dock.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" }, { "NextUIPanels", "next/uipanels.lua" }, { "NextOrnaments", "next/ornaments.lua" }, { "NextMenuButton", "next/menubutton.lua" }, { "NextGlitch", "next/glitch.lua" }, { "NextRain", "next/rain.lua" }, { "NextShatter", "next/shatter.lua" }, { "NextSnow", "next/snow.lua" }, { "NextThreads", "next/threads.lua" }, { "NextSmoke", "next/smoke.lua" }, { "NextBats", "next/bats.lua" }, { "NextBeam", "next/beam.lua" }, { "NextStopMotion", "next/stopmotion.lua" }, { "NextPaper", "next/paper.lua" }, { "NextGlass", "next/glass.lua" }, { "NextSheen", "next/sheen.lua" }, { "NextPanel", "next/panel.lua" },
-  { "NextGuildButton", "next/guildbutton.lua" }, { "NextGuildBank", "next/guildbank.lua" } }
+  { "NextVendorButton", "next/vendorbutton.lua" }, { "NextGuildButton", "next/guildbutton.lua" }, { "NextGuildBank", "next/guildbank.lua" } }
 for _, m in ipairs(modules) do
   ResetModuleStub(m[1], m[2])
   LoadBetterBagsModule(m[2])
@@ -73,6 +77,10 @@ local context = addon:GetModule("Context")
 local GUILD = 2
 local ALL = 1
 local SECTION_GRID, SECTION_ALL_BAGS = 2, 4
+-- What QueryGuildBankLog takes for the money log (GuildBank:MoneyLogID).
+local MONEY = 9
+-- The guild bank's views at its rail's foot: Items, Log, Money Log, Info.
+local VIEWS = { -1, -2, -3, -4 }
 
 describe("NextGuildBank", function()
   local messages, handlers, timers, calls, data, asked
@@ -93,9 +101,20 @@ describe("NextGuildBank", function()
     for _, fn in ipairs(pending) do fn() end
   end
 
+  -- tabIDs lists the guild's tabs down the rail, its views at its foot left out (footIDs).
   local function tabIDs(g)
     local ids = {}
-    for _, t in ipairs(g.tabs.tabs) do table.insert(ids, t.id) end
+    for _, t in ipairs(g.tabs.tabs) do
+      if not t.foot then table.insert(ids, t.id) end
+    end
+    return ids
+  end
+
+  local function footIDs(g)
+    local ids = {}
+    for _, t in ipairs(g.tabs.tabs) do
+      if t.foot then table.insert(ids, t.id) end
+    end
     return ids
   end
 
@@ -151,8 +170,9 @@ describe("NextGuildBank", function()
         tab(4, "Donations", { numWithdrawals = 0 }) },
       current = 2, canBuy = false, canWithdraw = true, money = 1234567, withdrawMoney = 50000,
       showTabs = false, views = { [GUILD] = SECTION_GRID }, slotInfo = {}, guildName = "Moonguard Traders",
-      canEdit = false,
+      canEdit = false, itemLogs = {}, moneyLog = {}, logLoaded = {}, texts = {}, textLoaded = {}, canEditText = {},
     }
+    calls.logs, calls.texts, calls.saved = {}, {}, {}
     override(addon, "isRetail", true)
     override(addon, "TriggerItemContextChanged", function() end)
     override(addon, "ForceHideBlizzardBags", function() end)
@@ -205,6 +225,8 @@ describe("NextGuildBank", function()
       local textBox = CreateFrame("EditBox", nil, frame, "BagSearchBoxTemplate")
       return { frame = frame, textBox = textBox, helpText = textBox.Instructions, kind = kind }
     end)
+    override(stubs.searchBox, "GetSearchText", function() return "" end)
+    override(stubs.search, "Search", function() return {} end)
     override(stubs.sonata, "UnregisterElement", function() end)
     override(stubs.sonata, "RegisterElement", function() end)
     -- What NextItemFit asks of it (docs/next-pixel-perfect.md): no theme applied here.
@@ -220,6 +242,19 @@ describe("NextGuildBank", function()
     override(stubs.guildBank, "LoadTab", function(_, n)
       table.insert(calls.load, n)
       data.current = n
+      return true
+    end)
+    override(stubs.guildBank, "MoneyLogID", function() return MONEY end)
+    override(stubs.guildBank, "LoadLogs", function(_, ids) table.insert(calls.logs, ids) return true end)
+    override(stubs.guildBank, "LoadTexts", function(_, tabs) table.insert(calls.texts, tabs) return true end)
+    override(stubs.guildBank, "IsLogLoaded", function(_, id) return data.logLoaded[id] == true end)
+    override(stubs.guildBank, "IsTextLoaded", function(_, n) return data.textLoaded[n] == true end)
+    override(stubs.guildBank, "ItemLog", function(_, n) return data.itemLogs[n] or {} end)
+    override(stubs.guildBank, "MoneyLog", function() return data.moneyLog end)
+    override(stubs.guildBank, "Text", function(_, n) return data.texts[n] or "" end)
+    override(stubs.guildBank, "CanEditText", function(_, n) return data.canEditText[n] == true end)
+    override(stubs.guildBank, "SaveText", function(_, n, text)
+      table.insert(calls.saved, { tab = n, text = text })
       return true
     end)
     override(stubs.guildBank, "CanBuyTab", function() return data.canBuy end)
@@ -640,6 +675,503 @@ describe("NextGuildBank", function()
       assert.are.equal(ore, g.content.buttons["1002_4"])
       assert.is_false(art:IsSnappingToPixelGrid())
       assert.are.equal(0, art:GetTexelSnappingBias())
+    end)
+  end)
+
+  -- Blizzard's guild bank frame has Log, Money Log and Info tabs (GuildBankFrameTabMixin:OnClick); BetterBags Next's has
+  -- them at its rail's foot, beside Items (asked: "maybe tabs for this on the bottom of the rail instead of the top?";
+  -- issue #1302: "I can't see the guild bank money log").
+  describe("its views", function()
+    local ORE = "|Hitem:200|h[Ore]|h"
+
+    local function view(g, id)
+      click(g.tabs:Tab(id).button)
+    end
+
+    local function ago(years, months, days, hours)
+      return format("%s ago", TimeUtil.GetRecentTimeDate(years, months, days, hours))
+    end
+
+    local function sectionNames(g)
+      local out = {}
+      for _, s in ipairs(g.content.order) do table.insert(out, s.name) end
+      return out
+    end
+
+    -- cards lists the cards drawn, section by section, each { title, line }.
+    local function cards(g)
+      local out = {}
+      for _, s in ipairs(g.content.order) do
+        for _, e in ipairs(s.entries) do table.insert(out, { e.item.name:GetText(), e.item.price:GetText() }) end
+      end
+      return out
+    end
+
+    local function firstCard(g)
+      return g.content.order[1].entries[1].item
+    end
+
+    local function oreRead()
+      return { sortedItems = {}, tabs = { [ALL] = { categories = { { name = "Ore" } }, items = {
+        { slotkey = "1002_4", bagid = 1002, slotid = 4, guildTab = 2, itemInfo = { category = "Ore", itemIcon = 5,
+          currentItemCount = 20, itemQuality = 1, classID = 7 } } } } } }
+    end
+
+    local function entry(fields)
+      local e = { years = 0, months = 0, days = 0, hours = 0 }
+      for k, v in pairs(fields) do e[k] = v end
+      e.age = ((e.years * 12 + e.months) * 30 + e.days) * 24 + e.hours
+      return e
+    end
+
+    before_each(function()
+      override(C_Item, "GetItemInfoInstant", function(link) return 200, "Trade Goods", "Metal", "", link == ORE and 777 or 555 end)
+      override(C_Item, "GetItemInfo", function() return "Ore", ORE, 3 end)
+      data.moneyLog = {
+        entry({ kind = "withdraw", name = "Thrall", amount = 500, hours = 1, index = 3 }),
+        entry({ kind = "deposit", name = "Arthas", amount = 1000000, hours = 5, index = 2 }),
+        entry({ kind = "deposit", name = "Jaina", amount = 20000, days = 2, index = 1 }),
+      }
+      data.itemLogs[1] = {
+        entry({ kind = "deposit", name = "Arthas", link = "|Hitem:100|h[Sword]|h", count = 1, tab = 1, hours = 3, index = 2 }),
+        entry({ kind = "move", name = "Jaina", link = ORE, count = 4, tab = 1, from = 1, to = 2, days = 1, index = 1 }),
+      }
+      data.itemLogs[2] = { entry({ kind = "withdraw", link = ORE, count = 20, tab = 2, hours = 1, index = 1 }) }
+    end)
+
+    it("lists Items, Log, Money Log and Info at its rail's foot, Items chosen as it opens", function()
+      local g = open()
+      assert.are.same(VIEWS, footIDs(g))
+      local names = {}
+      for _, id in ipairs(VIEWS) do table.insert(names, g.tabs:Tab(id).text:GetText()) end
+      assert.are.same({ "Items", GUILD_BANK_LOG, GUILD_BANK_MONEY_LOG, GUILD_BANK_TAB_INFO }, names)
+      assert.are.equal(-1, g.tabs.footSelected)
+      assert.are.equal(ALL, g.tabs.selected)
+      data.canBuy = true
+      g:RefreshTabs()
+      assert.are.same({ ALL, 1001, 1002, 1004, 0 }, tabIDs(g), "the guild's tabs above them")
+      assert.are.same(VIEWS, footIDs(g))
+    end)
+
+    it("shows the money log, asked of the server, newest first in sections by how long ago, each card's gold its line", function()
+      data.logLoaded[MONEY] = true
+      local g = open()
+      view(g, -3)
+      assert.are.same({ { MONEY } }, calls.logs)
+      assert.are.equal(-3, g.tabs.footSelected)
+      assert.are.same({ ago(0, 0, 0, 1), ago(0, 0, 0, 5), ago(0, 0, 2, 0) }, sectionNames(g))
+      local vendorButton = addon:GetModule("NextVendorButton")
+      assert.are.same({ { "Thrall withdrew", vendorButton:PriceText(500, {}) }, { "Arthas deposited", vendorButton:PriceText(1000000, {}) },
+        { "Jaina deposited", vendorButton:PriceText(20000, {}) } }, cards(g))
+      assert.are.equal("3 entries", g.freeText:GetText())
+      assert.is_true(g.content.cards)
+      assert.is_false(g.emptyText:IsShown())
+    end)
+
+    it("says Loading... until the money log arrives, and draws it as it does", function()
+      local g = open()
+      view(g, -3)
+      assert.is_true(g.emptyText:IsShown())
+      assert.are.equal("Loading...", g.emptyText:GetText())
+      data.logLoaded[MONEY] = true
+      handlers["guildbank/LogLoaded"](ctx(), MONEY)
+      assert.is_false(g.emptyText:IsShown())
+      assert.are.equal(3, #cards(g))
+    end)
+
+    it("says who did what for each kind of gold, as Blizzard's money log does", function()
+      data.logLoaded[MONEY] = true
+      data.moneyLog = {
+        entry({ kind = "repair", name = "Thrall", amount = 300, index = 8 }),
+        entry({ kind = "withdrawForTab", name = "Thrall", amount = 1000, index = 7 }),
+        entry({ kind = "buyTab", name = "Thrall", amount = 1000000, index = 6 }),
+        entry({ kind = "buyTab", name = "Thrall", amount = 0, index = 5 }),
+        entry({ kind = "depositSummary", amount = 5000, index = 4 }),
+        entry({ kind = "buyRename", name = "Thrall", amount = 100, index = 3 }),
+        entry({ kind = "refundRename", name = "Thrall", amount = 100, index = 2 }),
+        entry({ kind = "deposit", amount = 7, index = 1 }),
+      }
+      local g = open()
+      view(g, -3)
+      local titles = {}
+      for _, c in ipairs(cards(g)) do table.insert(titles, c[1]) end
+      assert.are.same({ "Thrall repaired", "Thrall withdrew for a tab", "Thrall bought a tab", "Thrall unlocked a tab",
+        "Guild perks deposited", "Thrall renamed the guild", "Thrall was refunded a guild rename", UNKNOWN .. " deposited" }, titles)
+    end)
+
+    it("shows every tab's item log on All Tabs, asked one log at a time, newest first across them", function()
+      data.logLoaded[1], data.logLoaded[2], data.logLoaded[4] = true, true, true
+      local g = open()
+      view(g, -2)
+      assert.are.same({ { 1, 2, 4 } }, calls.logs, "every tab the player can view")
+      assert.are.same({ ago(0, 0, 0, 1), ago(0, 0, 0, 3), ago(0, 0, 1, 0) }, sectionNames(g))
+      assert.are.same({ { "Ore", "Withdrawn by " .. UNKNOWN }, { "Sword", "Deposited by Arthas" }, { "Ore", "Moved by Jaina" } },
+        cards(g))
+      local withdrawn = firstCard(g)
+      assert.are.equal(777, withdrawn.icon:GetTexture())
+      assert.are.equal("20", withdrawn.count:GetText())
+      assert.are.same({ "Withdrawn by " .. UNKNOWN, "Count: 20", "Out of Mats", ago(0, 0, 0, 1) }, withdrawn.log.lines)
+      local moved = g.content.order[3].entries[1].item
+      assert.are.same({ "Moved by Jaina", "Count: 4", "From Gear to Mats", ago(0, 0, 1, 0) }, moved.log.lines)
+      assert.are.equal("3 entries", g.freeText:GetText())
+    end)
+
+    it("shows a tab's own log when it shows by itself, asked again at each tab clicked", function()
+      data.logLoaded[1], data.logLoaded[2] = true, true
+      local g = open()
+      view(g, -2)
+      click(tabNamed(g, "Gear").button)
+      assert.are.same({ 1, 2, 4 }, calls.logs[1])
+      assert.are.same({ 1 }, calls.logs[2])
+      assert.are.same({ { "Sword", "Deposited by Arthas" }, { "Ore", "Moved by Jaina" } }, cards(g))
+      assert.are.equal(-2, g.tabs.footSelected, "still the log")
+      assert.are.equal(1001, g.tabs.selected)
+    end)
+
+    it("says the log is still loading while a tab's has not arrived, and nothing was logged once all have", function()
+      local g = open()
+      view(g, -2)
+      assert.are.equal("Loading...", g.emptyText:GetText())
+      data.itemLogs = {}
+      for _, n in ipairs({ 1, 2, 4 }) do data.logLoaded[n] = true end
+      handlers["guildbank/LogLoaded"](ctx(), 4)
+      assert.is_true(g.emptyText:IsShown())
+      assert.are.equal("Nothing logged yet", g.emptyText:GetText())
+    end)
+
+    it("draws a log again when one arrives unasked", function()
+      data.logLoaded[1], data.logLoaded[2], data.logLoaded[4] = true, true, true
+      local g = open()
+      view(g, -2)
+      table.insert(data.itemLogs[2], 1, entry({ kind = "deposit", name = "Sylvanas", link = ORE, count = 2, tab = 2, index = 2 }))
+      handlers["guildbank/LogChanged"](ctx())
+      assert.are.same({ "Ore", "Deposited by Sylvanas" }, cards(g)[1])
+    end)
+
+    it("asks for the money log again when the guild's gold changes while it shows", function()
+      data.logLoaded[MONEY] = true
+      local g = open()
+      view(g, -3)
+      handlers["guildbank/MoneyChanged"](ctx())
+      assert.are.same({ { MONEY } }, calls.logs, "the withdrawal limit changed, not the gold (GUILDBANK_UPDATE_WITHDRAWMONEY)")
+      data.money = data.money + 100
+      handlers["guildbank/MoneyChanged"](ctx())
+      assert.are.same({ { MONEY }, { MONEY } }, calls.logs)
+      view(g, -1)
+      data.money = data.money + 100
+      handlers["guildbank/MoneyChanged"](ctx())
+      assert.are.equal(2, #calls.logs, "only while it shows")
+    end)
+
+    -- Found by the bug review: a tab bought, or opened to the player's rank, while a log or Info showed was never asked
+    -- for, its header saying Loading... for good.
+    it("asks for a tab that comes into view while a log or Info shows, and only for what it has not received", function()
+      data.logLoaded[1], data.logLoaded[2], data.logLoaded[4] = true, true, true
+      local g = open()
+      view(g, -2)
+      handlers["guildbank/TabsChanged"](ctx())
+      assert.are.equal(1, #calls.logs, "every tab shown has its log")
+      data.tabs[3].viewable = true
+      handlers["guildbank/TabsChanged"](ctx())
+      assert.are.same({ 3 }, calls.logs[2])
+      data.textLoaded[1], data.textLoaded[2], data.textLoaded[4] = true, true, true
+      view(g, -4)
+      data.tabs[3].viewable = false
+      handlers["guildbank/TabsChanged"](ctx())
+      assert.are.equal(1, #calls.texts)
+      data.tabs[3].viewable = true
+      handlers["guildbank/TabsChanged"](ctx())
+      assert.are.same({ 3 }, calls.texts[2])
+    end)
+
+    -- Found by the bug review: a guild button takes its dimming from the read it was drawn from, so items drawn again
+    -- from the last read showed every item while the search box still held a search.
+    it("applies the search box's text to its items again back on Items", function()
+      override(stubs.search, "Search", function(_, text) return { ["1002_4"] = text == "ore" } end)
+      local g = open()
+      override(stubs.searchBox, "GetSearchText", function() return g.searchBox.textBox:GetText() end)
+      g:Draw(ctx(), oreRead())
+      view(g, -2)
+      g.searchBox.textBox:SetText("zzz")
+      view(g, -1)
+      assert.is_false(g.content.buttons["1002_4"].button:GetMatchesSearch())
+      view(g, -2)
+      g.searchBox.textBox:SetText("")
+      view(g, -1)
+      assert.is_true(g.content.buttons["1002_4"].button:GetMatchesSearch())
+    end)
+
+    it("lists a log's and Info's tabs in the order the player put them on the rail", function()
+      data.tabOrder.guild = { 1004, 1001 }
+      data.textLoaded[1], data.textLoaded[2], data.textLoaded[4] = true, true, true
+      local g = open()
+      view(g, -4)
+      assert.are.same({ { 4, 1, 2 } }, calls.texts)
+      assert.are.same({ "Donations", "Gear", "Mats" }, sectionNames(g))
+    end)
+
+    it("lets go of the guild bank's buttons in a log, and draws them again from the last read back on Items", function()
+      data.logLoaded[MONEY] = true
+      local g = open()
+      g:Draw(ctx(), oreRead())
+      local ore = g.content.buttons["1002_4"]
+      assert.is_true(ore.frame:IsShown())
+      view(g, -3)
+      assert.is_false(ore.frame:IsShown())
+      assert.is_nil(g.content.buttons["1002_4"])
+      local later = oreRead()
+      later.tabs[ALL].categories[1].name = "Metals"
+      later.tabs[ALL].items[1].itemInfo.category = "Metals"
+      g:Draw(ctx(), later)
+      assert.are.equal(ago(0, 0, 0, 1), g.content.order[1].name, "a read waits while a log shows")
+      view(g, -1)
+      assert.is_false(g.content.cards)
+      assert.are.same({ "Metals" }, sectionNames(g))
+      assert.is_true(g.content.buttons["1002_4"].frame:IsShown())
+      assert.are.equal(-1, g.tabs.footSelected)
+    end)
+
+    it("lays a log out in one column of cards, whatever the guild bank's section columns", function()
+      override(stubs.database, "GetNextSectionColumns", function() return 3 end)
+      local g = open()
+      assert.are.equal(3, (g:SectionColumns()))
+      view(g, -2)
+      assert.are.equal(1, (g:SectionColumns()))
+    end)
+
+    it("dims the cards a search leaves out, by what they say", function()
+      data.logLoaded[MONEY] = true
+      local g = open()
+      view(g, -3)
+      g.searchBox.textBox:SetText("thrall")
+      g:Search(ctx(), {})
+      local dim = style.Theme.Vendor.SearchDim
+      local alphas = {}
+      for _, s in ipairs(g.content.order) do table.insert(alphas, s.entries[1].item.frame:GetAlpha()) end
+      assert.are.same({ 1, dim, dim }, alphas)
+      g.searchBox.textBox:SetText("")
+      g:ResetSearch(ctx())
+      assert.are.equal(1, g.content.order[2].entries[1].item.frame:GetAlpha())
+    end)
+
+    it("drags, withdraws and files nothing from a log's sections", function()
+      data.logLoaded[MONEY] = true
+      local g = open()
+      view(g, -3)
+      local section = g.content.order[1]
+      g:OnHeaderDragStart(section)
+      assert.is_false(nextDrag:IsActive())
+      g:OnHeaderClick(ctx(), section, "RightButton")
+      assert.are.same({}, calls.withdrawn)
+    end)
+
+    it("passes an item dropped on a log's card to the guild bank, as a drop on the panel does", function()
+      data.logLoaded[MONEY] = true
+      local g = open()
+      view(g, -3)
+      local card = firstCard(g)
+      card.card:GetScript("OnReceiveDrag")(card.card)
+      assert.are.same({ "current" }, calls.place)
+    end)
+
+    it("opens on Items again, its cards let go", function()
+      data.logLoaded[MONEY] = true
+      local g = open()
+      view(g, -3)
+      local card = firstCard(g)
+      addon.atGuildBank = false
+      handlers["guildbank/Closed"](ctx())
+      finishTweens()
+      g.frame:GetScript("OnHide")(g.frame)
+      assert.is_false(card.frame:IsShown())
+      open(g)
+      assert.are.equal(-1, g.tabs.footSelected)
+      assert.is_false(g.content.cards)
+    end)
+
+    describe("Info", function()
+      local function block(g, n)
+        return g.infoBlocks[n]
+      end
+
+      before_each(function()
+        data.texts[1], data.texts[2] = "Raid gear only", "Mats for crafters"
+        data.canEditText[1] = true
+        data.textLoaded[1], data.textLoaded[2], data.textLoaded[4] = true, true, true
+      end)
+
+      it("shows each tab's info text, asked of the server, a section a tab, for every tab on All Tabs", function()
+        local g = open()
+        view(g, -4)
+        assert.are.same({ { 1, 2, 4 } }, calls.texts)
+        assert.are.same({ "Gear", "Mats", "Donations" }, sectionNames(g))
+        assert.are.equal("Raid gear only", block(g, 1).area:GetText())
+        assert.are.equal(block(g, 1), g.content.order[1].block)
+        assert.is_false(g.content.cards)
+        assert.are.equal("", g.content.order[1].count:GetText())
+      end)
+
+      it("lets a member who may edit a tab's text change it and save it, and shows the others read only", function()
+        local g = open()
+        view(g, -4)
+        local gear, mats = block(g, 1), block(g, 2)
+        assert.is_true(gear.save.frame:IsShown())
+        assert.is_true(gear.area.editBox:IsEnabled())
+        assert.is_false(mats.save.frame:IsShown())
+        assert.is_false(mats.area.editBox:IsEnabled())
+        assert.are.equal(500, gear.area.editBox:GetMaxLetters(), "as long as Blizzard's Info tab lets it be")
+        gear.area.editBox:SetText("Raid gear and gems")
+        click(gear.save.frame)
+        assert.are.same({ { tab = 1, text = "Raid gear and gems" } }, calls.saved)
+        click(gear.save.frame)
+        assert.are.equal(1, #calls.saved, "nothing changed since")
+      end)
+
+      it("makes room for the save button only where it shows", function()
+        local g = open()
+        view(g, -4)
+        local gear, mats = block(g, 1), block(g, 2)
+        assert.is_true(gear:Height(300) > mats:Height(300))
+        assert.are.equal(mats:Height(300), mats.area.frame:GetHeight())
+      end)
+
+      it("takes a text that arrives, and keeps what the player typed and did not save", function()
+        local g = open()
+        view(g, -4)
+        local gear, mats = block(g, 1), block(g, 2)
+        gear.area.editBox:SetText("half typed")
+        data.texts[1], data.texts[2] = "Changed by an officer", "Mats, sorted"
+        handlers["guildbank/TextLoaded"](ctx(), 1)
+        handlers["guildbank/TextLoaded"](ctx(), 2)
+        assert.are.equal("half typed", gear.area:GetText())
+        assert.are.equal("Mats, sorted", mats.area:GetText())
+      end)
+
+      -- Found by the bug review: the canvas keeps sections by name, so the second of two tabs named alike took the
+      -- first's section, and the first's text was never drawn.
+      it("tells two tabs of the same name apart, each its own section", function()
+        data.tabs[2].name = "Gear"
+        local g = open()
+        view(g, -4)
+        assert.are.same({ "Gear (tab 1)", "Gear (tab 2)", "Donations" }, sectionNames(g))
+        assert.are.equal(block(g, 1), g.content.order[1].block)
+        assert.are.equal(block(g, 2), g.content.order[2].block)
+      end)
+
+      -- Found by the bug review: a member whose rank lost the right to edit while typing kept their unsaved text, read
+      -- only, with no Save to keep it nor the tab's own text to see.
+      it("puts the tab's own text back when the member may no longer edit it", function()
+        local g = open()
+        view(g, -4)
+        local gear = block(g, 1)
+        gear.area.editBox:SetText("half typed")
+        data.canEditText[1] = false
+        handlers["guildbank/TextLoaded"](ctx(), 1)
+        assert.are.equal("Raid gear only", gear.area:GetText())
+        assert.is_false(gear.save.frame:IsShown())
+      end)
+
+      -- Found by the bug review: the guild bank opened again while its panel still slid out (Wipe waits for it to hide)
+      -- kept what was typed and not saved.
+      it("forgets unsaved text as the visit ends, though the guild bank opens again before the panel is out", function()
+        local g = open()
+        view(g, -4)
+        local gear = block(g, 1)
+        gear.area.editBox:SetText("unsaved")
+        addon.atGuildBank = false
+        handlers["guildbank/Closed"](ctx())
+        open(g)
+        view(g, -4)
+        assert.are.equal("Raid gear only", gear.area:GetText())
+      end)
+
+      -- Found by the second review: forgotten as the visit ended, every box read "Nothing written" through the slide out.
+      it("keeps each tab's text on screen as the panel slides out", function()
+        local g = open()
+        view(g, -4)
+        addon.atGuildBank = false
+        handlers["guildbank/Closed"](ctx())
+        assert.are.equal("Raid gear only", block(g, 1).area:GetText())
+      end)
+
+      -- Found by the second review: Info follows the rail's order, and a tab moved there left it as it was.
+      it("follows a tab moved on the rail", function()
+        local g = open()
+        view(g, -4)
+        g.tabs.onReorder(ctx(), { ALL, 1004, 1002, 1001 })
+        assert.are.same({ "Donations", "Mats", "Gear" }, sectionNames(g))
+      end)
+
+      it("tells apart a tab named as another is told apart", function()
+        data.tabs[2].name = "Gear"
+        data.tabs[4].name = "Gear (tab 1)"
+        local g = open()
+        view(g, -4)
+        local names = sectionNames(g)
+        assert.are.equal(3, #names)
+        local seen = {}
+        for _, n in ipairs(names) do
+          assert.is_nil(seen[n], n)
+          seen[n] = true
+        end
+        for i = 1, 3 do
+          assert.are.equal(block(g, ({ 1, 2, 4 })[i]), g.content.order[i].block)
+        end
+      end)
+
+      -- Hidden and shown again, a text box could lose the player's typing focus (not seen in game): one tab's text
+      -- arriving must not hide another's box.
+      it("never hides the box being typed in when another tab's text arrives", function()
+        data.textLoaded[2] = nil
+        local g = open()
+        view(g, -4)
+        local gear = block(g, 1)
+        gear.area.editBox:SetFocus()
+        local hidden = 0
+        local hide = gear.frame.Hide
+        gear.frame.Hide = function(f) hidden = hidden + 1 hide(f) end
+        data.textLoaded[2] = true
+        handlers["guildbank/TextLoaded"](ctx(), 2)
+        gear.frame.Hide = hide
+        assert.are.equal(0, hidden)
+        assert.is_true(gear.area.editBox:HasFocus())
+      end)
+
+      it("says Loading... in a tab's header until its text arrives", function()
+        data.textLoaded[2] = nil
+        local g = open()
+        view(g, -4)
+        assert.are.equal("Loading...", g.content.order[2].count:GetText())
+        data.textLoaded[2] = true
+        handlers["guildbank/TextLoaded"](ctx(), 2)
+        assert.are.equal("", g.content.order[2].count:GetText())
+      end)
+
+      it("shows one tab's text when it shows by itself", function()
+        local g = open()
+        view(g, -4)
+        click(tabNamed(g, "Mats").button)
+        assert.are.same({ 2 }, calls.texts[2])
+        assert.are.same({ "Mats" }, sectionNames(g))
+        assert.is_false(block(g, 1).frame:IsShown(), "Gear's text is not shown")
+      end)
+
+      it("lets go of the text box's focus as the view changes, and forgets unsaved text when the visit ends", function()
+        local g = open()
+        view(g, -4)
+        local gear = block(g, 1)
+        gear.area.editBox:SetFocus()
+        gear.area.editBox:SetText("unsaved")
+        view(g, -2)
+        assert.is_false(gear.area.editBox:HasFocus())
+        addon.atGuildBank = false
+        handlers["guildbank/Closed"](ctx())
+        finishTweens()
+        g.frame:GetScript("OnHide")(g.frame)
+        open(g)
+        view(g, -4)
+        assert.are.equal("Raid gear only", gear.area:GetText())
+      end)
     end)
   end)
 

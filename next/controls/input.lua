@@ -67,6 +67,7 @@ addon:GetModule('Perf'):RegisterPrototype(inputProto, 'NextInputFrame')
 ---@class (exact) NextTextAreaOptions
 ---@field height number
 ---@field help? string
+---@field maxLetters? number
 ---@field onChange? fun(ctx: Context, text: string, userInput: boolean)
 
 ---@class NextTextAreaFrame
@@ -78,6 +79,7 @@ addon:GetModule('Perf'):RegisterPrototype(inputProto, 'NextInputFrame')
 ---@field editBox EditBox
 ---@field help FontString
 ---@field opts NextTextAreaOptions
+---@field readOnly? boolean It shows its text and takes no typing (SetReadOnly).
 local areaProto = {}
 addon:GetModule('Perf'):RegisterPrototype(areaProto, 'NextTextAreaFrame')
 
@@ -286,6 +288,9 @@ function nextInput:CreateArea(parent, opts)
   editBox:SetMultiLine(true)
   editBox:SetAutoFocus(false)
   editBox:SetCountInvisibleLetters(false)
+  if opts.maxLetters then
+    editBox:SetMaxLetters(opts.maxLetters)
+  end
   editBox.scrollable = true
   local help = frame:CreateFontString(nil, "ARTWORK")
   local view = CreateScrollBoxLinearView()
@@ -303,7 +308,11 @@ function nextInput:CreateArea(parent, opts)
   style:SetFont(editBox, controls:Theme("Input").Font)
   style:SetFont(help, controls:Theme("Input").HelpFont)
   help:SetText(opts.help or "")
-  addon.SetScript(box, "OnMouseDown", function() editBox:SetFocus() end)
+  addon.SetScript(box, "OnMouseDown", function()
+    if not area.readOnly then
+      editBox:SetFocus()
+    end
+  end)
   addon.SetScript(editBox, "OnEditFocusGained", function() area:OnFocus(true) end)
   addon.SetScript(editBox, "OnEditFocusLost", function() area:OnFocus(false) end)
   addon.SetScript(editBox, "OnEscapePressed", function() editBox:ClearFocus() end)
@@ -369,6 +378,18 @@ function areaProto:SetEnabled(enabled)
     self.editBox:ClearFocus()
   end
   self.frame:SetAlpha(enabled and 1 or controls:Theme("Button").DisabledAlpha)
+  self:Paint()
+end
+
+-- SetReadOnly shows the text to be read, drawn as ever, and takes no typing nor focus (a guild bank tab's info text for a
+-- member who may not edit it, as Blizzard's Info tab shows it).
+---@param readOnly boolean
+function areaProto:SetReadOnly(readOnly)
+  self.readOnly = readOnly
+  self.editBox:SetEnabled(not readOnly)
+  if readOnly then
+    self.editBox:ClearFocus()
+  end
   self:Paint()
 end
 
