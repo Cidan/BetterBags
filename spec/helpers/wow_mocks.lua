@@ -960,9 +960,14 @@ end
 function WidgetMethods:IsClampedToScreen()
   return self._clamped == true
 end
--- Frame:SetClampRectInsets(left, right, top, bottom).
+-- Frame:SetClampRectInsets(left, right, top, bottom) and GetClampRectInsets() -> left, right, top, bottom
+-- (SimpleFrameAPIDocumentation; none set: 0 each).
 function WidgetMethods:SetClampRectInsets(left, right, top, bottom)
   self._clampRectInsets = { left, right, top, bottom }
+end
+function WidgetMethods:GetClampRectInsets()
+  local insets = self._clampRectInsets or { 0, 0, 0, 0 }
+  return insets[1], insets[2], insets[3], insets[4]
 end
 function WidgetMethods:SetMovable(movable)
   self._movable = movable

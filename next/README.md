@@ -125,6 +125,12 @@ between its sections.
 Off, it is the height the player gave it with its grips, or a share of the screen. The rules are in
 `.claude/rules/next-small-autosize.md` §14i.
 
+With **Clamp Bags to Screen** on, a small panel is kept on the screen with its tabs, which hang past its body on its inner
+side (`NextPanel:TabReach`): every place it is given keeps them on the screen (`clampPlace`), its clamp rect takes them in
+so the client keeps them there as it is dragged (`ApplyClamp`), and as its tabs change it glides to where its place puts it
+with them, pushed in by tabs that grow at the screen's edge and back as they shrink or hide (`FollowTabs`). The rules are in
+`.claude/rules/next-small-mode.md` §14c.
+
 ## Moving sections
 
 Every section has a header button. Dragging a category's header picks the section up: its frame,

@@ -1030,6 +1030,277 @@ describe("BetterBags Next's small mode", function()
       assert.are.same({ width, height }, { bag.frame:GetWidth(), bag.frame:GetHeight() })
       assert.is_nil(db.places[BACKPACK], "no small place saved")
     end)
+
+    -- Its tabs hang past its body on its inner side (next/tabs.lua): the backpack's on its left, a companion's on its right, its
+    -- widest tab and the hover slide (as chain:SmallGap counts them), in its own units. Reported (#1248, from Discord): dragged
+    -- near the screen's edge with Clamp Bags to Screen on, a small bag's tabs went off the screen, its body kept on it.
+    describe("its tabs (#1248)", function()
+      local function reach(panel)
+        return panel.tabs:Width() + style.TAB_HOVER
+      end
+
+      -- Groups on (db.groupsOff turns them off), n of them.
+      local function grouped(n)
+        db.groupsOff = false
+        override(stubs.database, "GetGroupsEnabled", function() return not db.groupsOff end)
+        local all = {}
+        for i = 1, n do all[i] = { id = i, name = "Group " .. i } end
+        override(stubs.groups, "GetAllGroups", function() return all end)
+        return all
+      end
+
+      it("keeps them on the screen, not only its body, as it is moved to the screen's edge", function()
+        db.clamp = true
+        grouped(4)
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        local bank = opened(function(c) return nextBank:Create(c) end)
+        assert.is_true(bag.tabs:Width() > 0 and bank.tabs:Width() > 0)
+        drag(bag, 0, 900)
+        assert.are.same({ reach(bag), 900 }, { topLeft(bag) }, "the backpack's tabs on its left")
+        assert.are.same(cornerFor(bag, reach(bag), 900), db.corners[BACKPACK], "saved where it was kept")
+        drag(bank, UIParent:GetWidth(), 900)
+        local right = UIParent:GetWidth() - bank.frame:GetWidth() - reach(bank)
+        assert.are.same({ right, 900 }, { topLeft(bank) }, "the bank's tabs on its right")
+      end)
+
+      it("keeps them on the screen at its Bag Scale", function()
+        db.clamp, db.bagScale = true, 150
+        grouped(4)
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        drag(bag, 0, 600)
+        assert.are.equal(reach(bag) * 1.5, bag.placeX, "its tabs at its scale, on the screen")
+      end)
+
+      it("keeps them on the screen past a strip outside its body", function()
+        db.clamp = true
+        grouped(4)
+        UseNextTheme({ Header = { Buttons = { Rail = { Width = 40, Top = 64, Outside = true } } } })
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        local x = bag:clampPlace(0, 900)
+        local insets = { bag.frame:GetClampRectInsets() }
+        UseNextTheme(nil)
+        assert.are.equal(40 + reach(bag), x)
+        assert.are.same({ -(40 + reach(bag)), 0, 0, 0 }, insets)
+      end)
+
+      -- The client keeps a clamped frame's clamp rect on the screen (warcraft.wiki.gg Frame:SetClampRectInsets: a negative left
+      -- or a positive right keeps that much more on it), as the player drags it too. The mock never clamps: this is the rect.
+      it("takes them into its clamp rect, in its own units, for the client to keep on the screen as it is dragged", function()
+        db.clamp, db.bagScale = true, 150
+        grouped(4)
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        local bank = opened(function(c) return nextBank:Create(c) end)
+        assert.are.same({ -reach(bag), 0, 0, 0 }, { bag.frame:GetClampRectInsets() })
+        assert.are.same({ 0, reach(bank), 0, 0 }, { bank.frame:GetClampRectInsets() })
+      end)
+
+      it("puts them back on the screen once turned on", function()
+        grouped(4)
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        drag(bag, 0, 900)
+        assert.are.same({ 0, 900 }, { topLeft(bag) }, "off, its tabs leave the screen with it")
+        turned(true)
+        assert.are.same({ reach(bag), 900 }, { topLeft(bag) })
+      end)
+
+      it("lets them leave the screen while it is off, as the rest of it may", function()
+        grouped(4)
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        drag(bag, 0, 900)
+        assert.are.equal("off", bag:FollowTabs())
+        assert.are.same({ 0, 900 }, { topLeft(bag) })
+      end)
+
+      it("puts them back on the screen as they grow while it sits at the screen's edge, saving nothing", function()
+        db.clamp = true
+        local all = grouped(2)
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        drag(bag, 0, 900)
+        local corner = db.corners[BACKPACK]
+        local before = reach(bag)
+        all[3] = { id = 3, name = "A much longer group name" }
+        bag:RefreshTabs()
+        assert.is_true(reach(bag) > before, "its tabs grew")
+        finishTweens()
+        assert.are.same({ reach(bag), 900 }, { topLeft(bag) })
+        assert.are.same({ -reach(bag), 0, 0, 0 }, { bag.frame:GetClampRectInsets() })
+        assert.are.same(corner, db.corners[BACKPACK], "nothing saved: the player did not move it")
+      end)
+
+      it("waits for its open slide to end before putting them back on the screen", function()
+        db.clamp = true
+        local all = grouped(2)
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        drag(bag, 0, 900)
+        bag:Hide(ctx())
+        finishTweens()
+        bag:Show(ctx())
+        all[3] = { id = 3, name = "A much longer group name" }
+        bag:RefreshTabs()
+        assert.are.equal("owed", bag:FollowTabs(), "its slide plays")
+        local x = bag.placeX
+        finishTweens()
+        assert.are.equal(0, bag.offset, "it slid all the way in")
+        assert.is_true(bag.placeX > x)
+        assert.are.same({ reach(bag), 900 }, { topLeft(bag) })
+      end)
+
+      -- RefreshTabs hides the rail with groups off, its tabs kept (next/bag.lua), and the client fires OnHide as it hides.
+      it("lets its body reach the screen's edge again once its tabs are hidden", function()
+        db.clamp = true
+        grouped(4)
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        assert.are.same({ -reach(bag), 0, 0, 0 }, { bag.frame:GetClampRectInsets() }, "with its tabs")
+        db.groupsOff = true
+        bag:RefreshTabs()
+        bag.tabs.frame:GetScript("OnHide")(bag.tabs.frame)
+        assert.are.same({ 0, 0, 0, 0 }, { bag.frame:GetClampRectInsets() })
+        drag(bag, 0, 900)
+        assert.are.same({ 0, 900 }, { topLeft(bag) })
+      end)
+
+      -- Found by the bug review: pushed in as its tabs grew and left there as they shrank, the bag stood off its place, and the
+      -- next thing that placed it from there (Autosize Bags' height glide as items came in) slid it 74 units sideways.
+      it("glides back to its place as they shrink, where whatever places it next keeps it", function()
+        db.clamp = true
+        local all = grouped(2)
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        drag(bag, 0, 900)
+        local dropped = reach(bag)
+        all[3] = { id = 3, name = "A much longer group name" }
+        bag:RefreshTabs()
+        finishTweens()
+        assert.are.equal(reach(bag), bag.placeX, "pushed in as they grew")
+        all[3] = nil
+        bag:RefreshTabs()
+        finishTweens()
+        assert.are.equal(dropped, bag.placeX, "back where it was dropped")
+        assert.are.equal(bag.placeX, (bag:SmallPlace()), "where its place puts it")
+        assert.are.same({ dropped, 900 }, { topLeft(bag) })
+      end)
+
+      -- The rail shows after its tabs are set (RefreshTabs), and the client fires OnShow and OnHide as it shows and hides.
+      it("follows them shown and hidden as groups are turned on and off while it sits at the screen's edge", function()
+        db.clamp = true
+        grouped(4)
+        db.groupsOff = true
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        bag:RefreshTabs()
+        drag(bag, 0, 900)
+        assert.are.same({ 0, 900 }, { topLeft(bag) }, "no tabs: its body at the edge")
+        db.groupsOff = false
+        bag:RefreshTabs()
+        bag.tabs.frame:GetScript("OnShow")(bag.tabs.frame)
+        assert.are.same({ -reach(bag), 0, 0, 0 }, { bag.frame:GetClampRectInsets() }, "its clamp rect at once")
+        finishTweens()
+        assert.are.same({ reach(bag), 900 }, { topLeft(bag) }, "its tabs on the screen")
+        db.groupsOff = true
+        bag:RefreshTabs()
+        bag.tabs.frame:GetScript("OnHide")(bag.tabs.frame)
+        finishTweens()
+        assert.are.same({ 0, 900 }, { topLeft(bag) }, "back at the edge, where it was dropped")
+      end)
+
+      it("takes them out of its clamp rect when they are hidden while it is closed, as it opens", function()
+        db.clamp = true
+        grouped(4)
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        bag:Hide(ctx())
+        finishTweens()
+        db.groupsOff = true
+        bag:RefreshTabs()
+        bag:Show(ctx())
+        finishTweens()
+        assert.are.same({ 0, 0, 0, 0 }, { bag.frame:GetClampRectInsets() })
+      end)
+
+      -- Found by the bug review: the place was rounded to the nearest pixel, so the clamp rect, its tabs' exact reach, stood up to
+      -- 0.4 pixels past the screen at some Bag Scales (the hover slide at the scale is no whole pixel).
+      it("keeps its clamp rect wholly on the screen at every Bag Scale, on whole pixels", function()
+        db.clamp = true
+        grouped(4)
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        for _, scale in ipairs({ 90, 105, 120, 135, 140 }) do
+          db.bagScale = scale
+          bag:FitSmall()
+          drag(bag, 0, 600)
+          local s = scale / 100
+          assert.is_true(bag.placeX - reach(bag) * s >= -1e-9, scale .. "%: its tabs on the screen")
+          assert.are.equal(pixel:Snap(UIParent, bag.placeX), bag.placeX, scale .. "%: on a whole pixel")
+        end
+      end)
+
+      -- Found by the bug review: a bag sized nearly as wide as the screen (its grips go up to it) lost its body past the far
+      -- edge to keep its tabs on. It kept its body on the screen before its tabs were kept on it, and still does.
+      it("keeps its body on the screen when the screen cannot hold its tabs too", function()
+        db.clamp = true
+        grouped(4)
+        local width = UIParent:GetWidth()
+        db.sizes[BACKPACK], db.sizes[BANK] = { width - 20, 500 }, { width - 20, 500 }
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        drag(bag, 0, 900)
+        assert.are.equal(width - bag.frame:GetWidth(), bag.placeX, "the backpack's body on the screen")
+        local bank = opened(function(c) return nextBank:Create(c) end)
+        drag(bank, width, 900)
+        assert.are.equal(0, bank.placeX, "the bank's")
+      end)
+
+      local function step()
+        tween.driver:GetScript("OnUpdate")(tween.driver, 1 / 60)
+      end
+
+      it("glides to where its place puts it with them, not at once", function()
+        db.clamp = true
+        local all = grouped(2)
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        drag(bag, 0, 900)
+        local dropped = reach(bag)
+        all[3] = { id = 3, name = "A much longer group name" }
+        bag:RefreshTabs()
+        for _ = 1, 4 do step() end
+        local x = (topLeft(bag))
+        assert.is_true(x > dropped and x < reach(bag), "part way there: " .. x)
+        finishTweens()
+        assert.are.same({ reach(bag), 900 }, { topLeft(bag) })
+      end)
+
+      it("leaves a bag chained beside its anchor to the chain, and an anchor to follow its own", function()
+        db.clamp, db.smallChain = true, "backpack"
+        grouped(2)
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        local bank = opened(function(c) return nextBank:Create(c) end)
+        assert.are.equal(bag, chain:SmallAnchorOf(bank))
+        assert.are.equal("chained", bank:FollowTabs())
+        assert.are.equal("placed", bag:FollowTabs(), "the anchor follows its own")
+      end)
+
+      -- Found by the second bug review: a pair that does not fit beside the screen's edge (the anchor dropped against it, the bag
+      -- beside it held on the screen over it) has the anchor's tabs facing the edge, and an anchor was left to the chain.
+      it("follows them as the anchor of a pair pushed against the screen's edge", function()
+        db.clamp, db.smallChain = true, "backpack"
+        local all = grouped(2)
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        local bank = opened(function(c) return nextBank:Create(c) end)
+        drag(bag, 0, 900)
+        finishTweens()
+        assert.are.equal(reach(bag), bag.placeX, "its tabs on the screen")
+        all[3] = { id = 3, name = "A much longer group name" }
+        bag:RefreshTabs()
+        finishTweens()
+        assert.are.equal(reach(bag), bag.placeX, "its grown tabs on the screen")
+        assert.are.equal((bank:SmallPlace()), bank.placeX, "the bag beside it where its spot puts it")
+      end)
+
+      it("is where its place puts it within half a pixel, and glides nowhere", function()
+        db.clamp = true
+        grouped(2)
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        drag(bag, 0, 900)
+        bag.placeX = bag.placeX + 1e-6
+        assert.are.equal("placed", bag:FollowTabs())
+        assert.is_false(tween:IsPlaying(bag))
+      end)
+    end)
   end)
 
   -- A grip on each bottom corner resizes a small panel, its content reflowing as it goes, like an
