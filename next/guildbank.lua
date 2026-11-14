@@ -45,8 +45,44 @@ local nextDrag = addon:GetModule('NextDrag')
 ---@class NextPixel: AceModule
 local pixel = addon:GetModule('NextPixel')
 
+---@class Render: AceModule
+local render = addon:GetModule('Render')
+
+---@class Texels: AceModule
+local texels = addon:GetModule('Texels')
+
+---@class Motion: AceModule
+local motion = addon:GetModule('Motion')
+
+---@class NextVendorButton: AceModule
+local vendorButton = addon:GetModule('NextVendorButton')
+
+---@class NextInput: AceModule
+local nextInput = addon:GetModule('NextInput')
+
+---@class NextButton: AceModule
+local nextButton = addon:GetModule('NextButton')
+
+---@class SearchBox: AceModule
+local searchBox = addon:GetModule('SearchBox')
+
+---@class Search: AceModule
+local search = addon:GetModule('Search')
+
 -- The footer's gold, 16 tall: its text centered in it by the font's height (docs/next-pixel-perfect.md).
 local MONEY_WIDTH, MONEY_HEIGHT = 200, 16
+
+-- What the panel shows: the items of the tab chosen (VIEW_ITEMS), or one of Blizzard's Log, Money Log and Info tabs
+-- (GuildBankFrameTabMixin:OnClick), tabs at its rail's foot (asked: "maybe tabs for this on the bottom of the rail
+-- instead of the top?") chosen as any tab is, their ids the views'.
+local VIEW_ITEMS, VIEW_LOG, VIEW_MONEY, VIEW_INFO = -1, -2, -3, -4
+
+-- A tab's info text: as tall as the settings' text areas, and as long as Blizzard's Info tab lets it be
+-- (GuildBankTabInfoEditBox, letters="500").
+local INFO_HEIGHT, INFO_LETTERS = 120, 500
+
+-- The money log's cards show a coin.
+local MONEY_ICON = "Interface\\Icons\\INV_Misc_Coin_01"
 
 -- NextGuildBank is BetterBags Next's guild bank (guild-bank.md §5): a panel on the left, as the
 -- bank's, that stands in for Blizzard's guild bank frame while BetterBags Next is on. It shows every
@@ -82,7 +118,21 @@ local DIALOGS = { "GUILDBANK_DEPOSIT", "GUILDBANK_WITHDRAW", "CONFIRM_BUY_GUILDB
 ---@field closeRequested boolean It asked the guild bank to close.
 ---@field wipeWhenHidden boolean The visit ended while the panel slid out: let go of its buttons once hidden.
 ---@field off? boolean Switched off (Deactivate): it follows no visit, Blizzard's guild bank frame shows the guild bank.
+---@field view number What it shows: VIEW_ITEMS (the tab chosen on its rail), or the view chosen at its rail's foot (VIEW_LOG, VIEW_MONEY, VIEW_INFO).
+---@field logCards table<string, NextVendorButtonFrame> The log's cards this draw drew, by key.
+---@field infoBlocks table<number, NextGuildInfoBlock> Each tab's info text, made the first time it shows.
+---@field logMoney? number The guild's gold when the money log was last asked for.
 local guildProto = nextPanel:Extend({}, 'NextGuildBankPanel')
+
+-- A tab's info text in the Info view: the canvas holds it as a section's block (NextCanvasBlock), a text area that a
+-- member who may edit it types in and saves, read only for the others.
+---@class (exact) NextGuildInfoBlock: NextCanvasBlock
+---@field tab number
+---@field area NextTextAreaFrame
+---@field save NextButtonFrame
+---@field loaded string The text last received: Save saves only a change from it, and a text that arrives replaces the box's only while it still holds this.
+---@field editable boolean This member may edit it.
+---@field forgotten? boolean The visit it was shown in ended: its text stays on screen as the panel slides out, and is replaced whatever it holds the next time it shows.
 
 ---@param ctx Context
 ---@return NextGuildBankPanel
@@ -102,6 +152,9 @@ function nextGuildBank:Create(ctx)
   })
   g.closeRequested = false
   g.wipeWhenHidden = false
+  g.view = VIEW_ITEMS
+  g.logCards = {}
+  g.infoBlocks = {}
   g.content:SetButtonSource(guildButton)
   g:SetWash("Guild", true)
   self.panel = g
@@ -260,6 +313,16 @@ function guildProto:TabOrderKey()
   return "guild"
 end
 
+-- OnTabsReordered saves the order a tab was moved to, as every panel does; a log or Info lists the tabs in it.
+---@param ctx Context
+---@param ids number[]
+function guildProto:OnTabsReordered(ctx, ids)
+  nextPanel.proto.OnTabsReordered(self, ctx, ids)
+  if self.view ~= VIEW_ITEMS then
+    self:DrawView(ctx)
+  end
+end
+
 function guildProto:GetCurrentTabID()
   return self.shownTab or const.GUILD_BANK_ALL_TAB
 end
@@ -307,8 +370,28 @@ function guildProto:ShowTabTooltip(info)
   end
 end
 
+-- viewEntries are the views at the rail's foot: Blizzard's Log, Money Log and Info, in Blizzard's words.
+---@return NextTabEntry[]
+local function viewEntries()
+  return {
+    { id = VIEW_LOG, name = GUILD_BANK_LOG, foot = true, fixed = true,
+      tooltip = { GUILD_BANK_LOG, L:G("Who deposited, withdrew and moved items") } },
+    { id = VIEW_MONEY, name = GUILD_BANK_MONEY_LOG, foot = true, fixed = true,
+      tooltip = { GUILD_BANK_MONEY_LOG, L:G("Who deposited and withdrew the guild's gold") } },
+    { id = VIEW_INFO, name = GUILD_BANK_TAB_INFO, foot = true, fixed = true,
+      tooltip = { GUILD_BANK_TAB_INFO, L:G("What each tab is for") } },
+  }
+end
+
+-- isView says whether a tab's id is one of the views at the rail's foot.
+---@param id number
+---@return boolean
+local function isView(id)
+  return id == VIEW_LOG or id == VIEW_MONEY or id == VIEW_INFO
+end
+
 -- RefreshTabs lists All Tabs, then every tab the player can view, then "+" while the guild leader can
--- buy one, and selects the one shown.
+-- buy one, and the views at the rail's foot, and selects what shows (SelectedTabID).
 function guildProto:RefreshTabs()
   local entries = { { id = const.GUILD_BANK_ALL_TAB, name = L:G("All Tabs"), block = "all" } }
   local tabs = {}
@@ -338,9 +421,22 @@ function guildProto:RefreshTabs()
       tooltip = { L:G("Buy a Guild Bank Tab"), L:G("Click to buy the guild's next tab") },
     })
   end
+  for _, entry in ipairs(viewEntries()) do
+    table.insert(entries, entry)
+  end
   self.tabs:SetTabs(entries)
-  self.tabs:Select(self:GetCurrentTabID())
+  self.tabs:Select(self:SelectedTabID())
   self.tabs.frame:Show()
+end
+
+-- SelectedTabID is the tab chosen on the rail: the view shown, else All Tabs or the tab shown by itself (one at a time,
+-- asked: "the new tabs should be just like all the other tabs ... not this sort of dual selector type system").
+---@return number
+function guildProto:SelectedTabID()
+  if self.view ~= VIEW_ITEMS then
+    return self.view
+  end
+  return self:GetCurrentTabID()
 end
 
 -- viewable says whether a tab's container is a tab the player can view now.
@@ -363,10 +459,11 @@ local function firstViewable()
   return nil
 end
 
--- updateTitle titles the panel with the tab shown, else the guild's name.
+-- updateTitle titles the panel with the tab shown, else (every tab, or a log or Info, which are the guild's) the guild's
+-- name.
 ---@private
 function guildProto:updateTitle()
-  local tab = self:ShownTab()
+  local tab = self.view == VIEW_ITEMS and self:ShownTab() or nil
   local info = tab and guildBank:TabInfo(tab)
   if info then
     self:SetTitle(info.name)
@@ -382,13 +479,13 @@ function guildProto:useView()
   database:SetBagView(self.kind, self.shownTab and const.BAG_VIEW.SECTION_ALL_BAGS or const.BAG_VIEW.SECTION_GRID)
 end
 
--- shown draws the view just chosen: the title, the tab selected, and a recalculation of the guild
--- bank with a fresh layout, which draws it.
+-- shown draws the tab just chosen: the title, the tab selected, and a recalculation of the guild
+-- bank with a fresh layout, which draws it (kept for later while a log or Info shows, Draw).
 ---@private
 ---@param ctx Context
 function guildProto:shown(ctx)
   self:updateTitle()
-  self.tabs:Select(self:GetCurrentTabID(), true)
+  self.tabs:Select(self:SelectedTabID(), true)
   self.tabChanged = true
   events:SendMessage(ctx, 'bags/Rederive', { guild = true, resetLayout = true })
 end
@@ -414,12 +511,18 @@ function guildProto:ShowTab(ctx, container)
   self:shown(ctx)
 end
 
--- OnTabClicked runs a click on a tab: "+" buys a tab, a right click renames one, a left click shows
--- All Tabs or a tab by itself.
+-- OnTabClicked runs a click on a tab: a view at the rail's foot shows it, "+" buys a tab, a right click renames one, a
+-- left click shows All Tabs or a tab by itself, its items again from a log or Info (ShowItems).
 ---@param ctx Context
 ---@param id number
 ---@param button string
 function guildProto:OnTabClicked(ctx, id, button)
+  if isView(id) then
+    if button ~= "RightButton" and id ~= self.view then
+      self:ShowView(ctx, id)
+    end
+    return
+  end
   if id == 0 then
     guildBank:BuyTab()
     return
@@ -428,6 +531,10 @@ function guildProto:OnTabClicked(ctx, id, button)
     if id ~= const.GUILD_BANK_ALL_TAB then
       self:RenameTab(guildBank:TabOf(id))
     end
+    return
+  end
+  if self.view ~= VIEW_ITEMS then
+    self:ShowItems(ctx, id)
     return
   end
   if id == self:GetCurrentTabID() then
@@ -454,14 +561,20 @@ function guildProto:RenameTab(tab)
   end)
 end
 
--- OnShowing sets the guild bank up as it opens: the tab shown by itself last time (the guild bank's
--- current tab, else the first the player can view) or every tab, the tabs, the header and the gold,
--- and the guild bank's last read data drawn once the panel shows.
+-- OnShowing sets the guild bank up as it opens: its items, as Blizzard's frame opens on its own (GuildBankFrameMixin:OnShow),
+-- the tab shown by itself last time (the guild bank's current tab, else the first the player can view) or every tab, the
+-- tabs, the header and the gold, and the guild bank's last read data drawn once the panel shows.
 ---@param ctx Context
 function guildProto:OnShowing(ctx)
   local _ = ctx
   self.closeRequested = false
   self.wipeWhenHidden = false
+  if self.view ~= VIEW_ITEMS then
+    self.content:BindSections({})
+    self:releaseCards()
+  end
+  self.view = VIEW_ITEMS
+  self.content:SetCards(false)
   self.shownTab = nil
   if database:GetShowGuildBankTabs() then
     local container = guildBank:ContainerOf(guildBank:CurrentTab())
@@ -524,6 +637,8 @@ function guildProto:OnGuildBankClosed(ctx)
   for _, which in ipairs(DIALOGS) do
     StaticPopup_Hide(which)
   end
+  -- Now, not once the panel is out (Wipe): the guild bank can open again while it slides out.
+  self:forgetInfo()
   if self.frame:IsShown() and not self.closing then
     self:Hide(ctx)
   end
@@ -534,9 +649,9 @@ function guildProto:OnGuildBankClosed(ctx)
   end
 end
 
--- WatchKind follows the guild bank: its tabs (names, permissions, a tab bought), its gold, and the end
--- of the visit. Switched off, it neither switches its tabs nor closes Blizzard's dialogs: Blizzard's
--- guild bank frame shows the visit.
+-- WatchKind follows the guild bank: its tabs (names, permissions, a tab bought), its gold, its logs and info text, and
+-- the end of the visit. Switched off, it neither switches its tabs nor closes Blizzard's dialogs: Blizzard's guild bank
+-- frame shows the visit.
 function guildProto:WatchKind()
   events:RegisterMessage('guildbank/TabsChanged', function(ctx)
     if not self.off then
@@ -546,12 +661,41 @@ function guildProto:WatchKind()
   events:RegisterMessage('guildbank/MoneyChanged', function()
     self.moneyFrame:Update()
     self:UpdateHeader()
+    -- The money log shown follows the gold (Blizzard's asks only on a click): asked again when the gold changed, not
+    -- the member's withdrawal limit (GUILDBANK_UPDATE_WITHDRAWMONEY says the same message).
+    if self:shows(VIEW_MONEY) and GetGuildBankMoney() ~= self.logMoney then
+      self.logMoney = GetGuildBankMoney()
+      guildBank:LoadLogs({ guildBank:MoneyLogID() })
+    end
+  end)
+  events:RegisterMessage('guildbank/LogLoaded', function(ctx, id)
+    if self:shows(VIEW_MONEY) and id == guildBank:MoneyLogID() or self:shows(VIEW_LOG) and self:viewsTab(id) then
+      self:DrawView(ctx)
+    end
+  end)
+  events:RegisterMessage('guildbank/LogChanged', function(ctx)
+    if self:shows(VIEW_LOG) or self:shows(VIEW_MONEY) then
+      self:DrawView(ctx)
+    end
+  end)
+  events:RegisterMessage('guildbank/TextLoaded', function(ctx, tab)
+    if self:shows(VIEW_INFO) and self:viewsTab(tab) then
+      self:DrawView(ctx)
+    end
   end)
   events:RegisterMessage('guildbank/Closed', function(ctx)
     if not self.off then
       self:OnGuildBankClosed(ctx)
     end
   end)
+end
+
+-- shows says whether the panel, on and shown, shows a view.
+---@private
+---@param view number
+---@return boolean
+function guildProto:shows(view)
+  return not self.off and self.view == view and self.frame:IsShown()
 end
 
 -- Deactivate switches the guild bank off, with BetterBags Next or by itself (Enable Guild Bank Window, next-bagsystem.md §11g): it
@@ -577,9 +721,15 @@ function guildProto:OnTabsChanged(ctx)
   if self.shownTab ~= nil and not viewable(self.shownTab) then
     self:ShowAll(ctx)
     self:RefreshTabs()
-    return
+  else
+    self:updateTitle()
   end
-  self:updateTitle()
+  -- A log or Info names the tabs, and shows what the player may do in them; a tab come into view (bought, or opened to
+  -- the player's rank) is asked for.
+  if self.view ~= VIEW_ITEMS then
+    self:loadMissing()
+    self:DrawView(ctx)
+  end
 end
 
 -- Refresh recalculates the guild bank from what was last read (nothing while it is closed).
@@ -662,13 +812,39 @@ function guildProto:Withdraw(list)
   return guildBank:WithdrawItems(sectionFrame:WithStacks(list))
 end
 
+-- OnHeaderDragStart picks a guild section up, in Items: a log's and Info's sections are no items.
+---@param section NextSection
+function guildProto:OnHeaderDragStart(section)
+  if self.view == VIEW_ITEMS then
+    nextPanel.proto.OnHeaderDragStart(self, section)
+  end
+end
+
+-- OnHeaderReceiveDrag puts an item dropped on a log's or Info's header into the guild bank, as a drop on the panel does.
+---@param ctx Context
+---@param section NextSection
+function guildProto:OnHeaderReceiveDrag(ctx, section)
+  if self.view ~= VIEW_ITEMS then
+    self:PlaceCursorItem()
+    return
+  end
+  nextPanel.proto.OnHeaderReceiveDrag(self, ctx, section)
+end
+
 -- OnHeaderClick passes an item clicked onto a header to the guild bank (Shift: to the category), and
 -- takes a section out to the bags on a right click (the bank's right click moves it to the open
--- window; the guild bank's open window is the bags).
+-- window; the guild bank's open window is the bags). A log's and Info's sections hold no items: an item
+-- clicked onto one goes into the guild bank, as a drop on the panel does.
 ---@param ctx Context
 ---@param section NextSection
 ---@param button string
 function guildProto:OnHeaderClick(ctx, section, button)
+  if self.view ~= VIEW_ITEMS then
+    if CursorHasItem() then
+      self:PlaceCursorItem()
+    end
+    return
+  end
   if CursorHasItem() or button ~= "RightButton" then
     nextPanel.proto.OnHeaderClick(self, ctx, section, button)
     return
@@ -686,6 +862,10 @@ function guildProto:OnHeaderEnter(section)
   end
   GameTooltip:SetOwner(section.header, "ANCHOR_RIGHT")
   GameTooltip:SetText(section.name, 1, 1, 1, 1, true)
+  if self.view ~= VIEW_ITEMS then
+    GameTooltip:Show()
+    return
+  end
   if section.kind == "category" then
     GameTooltip:AddLine(L:G("Drag to reorder, or onto the backpack to take it out."), 0.8, 0.8, 0.8, true)
   end
@@ -700,4 +880,551 @@ end
 ---@return string
 function guildProto:PlaceCursorItem()
   return guildBank:PlaceCursorItem(self:ShownTab())
+end
+
+-- ShowView shows a view chosen at the rail's foot (a log or the tabs' info text), asked of the server as it shows, as
+-- Blizzard's tab click asks every time. The tab shown before stays where deposits go. Nothing travels from what showed.
+---@param ctx Context
+---@param view number
+function guildProto:ShowView(ctx, view)
+  local was = self.view
+  self.view = view
+  self.tabs:Select(view, true)
+  self.tabChanged = true
+  motion:ForgetShown(self.content)
+  if was == VIEW_ITEMS then
+    self:releaseItems(ctx)
+  else
+    self:releaseFocus()
+  end
+  self:updateTitle()
+  self:loadView()
+  self:DrawView(ctx)
+end
+
+-- ShowItems leaves a log or Info for a tab's items (asked: "going from all tabs, to a specific item tab, to money log,
+-- then back to an item tab should 'just work'"): the tab shown before it drawn at once from the last read (a read waits
+-- while a view shows, Draw) and searched again; another tab shown as its click shows it, drawn as its read arrives.
+---@param ctx Context
+---@param id number
+function guildProto:ShowItems(ctx, id)
+  self.content:BindSections({})
+  self:releaseCards()
+  self.content:SetCards(false)
+  self.emptyText:Hide()
+  self.freeText:SetText("")
+  self.view = VIEW_ITEMS
+  motion:ForgetShown(self.content)
+  if id ~= self:GetCurrentTabID() then
+    if id == const.GUILD_BANK_ALL_TAB then
+      self:ShowAll(ctx)
+    else
+      self:ShowTab(ctx, id)
+    end
+    return
+  end
+  self:updateTitle()
+  self.tabs:Select(id, true)
+  self.tabChanged = true
+  self:Draw(ctx, self.lastSlotInfo or {})
+  self:searchItems(ctx)
+end
+
+-- searchItems dims the items drawn by what the search box holds now, as the box does when typed in (SearchBox): they were
+-- drawn from the last read, its search as it was then.
+---@private
+---@param ctx Context
+function guildProto:searchItems(ctx)
+  local text = searchBox:GetSearchText(self.kind)
+  if text == nil or text == "" then
+    nextPanel.proto.ResetSearch(self, ctx)
+  else
+    nextPanel.proto.Search(self, ctx, search:Search(text))
+  end
+end
+
+-- viewTabs are the tabs a log or Info shows: every tab the player can view, in the order the rail lists them (the
+-- player's).
+---@private
+---@return number[]
+function guildProto:viewTabs()
+  local tabs = {}
+  for _, t in ipairs(self.tabs.tabs) do
+    local tab = not t.foot and guildBank:TabOf(t.id) or nil
+    if tab ~= nil and viewable(t.id) then
+      table.insert(tabs, tab)
+    end
+  end
+  return tabs
+end
+
+-- viewsTab says whether a log or Info shows a tab.
+---@private
+---@param tab? number
+---@return boolean
+function guildProto:viewsTab(tab)
+  for _, t in ipairs(self:viewTabs()) do
+    if t == tab then
+      return true
+    end
+  end
+  return false
+end
+
+-- loadView asks the server for what the view shows: the tabs' item logs (Log), the money log (Money Log), or the tabs'
+-- info text (Info).
+---@private
+function guildProto:loadView()
+  if self.view == VIEW_LOG then
+    guildBank:LoadLogs(self:viewTabs())
+  elseif self.view == VIEW_MONEY then
+    self.logMoney = GetGuildBankMoney()
+    guildBank:LoadLogs({ guildBank:MoneyLogID() })
+  elseif self.view == VIEW_INFO then
+    guildBank:LoadTexts(self:viewTabs())
+  end
+end
+
+-- loadMissing asks for the logs or texts of the tabs shown that this visit has not received: the tabs changed (a tab
+-- bought, or opened to the player's rank). What is still being asked for stays asked for (LoadLogs takes the place of
+-- what was still to ask, and those are among the missing).
+---@private
+function guildProto:loadMissing()
+  local loaded = self.view == VIEW_LOG and guildBank.IsLogLoaded or self.view == VIEW_INFO and guildBank.IsTextLoaded or nil
+  if loaded == nil then
+    return
+  end
+  local missing = {}
+  for _, tab in ipairs(self:viewTabs()) do
+    if not loaded(guildBank, tab) then
+      table.insert(missing, tab)
+    end
+  end
+  if #missing == 0 then
+    return
+  end
+  if self.view == VIEW_LOG then
+    guildBank:LoadLogs(missing)
+  else
+    guildBank:LoadTexts(missing)
+  end
+end
+
+-- tabName is a tab's name as the guild bank names it.
+---@private
+---@param tab? number
+---@return string
+function guildProto:tabName(tab)
+  local info = tab and guildBank:TabInfo(tab)
+  return info and info.name or format(GUILDBANK_TAB_NUMBER, tab or 0)
+end
+
+-- releaseItems lets go of the guild bank's buttons the last draw of its items drew: another view shows.
+---@private
+---@param ctx Context
+function guildProto:releaseItems(ctx)
+  self.content:BindSections({})
+  for item in pairs(self.drawnButtons) do
+    item:Release(ctx)
+  end
+  self.drawnButtons = {}
+end
+
+-- releaseFocus lets go of the focus a tab's info text has: its box is hidden or drawn again.
+---@private
+function guildProto:releaseFocus()
+  for _, block in pairs(self.infoBlocks) do
+    block.area.editBox:ClearFocus()
+  end
+end
+
+-- releaseCards lets go of the log's cards, and of the info text's focus.
+---@private
+function guildProto:releaseCards()
+  for _, c in pairs(self.logCards) do
+    c:Release()
+  end
+  self.logCards = {}
+  self:releaseFocus()
+end
+
+-- card returns this draw's card for a key: the last draw's when it had one, else a new one.
+---@private
+---@param key string
+---@param previous table<string, NextVendorButtonFrame>
+---@return NextVendorButtonFrame
+function guildProto:card(key, previous)
+  local c = previous[key]
+  if c ~= nil then
+    previous[key] = nil
+  else
+    c = vendorButton:Acquire()
+  end
+  self.logCards[key] = c
+  return c
+end
+
+-- itemCard is how a card shows an item log entry: the item and its stack, its name, and along the bottom a glyph for
+-- whether it was deposited, withdrawn or moved and who did it (asked: "an icon, not text, with the person who did it next
+-- to it ... color coded ... so humans can quickly scan it"); its tooltip says it in words, how many, which tab and when.
+---@private
+---@param entry GuildBankLogEntry
+---@param when string
+---@return NextLogCard
+function guildProto:itemCard(entry, when)
+  local who = entry.name or UNKNOWN
+  local line, where, action
+  if entry.kind == "deposit" then
+    line, where, action = format(L:G("Deposited by %s"), who), format(L:G("Into %s"), self:tabName(entry.tab)), "Deposit"
+  elseif entry.kind == "withdraw" then
+    line, where, action = format(L:G("Withdrawn by %s"), who), format(L:G("Out of %s"), self:tabName(entry.tab)), "Withdraw"
+  else
+    line, action = format(L:G("Moved by %s"), who), "Move"
+    where = format(L:G("From %s to %s"), self:tabName(entry.from), self:tabName(entry.to))
+  end
+  local lines = { line }
+  if (entry.count or 1) > 1 then
+    table.insert(lines, format(L:G("Count: %d"), entry.count))
+  end
+  table.insert(lines, where)
+  table.insert(lines, when)
+  local icon, quality
+  if entry.link ~= nil then
+    icon = select(5, C_Item.GetItemInfoInstant(entry.link))
+    quality = select(3, C_Item.GetItemInfo(entry.link))
+  end
+  return { key = "log:" .. entry.tab .. ":" .. entry.index, texture = icon, count = entry.count, quality = quality,
+    title = entry.link and entry.link:match("%[(.-)%]") or UNKNOWN, action = action, line = who, link = entry.link,
+    lines = lines, onDrop = function() self:PlaceCursorItem() end }
+end
+
+-- moneyCard is how a card shows a money log entry: a coin, the gold, and along the bottom a glyph for which way it went
+-- and who (each of Blizzard's money log's kinds, GuildBankFrame_UpdateMoneyLog); its tooltip says it in Blizzard's words,
+-- and when.
+---@private
+---@param entry GuildBankLogEntry
+---@param when string
+---@return NextLogCard
+function guildProto:moneyCard(entry, when)
+  local who, kind, amount = entry.name or UNKNOWN, entry.kind, entry.amount
+  local words, action
+  if kind == "deposit" then
+    words, action = format(L:G("%s deposited"), who), "DepositGold"
+  elseif kind == "withdraw" then
+    words, action = format(L:G("%s withdrew"), who), "WithdrawGold"
+  elseif kind == "repair" then
+    words, action = format(L:G("%s repaired"), who), "Repair"
+  elseif kind == "withdrawForTab" then
+    words, action = format(L:G("%s withdrew for a tab"), who), "BuyTab"
+  elseif kind == "buyTab" and amount > 0 then
+    words, action = format(L:G("%s bought a tab"), who), "BuyTab"
+  elseif kind == "buyTab" then
+    words, action = format(L:G("%s unlocked a tab"), who), "BuyTab"
+  elseif kind == "depositSummary" then
+    who = L:G("Guild perks")
+    words, action = L:G("Guild perks deposited"), "DepositGold"
+  elseif kind == "buyRename" then
+    words, action = format(L:G("%s renamed the guild"), who), "WithdrawGold"
+  elseif kind == "refundRename" then
+    words, action = format(L:G("%s was refunded a guild rename"), who), "DepositGold"
+  else
+    words = who
+  end
+  local title
+  if amount > 0 then
+    title = vendorButton:PriceText(amount, {})
+    words = words .. " " .. GetMoneyString(amount, true)
+  elseif kind == "buyTab" then
+    title = L:G("Tab unlocked")
+  else
+    title = words
+  end
+  return { key = "money:" .. entry.index, texture = MONEY_ICON, title = title, action = action, line = who,
+    lines = { words, when }, onDrop = function() self:PlaceCursorItem() end }
+end
+
+-- buildLog builds the Log (every tab shown's item log, newest first across them) or the Money Log: a card an entry, in
+-- sections by how long ago, in Blizzard's words (TimeUtil.GetRecentTimeDate), and what to say when none shows.
+---@private
+---@param previous table<string, NextVendorButtonFrame>
+---@return NextCanvasSection[] sections, string empty
+function guildProto:buildLog(previous)
+  local entries, loading = {}, false
+  if self.view == VIEW_MONEY then
+    loading = not guildBank:IsLogLoaded(guildBank:MoneyLogID())
+    if not loading then
+      entries = guildBank:MoneyLog()
+    end
+  else
+    local tabs = self:viewTabs()
+    if #tabs == 0 then
+      return {}, L:G("This guild has no tabs you can view")
+    end
+    for _, tab in ipairs(tabs) do
+      if guildBank:IsLogLoaded(tab) then
+        for _, entry in ipairs(guildBank:ItemLog(tab)) do
+          table.insert(entries, entry)
+        end
+      else
+        loading = true
+      end
+    end
+    table.sort(entries, function(a, b)
+      if a.age ~= b.age then
+        return a.age < b.age
+      end
+      if a.tab ~= b.tab then
+        return a.tab < b.tab
+      end
+      return a.index > b.index
+    end)
+  end
+  local sections, byName = {}, {}
+  for _, entry in ipairs(entries) do
+    local when = format(L:G("%s ago"), TimeUtil.GetRecentTimeDate(entry.years, entry.months, entry.days, entry.hours))
+    local section = byName[when]
+    if section == nil then
+      section = { name = when, buttons = {} }
+      byName[when] = section
+      table.insert(sections, section)
+    end
+    local spec = self.view == VIEW_MONEY and self:moneyCard(entry, when) or self:itemCard(entry, when)
+    local c = self:card(spec.key, previous)
+    c:SetLog(spec)
+    table.insert(section.buttons, c)
+  end
+  if loading then
+    return sections, L:G("Loading...")
+  end
+  return sections, self.view == VIEW_MONEY and L:G("No gold has moved yet") or L:G("Nothing logged yet")
+end
+
+-- infoBlock is a tab's info text as the Info view shows it (made the first time): a text area, as tall as the settings'
+-- (INFO_HEIGHT) and as long as Blizzard's lets it be, and for a member who may edit it a Save button under it, as a
+-- settings page puts its Primary button under its text area.
+---@private
+---@param tab number
+---@return NextGuildInfoBlock
+function guildProto:infoBlock(tab)
+  local block = self.infoBlocks[tab]
+  if block ~= nil then
+    return block
+  end
+  local frame = CreateFrame("Frame")
+  ---@type NextGuildInfoBlock
+  block = { tab = tab, frame = frame, loaded = "", editable = false }
+  block.area = nextInput:CreateArea(frame, { height = INFO_HEIGHT, maxLetters = INFO_LETTERS,
+    help = L:G("Nothing written for this tab yet") })
+  block.save = nextButton:Create(frame, { text = L:G("Save"), style = "Primary", onClick = function()
+    self:SaveInfo(block)
+  end })
+  block.Height = function(b)
+    if not b.editable then
+      return INFO_HEIGHT
+    end
+    return INFO_HEIGHT + style.GAP + b.save.frame:GetHeight()
+  end
+  block.Layout = function(b, width)
+    frame:SetSize(width, b:Height(width))
+    local area, save = b.area.frame, b.save.frame
+    area:ClearAllPoints()
+    area:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, 0)
+    area:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 0, 0)
+    save:ClearAllPoints()
+    pixel:Point(save, "TOPLEFT", area, "BOTTOMLEFT", 0, -style.GAP)
+  end
+  self.infoBlocks[tab] = block
+  return block
+end
+
+-- refreshInfo shows a tab's info text as the client last received it, unless the box holds what a member who may edit it
+-- typed and did not save, and whether this member may edit it (one who no longer may sees the tab's own text again).
+---@private
+---@param block NextGuildInfoBlock
+function guildProto:refreshInfo(block)
+  local text = guildBank:Text(block.tab)
+  block.editable = guildBank:CanEditText(block.tab)
+  if block.forgotten or block.area:GetText() == block.loaded or not block.editable then
+    block.area:SetText(text)
+  end
+  block.forgotten = nil
+  block.loaded = text
+  block.area:SetReadOnly(not block.editable)
+  block.save.frame:SetShown(block.editable)
+end
+
+-- SaveInfo saves what a member who may edit a tab's info text typed, as Blizzard's Info tab's Save button does
+-- (SetGuildBankText, only when the text changed).
+---@param block NextGuildInfoBlock
+function guildProto:SaveInfo(block)
+  local text = block.area:GetText()
+  block.area.editBox:ClearFocus()
+  if not block.editable or text == block.loaded then
+    return
+  end
+  if guildBank:SaveText(block.tab, text) then
+    block.loaded = text
+  end
+end
+
+-- buildInfo builds Info: a section a tab shown, named after it (two tabs named alike told apart by their number: the
+-- canvas keeps its sections by name), its text its block, its header saying Loading... until it arrives.
+---@private
+---@return NextCanvasSection[] sections, string empty
+function guildProto:buildInfo()
+  local tabs = self:viewTabs()
+  if #tabs == 0 then
+    return {}, L:G("This guild has no tabs you can view")
+  end
+  -- A name two tabs share, or one a tab told apart is given, is told apart by the tab's number (each tab's is its own).
+  local function count(names)
+    local n = {}
+    for _, name in pairs(names) do
+      n[name] = (n[name] or 0) + 1
+    end
+    return n
+  end
+  local names = {}
+  for _, tab in ipairs(tabs) do
+    names[tab] = self:tabName(tab)
+  end
+  local raw = count(names)
+  for _, tab in ipairs(tabs) do
+    if raw[names[tab]] > 1 then
+      names[tab] = format(L:G("%s (tab %d)"), self:tabName(tab), tab)
+    end
+  end
+  local told = count(names)
+  for _, tab in ipairs(tabs) do
+    if told[names[tab]] > 1 and names[tab] == self:tabName(tab) then
+      names[tab] = format(L:G("%s (tab %d)"), self:tabName(tab), tab)
+    end
+  end
+  local sections = {}
+  for _, tab in ipairs(tabs) do
+    local block = self:infoBlock(tab)
+    self:refreshInfo(block)
+    table.insert(sections, { name = names[tab], block = block,
+      count = guildBank:IsTextLoaded(tab) and "" or L:G("Loading...") })
+  end
+  return sections, ""
+end
+
+-- DrawView draws a log (cards, as the vendor's) or Info (each tab's text a section's block), keeping each card drawn
+-- again, and the footer counting the log's entries; nothing while hidden (the guild bank opens on its items).
+---@param ctx Context
+function guildProto:DrawView(ctx)
+  if not self.frame:IsShown() or self.view == VIEW_ITEMS then
+    return
+  end
+  local previous = self.logCards
+  self.logCards = {}
+  local sections, empty, footer
+  if self.view == VIEW_INFO then
+    sections, empty = self:buildInfo()
+    footer = ""
+  else
+    sections, empty = self:buildLog(previous)
+    local n = 0
+    for _ in pairs(self.logCards) do
+      n = n + 1
+    end
+    footer = format(L:G("%d entries"), n)
+  end
+  self.content:SetCards(self.view ~= VIEW_INFO)
+  self.content:BindSections(sections)
+  for _, c in pairs(previous) do
+    c:Release()
+  end
+  -- Before it is laid out: how narrow a small panel goes keeps room for its footer (MinWidth), and it follows what it
+  -- shows first (FollowNames).
+  self.freeText:SetText(footer)
+  self:FollowNames()
+  render:RenderNow(self.root, { ctx = ctx })
+  texels:Unsharpen(self.frame)
+  self.emptyText:SetText(empty)
+  self.emptyText:SetShown(#sections == 0)
+  if not self.opening then
+    self.content:Cascade(self.tabChanged)
+  end
+  self.tabChanged = false
+  self:applyLogSearch()
+end
+
+-- Draw draws the guild bank's items as every panel draws its kind's; while a log or Info shows, the read is kept for
+-- when its items show again (ShowView).
+---@param ctx Context
+---@param slotInfo SlotInfo
+---@param callback? fun()
+function guildProto:Draw(ctx, slotInfo, callback)
+  if self.view ~= VIEW_ITEMS then
+    self.lastSlotInfo = slotInfo
+    if callback then
+      callback()
+    end
+    return
+  end
+  nextPanel.proto.Draw(self, ctx, slotInfo, callback)
+end
+
+-- Wipe tears the drawing down, the log's cards too, and forgets the tabs' info text.
+---@param ctx Context
+function guildProto:Wipe(ctx)
+  nextPanel.proto.Wipe(self, ctx)
+  self:releaseCards()
+  self:forgetInfo()
+end
+
+-- forgetInfo forgets the tabs' info text, what was typed and not saved too: the next visit shows what the server sends.
+-- What shows stays on screen as the panel slides out (refreshInfo replaces it).
+---@private
+function guildProto:forgetInfo()
+  for _, block in pairs(self.infoBlocks) do
+    block.area.editBox:ClearFocus()
+    block.forgotten = true
+  end
+end
+
+-- Search dims the guild bank's items the search leaves out; in a log, the cards whose words do not hold what is typed,
+-- as the vendor's Buyback and Repair tabs dim theirs by name.
+---@param ctx Context
+---@param results table<string, boolean>
+function guildProto:Search(ctx, results)
+  if self.view == VIEW_ITEMS then
+    nextPanel.proto.Search(self, ctx, results)
+    return
+  end
+  self:applyLogSearch()
+end
+
+---@param ctx Context
+function guildProto:ResetSearch(ctx)
+  if self.view == VIEW_ITEMS then
+    nextPanel.proto.ResetSearch(self, ctx)
+    return
+  end
+  self:applyLogSearch()
+end
+
+-- applyLogSearch dims the log's cards whose title and tooltip do not hold the search box's text.
+---@private
+function guildProto:applyLogSearch()
+  local needle = (self.searchBox.textBox:GetText() or ""):lower()
+  for _, c in pairs(self.logCards) do
+    local log = c.log
+    local match = needle == "" or log.title:lower():find(needle, 1, true) ~= nil
+    for _, line in ipairs(log.lines) do
+      match = match or line:lower():find(needle, 1, true) ~= nil
+    end
+    c:SetSearchMatch(match)
+  end
+end
+
+-- SectionColumns lays a log and Info out in one column (a log's cards across it), and the items as the guild bank is set.
+---@return number count, string? fill, boolean? span, number? wideRows, boolean? compact
+function guildProto:SectionColumns()
+  if self.view ~= VIEW_ITEMS then
+    return 1
+  end
+  return nextPanel.proto.SectionColumns(self)
 end

@@ -56,7 +56,8 @@ describe("GuildBank (the guild bank as a data source)", function()
     savedAfter = C_Timer.After
     C_Timer.After = function(delay, fn) table.insert(timers, { delay = delay, fn = fn }) end
     for _, name in ipairs({ "guildbank/Opened", "guildbank/Closed", "guildbank/TabLoaded", "guildbank/Changed",
-      "guildbank/TabsChanged", "guildbank/MoneyChanged" }) do
+      "guildbank/TabsChanged", "guildbank/MoneyChanged", "guildbank/LogLoaded", "guildbank/LogChanged",
+      "guildbank/TextLoaded" }) do
       events:RegisterMessage(name, function(_, ...)
         table.insert(messages, { name = name, args = { ... } })
       end)
@@ -414,6 +415,177 @@ describe("GuildBank (the guild bank as a data source)", function()
     it("ends the visit", function()
       guildBank:Close()
       assert.are.equal(1, _G._guildBankCalls.closed)
+    end)
+  end)
+
+  local function loaded(name)
+    local out = {}
+    for _, m in ipairs(messages) do
+      if m.name == name then table.insert(out, m.args[1]) end
+    end
+    return out
+  end
+
+  -- Blizzard's Log and Money Log tabs ask with QueryGuildBankLog (a tab, or MAX_GUILDBANK_TABS + 1 for the gold) and
+  -- draw on GUILDBANKLOG_UPDATE, which names neither (GuildBankFrameTabMixin:OnClick, GuildBankFrameMixin:OnEvent).
+  describe("the logs", function()
+    it("names the money log as Blizzard's frame asks for it", function()
+      assert.are.equal(MAX_GUILDBANK_TABS + 1, guildBank:MoneyLogID())
+    end)
+
+    it("asks for each log one at a time, each answer the log last asked for", function()
+      openBank()
+      assert.is_true(guildBank:LoadLogs({ 2, guildBank:MoneyLogID() }))
+      assert.are.same({ 2 }, _G._guildBankCalls.logQueries)
+      fire("GUILDBANKLOG_UPDATE")
+      assert.are.same({ 2, MAX_GUILDBANK_TABS + 1 }, _G._guildBankCalls.logQueries)
+      assert.is_true(guildBank:IsLogLoaded(2))
+      assert.is_false(guildBank:IsLogLoaded(guildBank:MoneyLogID()))
+      fire("GUILDBANKLOG_UPDATE")
+      assert.is_true(guildBank:IsLogLoaded(guildBank:MoneyLogID()))
+      assert.are.same({ 2, MAX_GUILDBANK_TABS + 1 }, loaded("guildbank/LogLoaded"))
+      for _, m in ipairs(messages) do assert.are_not.equal("guildbank/LogChanged", m.name) end
+    end)
+
+    it("counts a log loaded when no answer comes in time, and goes on", function()
+      openBank()
+      guildBank:LoadLogs({ 1, 2 })
+      assert.are.equal(guildBank.QUERY_TIMEOUT, timers[1].delay)
+      runTimers()
+      assert.is_true(guildBank:IsLogLoaded(1))
+      assert.are.same({ 1, 2 }, _G._guildBankCalls.logQueries)
+    end)
+
+    it("ignores a timeout whose answer came", function()
+      openBank()
+      guildBank:LoadLogs({ 1, 2 })
+      local first = timers[1]
+      fire("GUILDBANKLOG_UPDATE")
+      first.fn()
+      assert.is_false(guildBank:IsLogLoaded(2), "tab 2's log was not skipped")
+    end)
+
+    it("asks for a new list in place of the logs still to ask, after the one asked for", function()
+      openBank()
+      guildBank:LoadLogs({ 1, 2 })
+      guildBank:LoadLogs({ 4 })
+      assert.are.same({ 1 }, _G._guildBankCalls.logQueries, "never asked twice while waiting")
+      fire("GUILDBANKLOG_UPDATE")
+      assert.are.same({ 1, 4 }, _G._guildBankCalls.logQueries)
+    end)
+
+    it("says a log changed when an answer comes unasked", function()
+      openBank()
+      messages = {}
+      fire("GUILDBANKLOG_UPDATE")
+      assert.are.same({ "guildbank/LogChanged" }, names(messages))
+    end)
+
+    it("asks nothing while closed, and forgets the logs when the visit ends", function()
+      assert.is_false(guildBank:LoadLogs({ 1 }))
+      assert.are.same({}, _G._guildBankCalls.logQueries)
+      openBank()
+      guildBank:LoadLogs({ 1, 2 })
+      fire("GUILDBANKLOG_UPDATE")
+      fire("PLAYER_INTERACTION_MANAGER_FRAME_HIDE", GUILD_BANKER)
+      runTimers()
+      assert.is_false(guildBank:IsLogLoaded(1))
+      assert.are.same({ 1, 2 }, _G._guildBankCalls.logQueries)
+      messages = {}
+      fire("GUILDBANKLOG_UPDATE")
+      assert.are.same({}, names(messages), "nothing is said while closed")
+    end)
+
+    it("reads a tab's item log newest first, how long ago each entry was in hours", function()
+      _G._guildBank.logs[2] = {
+        { type = "move", name = "Jaina", link = "|Hitem:200|h[Ore]|h", count = 4, tab1 = 1, tab2 = 2, day = 1, hour = 2 },
+        { type = "deposit", name = "Arthas", link = "|Hitem:100|h[Sword]|h", count = 1, hour = 3 },
+      }
+      local log = guildBank:ItemLog(2)
+      assert.are.equal(2, #log)
+      assert.are.same({ kind = "deposit", name = "Arthas", link = "|Hitem:100|h[Sword]|h", count = 1, tab = 2,
+        years = 0, months = 0, days = 0, hours = 3, age = 3, index = 2 }, log[1])
+      assert.are.same({ kind = "move", name = "Jaina", link = "|Hitem:200|h[Ore]|h", count = 4, tab = 2, from = 1, to = 2,
+        years = 0, months = 0, days = 1, hours = 2, age = 26, index = 1 }, log[2])
+      assert.are.same({}, guildBank:ItemLog(3))
+    end)
+
+    it("reads the money log newest first, never past its last entry", function()
+      _G._guildBank.moneyLog = {
+        { type = "deposit", name = "Arthas", amount = 1000000, month = 1 },
+        { type = "withdraw", amount = 500, hour = 1 },
+      }
+      local log = guildBank:MoneyLog()
+      assert.are.equal(2, #log)
+      assert.are.same({ kind = "withdraw", amount = 500, years = 0, months = 0, days = 0, hours = 1, age = 1, index = 2 },
+        log[1], "no name: the client does not know who")
+      assert.are.equal("Arthas", log[2].name)
+      assert.are.equal(30 * 24, log[2].age, "a month is thirty days, as Blizzard counts them (TimeUtil.lua)")
+    end)
+  end)
+
+  -- Blizzard's Info tab asks with QueryGuildBankText(tab), shows GetGuildBankText(tab) on GUILDBANK_UPDATE_TEXT(tab),
+  -- asks again on GUILDBANK_TEXT_CHANGED(tab), and saves with SetGuildBankText for a member CanEditGuildTabInfo allows.
+  describe("the tabs' info text", function()
+    it("asks for each tab's text one at a time, and says when each arrives", function()
+      openBank()
+      assert.is_true(guildBank:LoadTexts({ 1, 2 }))
+      assert.are.same({ 1 }, _G._guildBankCalls.textQueries)
+      fire("GUILDBANK_UPDATE_TEXT", 1)
+      assert.are.same({ 1, 2 }, _G._guildBankCalls.textQueries)
+      assert.is_true(guildBank:IsTextLoaded(1))
+      fire("GUILDBANK_UPDATE_TEXT", 2)
+      assert.are.same({ 1, 2 }, loaded("guildbank/TextLoaded"))
+      assert.is_true(guildBank:IsTextLoaded(2))
+    end)
+
+    it("counts a text loaded when no answer comes in time", function()
+      openBank()
+      guildBank:LoadTexts({ 4 })
+      runTimers()
+      assert.is_true(guildBank:IsTextLoaded(4))
+      assert.are.same({ 4 }, loaded("guildbank/TextLoaded"))
+    end)
+
+    it("takes an answer for a tab it is not waiting on without losing its place", function()
+      openBank()
+      guildBank:LoadTexts({ 1, 2 })
+      fire("GUILDBANK_UPDATE_TEXT", 2)
+      assert.are.same({ 1 }, _G._guildBankCalls.textQueries, "still waiting on tab 1")
+      fire("GUILDBANK_UPDATE_TEXT", 1)
+      assert.are.same({ 1, 2 }, _G._guildBankCalls.textQueries)
+    end)
+
+    it("asks again for a text another member changed, once this visit asked for it", function()
+      openBank()
+      guildBank:LoadTexts({ 1 })
+      fire("GUILDBANK_UPDATE_TEXT", 1)
+      fire("GUILDBANK_TEXT_CHANGED", 1)
+      assert.are.same({ 1, 1 }, _G._guildBankCalls.textQueries)
+      fire("GUILDBANK_TEXT_CHANGED", 3)
+      assert.are.same({ 1, 1 }, _G._guildBankCalls.textQueries, "a text never shown is not asked for")
+    end)
+
+    it("reads a tab's text, whether this member may edit it, and saves it", function()
+      openBank()
+      _G._guildBank.texts[2] = "Mats only, please"
+      _G._guildBank.canEditText[2] = true
+      assert.are.equal("Mats only, please", guildBank:Text(2))
+      assert.are.equal("", guildBank:Text(1))
+      assert.is_true(guildBank:CanEditText(2))
+      assert.is_false(guildBank:CanEditText(1))
+      assert.is_true(guildBank:SaveText(2, "Ore and herbs"))
+      assert.are.same({ { tab = 2, text = "Ore and herbs" } }, _G._guildBankCalls.textsSet)
+    end)
+
+    it("saves nothing once the visit has ended, and forgets the texts", function()
+      openBank()
+      guildBank:LoadTexts({ 1 })
+      fire("GUILDBANK_UPDATE_TEXT", 1)
+      fire("PLAYER_INTERACTION_MANAGER_FRAME_HIDE", GUILD_BANKER)
+      assert.is_false(guildBank:IsTextLoaded(1))
+      assert.is_false(guildBank:SaveText(1, "x"))
+      assert.are.same({}, _G._guildBankCalls.textsSet)
     end)
   end)
 end)

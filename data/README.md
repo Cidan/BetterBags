@@ -14,6 +14,9 @@ The Data module handles:
 - Refresh and update coordination
 - Item stacking logic
 - Slot management
+- The guild bank as a source (`guildbank.lua`, `GuildBank`): its visits, tabs and slots, and its item and money logs
+  and tabs' info text, each asked of the server one at a time, as Blizzard's guild bank frame asks
+  (`LoadLogs`, `LoadTexts`, `ItemLog`, `MoneyLog`, `Text`, `SaveText`; `.claude/rules/guild-bank.md` §2)
 
 ## Core Components
 

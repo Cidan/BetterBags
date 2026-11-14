@@ -77,6 +77,63 @@ describe("BetterBags Next's shipped themes", function()
     end
   end)
 
+  -- The guild bank's logs (guild-bank.md §5; asked: "icon should be color coded. this is so humans can quickly scan it").
+  -- Found by the bug review: Glitch's Gold is its green and Papercraft's its red pencil, so a move read as a deposit or a
+  -- withdrawal; Parchment's and Halloween's glyphs were measured against their cards, Parchment's Gold at 1.3:1.
+  -- Colors are told apart as an eye tells them (CIE76: the distance between two colors in CIELAB, sRGB under D65), and
+  -- read against the card each glyph sits on (the body under the card's fill) by WCAG's contrast ratio.
+  it("tints the guild bank log's in, out and moved glyphs apart in every theme, each one legible on its card", function()
+    local function rgb(theme, ref)
+      local c = type(ref) == "string" and theme.Palette[ref] or ref
+      assert.is_not_nil(c, tostring(ref))
+      if c.Global then return { _G[c.Global]:GetRGBA() } end
+      return c
+    end
+    local function linear(x)
+      return x <= 0.04045 and x / 12.92 or ((x + 0.055) / 1.055) ^ 2.4
+    end
+    local function lab(c)
+      local r, g, b = linear(c[1]), linear(c[2]), linear(c[3])
+      local x = (0.4124 * r + 0.3576 * g + 0.1805 * b) / 0.95047
+      local y = 0.2126 * r + 0.7152 * g + 0.0722 * b
+      local z = (0.0193 * r + 0.1192 * g + 0.9505 * b) / 1.08883
+      local function f(t) return t > 0.008856 and t ^ (1 / 3) or 7.787 * t + 16 / 116 end
+      return 116 * f(y) - 16, 500 * (f(x) - f(y)), 200 * (f(y) - f(z))
+    end
+    local function apart(a, b)
+      local l1, a1, b1 = lab(a)
+      local l2, a2, b2 = lab(b)
+      return math.sqrt((l1 - l2) ^ 2 + (a1 - a2) ^ 2 + (b1 - b2) ^ 2)
+    end
+    local function contrast(a, b)
+      local function lum(c) return 0.2126 * linear(c[1]) + 0.7152 * linear(c[2]) + 0.0722 * linear(c[3]) end
+      local la, lb = lum(a), lum(b)
+      return (math.max(la, lb) + 0.05) / (math.min(la, lb) + 0.05)
+    end
+    for _, key in ipairs(shipped()) do
+      local theme = sonataNext:Resolve(key)
+      local L = theme.Vendor.LogIcons
+      local body, fill = rgb(theme, "Body"), theme.Vendor.CardFill
+      local card = { body[1], body[2], body[3] }
+      if type(fill) == "table" and fill[1] then
+        local a = fill[4] or 1
+        for i = 1, 3 do card[i] = body[i] * (1 - a) + fill[i] * a end
+      end
+      local into, out, move = rgb(theme, L.Deposit.Color), rgb(theme, L.Withdraw.Color), rgb(theme, L.Move.Color)
+      assert.is_true(apart(into, out) >= 25, key .. ": deposit and withdraw")
+      assert.is_true(apart(into, move) >= 25, key .. ": deposit and move")
+      assert.is_true(apart(out, move) >= 25, key .. ": withdraw and move")
+      assert.is_true(apart(rgb(theme, L.DepositGold.Color), rgb(theme, L.WithdrawGold.Color)) >= 25, key .. ": gold in and out")
+      -- WCAG asks 3:1 of graphics; Halloween's palette has no green or red that reaches it on its orange cards (its best,
+      -- Lime and Maroon, are 2.9 and 2.6), so the floor is a little under.
+      for action, spec in pairs(L) do
+        assert.is_not_nil(spec.Atlas or theme.Textures[spec.Texture], key .. ": " .. action .. "'s glyph")
+        local ratio = contrast(rgb(theme, spec.Color), card)
+        assert.is_true(ratio >= 2.5, string.format("%s: %s's glyph at %.1f:1 on its card", key, action, ratio))
+      end
+    end
+  end)
+
   it("writes the bag's gold and currency counts in every theme's footer font, as the vendor's footer is", function()
     for client, flags in pairs(CLIENTS) do
       for _, flag in ipairs(FLAGS) do addon[flag] = flags[flag] == true end
@@ -894,7 +951,7 @@ describe("BetterBags Next's shipped themes", function()
       local theme = t()
       for _, name in ipairs({ "IconSettings", "IconClose", "IconAnchor", "IconAnchorShown", "IconLock", "IconBags", "IconSmall",
         "IconFull", "IconBankTabs",
-        "IconDeposit", "IconDepositGold", "IconWithdrawGold", "IconFilter", "IconSellJunk", "IconRepair",
+        "IconDeposit", "IconWithdraw", "IconDepositGold", "IconWithdrawGold", "IconFilter", "IconSellJunk", "IconRepair",
         "IconGuildRepair", "IconChevron", "IconBack", "IconCheck", "IconSearch", "IconPlus" }) do
         assert.is_true(theme.Textures[name]:find("papercraft", 1, true) ~= nil, name)
       end

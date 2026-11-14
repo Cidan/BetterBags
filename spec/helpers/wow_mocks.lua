@@ -4037,6 +4037,10 @@ end
 --   current: the current tab (GetCurrentGuildBankTab; Blizzard's frame acts only on it).
 --   money, withdrawMoney (-1: no limit), canWithdrawMoney, isLeader, tabCost (nil when every tab is
 --   bought), canEditTabs, guildName (nil: not in a guild).
+--   logs[t] = { { type, name, link, count, tab1, tab2, year, month, day, hour }, ... }: a tab's item log, oldest
+--     first (higher indices are newer, warcraft.wiki.gg API_GetGuildBankTransaction).
+--   moneyLog = { { type, name, amount, year, month, day, hour }, ... }: the money log, oldest first.
+--   texts[t]: a tab's info text (GetGuildBankText); canEditText[t]: CanEditGuildTabInfo(t).
 -- Each action records the current tab when it was asked (current), so a spec sees which tab it
 -- acted on.
 _G.MAX_GUILDBANK_TABS = 8
@@ -4045,10 +4049,11 @@ _G.MAX_BUY_GUILDBANK_TABS = 6
 _G.GuildBankFrame_LoadUI = function() return true end
 function _G.ResetMockGuildBank()
   _G._guildBank = { tabs = {}, delivered = {}, current = 1, money = 0, withdrawMoney = 0, canWithdrawMoney = false,
-    isLeader = false, tabCost = nil, canEditTabs = false, guildName = "The Guild" }
+    isLeader = false, tabCost = nil, canEditTabs = false, guildName = "The Guild", logs = {}, moneyLog = {},
+    texts = {}, canEditText = {} }
   _G._guildBankCalls = { queries = {}, setCurrent = {}, pickup = {}, autoStore = {}, split = {}, deposits = {},
     withdrawals = {}, closed = 0, bought = 0, tabInfo = {}, tooltips = {}, splitFrames = {}, cursorMoneyDropped = 0,
-    splitHidden = 0 }
+    splitHidden = 0, logQueries = {}, textQueries = {}, textsSet = {} }
 end
 _G.ResetMockGuildBank()
 
@@ -4106,6 +4111,58 @@ _G.CanEditGuildBankTabInfo = function() return _G._guildBank.canEditTabs end
 _G.SetGuildBankTabInfo = function(tab, name, icon)
   table.insert(_G._guildBankCalls.tabInfo, { tab = tab, name = name, icon = icon })
 end
+-- QueryGuildBankLog(tab) asks the server for a tab's item log, or for the money log as MAX_GUILDBANK_TABS + 1
+-- (GuildBankFrameTabMixin:OnClick); the answer is GUILDBANKLOG_UPDATE, which names neither.
+_G.QueryGuildBankLog = function(tab) table.insert(_G._guildBankCalls.logQueries, tab) end
+-- GetNumGuildBankTransactions(tab) -> how many entries the tab's item log holds.
+_G.GetNumGuildBankTransactions = function(tab)
+  local log = _G._guildBank.logs[tab]
+  return log and #log or 0
+end
+-- GetGuildBankTransaction(tab, index) -> type, name, itemLink, count, tab1, tab2, year, month, day, hour, each time
+-- part how long ago; higher indices are newer (warcraft.wiki.gg API_GetGuildBankTransaction).
+_G.GetGuildBankTransaction = function(tab, index)
+  local e = (_G._guildBank.logs[tab] or {})[index]
+  if e == nil then return nil end
+  return e.type, e.name, e.link, e.count, e.tab1, e.tab2, e.year or 0, e.month or 0, e.day or 0, e.hour or 0
+end
+-- GetNumGuildBankMoneyTransactions() -> how many entries the money log holds.
+_G.GetNumGuildBankMoneyTransactions = function() return #_G._guildBank.moneyLog end
+-- GetGuildBankMoneyTransaction(index) -> type, name, amount (copper), years, months, days, hours. Asked for an index
+-- out of range it crashes the client (warcraft.wiki.gg API_GetGuildBankMoneyTransaction): here it raises.
+_G.GetGuildBankMoneyTransaction = function(index)
+  local e = _G._guildBank.moneyLog[index]
+  if e == nil then
+    error("GetGuildBankMoneyTransaction(" .. tostring(index) .. "): out of range, which crashes the client")
+  end
+  return e.type, e.name, e.amount, e.year or 0, e.month or 0, e.day or 0, e.hour or 0
+end
+-- QueryGuildBankText(tab) asks for a tab's info text; the answer is GUILDBANK_UPDATE_TEXT(tab)
+-- (GuildBankFrameMixin:OnEvent, GuildBankDocumentation.lua).
+_G.QueryGuildBankText = function(tab) table.insert(_G._guildBankCalls.textQueries, tab) end
+-- GetGuildBankText(tab) -> the tab's info text, nil when none was received.
+_G.GetGuildBankText = function(tab) return _G._guildBank.texts[tab] end
+-- SetGuildBankText(tab, infoText) saves a tab's info text (Blizzard's Info tab's Save button).
+_G.SetGuildBankText = function(tab, text) table.insert(_G._guildBankCalls.textsSet, { tab = tab, text = text }) end
+-- CanEditGuildTabInfo(tab) -> whether this member may edit the tab's info text.
+_G.CanEditGuildTabInfo = function(tab) return _G._guildBank.canEditText[tab] == true end
+-- TimeUtil.GetRecentTimeDate as Blizzard_SharedXML/TimeUtil.lua defines it: how long ago, in its largest part.
+_G.TimeUtil = _G.TimeUtil or {}
+_G.TimeUtil.GetRecentTimeDate = _G.TimeUtil.GetRecentTimeDate or function(year, month, day, hour)
+  if year == 0 or year == nil then
+    if month == 0 or month == nil then
+      if day == 0 or day == nil then
+        if hour == 0 or hour == nil then
+          return _G.LASTONLINE_MINS
+        end
+        return format(_G.LASTONLINE_HOURS, hour)
+      end
+      return format(_G.LASTONLINE_DAYS, day)
+    end
+    return format(_G.LASTONLINE_MONTHS, month)
+  end
+  return format(_G.LASTONLINE_YEARS, year)
+end
 -- GetGuildInfo(unit) -> guildName, guildRankName, guildRankIndex; nothing when not in a guild.
 _G.GetGuildInfo = function()
   if _G._guildBank.guildName == nil then return nil end
@@ -4154,6 +4211,15 @@ _G.STACKS = "%d stacks"
 _G.UNLIMITED = "Unlimited"
 _G.NONE = _G.NONE or "None"
 _G.BUY_GUILDBANK_TAB = "Buy Guild Bank Tab"
+_G.GUILD_BANK_LOG = "Log"
+_G.GUILD_BANK_MONEY_LOG = "Money Log"
+_G.GUILD_BANK_TAB_INFO = "Info"
+_G.UNKNOWN = _G.UNKNOWN or "Unknown"
+_G.LASTONLINE_MINS = "< an hour"
+_G.LASTONLINE_HOURS = "%d |4hour:hours;"
+_G.LASTONLINE_DAYS = "%d |4day:days;"
+_G.LASTONLINE_MONTHS = "%d |4month:months;"
+_G.LASTONLINE_YEARS = "%d |4year:years;"
 _G.SOUNDKIT.GUILD_VAULT_OPEN = _G.SOUNDKIT.GUILD_VAULT_OPEN or 12188
 _G.SOUNDKIT.GUILD_VAULT_CLOSE = _G.SOUNDKIT.GUILD_VAULT_CLOSE or 12189
 _G.SOUNDKIT.GUILD_BANK_OPEN_BAG = _G.SOUNDKIT.GUILD_BANK_OPEN_BAG or 12206

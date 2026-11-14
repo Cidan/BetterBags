@@ -85,6 +85,8 @@ sonataNext:RegisterTheme({
     IconFull = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\full.png",
     IconBankTabs = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\banktabs.png",
     IconDeposit = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\deposit.png",
+    -- Out of the guild bank, in its log (deposit's arrow turned to rise out of the tray).
+    IconWithdraw = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\withdraw.png",
     IconDepositGold = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\depositgold.png",
     IconWithdrawGold = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\withdrawgold.png",
     IconFilter = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\filter.png",
@@ -664,6 +666,18 @@ sonataNext:RegisterTheme({
     CardHover = { 1, 1, 1, 0.07 },
     StackFont = "Stack",
     DurabilityHeight = 3,
+    -- A guild bank log entry's action, before who did it on its card's bottom line (guild-bank.md §5; asked: "an icon,
+    -- not text ... color coded ... so humans can quickly scan it"): a glyph (Texture or Atlas) as large as a price's
+    -- coins, tinted by which way it went: in Gain's color, out in Danger's, moved between tabs in Gold's.
+    LogIcons = {
+      Deposit = { Texture = "IconDeposit", Color = "Gain" },
+      Withdraw = { Texture = "IconWithdraw", Color = "Danger" },
+      Move = { Texture = "IconBankTabs", Color = "Gold" },
+      DepositGold = { Texture = "IconDepositGold", Color = "Gain" },
+      WithdrawGold = { Texture = "IconWithdrawGold", Color = "Danger" },
+      Repair = { Texture = "IconGuildRepair", Color = "Danger" },
+      BuyTab = { Texture = "IconBankTabs", Color = "Danger" },
+    },
   },
 
   -- The settings window (next-settings.md): a page per entry down its sidebar, tabs across a page,

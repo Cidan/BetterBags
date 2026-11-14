@@ -44,6 +44,9 @@ local nextTabs = addon:NewModule('NextTabs')
 ---@field fixed? boolean It never moves, nor does a moved tab pass it (the tab that makes a group or buys one).
 ---@field block? string The tabs it moves among: those of the same block, next to each other (the bank's own
 --- groups and its Warbank's). A block's gap stays above whichever of its tabs is first.
+---@field foot? boolean It hangs at the rail's foot (listed after the others): the foot's last tab ends where the content
+--- does, the footer's height above the body's bottom, never over the tabs above it. It is chosen as any tab is, and
+--- never moves (the guild bank's views).
 
 ---@class (exact) NextTab
 ---@field id number
@@ -66,8 +69,9 @@ local nextTabs = addon:NewModule('NextTabs')
 ---@field bag? boolean
 ---@field fixed? boolean
 ---@field block? string
+---@field foot? boolean It hangs at the rail's foot.
 ---@field movable boolean The player can move it (the rail has a reorder handler, and it is not fixed,
---- a purchase tab or draggable).
+--- a purchase tab, draggable or at the foot).
 ---@field yKey table The key of its slide up or down (NextTween), apart from its hover slide.
 ---@field yTarget? number Where it is sliding to.
 
@@ -87,6 +91,7 @@ local nextTabs = addon:NewModule('NextTabs')
 ---@field pool NextTab[] Ordinary tabs not in use, hidden.
 ---@field securePool NextTab[] Purchase tabs not in use, hidden.
 ---@field selected? number
+---@field topEnd number How far down the tabs above the foot reach, the spacing after the last included; 0 with none.
 ---@field dropTarget? number The tab a dragged section would drop on (next.md §7).
 ---@field entries NextTabEntry[] What SetTabs was last given, laid out again by a theme (ApplyStyle).
 ---@field onClick? fun(ctx: Context, id: number, button: string)
@@ -139,10 +144,15 @@ function nextTabs:Create(body, side)
   rail.pool = {}
   rail.securePool = {}
   rail.gaps = {}
+  rail.topEnd = 0
   rail:styleRail()
   -- A tab being moved goes back to its place when the rail hides (its panel closed).
   addon.HookScript(rail.frame, "OnHide", function()
     rail:CancelMove()
+  end)
+  -- The foot hangs from the body's bottom.
+  addon.HookScript(body, "OnSizeChanged", function()
+    rail:PlaceFoot()
   end)
   return rail
 end
@@ -160,7 +170,7 @@ function nextTabs:Ordered(entries, saved)
     rank[id] = i
   end
   local function moves(entry)
-    return not entry.fixed and entry.secure == nil
+    return not entry.fixed and entry.secure == nil and not entry.foot
   end
   local out, i = {}, 1
   while i <= #entries do
@@ -498,28 +508,33 @@ function railProto:SetTabs(entries)
     end
   end
 
-  local y = 0
+  local y, above = 0, 0
   self.gaps = {}
   for i, entry in ipairs(entries) do
     local tab = self.tabs[i]
-    if i > 1 then
-      y = y + step(self)
-    end
-    y = y + pixel:Snap(self.frame, entry.gap or 0)
-    if entry.block ~= nil and self.gaps[entry.block] == nil then
-      self.gaps[entry.block] = entry.gap or 0
+    if not entry.foot then
+      if above > 0 then
+        y = y + step(self)
+      end
+      above = above + 1
+      y = y + pixel:Snap(self.frame, entry.gap or 0)
+      if entry.block ~= nil and self.gaps[entry.block] == nil then
+        self.gaps[entry.block] = entry.gap or 0
+      end
+      tab.y = y
     end
     tween:Stop(tab.yKey)
     tab.yTarget = nil
     tab.id = entry.id
-    tab.y = y
     tab.accent = entry.accent
     tab.tooltip = entry.tooltip
     tab.draggable = entry.draggable
     tab.bag = entry.bag
     tab.fixed = entry.fixed
     tab.block = entry.block
+    tab.foot = entry.foot
     tab.movable = self.onReorder ~= nil and entry.secure == nil and not entry.fixed and not entry.draggable
+      and not entry.foot
     if entry.secure ~= nil then
       tab.button:SetAttribute("overrideBankType", entry.secure)
     elseif entry.draggable or tab.movable then
@@ -542,13 +557,49 @@ function railProto:SetTabs(entries)
     tab.width = pixel:Ceil(tab.button, math.min(style.TAB_MAX_WIDTH, math.max(style.TAB_MIN_WIDTH, width)))
     tab.button:SetWidth(tab.width)
     self:placeContent(tab)
-    self:place(tab)
+    if not entry.foot then
+      self:place(tab)
+    end
     tab.button:Show()
   end
-  self.frame:SetHeight(#entries > 0 and (y + step(self)) or 1)
+  self.topEnd = above > 0 and (y + step(self)) or 0
+  self:PlaceFoot()
   self:Select(self.selected)
   if self.onResize then
     self.onResize(context:New("NextTabs_Resize"))
+  end
+end
+
+-- PlaceFoot hangs the foot's tabs from the body's bottom: their last tab ends where the content does, the footer's height
+-- above it (NextPanel:ContentBottom), so they stay there as the body changes height; on a body too short, right under the
+-- tabs above, the group gap between. The rail is as tall as its tabs stacked (an autosized panel fits it, FittedHeight):
+-- its height never follows the body's.
+function railProto:PlaceFoot()
+  local frame = self.frame
+  local foot = {}
+  for _, tab in ipairs(self.tabs) do
+    if tab.foot then
+      table.insert(foot, tab)
+    end
+  end
+  local s = step(self)
+  local high = self.topEnd > 0 and (self.topEnd + pixel:Snap(frame, style.TAB_GROUP_GAP)) or 0
+  if #foot == 0 then
+    frame:SetHeight(self.topEnd > 0 and self.topEnd or 1)
+    return
+  end
+  frame:SetHeight(high + #foot * s)
+  local room = pixel:Floor(frame, self.body:GetHeight()) - pixel:Snap(frame, style.CONTENT_TOP) - pixel:Snap(frame, style.FOOTER)
+  local top = math.max(high, room - (#foot * s - pixel:Length(frame, style.TAB_SPACING)))
+  for i, tab in ipairs(foot) do
+    tween:Stop(tab.yKey)
+    tab.yTarget = nil
+    tab.y = top + (i - 1) * s
+    self:place(tab)
+    if tab.id == self.selected and self.indicator:IsShown() then
+      tween:Stop(self.indicator)
+      self:moveIndicator(-tab.y)
+    end
   end
 end
 
@@ -697,7 +748,7 @@ function railProto:Pulse(id)
   })
 end
 
--- Select makes id's tab the selected one; with animate the bar glides to it.
+-- Select makes id's tab the selected one, wherever it hangs (at the foot too); with animate the bar glides to it.
 ---@param id? number
 ---@param animate? boolean
 function railProto:Select(id, animate)
@@ -799,7 +850,10 @@ function railProto:layout(withRoom)
     end
   end
   for i, tab in ipairs(self.tabs) do
-    if state ~= nil and tab == state.tab then
+    if tab.foot then
+      -- The foot hangs from the body's bottom (PlaceFoot), and no tab moves into it.
+      ys[tab] = tab.y
+    elseif state ~= nil and tab == state.tab then
       if not withRoom then
         ys[tab] = put(tab.block)
       elseif lastOfBlock == nil then

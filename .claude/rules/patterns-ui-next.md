@@ -122,3 +122,20 @@ and drops reach the card under it. Find the part's place by measuring the text u
 set to none, text set to the part, `GetStringWidth`, then its text and width back, before the client draws), and lay it
 out again whenever the text's font or width changes. Leaving it is the card's `OnLeave`; entering it lights the card as
 the card does. next-vendor.md §10b ("A cost's own tooltip").
+
+## Something Pinned to a Panel's Bottom Takes No Part in What Sizes the Panel
+**Problem**: an autosized small panel is as tall as what it shows and never shorter than its tab rail (`FittedHeight`).
+The guild bank's views hang at the rail's foot, pinned to the body's bottom. Had the rail's height reached down to them,
+it would follow the body's height, and the body would grow to the rail, which grew with the body.
+**Rule**: what is pinned to a frame's edge is placed from that edge (`PlaceFoot`, on the body's `OnSizeChanged`), and
+what the frame is sized from (the rail's own height) is what that part needs stacked, never where it was pinned. On a
+frame too short, the pinned part falls back to just after what is above it, so the stacked height is enough. next.md §3
+("Tabs at the rail's foot").
+
+## Never Hide and Show Again a Frame a Pass Keeps
+**Problem**: the canvas hid a section's block (a frame of its caller's, a tab's info text) as each pass began, and showed
+it again if the pass gave it back. A pass runs whenever any tab's text arrives, so the box the player typed in was
+hidden and shown under them: a flash at best, and a text box hidden could lose its focus (not seen in game). And a block
+that moved to another section (a tab renamed) was hidden by the section it left, after the new one showed it.
+**Rule**: decide what goes at the end of a pass, from what the pass kept: hold what each part had (`heldBlock`), and hide
+only what nothing took again, and only where it still hangs (its parent is the part that let it go). next.md §2.

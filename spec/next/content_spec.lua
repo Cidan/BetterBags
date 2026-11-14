@@ -869,6 +869,105 @@ describe("NextContent", function()
     end)
   end)
 
+  -- A section can hold a frame of its caller's in place of buttons, across it under its header: the guild bank's Info
+  -- view, each tab's text a section (guild-bank.md §5).
+  describe("sections holding a block", function()
+    -- block is a frame its height tall at any width, that remembers the widths it was laid out for.
+    local function block(height)
+      local b = { frame = CreateFrame("Frame"), laidOut = {} }
+      function b:Height(width) return height + (width > 200 and 0 or 10) end
+      function b:Layout(width)
+        table.insert(self.laidOut, width)
+        self.frame:SetSize(width, self:Height(width))
+      end
+      return b
+    end
+
+    it("lays the block out across the section under its header, the section as tall as both", function()
+      local text = block(120)
+      canvas:BindSections({ { name = "Gear", block = text, count = "" } })
+      draw(300)
+      local section = canvas.order[1]
+      assert.are.equal(section.cells, text.frame:GetParent())
+      assert.are.same({ "TOPLEFT", section.cells, "TOPLEFT", 0, 0 }, { text.frame:GetPoint(1) })
+      assert.are.same({ 300 }, text.laidOut)
+      assert.are.equal(style.SECTION_HEADER + 120, section.height)
+      assert.are.equal("", section.count:GetText())
+      assert.is_true(text.frame:IsShown())
+    end)
+
+    it("measures the block for the width it is laid out at", function()
+      local text = block(120)
+      canvas:BindSections({ { name = "Gear", block = text } })
+      draw(180)
+      assert.are.equal(style.SECTION_HEADER + 130, canvas.order[1].height)
+    end)
+
+    it("lays the next section out below it", function()
+      canvas:BindSections({ { name = "Gear", block = block(120) }, { name = "Mats", block = block(40) } })
+      canvas:SetInstant(true)
+      draw(300)
+      assert.are.same({ canvas.frame, 0, -(style.SECTION_HEADER + 120 + style.SECTION_SPACING) }, { at(canvas.order[2].frame) })
+    end)
+
+    it("hides a block whose section goes, or that a section of the same name no longer holds", function()
+      local gear, other = block(120), block(60)
+      canvas:BindSections({ { name = "Gear", block = gear }, { name = "Mats", block = other } })
+      draw(300)
+      canvas:BindSections({ { name = "Gear", buttons = {} } })
+      draw(300)
+      assert.is_false(gear.frame:IsShown(), "Gear holds no block now")
+      assert.is_false(other.frame:IsShown(), "Mats is gone")
+      assert.is_nil(canvas.order[1].block)
+    end)
+
+    -- Hidden and shown again, a text box the player types in could lose its focus (not seen in game): a tab's text
+    -- arriving redraws Info, and must not hide the box of the tab the player is writing in.
+    it("never hides a block its section is given again", function()
+      local text = block(120)
+      canvas:BindSections({ { name = "Gear", block = text } })
+      draw(300)
+      local hidden = 0
+      local hide = text.frame.Hide
+      text.frame.Hide = function(f) hidden = hidden + 1 hide(f) end
+      canvas:BindSections({ { name = "Gear", block = text }, { name = "Mats", block = block(40) } })
+      draw(300)
+      assert.are.equal(0, hidden)
+      assert.is_true(text.frame:IsShown())
+      text.frame.Hide = hide
+    end)
+
+    -- A tab renamed while Info shows: its text's block goes to a section of the new name, the old one gone or kept.
+    it("keeps a block shown that moves to a section of another name", function()
+      local text, other = block(120), block(60)
+      canvas:BindSections({ { name = "Gear", block = text }, { name = "Mats", block = other } })
+      draw(300)
+      canvas:BindSections({ { name = "Raid Gear", block = text }, { name = "Mats", block = other } })
+      draw(300)
+      assert.is_true(text.frame:IsShown(), "its old section went")
+      assert.are.equal(canvas.byName["Raid Gear"].cells, text.frame:GetParent())
+      canvas:BindSections({ { name = "Gear", buttons = {} }, { name = "Raid Gear", block = other }, { name = "Mats", block = text } })
+      draw(300)
+      assert.is_true(text.frame:IsShown(), "swapped between two sections drawn again")
+      assert.is_true(other.frame:IsShown())
+    end)
+
+    it("hides a block when its section is bound with items again", function()
+      local text = block(120)
+      canvas:BindSections({ { name = "A", block = text } })
+      draw(300)
+      bind(data({ categories = { { name = "A" } }, items = { item("0_1", "A") } }))
+      assert.is_false(text.frame:IsShown())
+      assert.is_nil(canvas.order[1].block)
+    end)
+
+    it("takes no cells: the width it needs is its buttons'", function()
+      canvas:BindSections({ { name = "Gear", block = block(120) } })
+      draw(300)
+      assert.are.equal(0, canvas:Widest())
+    end)
+  end)
+
   -- A section dragged by its header (next.md §7).
   describe("dragging a section", function()
     local function threeSections(opts)

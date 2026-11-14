@@ -402,10 +402,45 @@ describe("a guild bank visit on the whole addon", function()
     openGuildBank(addon)
     slideIn(addon)
     answer(addon)
-    local ids = {}
-    for _, t in ipairs(panel.tabs.tabs) do table.insert(ids, t.id) end
+    local ids, views = {}, {}
+    for _, t in ipairs(panel.tabs.tabs) do table.insert(t.foot and views or ids, t.id) end
     assert.are.same({ 1, 1001, 1002 }, ids)
+    assert.are.same({ -2, -3, -4 }, views, "Log, Money Log and Info at the rail's foot")
     assert.are.equal(C_CurrencyInfo.GetCoinTextureString(5000000), panel.moneyFrame.text:GetText())
+    assert.are.same({}, handle.errors)
+  end)
+
+  -- Issue #1302: "I can't see the guild bank money log and I have to disable the addon in order to see money log".
+  it("shows the money log from the rail's foot, asked of the server and drawn as it answers", function()
+    local addon = start("next")
+    guild()
+    _G._guildBank.moneyLog = {
+      { type = "deposit", name = "Arthas", amount = 1000000, day = 1 },
+      { type = "deposit", name = "Jaina", amount = 250000, hour = 2 },
+    }
+    local panel = addon.Bags.GuildBank
+    openGuildBank(addon)
+    slideIn(addon)
+    answer(addon)
+    local money = panel.tabs:Tab(-3)
+    money.button:GetScript("OnClick")(money.button, "LeftButton")
+    assert.are.same({ MAX_GUILDBANK_TABS + 1 }, _G._guildBankCalls.logQueries, "asked as Blizzard's Money Log tab asks")
+    assert.are.equal("Loading...", panel.emptyText:GetText())
+    addon:GetModule("Events")._eventMap["GUILDBANKLOG_UPDATE"].fn("GUILDBANKLOG_UPDATE")
+    frames()
+    local who = {}
+    for _, s in ipairs(panel.content.order) do
+      for _, e in ipairs(s.entries) do table.insert(who, e.item.price:GetText()) end
+    end
+    local deposited = addon:GetModule("NextVendorButton"):LogIcon("DepositGold")
+    assert.is_true(deposited:find("depositgold", 1, true) ~= nil, "the theme's deposit glyph")
+    assert.are.same({ deposited .. " Jaina", deposited .. " Arthas" }, who, "newest first, each a glyph and who")
+    assert.is_false(panel.emptyText:IsShown())
+    local items = panel.tabs:Tab(1)
+    items.button:GetScript("OnClick")(items.button, "LeftButton")
+    frames()
+    assert.is_not_nil(panel.content.buttons["1002_2"], "All Tabs' items again")
+    assert.are.equal(1, panel.tabs.selected)
     assert.are.same({}, handle.errors)
   end)
 

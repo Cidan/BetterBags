@@ -253,5 +253,7 @@ sonataNext:RegisterTheme({
     -- Cards inked faintly on the paper.
     CardFill = { 46 / 255, 31 / 255, 15 / 255, 0.06 },
     CardHover = { 46 / 255, 31 / 255, 15 / 255, 0.08 },
+    -- A guild bank log's move in brown ink: Default's pale Gold measured 1.3 to one on this paper.
+    LogIcons = { Move = { Color = "InkSoft" } },
   },
 })

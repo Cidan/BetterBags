@@ -40,6 +40,9 @@ local stubs = {
   color = trackStub("Color"),
   elements = trackStub("SonataElements"),
   picker = trackStub("NextCategoryPicker"),
+  merchant = trackStub("NextMerchant"),
+  dialog = trackStub("NextDialog"),
+  search = trackStub("Search"),
 }
 
 local replaced = {}
@@ -63,7 +66,8 @@ local modules = { { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.
   { "NextDockCard", "next/dockcard.lua" }, { "NextDock", "next/dock.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" }, { "NextUIPanels", "next/uipanels.lua" }, { "NextOrnaments", "next/ornaments.lua" }, { "NextMenuButton", "next/menubutton.lua" }, { "NextGlitch", "next/glitch.lua" }, { "NextRain", "next/rain.lua" }, { "NextShatter", "next/shatter.lua" }, { "NextSnow", "next/snow.lua" }, { "NextThreads", "next/threads.lua" }, { "NextSmoke", "next/smoke.lua" }, { "NextBats", "next/bats.lua" }, { "NextBeam", "next/beam.lua" }, { "NextStopMotion", "next/stopmotion.lua" }, { "NextPaper", "next/paper.lua" }, { "NextGlass", "next/glass.lua" }, { "NextSheen", "next/sheen.lua" }, { "NextPanel", "next/panel.lua" }, { "Currencies", "data/currencies.lua" }, { "NextCurrencyEntry", "next/currencyentry.lua" },
   { "NextCurrencyDrag", "next/currencydrag.lua" },
   { "NextCurrencyTracker", "next/currencytracker.lua" }, { "NextCurrencyStrip", "next/currencystrip.lua" }, { "NextBag", "next/bag.lua" },
-  { "NextBank", "next/bank.lua" }, { "NextGuildButton", "next/guildbutton.lua" }, { "NextGuildBank", "next/guildbank.lua" } }
+  { "NextBank", "next/bank.lua" }, { "NextButton", "next/controls/button.lua" }, { "NextInput", "next/controls/input.lua" },
+  { "NextVendorButton", "next/vendorbutton.lua" }, { "NextGuildButton", "next/guildbutton.lua" }, { "NextGuildBank", "next/guildbank.lua" } }
 for _, m in ipairs(modules) do
   ResetModuleStub(m[1], m[2])
   LoadBetterBagsModule(m[2])

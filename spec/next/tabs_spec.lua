@@ -301,6 +301,109 @@ describe("NextTabs", function()
     end)
   end)
 
+  -- The guild bank's views (Items, Log, Money Log, Info; guild-bank.md §5) hang at the foot of its rail, apart from
+  -- its tabs at the top (asked: "maybe tabs for this on the bottom of the rail instead of the top?").
+  describe("tabs at its foot", function()
+    local step, views
+
+    before_each(function()
+      step = style.TAB_HEIGHT + style.TAB_SPACING
+      views = { { id = -1, name = "Items", foot = true }, { id = -2, name = "Log", foot = true },
+        { id = -3, name = "Money Log", foot = true } }
+      body:SetSize(400, 600)
+    end)
+
+    local function list(top)
+      local out = {}
+      for _, e in ipairs(top) do table.insert(out, e) end
+      for _, e in ipairs(views) do table.insert(out, e) end
+      return out
+    end
+
+    -- Where the foot's first tab goes, down from the rail's top, for a body of a height: its last tab ending where the
+    -- content does, the footer's height above the body's bottom.
+    local function footTop(height)
+      return height - style.CONTENT_TOP - style.FOOTER - (3 * step - style.TAB_SPACING)
+    end
+
+    it("hangs them from the body's bottom, their last tab ending where the content does", function()
+      rail:SetTabs(list({ { id = 1, name = "All Tabs" }, { id = 1001, name = "Gear" } }))
+      assert.are.same({ "TOPRIGHT", rail.frame, "TOPRIGHT", 0, -step }, { rail.tabs[2].button:GetPoint(1) })
+      for i = 3, 5 do
+        assert.are.same({ "TOPRIGHT", rail.frame, "TOPRIGHT", 0, -(footTop(600) + (i - 3) * step) },
+          { rail.tabs[i].button:GetPoint(1) }, rail.tabs[i].text:GetText())
+      end
+    end)
+
+    it("is as tall as its tabs stacked, the group gap between the two, whatever the body's height", function()
+      rail:SetTabs(list({ { id = 1, name = "All Tabs" }, { id = 1001, name = "Gear" } }))
+      assert.are.equal(5 * step + style.TAB_GROUP_GAP, rail.frame:GetHeight())
+    end)
+
+    it("never puts them over the tabs above: on a short body they follow those, the group gap between", function()
+      body:SetSize(400, 150)
+      rail:SetTabs(list({ { id = 1, name = "All Tabs" }, { id = 1001, name = "Gear" } }))
+      assert.are.same({ "TOPRIGHT", rail.frame, "TOPRIGHT", 0, -(2 * step + style.TAB_GROUP_GAP) },
+        { rail.tabs[3].button:GetPoint(1) })
+    end)
+
+    it("starts them at the rail's top when there is nothing above them, on a short body", function()
+      body:SetSize(400, 10)
+      rail:SetTabs(list({}))
+      assert.are.same({ "TOPRIGHT", rail.frame, "TOPRIGHT", 0, 0 }, { rail.tabs[1].button:GetPoint(1) })
+    end)
+
+    it("follows the body's bottom as the body changes height, the bar too when one of them is chosen", function()
+      rail:SetTabs(list({ { id = 1, name = "All Tabs" } }))
+      rail:Select(-2)
+      body:SetSize(400, 700)
+      body:GetScript("OnSizeChanged")(body, 400, 700)
+      assert.are.same({ "TOPRIGHT", rail.frame, "TOPRIGHT", 0, -footTop(700) }, { rail.tabs[2].button:GetPoint(1) })
+      assert.are.same({ "TOPRIGHT", rail.frame, "TOPRIGHT", 0, -(footTop(700) + step) }, { rail.indicator:GetPoint(1) })
+    end)
+
+    -- Asked: "the new tabs should be just like all the other tabs ... it should just work as a selector along side the
+    -- others, not this sort of dual selector type system".
+    it("chooses one of them as it chooses any tab: one chosen down the whole rail, the bar gliding to it", function()
+      rail:SetTabs(list({ { id = 1, name = "All Tabs" }, { id = 1001, name = "Gear" } }))
+      rail:Select(1001)
+      rail:Select(-3, true)
+      assert.are.equal(style:Font("TabSelected"), rail.tabs[5].text:GetFontObject())
+      assert.are.equal(style:Font("Tab"), rail.tabs[2].text:GetFontObject(), "Gear is no longer chosen")
+      assert.is_true(tween:IsPlaying(rail.indicator))
+      finishTweens()
+      assert.are.same({ "TOPRIGHT", rail.frame, "TOPRIGHT", 0, -(footTop(600) + 2 * step) }, { rail.indicator:GetPoint(1) })
+      rail:Select(1, true)
+      finishTweens()
+      assert.are.same({ "TOPRIGHT", rail.frame, "TOPRIGHT", 0, 0 }, { rail.indicator:GetPoint(1) })
+      assert.are.equal(style:Font("Tab"), rail.tabs[5].text:GetFontObject())
+    end)
+
+    it("counts them in its width", function()
+      views[2].name = string.rep("W", 40)
+      rail:SetTabs(list({ { id = 1, name = "All" } }))
+      assert.are.equal(style.TAB_MAX_WIDTH, rail:Width())
+    end)
+
+    it("tells its click handler when one is clicked", function()
+      rail:SetTabs(list({}))
+      local button = rail.tabs[2].button
+      button:GetScript("OnClick")(button, "LeftButton")
+      assert.are.same({ { -2, "LeftButton" } }, clicks)
+    end)
+
+    it("never moves them, nor lets a moved tab pass them", function()
+      rail:SetReorderHandler(function() end)
+      rail:SetTabs(list({ { id = 1, name = "All Tabs" }, { id = 1001, name = "Gear", block = "guild" },
+        { id = 1002, name = "Mats", block = "guild" } }))
+      for i = 4, 6 do
+        assert.is_false(rail.tabs[i].movable, rail.tabs[i].text:GetText())
+      end
+      local ordered = nextTabs:Ordered(list({ { id = 1001, name = "Gear", block = "guild" } }), { -3, -1, 1001 })
+      assert.are.same({ 1001, -1, -2, -3 }, { ordered[1].id, ordered[2].id, ordered[3].id, ordered[4].id })
+    end)
+  end)
+
   -- A section dragged over a tab (next.md §7).
   describe("as a drop target", function()
     it("finds the tab under the cursor, by position", function()
