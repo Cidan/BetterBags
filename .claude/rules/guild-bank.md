@@ -209,34 +209,45 @@ tabs' accent `style.Color.Guild`).
   searches only the guild bank (`SearchBox:BagOfKind`).
 - **Views** (issue #1302: "I can't see the guild bank money log and I have to disable the addon"; asked, of
   where Blizzard's Log, Money Log and Info tabs go: "maybe tabs for this on the bottom of the rail instead
-  of the top?"). Four tabs at the rail's foot (`NextTabEntry.foot`, next.md §3 "Tabs at the rail's foot"),
-  under the guild's tabs: **Items** (all of the above), **Log**, **Money Log**, **Info**, the last three
-  in Blizzard's words (`GUILD_BANK_LOG`, `GUILD_BANK_MONEY_LOG`, `GUILD_BANK_TAB_INFO`). The view is chosen
-  apart from the tab (`self.view`, `SelectFoot`), as on Blizzard's frame its side tabs pick the tab and its
-  bottom tabs the mode; the tab chosen still says what a log or Info shows, and where deposits go. It opens
-  on Items, as Blizzard's frame does (`OnShowing`, `GuildBankFrameMixin:OnShow`).
+  of the top?"). Three tabs at the rail's foot (`NextTabEntry.foot`, next.md §3 "Tabs at the rail's foot"),
+  under the guild's tabs: **Log**, **Money Log**, **Info**, in Blizzard's words (`GUILD_BANK_LOG`,
+  `GUILD_BANK_MONEY_LOG`, `GUILD_BANK_TAB_INFO`). One tab is chosen down the whole rail, a view as any tab
+  (asked, of a first version that chose the view apart from the tab, with an Items tab: "the new tabs should
+  be just like all the other tabs, meaning, you can get rid of items -- it should just work as a selector
+  along side the others, not this sort of dual selector type system. i.e. going from all tabs, to a specific
+  item tab, to money log, then back to an item tab should 'just work'"). `self.view` is `VIEW_ITEMS` while
+  All Tabs or a tab shows, else the view's id; `SelectedTabID` is what the rail selects. The tab shown before
+  a view stays the guild bank's (`shownTab`: where deposits go, `DepositTab`); a log's or Info's title is the
+  guild's name. It opens on its items, as Blizzard's frame does (`OnShowing`, `GuildBankFrameMixin:OnShow`).
   - **Switching** (`ShowView`): to a log or Info, the guild buttons drawn are let go (`releaseItems`) and
-    what the view shows is asked of the server (`loadView`; every time, as Blizzard's tab click asks); back
-    to Items, the items are drawn from the last read, a read that came meanwhile having waited (`Draw` keeps
-    it), and dimmed by what the search box holds now (`searchItems`, as `SearchBox` applies a search: each
-    guild button takes its dimming from the read it is drawn from). Nothing travels between views
-    (`Motion:ForgetShown`). A tab clicked in a log or Info shows that tab's (`shown`).
+    what the view shows is asked of the server (`loadView`; every time, as Blizzard's tab click asks).
+    Nothing travels from what showed (`Motion:ForgetShown`). A guild tab clicked from a log or Info
+    (`ShowItems`) lets go of the view's cards and shows that tab's items: the tab that showed before drawn at
+    once from the last read, a read that came meanwhile having waited (`Draw` keeps it), dimmed by what the
+    search box holds now (`searchItems`, as `SearchBox` applies a search: each guild button takes its dimming
+    from the read it is drawn from); another tab shown as its click shows it (`ShowAll`, `ShowTab`: asked of
+    the server, drawn as its read arrives).
   - **Log and Money Log** (`buildLog`, `DrawView`) are the vendor's cards (`NextVendorButton:SetLog`,
     next-vendor.md §10b), `SetCards(true)`, in one column of sections (`SectionColumns` returns 1 for every
-    view but Items), a section for each "how long ago" in Blizzard's words
-    (`TimeUtil.GetRecentTimeDate`, "%s ago"), newest first. Log shows the tabs shown (`viewTabs`: the tab
-    shown by itself, else every tab the player can view, in the rail's order), their entries merged by age;
-    a card is the item and its stack, its name in its quality's color, and "Deposited by", "Withdrawn by" or
-    "Moved by" who, its tooltip the item's then how many, which tab ("Into", "Out of", "From ... to"), and
-    when. Money Log is the whole guild's: a coin, "%s deposited", "withdrew", "repaired", "withdrew for a tab",
-    "bought a tab" (or "unlocked a tab" for none), "Guild perks deposited", "renamed the guild", "was refunded
-    a guild rename", the gold written as the vendor writes a price. Who the client does not know is `UNKNOWN`,
-    as on Blizzard's frame. The footer counts the entries. Empty: "Loading..." until a log shown has arrived,
-    then "Nothing logged yet" / "No gold has moved yet"; with no tab to view, "This guild has no tabs you can
-    view". A log arriving (`guildbank/LogLoaded` for one shown, `guildbank/LogChanged`) draws it again. The
-    money log is asked for again when the guild's gold changes while it shows (`logMoney`: not for the
-    withdrawal limit, `GUILDBANK_UPDATE_WITHDRAWMONEY`, which says the same message); Blizzard's asks only on
-    a click.
+    view), a section for each "how long ago" in Blizzard's words (`TimeUtil.GetRecentTimeDate`, "%s ago"),
+    newest first. Each card's bottom line is a glyph for what happened, tinted by which way it went, then who
+    (asked: "withdraw and deposit need an icon, not text, with the person who did it next to it. icon should be
+    color coded. this is so humans can quickly scan it"; `Vendor.LogIcons`, `NextVendorButton:LogIcon`; the colors per
+    theme, measured against each theme's cards, next-themes.md, the `Vendor` row). Log
+    shows every tab the player can view (`viewTabs`, in the rail's order), their entries merged by age: a card
+    is the item and its stack, its name in its quality's color, and Deposit (in), Withdraw (out) or Move's
+    glyph with who; its tooltip the item's then "Deposited by" / "Withdrawn by" / "Moved by" who, how many,
+    which tab ("Into", "Out of", "From ... to"), and when. Money Log is the whole guild's: a coin, the gold as
+    its title (written as the vendor writes a price; "Tab unlocked" for a tab that cost none), and
+    DepositGold, WithdrawGold, Repair or BuyTab's glyph with who; its tooltip in Blizzard's money log's words
+    ("%s deposited", "withdrew", "repaired", "withdrew for a tab", "bought a tab" or "unlocked a tab", "Guild
+    perks deposited", "renamed the guild", "was refunded a guild rename") with the gold, and when. A deposit
+    of the guild's perks names "Guild perks"; who the client does not know is `UNKNOWN`, as on Blizzard's
+    frame. The footer counts the entries. Empty: "Loading..." until a log shown has arrived, then "Nothing
+    logged yet" / "No gold has moved yet"; with no tab to view, "This guild has no tabs you can view". A log
+    arriving (`guildbank/LogLoaded` for one shown, `guildbank/LogChanged`) draws it again. The money log is
+    asked for again when the guild's gold changes while it shows (`logMoney`: not for the withdrawal limit,
+    `GUILDBANK_UPDATE_WITHDRAWMONEY`, which says the same message); Blizzard's asks only on a click.
   - **Info** (`buildInfo`): a section a tab shown, its body a block of the canvas's (`NextCanvasBlock`,
     next.md §2), a text area (`NextInput:CreateArea`, 120 tall as the settings' are, `maxLetters` 500 as
     Blizzard's `GuildBankTabInfoEditBox`) and, for a member `CanEditGuildTabInfo` lets edit it, a Primary
@@ -397,6 +408,9 @@ None of it has been seen in a client. Per data-driven.md, the first visit should
   - A read-only text area takes the wheel only while focused, as every text area does, and refuses focus: a
     long text scrolls by its bar.
   - The log's cards come from the vendor's pool, so Masque skins them in its Vendor group.
+  - Halloween's log glyphs read at 2.9, 2.6 and 3.0 to one on its orange cards (in, out, moved: its `Lime`, `Maroon`,
+    `Night`), under WCAG's 3:1 for graphics for in and out: its palette has no green or red darker or lighter that keeps
+    the color coding there. Measured, not seen in game; a darker green and red of its own would fix it.
 - Dimming bag items the guild bank would refuse (issue #768): Blizzard has no item context for the
   guild bank (`ItemButtonUtil.ItemContextEnum` stops at `BankDepositing`, while its own `BankPanel`
   shows), so it would be a rule of BetterBags' own.
@@ -407,9 +421,9 @@ None of it has been seen in a client. Per data-driven.md, the first visit should
 `spec/core/constants_spec.lua` ("guild bank"), `spec/database_spec.lua` (`showGuildBankTabs`),
 `spec/guildbank_spec.lua` (the data source: visits, tabs, loading and its timeout, changes, actions on
 the item's tab, placing the cursor's item, moving many items, gold and tabs, "the logs", "the tabs' info
-text"), `spec/next/guildbank_spec.lua` ("its views": every view, switching, reads kept, the search
-again, tabs coming into view, the rail's order, same-named tabs, editing lost, the visit ending,
-the box being typed in), `spec/integration/guild_bank_spec.lua` ("shows the money log from the rail's foot"),
+text"), `spec/next/guildbank_spec.lua` ("its views": every view, one tab chosen down the rail, from All
+Tabs to a tab to the money log and back, reads kept, the search again, the action glyphs, tabs coming into
+view, the rail's order, same-named tabs, editing lost, the visit ending, the box being typed in), `spec/integration/guild_bank_spec.lua` ("shows the money log from the rail's foot"),
 `spec/guildbank_pipeline_spec.lua` (reading, kept slots, cold reads, binding, derive, both views,
 stacking across tabs, empty slots in place, the shared index, an ended read), `spec/tooltip_spec.lua`
 ("guild bank items"), `spec/loader_spec.lua` (`PrimeGuildBank`), `spec/refresh_spec.lua` ("the guild

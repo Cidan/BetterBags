@@ -818,6 +818,12 @@ def _deposit(h):
     h.line([(9, 34), (10, 54), (54, 54), (55, 34)], width=3.6)
 
 
+@glyph("withdraw")
+def _withdraw(h):
+    arrow(h, 32, 40, 32, 9)
+    h.line([(9, 34), (10, 54), (54, 54), (55, 34)], width=3.6)
+
+
 @glyph("depositgold")
 def _depositgold(h):
     coins(h, 34, 54)

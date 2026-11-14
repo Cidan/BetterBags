@@ -64,9 +64,12 @@ the sell cursor). So the frame must stay shown, on tab 1, and never be seen:
 - **A log entry** (`NextVendorButton:SetLog`, mode `"log"`): the same card shows the guild bank's log
   entries (guild-bank.md §5), the one look BetterBags Next has for an item with words beside it. A
   `NextLogCard` gives its icon and stack, its title (the item's name, in its quality's color from Uncommon
-  up, or who did what with the gold), and along the bottom its line in the price's role (who deposited it)
-  or its gold written as a price (`showPrice`). Its tooltip is the item's (`SetHyperlink`) then its lines,
-  or for gold its lines alone. It buys, buys back, repairs and sells nothing: a modified click links the
+  up, or the gold written as a price), and along the bottom, in the price's role, its action's glyph then who
+  (`writeLogLine`, again as it is styled, so a theme's colors take). `LogIcon(action)` is the glyph as text:
+  the theme's `Vendor.LogIcons[action]` texture or atlas, as large as a price's coins (`CoinSize`), tinted by
+  its color through the texture escape's vertex color fields (`|Tpath:h:w:x:y:64:64:0:64:0:64:r:g:b|t`,
+  `|A:atlas:h:w:x:y:r:g:b|a`, warcraft.wiki.gg UI escape sequences); "" for an action the theme draws none
+  for. Its tooltip is the item's (`SetHyperlink`) then its lines, or for gold its lines alone. It buys, buys back, repairs and sells nothing: a modified click links the
   item, and an item dropped or left-clicked onto it goes to its panel (`onDrop`), never `SellCursorItem`.
   `Release` forgets it.
 - **Cards** (asked, from a user: the price under the icon was "way too small"; a first version put

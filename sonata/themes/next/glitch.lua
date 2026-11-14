@@ -315,6 +315,8 @@ sonataNext:RegisterTheme({
     Highlight = { 0.3, 1, 0.5, 0.15 },
     CardFill = { 0.3, 1, 0.5, 0.04 },
     CardHover = { 0.3, 1, 0.5, 0.1 },
+    -- A guild bank log's move in cyan: this theme's Gold is a green, a deposit's color.
+    LogIcons = { Move = { Color = "Cyan" } },
   },
 
   Currency = {

@@ -79,8 +79,8 @@ local ALL = 1
 local SECTION_GRID, SECTION_ALL_BAGS = 2, 4
 -- What QueryGuildBankLog takes for the money log (GuildBank:MoneyLogID).
 local MONEY = 9
--- The guild bank's views at its rail's foot: Items, Log, Money Log, Info.
-local VIEWS = { -1, -2, -3, -4 }
+-- The guild bank's views at its rail's foot: Log, Money Log, Info.
+local VIEWS = { -2, -3, -4 }
 
 describe("NextGuildBank", function()
   local messages, handlers, timers, calls, data, asked
@@ -679,8 +679,9 @@ describe("NextGuildBank", function()
   end)
 
   -- Blizzard's guild bank frame has Log, Money Log and Info tabs (GuildBankFrameTabMixin:OnClick); BetterBags Next's has
-  -- them at its rail's foot, beside Items (asked: "maybe tabs for this on the bottom of the rail instead of the top?";
-  -- issue #1302: "I can't see the guild bank money log").
+  -- them at its rail's foot (asked: "maybe tabs for this on the bottom of the rail instead of the top?"; issue #1302: "I
+  -- can't see the guild bank money log"), each chosen as any tab is (asked: "the new tabs should be just like all the
+  -- other tabs ... going from all tabs, to a specific item tab, to money log, then back to an item tab should 'just work'").
   describe("its views", function()
     local ORE = "|Hitem:200|h[Ore]|h"
 
@@ -711,6 +712,16 @@ describe("NextGuildBank", function()
       return g.content.order[1].entries[1].item
     end
 
+    -- action is a card's bottom line: its action's glyph, then who (asked: "withdraw and deposit need an icon, not text,
+    -- with the person who did it next to it ... color coded").
+    local function action(key, who)
+      return addon:GetModule("NextVendorButton"):LogIcon(key) .. " " .. who
+    end
+
+    local function price(amount)
+      return addon:GetModule("NextVendorButton"):PriceText(amount, {})
+    end
+
     local function oreRead()
       return { sortedItems = {}, tabs = { [ALL] = { categories = { { name = "Ore" } }, items = {
         { slotkey = "1002_4", bagid = 1002, slotid = 4, guildTab = 2, itemInfo = { category = "Ore", itemIcon = 5,
@@ -739,13 +750,12 @@ describe("NextGuildBank", function()
       data.itemLogs[2] = { entry({ kind = "withdraw", link = ORE, count = 20, tab = 2, hours = 1, index = 1 }) }
     end)
 
-    it("lists Items, Log, Money Log and Info at its rail's foot, Items chosen as it opens", function()
+    it("lists Log, Money Log and Info at its rail's foot, All Tabs chosen as it opens", function()
       local g = open()
       assert.are.same(VIEWS, footIDs(g))
       local names = {}
       for _, id in ipairs(VIEWS) do table.insert(names, g.tabs:Tab(id).text:GetText()) end
-      assert.are.same({ "Items", GUILD_BANK_LOG, GUILD_BANK_MONEY_LOG, GUILD_BANK_TAB_INFO }, names)
-      assert.are.equal(-1, g.tabs.footSelected)
+      assert.are.same({ GUILD_BANK_LOG, GUILD_BANK_MONEY_LOG, GUILD_BANK_TAB_INFO }, names)
       assert.are.equal(ALL, g.tabs.selected)
       data.canBuy = true
       g:RefreshTabs()
@@ -753,16 +763,17 @@ describe("NextGuildBank", function()
       assert.are.same(VIEWS, footIDs(g))
     end)
 
-    it("shows the money log, asked of the server, newest first in sections by how long ago, each card's gold its line", function()
+    it("shows the money log, asked of the server, newest first in sections by how long ago: each card its gold, and who by a glyph for which way it went", function()
       data.logLoaded[MONEY] = true
       local g = open()
       view(g, -3)
       assert.are.same({ { MONEY } }, calls.logs)
-      assert.are.equal(-3, g.tabs.footSelected)
+      assert.are.equal(-3, g.tabs.selected)
       assert.are.same({ ago(0, 0, 0, 1), ago(0, 0, 0, 5), ago(0, 0, 2, 0) }, sectionNames(g))
-      local vendorButton = addon:GetModule("NextVendorButton")
-      assert.are.same({ { "Thrall withdrew", vendorButton:PriceText(500, {}) }, { "Arthas deposited", vendorButton:PriceText(1000000, {}) },
-        { "Jaina deposited", vendorButton:PriceText(20000, {}) } }, cards(g))
+      assert.are.same({ { price(500), action("WithdrawGold", "Thrall") }, { price(1000000), action("DepositGold", "Arthas") },
+        { price(20000), action("DepositGold", "Jaina") } }, cards(g))
+      assert.are.same({ "Thrall withdrew " .. GetMoneyString(500, true), ago(0, 0, 0, 1) }, firstCard(g).log.lines,
+        "its tooltip says it in words")
       assert.are.equal("3 entries", g.freeText:GetText())
       assert.is_true(g.content.cards)
       assert.is_false(g.emptyText:IsShown())
@@ -793,10 +804,18 @@ describe("NextGuildBank", function()
       }
       local g = open()
       view(g, -3)
-      local titles = {}
-      for _, c in ipairs(cards(g)) do table.insert(titles, c[1]) end
-      assert.are.same({ "Thrall repaired", "Thrall withdrew for a tab", "Thrall bought a tab", "Thrall unlocked a tab",
-        "Guild perks deposited", "Thrall renamed the guild", "Thrall was refunded a guild rename", UNKNOWN .. " deposited" }, titles)
+      assert.are.same({ { price(300), action("Repair", "Thrall") }, { price(1000), action("BuyTab", "Thrall") },
+        { price(1000000), action("BuyTab", "Thrall") }, { "Tab unlocked", action("BuyTab", "Thrall") },
+        { price(5000), action("DepositGold", "Guild perks") }, { price(100), action("WithdrawGold", "Thrall") },
+        { price(100), action("DepositGold", "Thrall") }, { price(7), action("DepositGold", UNKNOWN) } }, cards(g))
+      local words = {}
+      for _, s in ipairs(g.content.order) do
+        for _, e in ipairs(s.entries) do table.insert(words, e.item.log.lines[1]) end
+      end
+      assert.are.same({ "Thrall repaired " .. GetMoneyString(300, true), "Thrall withdrew for a tab " .. GetMoneyString(1000, true),
+        "Thrall bought a tab " .. GetMoneyString(1000000, true), "Thrall unlocked a tab", "Guild perks deposited " .. GetMoneyString(5000, true),
+        "Thrall renamed the guild " .. GetMoneyString(100, true), "Thrall was refunded a guild rename " .. GetMoneyString(100, true),
+        UNKNOWN .. " deposited " .. GetMoneyString(7, true) }, words, "its tooltip says it in Blizzard's money log's words")
     end)
 
     it("shows every tab's item log on All Tabs, asked one log at a time, newest first across them", function()
@@ -805,8 +824,8 @@ describe("NextGuildBank", function()
       view(g, -2)
       assert.are.same({ { 1, 2, 4 } }, calls.logs, "every tab the player can view")
       assert.are.same({ ago(0, 0, 0, 1), ago(0, 0, 0, 3), ago(0, 0, 1, 0) }, sectionNames(g))
-      assert.are.same({ { "Ore", "Withdrawn by " .. UNKNOWN }, { "Sword", "Deposited by Arthas" }, { "Ore", "Moved by Jaina" } },
-        cards(g))
+      assert.are.same({ { "Ore", action("Withdraw", UNKNOWN) }, { "Sword", action("Deposit", "Arthas") },
+        { "Ore", action("Move", "Jaina") } }, cards(g))
       local withdrawn = firstCard(g)
       assert.are.equal(777, withdrawn.icon:GetTexture())
       assert.are.equal("20", withdrawn.count:GetText())
@@ -816,16 +835,43 @@ describe("NextGuildBank", function()
       assert.are.equal("3 entries", g.freeText:GetText())
     end)
 
-    it("shows a tab's own log when it shows by itself, asked again at each tab clicked", function()
-      data.logLoaded[1], data.logLoaded[2] = true, true
+    -- Asked: "going from all tabs, to a specific item tab, to money log, then back to an item tab should 'just work'".
+    it("goes from All Tabs to a tab, to the money log and back to a tab's items, one tab chosen at a time", function()
+      data.logLoaded[MONEY] = true
       local g = open()
-      view(g, -2)
       click(tabNamed(g, "Gear").button)
-      assert.are.same({ 1, 2, 4 }, calls.logs[1])
-      assert.are.same({ 1 }, calls.logs[2])
-      assert.are.same({ { "Sword", "Deposited by Arthas" }, { "Ore", "Moved by Jaina" } }, cards(g))
-      assert.are.equal(-2, g.tabs.footSelected, "still the log")
       assert.are.equal(1001, g.tabs.selected)
+      view(g, -3)
+      assert.are.equal(-3, g.tabs.selected)
+      assert.are.equal("Moonguard Traders", g.title:GetText(), "the guild's money, not Gear's")
+      assert.are.equal(3, #cards(g))
+      messages = {}
+      click(tabNamed(g, "Mats").button)
+      assert.are.equal(1002, g.tabs.selected)
+      assert.are.equal(1002, g:GetCurrentTabID())
+      assert.are.equal("Mats", g.title:GetText())
+      assert.is_false(g.content.cards)
+      assert.are.same({}, cards(g), "the log's cards are gone")
+      assert.are.equal("", g.freeText:GetText(), "nor its count, until Mats' items arrive (found by the bug review)")
+      assert.are.same({ { { guild = true, resetLayout = true } } }, sent("bags/Rederive"))
+      assert.are.same({ 1, 2 }, calls.load, "each tab asked of the server as it is chosen")
+      view(g, -2)
+      assert.are.equal(-2, g.tabs.selected)
+      click(tabNamed(g, "All Tabs").button)
+      assert.are.equal(ALL, g.tabs.selected)
+      assert.is_false(data.showTabs)
+      assert.are.equal(SECTION_GRID, data.views[GUILD])
+    end)
+
+    it("shows every tab's log whichever tab showed before it", function()
+      data.showTabs = true
+      data.logLoaded[1], data.logLoaded[2], data.logLoaded[4] = true, true, true
+      local g = open()
+      assert.are.equal(1002, g:GetCurrentTabID())
+      view(g, -2)
+      assert.are.same({ { 1, 2, 4 } }, calls.logs)
+      assert.are.equal(3, #cards(g))
+      assert.are.equal(2, g:DepositTab(), "deposits still go to the tab shown last")
     end)
 
     it("says the log is still loading while a tab's has not arrived, and nothing was logged once all have", function()
@@ -845,7 +891,7 @@ describe("NextGuildBank", function()
       view(g, -2)
       table.insert(data.itemLogs[2], 1, entry({ kind = "deposit", name = "Sylvanas", link = ORE, count = 2, tab = 2, index = 2 }))
       handlers["guildbank/LogChanged"](ctx())
-      assert.are.same({ "Ore", "Deposited by Sylvanas" }, cards(g)[1])
+      assert.are.same({ "Ore", action("Deposit", "Sylvanas") }, cards(g)[1])
     end)
 
     it("asks for the money log again when the guild's gold changes while it shows", function()
@@ -857,7 +903,7 @@ describe("NextGuildBank", function()
       data.money = data.money + 100
       handlers["guildbank/MoneyChanged"](ctx())
       assert.are.same({ { MONEY }, { MONEY } }, calls.logs)
-      view(g, -1)
+      click(tabNamed(g, "All Tabs").button)
       data.money = data.money + 100
       handlers["guildbank/MoneyChanged"](ctx())
       assert.are.equal(2, #calls.logs, "only while it shows")
@@ -886,18 +932,18 @@ describe("NextGuildBank", function()
 
     -- Found by the bug review: a guild button takes its dimming from the read it was drawn from, so items drawn again
     -- from the last read showed every item while the search box still held a search.
-    it("applies the search box's text to its items again back on Items", function()
+    it("applies the search box's text to its items again back on a tab's items", function()
       override(stubs.search, "Search", function(_, text) return { ["1002_4"] = text == "ore" } end)
       local g = open()
       override(stubs.searchBox, "GetSearchText", function() return g.searchBox.textBox:GetText() end)
       g:Draw(ctx(), oreRead())
       view(g, -2)
       g.searchBox.textBox:SetText("zzz")
-      view(g, -1)
+      click(tabNamed(g, "All Tabs").button)
       assert.is_false(g.content.buttons["1002_4"].button:GetMatchesSearch())
       view(g, -2)
       g.searchBox.textBox:SetText("")
-      view(g, -1)
+      click(tabNamed(g, "All Tabs").button)
       assert.is_true(g.content.buttons["1002_4"].button:GetMatchesSearch())
     end)
 
@@ -910,7 +956,7 @@ describe("NextGuildBank", function()
       assert.are.same({ "Donations", "Gear", "Mats" }, sectionNames(g))
     end)
 
-    it("lets go of the guild bank's buttons in a log, and draws them again from the last read back on Items", function()
+    it("lets go of the guild bank's buttons in a log, and draws them at once from the last read back on the tab shown", function()
       data.logLoaded[MONEY] = true
       local g = open()
       g:Draw(ctx(), oreRead())
@@ -924,11 +970,11 @@ describe("NextGuildBank", function()
       later.tabs[ALL].items[1].itemInfo.category = "Metals"
       g:Draw(ctx(), later)
       assert.are.equal(ago(0, 0, 0, 1), g.content.order[1].name, "a read waits while a log shows")
-      view(g, -1)
+      click(tabNamed(g, "All Tabs").button)
       assert.is_false(g.content.cards)
       assert.are.same({ "Metals" }, sectionNames(g))
       assert.is_true(g.content.buttons["1002_4"].frame:IsShown())
-      assert.are.equal(-1, g.tabs.footSelected)
+      assert.are.equal(ALL, g.tabs.selected)
     end)
 
     it("lays a log out in one column of cards, whatever the guild bank's section columns", function()
@@ -974,7 +1020,7 @@ describe("NextGuildBank", function()
       assert.are.same({ "current" }, calls.place)
     end)
 
-    it("opens on Items again, its cards let go", function()
+    it("opens on its items again, its cards let go", function()
       data.logLoaded[MONEY] = true
       local g = open()
       view(g, -3)
@@ -985,7 +1031,7 @@ describe("NextGuildBank", function()
       g.frame:GetScript("OnHide")(g.frame)
       assert.is_false(card.frame:IsShown())
       open(g)
-      assert.are.equal(-1, g.tabs.footSelected)
+      assert.are.equal(ALL, g.tabs.selected)
       assert.is_false(g.content.cards)
     end)
 
@@ -1147,13 +1193,15 @@ describe("NextGuildBank", function()
         assert.are.equal("", g.content.order[2].count:GetText())
       end)
 
-      it("shows one tab's text when it shows by itself", function()
+      it("shows every tab's text whichever tab showed before it, and lets go of them for a tab's items", function()
+        data.showTabs = true
         local g = open()
         view(g, -4)
+        assert.are.same({ { 1, 2, 4 } }, calls.texts)
+        assert.are.same({ "Gear", "Mats", "Donations" }, sectionNames(g))
         click(tabNamed(g, "Mats").button)
-        assert.are.same({ 2 }, calls.texts[2])
-        assert.are.same({ "Mats" }, sectionNames(g))
-        assert.is_false(block(g, 1).frame:IsShown(), "Gear's text is not shown")
+        assert.is_false(block(g, 1).frame:IsShown())
+        assert.is_false(block(g, 2).frame:IsShown())
       end)
 
       it("lets go of the text box's focus as the view changes, and forgets unsaved text when the visit ends", function()

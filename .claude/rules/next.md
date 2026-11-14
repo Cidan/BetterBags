@@ -357,8 +357,9 @@ section dragged out of a panel returns to the panel's strata (next-drag.md §7).
   as the body changes height (`PlaceFoot`, from the body's `OnSizeChanged`); on a body too short, right under the tabs
   above, the group gap (`TAB_GROUP_GAP`) between, never over them. The rail stays as tall as its tabs stacked, whatever the
   body's height: an autosized small panel fits the rail (`FittedHeight`), and a rail as tall as the body would grow it
-  for ever. The foot is chosen apart from the tabs above (`SelectFoot`, `footSelected`), with a bar of its own
-  (`footIndicator`, styled and accented as the other); both bars go through `selectOn`. Foot tabs never move nor let a
+  for ever. A foot tab is chosen as any tab is (`Select`: one chosen down the whole rail, the bar going to it, and
+  following it as the foot follows the body; asked: "just like all the other tabs ... not this sort of dual selector
+  type system"). Foot tabs never move nor let a
   moved tab pass them (`movable` false, `Ordered` leaves them, `layout` keeps their place through a move); they count in
   the rail's width (a chained bag's gap). Rails without foot tabs lay out as before. Coverage: `spec/next/tabs_spec.lua`
   ("tabs at its foot").

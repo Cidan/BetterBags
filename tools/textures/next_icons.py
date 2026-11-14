@@ -218,6 +218,10 @@ def deposit():
     # Into the Warbank: an arrow down into a tray.
     return union(tray(), line(10.0, 2.4, 10.0, 12.6), chevron(10.0, 13.0, 0, 1, 3.8))
 
+def withdraw():
+    # Out of the guild bank (its log, guild-bank.md §5): deposit's arrow turned to rise out of the tray.
+    return union(tray(), line(10.0, 13.0, 10.0, 2.8), chevron(10.0, 2.4, 0, -1, 3.8))
+
 def coins():
     # A stack of three coins, seen from the side.
     def coin(y):
@@ -416,7 +420,7 @@ def mortar():
 GLYPHS = {
     "settings": gear, "close": close, "anchor": anchorFree, "anchorshown": anchorShown, "lock": lock, "bags": bag,
     "small": shrink, "full": expand,
-    "banktabs": tabs, "deposit": deposit, "depositgold": depositGold, "withdrawgold": withdrawGold,
+    "banktabs": tabs, "deposit": deposit, "withdraw": withdraw, "depositgold": depositGold, "withdrawgold": withdrawGold,
     "filter": filt, "selljunk": tag, "repair": repair, "guildrepair": guildRepair,
     "chevron": chevronDown, "back": chevronLeft, "check": check, "search": magnifier, "plus": plus,
     "circle": circle, "minimize": minimize, "maximize": maximize,

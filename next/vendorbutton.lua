@@ -68,16 +68,16 @@ end
 
 ---@alias NextVendorButtonMode "buy"|"buyback"|"repair"|"log"
 
--- A log entry as a card shows it (the guild bank's logs): its icon, its title beside it, and its line, or its gold
--- written as a price, along the bottom.
+-- A log entry as a card shows it (the guild bank's logs): its icon, its title beside it (an item's name, or gold written
+-- as a price), and along the bottom its action's glyph and who did it.
 ---@class (exact) NextLogCard
 ---@field key string What the canvas knows it by.
 ---@field texture number|string
 ---@field count? number A stack drawn on the icon.
 ---@field quality? number Its title's color from Uncommon up, and the quality border.
 ---@field title string Beside the icon, up to two lines.
----@field line? string Along the bottom, in the price's role.
----@field amount? number Gold along the bottom instead, written as a price.
+---@field action? string Its action (a key of Vendor.LogIcons), its glyph first on the bottom line (LogIcon).
+---@field line? string Along the bottom, after the glyph, in the price's role: who did it.
 ---@field link? string Its item: the tooltip shows it, and a modified click links it.
 ---@field lines string[] What its tooltip says (after its item's, when it has one).
 ---@field onDrop? fun() What an item dropped on it, or left-clicked onto it, does: its panel's own drop.
@@ -143,6 +143,27 @@ local function priceParts(price, costs)
     add(cost.value, cost.texture)
   end
   return parts, coins
+end
+
+-- LogIcon is a guild bank log entry's action as a glyph in a line of text (Vendor.LogIcons: its Texture or Atlas and
+-- Color), as large as a price's coins (Vendor.CoinSize), tinted by its color: the texture escape's vertex color
+-- (|T...|t's last three fields, |A...|a's, warcraft.wiki.gg UI escape sequences). "" for an action the theme draws none
+-- for.
+---@param key string
+---@return string
+function vendorButton:LogIcon(key)
+  local V = style.Theme.Vendor
+  local spec = V.LogIcons and V.LogIcons[key]
+  if not spec then
+    return ""
+  end
+  local r, g, b = style:RGBA(spec.Color or "White")
+  r, g, b = math.floor(r * 255 + 0.5), math.floor(g * 255 + 0.5), math.floor(b * 255 + 0.5)
+  local size = V.CoinSize
+  if spec.Atlas then
+    return format("|A:%s:%d:%d:0:0:%d:%d:%d|a", spec.Atlas, size, size, r, g, b)
+  end
+  return format("|T%s:%d:%d:0:0:64:64:0:64:0:64:%d:%d:%d|t", style:TexturePath(spec.Texture), size, size, r, g, b)
 end
 
 -- PriceText is a price on one line, as Blizzard's merchant writes it: each coin of the gold it has
@@ -272,6 +293,9 @@ function buttonProto:Style()
   style:SetFont(self.stock, V.StackFont)
   self:setNameFont()
   self:setPriceFont()
+  if self.mode == "log" then
+    self:writeLogLine()
+  end
   self:placeCosts()
 end
 
@@ -566,8 +590,8 @@ function buttonProto:SetRepair(entry)
   self:showPrice(entry.cost, {})
 end
 
--- SetLog shows a guild bank log entry: its icon and stack, its title beside it in its quality's color, and its line
--- (or its gold, written as a price) along the bottom.
+-- SetLog shows a guild bank log entry: its icon and stack, its title beside it in its quality's color, and along the
+-- bottom its action's glyph and who did it.
 ---@param entry NextLogCard
 function buttonProto:SetLog(entry)
   self.mode, self.log = "log", entry
@@ -575,13 +599,18 @@ function buttonProto:SetLog(entry)
   self:reset(entry.texture, entry.quality)
   self:setCount(entry.count)
   self:setName(entry.title, entry.quality)
-  if entry.amount ~= nil then
-    self:showPrice(entry.amount, {})
-  else
-    self.priceAmount, self.priceCosts = nil, nil
-    self.price:SetText(entry.line or "")
-    self:placeCosts()
-  end
+  self.priceAmount, self.priceCosts = nil, nil
+  self:writeLogLine()
+  self:placeCosts()
+end
+
+-- writeLogLine writes a log entry's bottom line: its action's glyph in the theme's color for it (again for each theme),
+-- then who did it.
+---@private
+function buttonProto:writeLogLine()
+  local entry = self.log
+  local icon = entry.action and vendorButton:LogIcon(entry.action) or ""
+  self.price:SetText(icon ~= "" and (icon .. " " .. (entry.line or "")) or (entry.line or ""))
 end
 
 -- SetSearchMatch dims the button when a search leaves it out.

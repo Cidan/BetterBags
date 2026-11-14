@@ -199,6 +199,7 @@ sonataNext:RegisterTheme({
     IconFull = TEXTURES .. "icon_full.png",
     IconBankTabs = TEXTURES .. "icon_banktabs.png",
     IconDeposit = TEXTURES .. "icon_deposit.png",
+    IconWithdraw = TEXTURES .. "icon_withdraw.png",
     IconDepositGold = TEXTURES .. "icon_depositgold.png",
     IconWithdrawGold = TEXTURES .. "icon_withdrawgold.png",
     IconFilter = TEXTURES .. "icon_filter.png",
@@ -471,6 +472,8 @@ sonataNext:RegisterTheme({
     Highlight = { 0.3, 0.48, 0.71, 0.14 },
     CardFill = { 0.18, 0.16, 0.14, 0.045 },
     CardHover = { 0.18, 0.16, 0.14, 0.09 },
+    -- A guild bank log's move in blue pencil: this theme's Gold is its red pencil, a withdrawal's color.
+    LogIcons = { Move = { Color = "PencilBlue" } },
   },
 
   -- The settings window as a larger sheet: the pages down its side on a shade of it, marked in a highlighter's blue.

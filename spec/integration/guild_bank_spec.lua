@@ -405,7 +405,7 @@ describe("a guild bank visit on the whole addon", function()
     local ids, views = {}, {}
     for _, t in ipairs(panel.tabs.tabs) do table.insert(t.foot and views or ids, t.id) end
     assert.are.same({ 1, 1001, 1002 }, ids)
-    assert.are.same({ -1, -2, -3, -4 }, views, "Items, Log, Money Log and Info at the rail's foot")
+    assert.are.same({ -2, -3, -4 }, views, "Log, Money Log and Info at the rail's foot")
     assert.are.equal(C_CurrencyInfo.GetCoinTextureString(5000000), panel.moneyFrame.text:GetText())
     assert.are.same({}, handle.errors)
   end)
@@ -428,16 +428,19 @@ describe("a guild bank visit on the whole addon", function()
     assert.are.equal("Loading...", panel.emptyText:GetText())
     addon:GetModule("Events")._eventMap["GUILDBANKLOG_UPDATE"].fn("GUILDBANKLOG_UPDATE")
     frames()
-    local titles = {}
+    local who = {}
     for _, s in ipairs(panel.content.order) do
-      for _, e in ipairs(s.entries) do table.insert(titles, e.item.name:GetText()) end
+      for _, e in ipairs(s.entries) do table.insert(who, e.item.price:GetText()) end
     end
-    assert.are.same({ "Jaina deposited", "Arthas deposited" }, titles, "newest first")
+    local deposited = addon:GetModule("NextVendorButton"):LogIcon("DepositGold")
+    assert.is_true(deposited:find("depositgold", 1, true) ~= nil, "the theme's deposit glyph")
+    assert.are.same({ deposited .. " Jaina", deposited .. " Arthas" }, who, "newest first, each a glyph and who")
     assert.is_false(panel.emptyText:IsShown())
-    local items = panel.tabs:Tab(-1)
+    local items = panel.tabs:Tab(1)
     items.button:GetScript("OnClick")(items.button, "LeftButton")
     frames()
-    assert.is_not_nil(panel.content.buttons["1002_2"], "its items again")
+    assert.is_not_nil(panel.content.buttons["1002_2"], "All Tabs' items again")
+    assert.are.equal(1, panel.tabs.selected)
     assert.are.same({}, handle.errors)
   end)
 

@@ -441,6 +441,13 @@ sonataNext:RegisterTheme({
     -- Cards inked faintly on the orange.
     CardFill = { 0.09, 0.055, 0.04, 0.08 },
     CardHover = { 0.09, 0.055, 0.04, 0.12 },
+    -- A guild bank log's glyphs in this palette's greens, reds and purples that read best on the orange: Gain, Danger and
+    -- Gold measured 1.6, 2.2 and 2.8 to one against these cards, Lime, Maroon and Night 2.9, 2.6 and 3.0.
+    LogIcons = {
+      Deposit = { Color = "Lime" }, Withdraw = { Color = "Maroon" }, Move = { Color = "Night" },
+      DepositGold = { Color = "Lime" }, WithdrawGold = { Color = "Maroon" }, Repair = { Color = "Maroon" },
+      BuyTab = { Color = "Maroon" },
+    },
   },
 
   -- Item buttons as dark cells on the orange: the icon cropped, a thin ink edge, an item's quality on its icon's border.

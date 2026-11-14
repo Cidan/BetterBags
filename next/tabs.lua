@@ -45,8 +45,8 @@ local nextTabs = addon:NewModule('NextTabs')
 ---@field block? string The tabs it moves among: those of the same block, next to each other (the bank's own
 --- groups and its Warbank's). A block's gap stays above whichever of its tabs is first.
 ---@field foot? boolean It hangs at the rail's foot (listed after the others): the foot's last tab ends where the content
---- does, the footer's height above the body's bottom, never over the tabs above it. The foot's tabs are chosen apart from
---- the others (SelectFoot), with a bar of their own, and never move (the guild bank's views).
+--- does, the footer's height above the body's bottom, never over the tabs above it. It is chosen as any tab is, and
+--- never moves (the guild bank's views).
 
 ---@class (exact) NextTab
 ---@field id number
@@ -87,13 +87,10 @@ local nextTabs = addon:NewModule('NextTabs')
 ---@field side "RIGHT"|"LEFT" The side of the screen the panel is on.
 ---@field indicator Texture The bar beside the selected tab.
 ---@field indicatorY number Where the bar is.
----@field footIndicator Texture The bar beside the foot's selected tab.
----@field footIndicatorY number Where the foot's bar is.
 ---@field tabs NextTab[]
 ---@field pool NextTab[] Ordinary tabs not in use, hidden.
 ---@field securePool NextTab[] Purchase tabs not in use, hidden.
 ---@field selected? number
----@field footSelected? number The foot's selected tab.
 ---@field topEnd number How far down the tabs above the foot reach, the spacing after the last included; 0 with none.
 ---@field dropTarget? number The tab a dragged section would drop on (next.md §7).
 ---@field entries NextTabEntry[] What SetTabs was last given, laid out again by a theme (ApplyStyle).
@@ -142,10 +139,6 @@ function nextTabs:Create(body, side)
   rail.indicator:SetColorTexture(1, 1, 1, 1)
   rail.indicator:Hide()
   rail.indicatorY = 0
-  rail.footIndicator = rail.frame:CreateTexture(nil, "OVERLAY")
-  rail.footIndicator:SetColorTexture(1, 1, 1, 1)
-  rail.footIndicator:Hide()
-  rail.footIndicatorY = 0
   rail.tabs = {}
   rail.entries = {}
   rail.pool = {}
@@ -222,15 +215,13 @@ function railProto:styleRail()
   end
   pixel:Size(frame, style.TAB_MAX_WIDTH, 1)
   local bar = style.Theme.Tabs.Indicator
-  for _, indicator in ipairs({ self.indicator, self.footIndicator }) do
-    pixel:Size(indicator, bar and bar.Width or 0, style.TAB_HEIGHT)
-    -- A bar of art or of a color, tinted by the selected tab's accent as it is selected (Select).
-    if style:IsArt(bar) then
-      style:Paint(indicator, bar)
-    else
-      indicator:SetTexCoord(0, 1, 0, 1)
-      indicator:SetColorTexture(1, 1, 1, 1)
-    end
+  pixel:Size(self.indicator, bar and bar.Width or 0, style.TAB_HEIGHT)
+  -- A bar of art or of a color, tinted by the selected tab's accent as it is selected (Select).
+  if style:IsArt(bar) then
+    style:Paint(self.indicator, bar)
+  else
+    self.indicator:SetTexCoord(0, 1, 0, 1)
+    self.indicator:SetColorTexture(1, 1, 1, 1)
   end
 end
 
@@ -574,7 +565,6 @@ function railProto:SetTabs(entries)
   self.topEnd = above > 0 and (y + step(self)) or 0
   self:PlaceFoot()
   self:Select(self.selected)
-  self:SelectFoot(self.footSelected)
   if self.onResize then
     self.onResize(context:New("NextTabs_Resize"))
   end
@@ -606,9 +596,9 @@ function railProto:PlaceFoot()
     tab.yTarget = nil
     tab.y = top + (i - 1) * s
     self:place(tab)
-    if tab.id == self.footSelected and self.footIndicator:IsShown() then
-      tween:Stop(self.footIndicator)
-      self:moveIndicator(-tab.y, true)
+    if tab.id == self.selected and self.indicator:IsShown() then
+      tween:Stop(self.indicator)
+      self:moveIndicator(-tab.y)
     end
   end
 end
@@ -630,7 +620,7 @@ end
 ---@param tab NextTab
 function railProto:paint(tab)
   local T = style.Theme.Tabs
-  local selected = tab.id == (tab.foot and self.footSelected or self.selected) or tab.id == self.dropTarget
+  local selected = tab.id == self.selected or tab.id == self.dropTarget
   local fill = selected and T.SelectedFill or T.Fill
   if style:IsArt(fill) then
     -- Art is drawn for the backpack's tabs, sticking out to the left, and mirrored on the other panels.
@@ -670,19 +660,12 @@ function railProto:paint(tab)
   self:placeContent(tab)
 end
 
--- moveIndicator puts a bar at y: the foot's (foot), else the one of the tabs above it.
 ---@private
 ---@param y number
----@param foot? boolean
-function railProto:moveIndicator(y, foot)
-  local bar = foot and self.footIndicator or self.indicator
-  if foot then
-    self.footIndicatorY = y
-  else
-    self.indicatorY = y
-  end
-  bar:ClearAllPoints()
-  pixel:Point(bar, self:edge(), self.frame, self:edge(), 0, y)
+function railProto:moveIndicator(y)
+  self.indicatorY = y
+  self.indicator:ClearAllPoints()
+  pixel:Point(self.indicator, self:edge(), self.frame, self:edge(), 0, y)
 end
 
 -- tab returns the tab of an id.
@@ -765,59 +748,40 @@ function railProto:Pulse(id)
   })
 end
 
--- Select makes id's tab the selected one among the tabs above the foot; with animate the bar glides to it.
+-- Select makes id's tab the selected one, wherever it hangs (at the foot too); with animate the bar glides to it.
 ---@param id? number
 ---@param animate? boolean
 function railProto:Select(id, animate)
   self.selected = id
-  self:selectOn(false, id, animate)
-end
-
--- SelectFoot makes id's tab the selected one among the foot's, with the foot's bar; with animate it glides to it.
----@param id? number
----@param animate? boolean
-function railProto:SelectFoot(id, animate)
-  self.footSelected = id
-  self:selectOn(true, id, animate)
-end
-
--- selectOn paints every tab for what is selected, and puts a bar (the foot's, or the one above it) beside id's tab in its
--- accent, gliding with animate, or hides the bar when id names none of its tabs.
----@private
----@param foot boolean
----@param id? number
----@param animate? boolean
-function railProto:selectOn(foot, id, animate)
-  local bar = foot and self.footIndicator or self.indicator
   local target, accent
   for _, tab in ipairs(self.tabs) do
     self:paint(tab)
-    if tab.id == id and (tab.foot or false) == foot then
+    if tab.id == id then
       target = -tab.y
       accent = tab.accent
     end
   end
   if target == nil or not style.Theme.Tabs.Indicator then
-    tween:Stop(bar)
-    bar:Hide()
+    tween:Stop(self.indicator)
+    self.indicator:Hide()
     return
   end
-  bar:SetVertexColor(accentColor(accent))
-  if animate and bar:IsShown() then
-    tween:Play(bar, {
+  self.indicator:SetVertexColor(accentColor(accent))
+  if animate and self.indicator:IsShown() then
+    tween:Play(self.indicator, {
       duration = style.Time.Glide,
-      from = foot and self.footIndicatorY or self.indicatorY,
+      from = self.indicatorY,
       to = target,
       ease = style:Ease("Glide"),
       onUpdate = function(v)
-        self:moveIndicator(v, foot)
+        self:moveIndicator(v)
       end,
     })
   else
-    tween:Stop(bar)
-    self:moveIndicator(target, foot)
+    tween:Stop(self.indicator)
+    self:moveIndicator(target)
   end
-  bar:Show()
+  self.indicator:Show()
 end
 
 -- BeginMove lifts a tab to move it (SetReorderHandler), unless one is already moving or another frame is
