@@ -40,8 +40,10 @@ tabs, the title and its ribbon, the sparkles, the header buttons and the footer.
 prototype with `NextPanel:Extend(proto, name)` and overrides what differs: `GetHeaderButtons`,
 `CreateMoney`, `RefreshTabs`, `OnTabClicked`, `OnTabDragged`, `GetCurrentTabID`, `OnShowing`,
 `OnSlidOut`, `WatchKind`, `Refresh` and `Sort` (and `watchesCooldowns`), and what a right click on
-its title does with `OnTitleRightClick` and `TitleRightClickHint` (the backpack and the bank sort; the others do
-nothing).
+its title does with `OnTitleRightClick`, `TitleRightClickHint` and `TitleRightClickLabel` (the backpack and the bank sort;
+the others do nothing). In a theme with a bag button (Plain), a right click on the button does the same, and its menu lists,
+after the header's buttons, what only it offers (`MenuEntries`: that right click's action, and the switch to small bags,
+`SizeEntry`, on a panel with no size button).
 
 Docked at full height, a panel stands from the screen's top to its bottom, unless its theme keeps it clear of both
 (`Panel.DockMargin`, the Plain theme): it stands in by what its art reaches past its body there (`NextFrameArt:Reach`,

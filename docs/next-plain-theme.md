@@ -397,6 +397,21 @@ offset by its direction (no shipped theme pins one outward but Plain).
 Not yet seen in game: all of it. The vendor's portrait in its ring was only checked in the specs (the preview cannot draw
 a unit's portrait).
 
+## The bag button's right click, and what its menu was missing (2026-11-14)
+
+Asked: "add the missing button interactions to the plain drop down menu ... minimize/maximize bags, etc, whatever is
+missing", and reported: "right clicking the bag button on plain doesn't seem to sort bags like it does on the other themes".
+Measured against the real panels first: every header button was in its panel's menu already (the backpack's Show Blizzard
+Bags and Small Bags, the bank's Show Bank Tabs and Deposit Warbank Items, each anchor while small); what was nowhere was the
+sort (a right click on the title, on every theme) and the switch to small bags on the bank, vendor and guild bank (only the
+backpack has a size button), and the bag button took left clicks only.
+
+Now (next-themes-menubutton.md §19): a right click on the bag button does what one on the title does (the backpack and
+the bank sort; the bank as the original bank's button did, the Warbank on a Warbank tab, Shift depositing), its tooltip
+naming it ("Right Click: Sort Bags", "Sort Bank"), as the original's; and the menu lists Sort Bags on the backpack, Sort Bank
+on the bank, and Small Bags on the bank, vendor and guild bank, before Open Options Screen. No theme gains a header button.
+Not seen in game.
+
 ## Docked clear of the screen's top and bottom (2026-11-14, issue #1248)
 
 Triaged from Discord: docked at full height, the bag's frame and its bag button stood past the screen's edges. The first

@@ -411,7 +411,10 @@ describe("NextGuildBank", function()
         Pinned = { closeButton = { Point = "TOPOUTER" } } } } })
       g:ApplyStyle(ctx())
       g.menuButton:Open(ctx())
-      assert.are.same({ "Deposit Gold", "Withdraw Gold", "Open Options Screen" }, { list[2].text, list[3].text, list[4].text })
+      -- The switch to small bags too: the backpack's size button's, every bag's (asked: "add the missing button interactions to
+      -- the plain drop down menu").
+      assert.are.same({ "Deposit Gold", "Withdraw Gold", "Small Bags", "Open Options Screen" },
+        { list[2].text, list[3].text, list[4].text, list[5].text })
       assert.is_truthy(list[3].tooltipText:find("You may withdraw up to ", 1, true))
       data.withdrawMoney = 12340000
       data.money = 56780000

@@ -138,12 +138,18 @@ function bagProto:GetHeaderButtons()
       menuTooltip = function() return L:G("Your bags in the tabs, to swap them, and your items bag by bag.") end,
       onClick = function(ctx) self:ToggleBlizzardBags(ctx) end },
     -- Small mode (docs/next-small-mode.md): every BetterBags Next panel full height or small and
-    -- movable. Its icon is its state's (SizeIconKey).
-    { key = "sizeButton", iconKey = self:SizeIconKey(), tooltipFunc = function() self:SizeTooltip() end,
-      label = L:G("Small Bags"), checked = function() return self:IsSmall() end,
-      menuTooltip = function() return L:G("Smaller bags you can move anywhere: drag a bag by its title.") end,
-      onClick = function(ctx) nextPanel:SetSize(ctx, self:IsSmall() and "full" or "small") end },
+    -- movable (SizeEntry, every panel's switch). Its icon is its state's (SizeIconKey).
+    self:sizeButtonSpec(),
   }
+end
+
+-- sizeButtonSpec is the size button: the switch every panel's menu offers (SizeEntry), with its icon and its tooltip.
+---@private
+---@return NextHeaderButton
+function bagProto:sizeButtonSpec()
+  local spec = self:SizeEntry()
+  spec.key, spec.iconKey, spec.tooltipFunc = "sizeButton", self:SizeIconKey(), function() self:SizeTooltip() end
+  return spec
 end
 
 -- SizeIconKey is the size button's icon for the panel's size (Header.Buttons.Icons): sizeButtonFull
@@ -407,4 +413,10 @@ end
 ---@return string
 function bagProto:TitleRightClickHint()
   return L:G("Right-click to sort your bags.")
+end
+
+-- TitleRightClickLabel names the sort, as the original bags' button's right click did (frames/menubutton.lua).
+---@return string
+function bagProto:TitleRightClickLabel()
+  return L:G("Sort Bags")
 end

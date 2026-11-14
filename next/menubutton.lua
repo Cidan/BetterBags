@@ -55,7 +55,7 @@ function menuButton:Create(panel)
   local frame = CreateFrame("Button", nil, panel.frame)
   -- Over the panel's frame drawn above its content (Panel.Frame.Above), as the header's buttons are.
   frame:SetFrameLevel(panel.overlay:GetFrameLevel() + 3)
-  frame:RegisterForClicks("LeftButtonUp")
+  frame:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   frame:Hide()
   local b = setmetatable({ panel = panel, frame = frame, layers = {}, masks = {}, glow = 1,
     highlight = frame:CreateTexture(nil, "OVERLAY", nil, 7) }, { __index = buttonProto })
@@ -66,9 +66,15 @@ function menuButton:Create(panel)
   addon.SetScript(frame, "OnLeave", function()
     b:Light(false)
   end)
-  -- An item dropped or clicked on it goes in a category, where the theme takes it here (Header.ItemDrop: Plain's), as
-  -- the original bags' button made a category of one.
-  addon.SetScript(frame, "OnClick", function(ctx)
+  -- A right click does what one on the panel's title does (the backpack and the bank sort), as the original bags' button's
+  -- did (reported of Plain: "right clicking the bag button on plain doesn't seem to sort bags like it does on the other
+  -- themes"). An item dropped or clicked on it goes in a category, where the theme takes it here (Header.ItemDrop: Plain's),
+  -- as the original bags' button made a category of one.
+  addon.SetScript(frame, "OnClick", function(ctx, _, mouse)
+    if mouse == "RightButton" then
+      panel:OnTitleRightClick(ctx)
+      return
+    end
     if GetCursorInfo() == "item" and panel:ItemDropTarget() == "Menu" then
       panel:PickCategory(ctx, frame)
       return
@@ -298,6 +304,10 @@ function buttonProto:Light(on)
     end
     GameTooltip:SetOwner(self.frame, point)
     GameTooltip:AddDoubleLine(L:G("Left Click"), L:G("Open Menu"), 1, 0.81, 0, 1, 1, 1)
+    local right = self.panel:TitleRightClickLabel()
+    if right ~= nil then
+      GameTooltip:AddDoubleLine(L:G("Right Click"), right, 1, 0.81, 0, 1, 1, 1)
+    end
     GameTooltip:Show()
   else
     GameTooltip:Hide()
@@ -312,14 +322,14 @@ local function pinned(button)
   return type(pins) == "table" and pins[button.key] ~= nil
 end
 
--- entryOf is a header button as a menu entry, in the original bags' menu's form (LibUIDropDownMenu, EasyMenu): its
--- name (label, else its tooltip), checked for a toggle (checked), disabled as the button is, its tooltip on the entry
--- (menuTooltip, else its tooltip when it is not the name), its action on a click. The tooltip is read now: the
+-- entryOf is a header button's spec as a menu entry, in the original bags' menu's form (LibUIDropDownMenu, EasyMenu): its
+-- name (label, else its tooltip), checked for a toggle (checked), disabled unless enabled (as its button is), its tooltip on
+-- the entry (menuTooltip, else its tooltip when it is not the name), its action on a click. The tooltip is read now: the
 -- library calls back on entering an entry only on retail.
----@param button Button
 ---@param spec NextHeaderButton
+---@param enabled boolean
 ---@return table
-local function entryOf(button, spec)
+local function entryOf(spec, enabled)
   local label = spec.label or spec.tooltip
   if type(label) == "function" then
     label = label()
@@ -333,7 +343,7 @@ local function entryOf(button, spec)
     notCheckable = spec.checked == nil,
     checked = spec.checked,
     isNotRadio = true,
-    disabled = not button:IsEnabled(),
+    disabled = not enabled,
     tooltipTitle = label,
     tooltipText = text,
     tooltipOnButton = true,
@@ -345,7 +355,8 @@ local function entryOf(button, spec)
 end
 
 -- Entries lists the menu: the original bags' title line, then the header buttons the panel shows that are not pinned,
--- in their order, those that say menuLast (Open Options Screen, last in the original menu too) at the end.
+-- in their order, then what only the menu offers (the panel's MenuEntries: its sort, the switch to small bags where it has
+-- no size button), those that say menuLast (Open Options Screen, last in the original menu too) at the end.
 ---@return table[]
 function buttonProto:Entries()
   local settings = addon:GetModule('NextSettings', true)
@@ -355,8 +366,11 @@ function buttonProto:Entries()
   for _, button in ipairs(self.panel.headerButtons) do
     local spec = button.spec
     if spec ~= nil and button:IsShown() and not pinned(button) then
-      table.insert(spec.menuLast and last or list, entryOf(button, spec))
+      table.insert(spec.menuLast and last or list, entryOf(spec, button:IsEnabled()))
     end
+  end
+  for _, spec in ipairs(self.panel:MenuEntries()) do
+    table.insert(list, entryOf(spec, true))
   end
   for _, entry in ipairs(last) do
     table.insert(list, entry)

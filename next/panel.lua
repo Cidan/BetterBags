@@ -5112,6 +5112,44 @@ function panelProto:TitleRightClickHint()
   return nil
 end
 
+-- TitleRightClickLabel names what a right click on the title does, as an action: the bag button's tooltip line (it runs the
+-- same right click) and its menu's entry for it (MenuEntries); nil when it does nothing.
+---@return string?
+function panelProto:TitleRightClickLabel()
+  return nil
+end
+
+-- SizeEntry is the switch between full and small bags (docs/next-small-mode.md), one for every bag (nextPanel:SetSize), as a
+-- header button's spec without its button: the backpack's size button (next/bag.lua) and the entry a bag button's menu lists on
+-- a panel without one (MenuEntries).
+---@return table
+function panelProto:SizeEntry()
+  return {
+    label = L:G("Small Bags"),
+    checked = function() return self:IsSmall() end,
+    menuTooltip = function() return L:G("Smaller bags you can move anywhere: drag a bag by its title.") end,
+    onClick = function(ctx) nextPanel:SetSize(ctx, self:IsSmall() and "full" or "small") end,
+  }
+end
+
+-- MenuEntries is what a bag button's menu (Header.Buttons.Menu, NextMenuButton) lists after the header's row, none of it a
+-- header button: what a right click on the title does (the backpack's and the bank's sort), and the switch to small bags on a
+-- panel with no size button of its own, so every bag's menu has it (asked of the Plain theme: "add the missing button
+-- interactions to the plain drop down menu ... minimize/maximize bags, etc, whatever is missing"). Each is a header button's
+-- spec without its button (label, checked, menuTooltip, onClick).
+---@return table[]
+function panelProto:MenuEntries()
+  local entries = {}
+  local sort = self:TitleRightClickLabel()
+  if sort ~= nil then
+    table.insert(entries, { label = sort, onClick = function(ctx) self:OnTitleRightClick(ctx) end })
+  end
+  if self.sizeButton == nil then
+    table.insert(entries, self:SizeEntry())
+  end
+  return entries
+end
+
 ---@private
 ---@param on boolean
 function panelProto:lightTitle(on)

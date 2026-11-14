@@ -523,13 +523,38 @@ describe("NextBank", function()
       for i = 2, #list do
         names[i - 1] = list[i].text
       end
-      -- Its anchor only while small (docs/next-bag-anchor.md); its sort on a right click on its title.
-      assert.are.same({ "Show Bank Tabs", "Deposit Warbank Items", "Open Options Screen" }, names)
+      -- Its anchor only while small (docs/next-bag-anchor.md); its sort (a right click on its title) and the switch to small
+      -- bags (the backpack's size button's) in the menu too (asked: "add the missing button interactions to the plain drop
+      -- down menu").
+      assert.are.same({ "Show Bank Tabs", "Deposit Warbank Items", "Sort Bank", "Small Bags", "Open Options Screen" }, names)
       assert.is_true(list[2].checked())
       db.showBankTabs = false
       assert.is_false(list[2].checked())
       list[3].func()
       assert.are.same({ ACCOUNT }, calls.deposits)
+      UseNextTheme(nil)
+      bank:ApplyStyle(ctx())
+    end)
+
+    -- Reported of Plain: "right clicking the bag button on plain doesn't seem to sort bags like it does on the other themes".
+    it("sorts on a right click of its bag button and from its menu, as a right click on its title does", function()
+      local list
+      override(StubBetterBagsModule("ContextMenu"), "Show", function(_, _, entries) list = entries end)
+      local bank = opened()
+      UseNextTheme({ Header = { Buttons = { Menu = { Point = "TOPINNER", Width = 40, Height = 40, Layers = {} },
+        Pinned = { closeButton = { Point = "TOPOUTER" } } } } })
+      bank:ApplyStyle(ctx())
+      local frame = bank.menuButton.frame
+      frame:GetScript("OnClick")(frame, "RightButton")
+      assert.are.same({ { "menu", bank } }, calls.sorts, "the menu button's sort, as its title's")
+      frame:GetScript("OnEnter")(frame)
+      local line = GameTooltip.doubleLines[2]
+      assert.are.same({ "Right Click", "Sort Bank" }, { line and line.left, line and line.right })
+      frame:GetScript("OnLeave")(frame)
+      bank.menuButton:Open(ctx())
+      assert.are.equal("Sort Bank", list[4].text)
+      list[4].func()
+      assert.are.same({ { "menu", bank }, { "menu", bank } }, calls.sorts)
       UseNextTheme(nil)
       bank:ApplyStyle(ctx())
     end)
@@ -576,6 +601,7 @@ describe("NextBank", function()
       assert.are.equal(0, #sentNamed("bags/SortBank"))
       assert.are.same({}, calls.sorts)
       assert.is_nil(bank:TitleRightClickHint())
+      assert.is_nil(bank:TitleRightClickLabel(), "no sort in a bag button's menu or tooltip either")
     end)
   end)
 

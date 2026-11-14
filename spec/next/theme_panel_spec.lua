@@ -929,10 +929,55 @@ describe("BetterBags Next's panels and themes", function()
       for i = 2, #list do
         names[i - 1] = list[i].text
       end
-      -- Sorted by a right click on its title, its anchor only while small (docs/next-bag-anchor.md).
-      assert.are.same({ "Show Blizzard Bags", "Small Bags", "Open Options Screen" }, names)
+      -- Its anchor only while small (docs/next-bag-anchor.md); its sort, a right click on its title, in the menu too (asked: "add
+      -- the missing button interactions to the plain drop down menu").
+      assert.are.same({ "Show Blizzard Bags", "Small Bags", "Sort Bags", "Open Options Screen" }, names)
       assert.is_false(list[2].checked())
       assert.are.equal(bag:IsSmall(), list[3].checked())
+      sent = {}
+      list[4].func()
+      assert.are.same({ "bags/SortBackpack" }, { sent[1] and sent[1][1] }, "sorted as a right click on its title sorts")
+    end)
+
+    -- Reported: "right clicking the bag button on plain doesn't seem to sort bags like it does on the other themes".
+    it("sorts the backpack on a right click of its bag button, as on its title, and says so", function()
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      menuTheme()
+      local frame = bag.menuButton.frame
+      sent = {}
+      frame:GetScript("OnClick")(frame, "RightButton")
+      assert.are.same({ "bags/SortBackpack" }, { sent[1] and sent[1][1] })
+      frame:GetScript("OnEnter")(frame)
+      local line = GameTooltip.doubleLines[2]
+      assert.are.same({ "Right Click", "Sort Bags" }, { line and line.left, line and line.right })
+      frame:GetScript("OnLeave")(frame)
+    end)
+
+    -- Every bag switches size together (nextPanel:SetSize); only the backpack has a size button, so the bank's menu has the
+    -- switch of its own (asked: "minimize/maximize bags, etc, whatever is missing").
+    it("lists the switch to small bags in the bank's menu, switching every bag", function()
+      local list
+      override(StubBetterBagsModule("ContextMenu"), "Show", function(_, _, entries) list = entries end)
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      local bank = opened(function(c) return nextBank:Create(c) end)
+      menuTheme()
+      bank.menuButton:Open(ctx())
+      local size = list[#list - 1]
+      assert.are.equal("Small Bags", size.text)
+      assert.are.equal("Open Options Screen", list[#list].text)
+      assert.is_false(size.checked())
+      size.func()
+      finishTweens()
+      assert.are.equal("small", db.size)
+      assert.is_true(bag:IsSmall() and bank:IsSmall())
+      assert.are.equal("sizeButtonSmall", bag.sizeButton.iconKey, "the backpack's size button says so")
+      bank.menuButton:Open(ctx())
+      assert.is_true(list[#list - 1].checked())
+      list[#list - 1].func()
+      finishTweens()
+      assert.are.equal("full", db.size, "and back")
+      assert.is_false(bag:IsSmall() or bank:IsSmall())
+      assert.are.equal("sizeButtonFull", bag.sizeButton.iconKey)
     end)
 
     -- Its anchor's entry names what a click does next (docs/next-bag-anchor.md), as its button's tooltip does.
@@ -947,7 +992,7 @@ describe("BetterBags Next's panels and themes", function()
       for i = 2, #list do
         names[i - 1] = list[i].text
       end
-      assert.are.same({ "Show Bag Anchor", "Show Blizzard Bags", "Small Bags", "Open Options Screen" }, names)
+      assert.are.same({ "Show Bag Anchor", "Show Blizzard Bags", "Small Bags", "Sort Bags", "Open Options Screen" }, names)
       assert.is_true(list[2].notCheckable)
       list[2].func()
       bag.menuButton:Open(ctx())
