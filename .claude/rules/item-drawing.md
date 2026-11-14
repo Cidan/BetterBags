@@ -96,6 +96,12 @@ Virtual slot keys (like `"Container"`, `"Reagent Bag"`, or aggregated free space
   `initializeSlotButton`. The Food & Drink bar's buttons move this way as what they offer moves (food-drink.md §3). Coverage:
   `spec/frames/item_classic_spec.lua` ("points a button made for no slot at a bag slot, and at another", "points a retail
   button at a slot through its Initialize").
+- **A static draw shows no new-item glow** (`SetStaticItemFromData`: it calls `ClearFlashItem` where an item draw calls
+  `UpdateNewItem`). On a button pointed at a bag slot (the Food & Drink bar's; asked: no new-item glow on those buttons),
+  Blizzard's own `UpdateNewItem`, which `ResetVisuals` calls on the button's first draw, lights the glow for a slot the
+  client flags new (`ContainerFrameItemButtonMixin:UpdateNewItem`, Mainline/ContainerFrame.lua: `C_NewItems.IsNewItem`) and
+  loops it until something stops it; a bag's own buttons and the item rows (on no real slot) are unchanged. Coverage:
+  `spec/frames/item_spec.lua` ("leaves no new-item glow on a static draw of a slot the client flags new").
 - **Acquisition & Release:** `itemFrame:GetButton(ctx, slotkey)` acquires a virtual button from `virtualPool` via `itemFrame:AcquireVirtualItem(ctx, slotkey)`. When views wipe or release item frames (`item:Wipe(ctx)`), virtual buttons are unmapped from `buttonsBySlotkey` and returned to `virtualPool`.
 
 ### 7a. Redrawing a Button Without Releasing It

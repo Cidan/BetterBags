@@ -685,7 +685,11 @@ function itemFrame.itemProto:SetItemFromData(ctx, data)
 	end
 	if decoration.UpdateQuestItem then decoration:UpdateQuestItem(isQuestItem, questID, isActive) end
 	elements:DrawItemQuest(decoration, questInfo)
-	if not self.staticData then
+	if self.staticData then
+		-- No new-item glow on a static draw: on a button pointed at a bag slot (the Food & Drink bar's), Blizzard's own
+		-- UpdateNewItem, which ResetVisuals calls, lights it for a slot the client flags new (item-drawing.md).
+		self:ClearFlashItem(ctx)
+	else
 		self:UpdateNewItem(ctx, data)
 	end
 	if decoration.UpdateJunkItem then decoration:UpdateJunkItem(data.itemInfo.itemQuality, noValue) end

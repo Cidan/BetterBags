@@ -82,7 +82,10 @@ tables (wago.tools DB2, retail 12.1.5.70783, Mists Classic, TBC Anniversary and 
   decoration as `GetButton` does once for a slot's own button; Blizzard's `SetBagID` goes through an attribute so the bag
   ID taints nothing, ContainerFrame.lua) as soon as the pick changes; a kind with no pick hides at once, so nothing is
   left to click on a slot that changed. Drawn as a row of the item list is (`SetStaticItemFromData`, which never skips a
-  draw: no new-item glow, no upgrade arrow), never dimmed by a search in the bags, with the count of every stack.
+  draw: no upgrade arrow), never dimmed by a search in the bags, with the count of every stack.
+- **No new-item glow** (asked: "eliminate new item glow just on these buttons"): a static draw clears it
+  (`ClearFlashItem`, item-drawing.md). Blizzard's own `UpdateNewItem`, which the item button's first draw calls through
+  `ResetVisuals`, lit it, looping, on food just bought. The bags' own buttons keep theirs.
 - **Laid out** (`LayOut`) in a row or a column, each button the bags' item size (`style.ICON`, so Icon Scale on the Size
   tab, `next/ScalesChanged`) and their gap (`style.GAP`) apart, the card's `Pad` round them, on whole pixels of the card's
   grid (again when the UI scale or the display changes). Each button is sized before it is drawn: Masque sizes a skin to
@@ -90,7 +93,11 @@ tables (wago.tools DB2, retail 12.1.5.70783, Mists Classic, TBC Anniversary and 
   its own: a layout asked for then (a pick changing) waits until it is at rest (`layOutLater`, the card's `settle`), the
   card keeping the scale of its drag or flight.
 - **Right click only** (asked): `RegisterForClicks("RightButtonUp")`, so a left click does nothing (Blizzard's left
-  click picks the item up). Its `OnReceiveDrag` is taken off (Blizzard's would place what the cursor holds in the slot).
+  click picks the item up). A left click that eats is not possible on these buttons (asked 2026-11-14): Blizzard's
+  `ContainerFrameItemButton_OnClick` uses an item on a left click only to target a spell at it, and
+  `C_Container.UseContainerItem` is protected ("#protected ... Use the 'item' action type of SecureActionButtonTemplate
+  or the /use slash command", warcraft.wiki.gg), so a use from BetterBags' own click is blocked; only a secure action
+  button can. Its `OnReceiveDrag` is taken off (Blizzard's would place what the cursor holds in the slot).
   A drag on a button picks the bar up (its `OnDragStart` and `OnDragStop`, set with plain `SetScript`; its press and a
   drag's start make no context, patterns-taint.md; a drag's end, which no use follows, makes one for the drop).
 - **A right click does what it does in the bags**: at a vendor it sells the item, at the bank it deposits it
