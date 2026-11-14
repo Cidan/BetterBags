@@ -1,0 +1,17 @@
+{
+  "id": 1794671265,
+  "version": "v0.9.2-18-ga5191ee",
+  "channel": "alpha",
+  "date": "2026-11-14",
+  "from": "584700362999383ed0ea4f3a701c7c2f8ac085ed",
+  "to": "a5191ee28cc8b8cc3287e5c8983be42a1b030cb0",
+  "headline": "This build clarifies the description for the Enable Groups setting.",
+  "entries": [
+    {
+      "category": "Fixed",
+      "title": "Fixed Enable Groups setting tooltip",
+      "details": "The tooltip for the Enable Groups setting no longer states tabs always appear at the bottom of the bag, keeping the description accurate for layouts that place tabs along the side.",
+      "clients": []
+    }
+  ]
+}
