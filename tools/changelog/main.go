@@ -22,6 +22,13 @@ import (
 	"time"
 )
 
+const (
+	// requestTimeout is how long one Gemini request may take: a review thinks over every commit.
+	requestTimeout = 5 * time.Minute
+	// runTimeout is how long the whole run may take, every request and its retries included.
+	runTimeout = 15 * time.Minute
+)
+
 func main() {
 	var cfg Config
 	flag.StringVar(&cfg.Channel, "channel", "", `"alpha" (a push to main) or "release" (a tag)`)
@@ -41,7 +48,7 @@ func main() {
 			BaseURL:  DefaultGeminiURL,
 			Key:      key,
 			Model:    *model,
-			HTTP:     &http.Client{Timeout: 3 * time.Minute},
+			HTTP:     &http.Client{Timeout: requestTimeout},
 			Attempts: 3,
 			Sleep:    time.Sleep,
 			Log:      os.Stderr,
@@ -55,7 +62,7 @@ func main() {
 			HTTP:    &http.Client{Timeout: 30 * time.Second},
 		}
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), runTimeout)
 	defer cancel()
 	if err := Run(ctx, cfg, deps); err != nil {
 		fmt.Fprintln(os.Stderr, "changelog:", err)
