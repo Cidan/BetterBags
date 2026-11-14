@@ -398,4 +398,106 @@ describe("items:BuildOrderedItems (persistent gap reconciliation)", function()
       assert.equal(BACKPACK, markCalls[1])
     end)
   end)
+
+  -- A stack's count is not in its hash, so a stack that grows keeps its place while the bag is open; under
+  -- Sell Price (Stack) (issue #1303) that can put it out of order. Closing the bag puts it back in order.
+  describe("items the item order now puts the other way round", function()
+    -- byCount orders by count, highest first, as Sell Price (Stack) orders by what a stack is worth.
+    local function byCount(a, b)
+      if a.isItemGap or a.isFreeSlot then return false end
+      if b.isItemGap or b.isFreeSlot then return true end
+      if a.itemInfo.currentItemCount ~= b.itemInfo.currentItemCount then
+        return a.itemInfo.currentItemCount > b.itemInfo.currentItemCount
+      end
+      return tostring(a.slotkey) < tostring(b.slotkey)
+    end
+
+    before_each(function()
+      override(addon:GetModule("Sort"), "GetItemDataSortFunction", function() return byCount end)
+    end)
+
+    it("keeps a stack that grew past another in its place, and marks drawOnClose", function()
+      local A = mkItem("0_1", "H_A", "Cat", { count = 5 })
+      local B = mkItem("0_2", "H_B", "Cat", { count = 3 })
+      local grown = mkItem("0_2", "H_B", "Cat", { count = 10 })
+      local result = items:BuildOrderedItems(fakeCtx(), BACKPACK, toVisible({ A, grown }), {}, { A, B })
+
+      assert.equal(2, #result)
+      assert.equal(A, result[1])
+      assert.equal(grown, result[2])
+      assert.are.same({ BACKPACK }, markCalls)
+    end)
+
+    it("compares the items across a gap between them", function()
+      local A = mkItem("0_1", "H_A", "Cat", { count = 5 })
+      local gap = { isItemGap = true, slotkey = "gap:0_9", bagid = 0, itemHash = "H_Z", itemInfo = { category = "Cat" } }
+      local B = mkItem("0_2", "H_B", "Cat", { count = 3 })
+      local grown = mkItem("0_2", "H_B", "Cat", { count = 10 })
+      assert.are.same({ "0_1", "0_2" }, { items:OutOfOrder({ A, gap, grown }, byCount) })
+      assert.is_nil(items:OutOfOrder({ A, gap, B }, byCount))
+    end)
+
+    -- A section shows its category's items in the list's order (Phase10_PartitionIntoTabs), so only items of
+    -- one category are compared: an item of another between them is in another section.
+    it("compares only items of one category, across the items of others between them", function()
+      local A = mkItem("0_1", "H_A", "Cloth", { count = 5 })
+      local X = mkItem("0_2", "H_X", "Herbs", { count = 1 })
+      local B = mkItem("0_3", "H_B", "Cloth", { count = 10 })
+      assert.are.same({ "0_1", "0_3" }, { items:OutOfOrder({ A, X, B }, byCount) })
+      local Y = mkItem("0_4", "H_Y", "Herbs", { count = 10 })
+      assert.is_nil(items:OutOfOrder({ A, Y }, byCount), "Herbs' 10 after Cloth's 5 is another section")
+      -- Each item against the one of its category just before it, not the first: 10, 5, 7.
+      local first = mkItem("0_5", "H_1", "Ore", { count = 10 })
+      local second = mkItem("0_6", "H_2", "Ore", { count = 5 })
+      local third = mkItem("0_7", "H_3", "Ore", { count = 7 })
+      assert.are.same({ "0_6", "0_7" }, { items:OutOfOrder({ first, X, second, third }, byCount) })
+    end)
+
+    it("does not mark drawOnClose for an item of another category the order would put first", function()
+      local A = mkItem("0_1", "H_A", "Cloth", { count = 5 })
+      local B = mkItem("0_2", "H_B", "Herbs", { count = 3 })
+      local grown = mkItem("0_2", "H_B", "Herbs", { count = 10 })
+      items:BuildOrderedItems(fakeCtx(), BACKPACK, toVisible({ A, grown }), {}, { A, B })
+      assert.are.same({}, markCalls)
+    end)
+
+    -- Two identical guild bank piles: their GUIDs are empty, so the item orders hold them equal.
+    it("does not mark drawOnClose for items the order holds equal", function()
+      local function byCountAlone(a, b)
+        return a.itemInfo.currentItemCount > b.itemInfo.currentItemCount
+      end
+      local A = mkItem("0_1", "H", "Cat", { count = 20, guid = "" })
+      local B = mkItem("0_2", "H", "Cat", { count = 20, guid = "" })
+      assert.is_nil(items:OutOfOrder({ A, B }, byCountAlone))
+      override(addon:GetModule("Sort"), "GetItemDataSortFunction", function() return byCountAlone end)
+      items:BuildOrderedItems(fakeCtx(), BACKPACK, toVisible({ A, B }), {}, { A, B })
+      assert.are.same({}, markCalls)
+    end)
+
+    it("does not mark drawOnClose while every item is still in order", function()
+      local A = mkItem("0_1", "H_A", "Cat", { count = 5 })
+      local B = mkItem("0_2", "H_B", "Cat", { count = 3 })
+      local grown = mkItem("0_2", "H_B", "Cat", { count = 4 })
+      items:BuildOrderedItems(fakeCtx(), BACKPACK, toVisible({ A, grown }), {}, { A, B })
+      assert.are.same({}, markCalls)
+    end)
+
+    -- A new item is appended at the end of its section while the bag is open; closing it puts the item in
+    -- its place, in the sweep that appends it as in any later one.
+    it("appends a new item the order puts before the kept ones at the end, and marks drawOnClose", function()
+      local A = mkItem("0_1", "H_A", "Cat", { count = 5 })
+      local NEW = mkItem("0_3", "H_N", "Cat", { count = 10 })
+      local result = items:BuildOrderedItems(fakeCtx(), BACKPACK, toVisible({ A, NEW }), {}, { A })
+      assert.equal(A, result[1])
+      assert.equal(NEW, result[2])
+      assert.are.same({ BACKPACK }, markCalls)
+    end)
+
+    it("does not mark drawOnClose for a new item appended in order", function()
+      local A = mkItem("0_1", "H_A", "Cat", { count = 5 })
+      local NEW = mkItem("0_3", "H_N", "Cat", { count = 1 })
+      items:BuildOrderedItems(fakeCtx(), BACKPACK, toVisible({ A, NEW }), {}, { A })
+      assert.are.same({}, markCalls)
+    end)
+  end)
 end)

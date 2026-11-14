@@ -393,6 +393,8 @@ const.ITEM_SORT_TYPE = {
   QUALITY_THEN_ALPHABETICALLY = 2,
   ITEM_LEVEL = 3,
   EXPANSION = 4,
+  SELL_PRICE_STACK = 5,
+  SELL_PRICE_EACH = 6,
 }
 
 ---@enum ExpansionType

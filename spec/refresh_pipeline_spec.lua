@@ -50,7 +50,7 @@ local itemNames = {
 }
 
 local const, database, categories, searchText
-local mockContainer, newSlots, removedNewItems, mockStats
+local mockContainer, newSlots, removedNewItems, mockStats, mockPrices
 
 local function stubModules()
   local debug = stubModule("Debug")
@@ -216,7 +216,7 @@ local function stubClientAPIs()
     local id = tonumber(itemID) or tonumber(tostring(itemID):match("item:(%d+)")) or 0
     local name = itemNames[id] or ("TestItem " .. id)
     return name, "|cffffffff|Hitem:" .. id .. "|h[" .. name .. "]|h|r",
-      1, 100, 1, "Misc", "Junk", 20, "INVTYPE_NON_EQUIP", 134400, 10, 1, 0, 1, 0, 0, false
+      1, 100, 1, "Misc", "Junk", 20, "INVTYPE_NON_EQUIP", 134400, mockPrices[id] or 10, 1, 0, 1, 0, 0, false
   end
   -- C_Item.GetItemGUID(itemLocation) takes an ItemLocation that holds an item, not an
   -- EmptiableItemLocation (ItemDocumentation.lua): the client raises an error for an empty slot, as
@@ -310,6 +310,7 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
     newSlots = {}
     removedNewItems = {}
     mockStats = {}
+    mockPrices = {}
     searchText = ""
 
     stubModules()
@@ -4523,6 +4524,129 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       assert.is_false(items:ExpireRecentItems(const.BAG_KIND.BACKPACK))
       local slotInfo = refreshBackpack()
       assert.equal("Recent Items", slotInfo.itemsBySlotKey["0_1"].itemInfo.category)
+    end)
+  end)
+
+  -- Issue #1303: Sell Price (Stack) and Sell Price (Each), through the real Sort module's item orders: the
+  -- price Auto Sell uses (items:SellPriceOf, the link's), times the count the button shows for the stack.
+  describe("sorting by sell price", function()
+    local function useItemOrder(sortType)
+      local aceAddon = LibStub("AceAddon-3.0")
+      local stub, stubAddon = addon.modules.Sort, aceAddon.addons.BetterBags_Sort
+      ResetModuleStub("Sort", "util/sort.lua")
+      LoadBetterBagsModule("util/sort.lua")
+      local real = addon:GetModule("Sort")
+      ResetModuleStub("Sort", "util/sort.lua")
+      addon.modules.Sort, aceAddon.addons.BetterBags_Sort = stub, stubAddon
+      override(const, "ITEM_SORT_TYPE", { ALPHABETICALLY_THEN_QUALITY = 1, QUALITY_THEN_ALPHABETICALLY = 2,
+        ITEM_LEVEL = 3, EXPANSION = 4, SELL_PRICE_STACK = 5, SELL_PRICE_EACH = 6 })
+      override(database, "GetItemSortType", function() return const.ITEM_SORT_TYPE[sortType] end)
+      override(stub, "GetItemDataSortFunction", function(_, kind, view) return real:GetItemDataSortFunction(kind, view) end)
+    end
+
+    local function idsInOrder(slotInfo)
+      local ids = {}
+      for _, item in ipairs(slotInfo.sortedItems) do
+        if not item.isItemGap then table.insert(ids, item.itemInfo.itemID) end
+      end
+      return ids
+    end
+
+    local function mergeStacks()
+      override(database, "GetStackingOptions", function()
+        return { mergeStacks = true, mergeUnstackable = true, unmergeAtShop = false,
+          dontMergePartial = false, dontMergeTransmog = false }
+      end)
+    end
+
+    -- A full link, so each item's hash has its own item ID; info overrides the slot's ContainerItemInfo.
+    local function slot(id, guid, count, info)
+      return { itemID = id, guid = guid, count = count, info = info,
+        link = "|cnIQ1:|Hitem:" .. id .. ":0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:::|h[" .. itemNames[id] .. "]|h|r" }
+    end
+
+    before_each(function()
+      -- 101 sells for 10 each, 201 for 60, and no vendor buys 202; 303 has a price but no merchant buys it.
+      mockPrices[101], mockPrices[201], mockPrices[202], mockPrices[303] = 10, 60, 0, 1000
+    end)
+
+    it("puts the stack worth more first, a merged stack counted whole (Sell Price (Stack))", function()
+      useItemOrder("SELL_PRICE_STACK")
+      mergeStacks()
+      mockContainer[0] = { slot(101, "g101a", 5), slot(202, "g202", 20), slot(201, "g201", 1), slot(101, "g101b", 5),
+        slot(303, "g303", 1, { hasNoValue = true }) }
+      -- 101: two piles of 5 shown as one stack of 10, 100; 201: 60; 202 and 303: 0, by name (Beta, Gamma).
+      assert.are.same({ 101, 201, 202, 303 }, idsInOrder(refreshBackpack({ wipe = true })))
+    end)
+
+    it("puts the item worth more each first, whatever its count (Sell Price (Each))", function()
+      useItemOrder("SELL_PRICE_EACH")
+      mockContainer[0] = { slot(101, "g101", 20), slot(202, "g202", 20), slot(201, "g201", 1) }
+      assert.are.same({ 201, 101, 202 }, idsInOrder(refreshBackpack({ wipe = true })))
+    end)
+
+    -- The bag open, with Preserve Empty Slots as Gaps; marks records MarkDrawOnClose, which makes closing the bag
+    -- refresh it (bagProto:OnClosed), and setOpen(false) stands for the bag once closed.
+    local function openBag()
+      override(database, "GetPreserveItemGaps", function() return true end)
+      local state = { open = true, marks = {} }
+      override(items, "IsBagOpen", function() return state.open end)
+      override(items, "MarkDrawOnClose", function(_, kind) table.insert(state.marks, kind) end)
+      return state
+    end
+
+    it("keeps a stack that grew past another's worth in its place while the bag is open, marking it to re-sort on close",
+      function()
+      useItemOrder("SELL_PRICE_STACK")
+      local bag = openBag()
+      mockContainer[0] = { slot(101, "g101", 5), slot(201, "g201", 1) }
+      -- 101: 50; 201: 60.
+      assert.are.same({ 201, 101 }, idsInOrder(refreshBackpack()))
+      assert.are.same({ 201, 101 }, idsInOrder(refreshBackpack({ bags = { [0] = true } })), "kept in place")
+      assert.are.same({}, bag.marks, "nothing out of order yet")
+
+      -- Five more looted onto the stack: 100, more than 201's 60.
+      mockContainer[0][1].count = 10
+      assert.are.same({ 201, 101 }, idsInOrder(refreshBackpack({ bags = { [0] = true } })), "kept in place while open")
+      assert.are.same({ const.BAG_KIND.BACKPACK }, bag.marks)
+
+      bag.open = false
+      assert.are.same({ 101, 201 }, idsInOrder(refreshBackpack()), "in order once closed")
+    end)
+
+    it("appends an item looted while the bag is open at the end, marking it to re-sort on close (Sell Price (Each))",
+      function()
+      useItemOrder("SELL_PRICE_EACH")
+      local bag = openBag()
+      mockContainer[0] = { slot(101, "g101", 5), {} }
+      refreshBackpack()
+
+      mockContainer[0][2] = slot(201, "g201", 1)
+      assert.are.same({ 101, 201 }, idsInOrder(refreshBackpack({ bags = { [0] = true } })), "appended while open")
+      assert.are.same({ const.BAG_KIND.BACKPACK }, bag.marks, "in the sweep that appends it")
+
+      bag.open = false
+      assert.are.same({ 201, 101 }, idsInOrder(refreshBackpack()), "in order once closed")
+    end)
+
+    -- Every item order: two piles of one item under Quality go by count, the bigger first.
+    it("marks the bag to re-sort on close under the other item orders too (Quality)", function()
+      useItemOrder("QUALITY_THEN_ALPHABETICALLY")
+      local bag = openBag()
+      mockContainer[0] = { slot(101, "g101a", 20), slot(101, "g101b", 15) }
+      local function keys(slotInfo)
+        return { slotInfo.sortedItems[1].slotkey, slotInfo.sortedItems[2].slotkey }
+      end
+      assert.are.same({ "0_1", "0_2" }, keys(refreshBackpack()))
+      assert.are.same({ "0_1", "0_2" }, keys(refreshBackpack({ bags = { [0] = true } })))
+      assert.are.same({}, bag.marks, "nothing out of order yet")
+
+      mockContainer[0][1].count = 14
+      assert.are.same({ "0_1", "0_2" }, keys(refreshBackpack({ bags = { [0] = true } })), "kept in place while open")
+      assert.are.same({ const.BAG_KIND.BACKPACK }, bag.marks)
+
+      bag.open = false
+      assert.are.same({ "0_2", "0_1" }, keys(refreshBackpack()), "the bigger pile first once closed")
     end)
   end)
 

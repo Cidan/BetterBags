@@ -418,15 +418,18 @@ local itemOrders = {
   ["Quality"] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
   ["Item Level"] = const.ITEM_SORT_TYPE.ITEM_LEVEL,
   ["Expansion"] = const.ITEM_SORT_TYPE.EXPANSION,
+  ["Sell Price (Stack)"] = const.ITEM_SORT_TYPE.SELL_PRICE_STACK,
+  ["Sell Price (Each)"] = const.ITEM_SORT_TYPE.SELL_PRICE_EACH,
 }
 
 define('itemOrder', {
   kind = "dropdown",
   bag = true,
   title = 'Item Order',
-  description = 'The default order of items within each section.',
-  keywords = { 'sort', 'items', 'quality', 'item level', 'expansion', 'alphabetical' },
-  items = {'Alphabetically', 'Quality', 'Item Level', 'Expansion'},
+  description = 'The default order of items within each section. Sell Price puts what a vendor pays most for '
+    .. 'first: the whole stack, or one of it.',
+  keywords = { 'sort', 'items', 'quality', 'item level', 'expansion', 'alphabetical', 'sell price', 'vendor', 'value' },
+  items = {'Alphabetically', 'Quality', 'Item Level', 'Expansion', 'Sell Price (Stack)', 'Sell Price (Each)'},
   get = function(_, bag)
     return choiceOf(itemOrders, db:GetItemSortType(bag.kind, db:GetBagView(bag.kind)))
   end,

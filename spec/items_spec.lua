@@ -182,6 +182,33 @@ describe("Items (New Data Farming Engine)", function()
     end)
   end)
 
+  -- The vendor price of one item, as Auto Sell's total and the Sell Price item orders (issue #1303) read it.
+  describe("sell price (items:SellPriceOf)", function()
+    it("is the price of the item in the slot, its link's, once its data has loaded", function()
+      local data = MockData.ItemData({ sellPrice = 5, traits = { sellPrice = 120, stats = {} } })
+      assert.are.equal(120, items:SellPriceOf(data))
+    end)
+
+    it("is its base item's price, by item ID, for an item read cold", function()
+      local data = MockData.ItemData({ sellPrice = 5 })
+      assert.are.equal(5, items:SellPriceOf(data))
+    end)
+
+    it("is 0 when the client gave no price", function()
+      local data = MockData.ItemData({})
+      data.itemInfo.sellPrice = nil
+      assert.are.equal(0, items:SellPriceOf(data))
+    end)
+
+    -- The retail 12.1.5 capture's Mark of Honor (137642): a price of 1 copper, flagged as one no merchant buys
+    -- (automation.md §2), as Auto Sell reads it.
+    it("is 0 for an item no merchant buys (the slot's hasNoValue), whatever its price", function()
+      local data = MockData.ItemData({ sellPrice = 1, traits = { sellPrice = 1, stats = {} } })
+      data.containerInfo.hasNoValue = true
+      assert.are.equal(0, items:SellPriceOf(data))
+    end)
+  end)
+
   describe("Harvesting Engine", function()
     local savedContainerIDToInventoryID
     local savedGetItemSubClassInfo

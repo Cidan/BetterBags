@@ -31,10 +31,16 @@ const.ITEM_SORT_TYPE = {
   QUALITY_THEN_ALPHABETICALLY = 2,
   ITEM_LEVEL = 3,
   EXPANSION = 4,
+  SELL_PRICE_STACK = 5,
+  SELL_PRICE_EACH = 6,
 }
 
 -- Localization: L:G(key) returns the key as-is (no translations loaded)
 function L:G(key) return key end
+
+-- The vendor price of one item is the Items module's (items:SellPriceOf, spec/items_spec.lua); the sell
+-- price tests give it the price each item is made with.
+local itemsModule = StubBetterBagsModule("Items")
 
 -- Now load the Sort module
 ResetModuleStub("Sort", "util/sort.lua")
@@ -595,6 +601,157 @@ describe("Sort", function()
       assert.is_true(sort.SortItemDataByQualityThenAlpha(item, freeSlot))
       assert.is_false(sort.SortItemDataByQualityThenAlpha(gapSlot, item))
       assert.is_true(sort.SortItemDataByQualityThenAlpha(item, gapSlot))
+    end)
+  end)
+
+  -- ─── Item Sort: Sell Price ────────────────────────────────────────────────
+  -- Issue #1303: Sell Price (Stack) orders by what the stack the button shows sells for, Sell Price (Each)
+  -- by what one sells for, highest first. The price is the one Auto Sell uses (items:SellPriceOf).
+
+  describe("by sell price", function()
+    local MockItemData = MockData.ItemData
+    local savedPriceOf
+
+    before_each(function()
+      savedPriceOf = rawget(itemsModule, "SellPriceOf")
+      itemsModule.SellPriceOf = function(_, data) return data.itemInfo.sellPrice end
+    end)
+
+    after_each(function()
+      itemsModule.SellPriceOf = savedPriceOf
+    end)
+
+    it("Sell Price (Stack) puts the stack worth more first: its price times its count", function()
+      local cloth = MockItemData({ name = "Cloth", sellPrice = 10, count = 20, guid = "a" })
+      local ring = MockItemData({ name = "Ring", sellPrice = 150, count = 1, guid = "b" })
+      assert.is_true(sort.SortItemDataBySellPriceStack(cloth, ring))
+      assert.is_false(sort.SortItemDataBySellPriceStack(ring, cloth))
+    end)
+
+    it("Sell Price (Stack) counts what the button shows: a merged stack's total", function()
+      local cloth = MockItemData({ name = "Cloth", sellPrice = 10, count = 5, stackedCount = 30, guid = "a" })
+      local ring = MockItemData({ name = "Ring", sellPrice = 200, count = 1, guid = "b" })
+      assert.is_true(sort.SortItemDataBySellPriceStack(cloth, ring))
+      assert.is_false(sort.SortItemDataBySellPriceStack(ring, cloth))
+    end)
+
+    it("Sell Price (Each) puts the item worth more each first, whatever the count", function()
+      local cloth = MockItemData({ name = "Cloth", sellPrice = 10, count = 20, stackedCount = 40, guid = "a" })
+      local ring = MockItemData({ name = "Ring", sellPrice = 150, count = 1, guid = "b" })
+      assert.is_true(sort.SortItemDataBySellPriceEach(ring, cloth))
+      assert.is_false(sort.SortItemDataBySellPriceEach(cloth, ring))
+    end)
+
+    for _, case in ipairs({ { "Sell Price (Stack)", "SortItemDataBySellPriceStack" },
+      { "Sell Price (Each)", "SortItemDataBySellPriceEach" } }) do
+      local name, fn = case[1], case[2]
+
+      it(name .. " puts what no vendor buys (0) after everything worth a copper", function()
+        local unsellable = MockItemData({ name = "A Quest Item", sellPrice = 0, count = 1, guid = "a" })
+        local junk = MockItemData({ name = "Z Junk", sellPrice = 1, count = 1, guid = "b" })
+        assert.is_true(sort[fn](junk, unsellable))
+        assert.is_false(sort[fn](unsellable, junk))
+      end)
+
+      it(name .. " falls back to the name, and last to the GUID", function()
+        local apple = MockItemData({ name = "Apple", sellPrice = 5, count = 1, guid = "z" })
+        local bread = MockItemData({ name = "Bread", sellPrice = 5, count = 1, guid = "a" })
+        assert.is_true(sort[fn](apple, bread))
+        assert.is_false(sort[fn](bread, apple))
+        local first = MockItemData({ name = "Potion", sellPrice = 5, count = 1, guid = "aaa" })
+        local second = MockItemData({ name = "Potion", sellPrice = 5, count = 1, guid = "zzz" })
+        assert.is_true(sort[fn](first, second))
+        assert.is_false(sort[fn](second, first))
+      end)
+
+      it(name .. " puts free slots and gaps last", function()
+        local item = MockItemData({ name = "Sword", sellPrice = 0, guid = "a" })
+        local freeSlot = { isFreeSlot = true, bagid = 0, slotid = 1 }
+        local gapSlot = { isItemGap = true, bagid = 0, slotid = 2 }
+        assert.is_true(sort[fn](item, freeSlot))
+        assert.is_false(sort[fn](freeSlot, item))
+        assert.is_true(sort[fn](item, gapSlot))
+        assert.is_false(sort[fn](gapSlot, item))
+      end)
+
+      it(name .. " leaves an item without its data unordered", function()
+        local good = MockItemData({ name = "Sword", sellPrice = 50, guid = "a" })
+        local bad = MockItemData({ name = "Shield", sellPrice = 10, guid = "b" })
+        bad.itemInfo.itemGUID = nil
+        assert.is_false(sort[fn](good, bad))
+        assert.is_false(sort[fn](bad, good))
+      end)
+    end
+
+    it("Sell Price (Stack) breaks a tie of worth by the bigger pile", function()
+      local few = MockItemData({ name = "Potion", sellPrice = 10, count = 2, guid = "a" })
+      local many = MockItemData({ name = "Potion", sellPrice = 5, count = 4, guid = "b" })
+      assert.is_true(sort.SortItemDataBySellPriceStack(many, few))
+      assert.is_false(sort.SortItemDataBySellPriceStack(few, many))
+    end)
+
+    it("Sell Price (Each) breaks a tie of price by the bigger pile", function()
+      local few = MockItemData({ name = "Potion", sellPrice = 5, count = 2, guid = "a" })
+      local many = MockItemData({ name = "Potion", sellPrice = 5, count = 3, guid = "b" })
+      assert.is_true(sort.SortItemDataBySellPriceEach(many, few))
+      assert.is_false(sort.SortItemDataBySellPriceEach(few, many))
+    end)
+
+    it("takes each item's price from items:SellPriceOf", function()
+      itemsModule.SellPriceOf = function(_, data) return data.itemInfo.itemName == "Cheap" and 1 or 100 end
+      local cheap = MockItemData({ name = "Cheap", sellPrice = 900, guid = "a" })
+      local dear = MockItemData({ name = "Dear", sellPrice = 1, guid = "b" })
+      assert.is_true(sort.SortItemDataBySellPriceEach(dear, cheap))
+      assert.is_true(sort.SortItemDataBySellPriceStack(dear, cheap))
+    end)
+
+    it("sorts a whole list by the stack's worth with table.sort", function()
+      local list = {
+        MockItemData({ name = "Ring", sellPrice = 150, count = 1, guid = "r" }),
+        { isFreeSlot = true, bagid = 0, slotid = 9 },
+        MockItemData({ name = "Quest Item", sellPrice = 0, count = 1, guid = "q" }),
+        MockItemData({ name = "Cloth", sellPrice = 10, count = 20, guid = "c" }),
+        MockItemData({ name = "Herb", sellPrice = 15, count = 10, guid = "h" }),
+        MockItemData({ name = "Potion", sellPrice = 75, count = 2, guid = "p" }),
+      }
+      table.sort(list, sort.SortItemDataBySellPriceStack)
+      local names = {}
+      for i = 1, 5 do table.insert(names, list[i].itemInfo.itemName) end
+      -- Cloth 200; Herb, Potion and Ring 150 each, by name; Quest Item 0.
+      assert.are.same({ "Cloth", "Herb", "Potion", "Ring", "Quest Item" }, names)
+      assert.is_true(list[6].isFreeSlot)
+    end)
+
+    it("orders item buttons the same way (SortItemsBySellPriceStack, SortItemsBySellPriceEach)", function()
+      local cloth = MockItem({ name = "Cloth", sellPrice = 10, count = 20, guid = "a" })
+      local ring = MockItem({ name = "Ring", sellPrice = 150, count = 1, guid = "b" })
+      local freeSlot = MockItem({ isFreeSlot = true })
+      local bad = { isFreeSlot = false, GetItemData = function() return nil end }
+      assert.is_true(sort.SortItemsBySellPriceStack(cloth, ring))
+      assert.is_false(sort.SortItemsBySellPriceStack(ring, cloth))
+      assert.is_true(sort.SortItemsBySellPriceEach(ring, cloth))
+      assert.is_false(sort.SortItemsBySellPriceEach(cloth, ring))
+      for _, fn in ipairs({ sort.SortItemsBySellPriceStack, sort.SortItemsBySellPriceEach }) do
+        assert.is_true(fn(cloth, freeSlot))
+        assert.is_false(fn(freeSlot, cloth))
+        assert.is_false(fn(cloth, bad))
+        assert.is_false(fn(bad, cloth))
+      end
+    end)
+
+    it("is what GetItemDataSortFunction and GetItemSortFunction give when chosen", function()
+      local chosen
+      database.GetItemSortType = function() return chosen end
+      chosen = const.ITEM_SORT_TYPE.SELL_PRICE_STACK
+      assert.are.equal(sort.SortItemDataBySellPriceStack,
+        sort:GetItemDataSortFunction(const.BAG_KIND.BACKPACK, const.BAG_VIEW.SECTION_GRID))
+      assert.are.equal(sort.SortItemsBySellPriceStack,
+        sort:GetItemSortFunction(const.BAG_KIND.BACKPACK, const.BAG_VIEW.SECTION_GRID))
+      chosen = const.ITEM_SORT_TYPE.SELL_PRICE_EACH
+      assert.are.equal(sort.SortItemDataBySellPriceEach,
+        sort:GetItemDataSortFunction(const.BAG_KIND.BACKPACK, const.BAG_VIEW.SECTION_GRID))
+      assert.are.equal(sort.SortItemsBySellPriceEach,
+        sort:GetItemSortFunction(const.BAG_KIND.BACKPACK, const.BAG_VIEW.SECTION_GRID))
     end)
   end)
 
