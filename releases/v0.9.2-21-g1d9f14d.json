@@ -1,0 +1,17 @@
+{
+  "id": 1794691862,
+  "version": "v0.9.2-21-g1d9f14d",
+  "channel": "alpha",
+  "date": "2026-11-14",
+  "from": "756d500c633600d4e63e5ae546f367514e4992c2",
+  "to": "1d9f14d4d48ba1427c5e5740b5a093820952640a",
+  "headline": "Adds Log, Money Log, and Info tabs to the Next guild bank.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "Next guild bank Log, Money Log, and Info tabs",
+      "details": "You can now view item and money transaction logs directly in the Next guild bank, complete with color-coded action icons for deposits, withdrawals, and repairs. A new Info tab allows viewing and updating guild tab descriptions.",
+      "clients": []
+    }
+  ]
+}
