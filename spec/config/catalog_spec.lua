@@ -22,7 +22,8 @@ const.BAG_KIND.GUILD = const.BAG_KIND.GUILD or 2
 const.NEXT_SECTION_COLUMNS_MAX = const.NEXT_SECTION_COLUMNS_MAX or 4
 const.SECTION_SORT_TYPE = const.SECTION_SORT_TYPE or { ALPHABETICALLY = 1, SIZE_DESCENDING = 2, SIZE_ASCENDING = 3 }
 const.ITEM_SORT_TYPE = const.ITEM_SORT_TYPE
-  or { ALPHABETICALLY_THEN_QUALITY = 1, QUALITY_THEN_ALPHABETICALLY = 2, ITEM_LEVEL = 3, EXPANSION = 4 }
+  or { ALPHABETICALLY_THEN_QUALITY = 1, QUALITY_THEN_ALPHABETICALLY = 2, ITEM_LEVEL = 3, EXPANSION = 4,
+    SELL_PRICE_STACK = 5, SELL_PRICE_EACH = 6 }
 
 local context = LoadFreshBetterBagsModule("Context", "core/context.lua")
 local events = stubModule("Events")
@@ -147,6 +148,23 @@ describe("The settings catalog", function()
     local list = provider.itemsFunction(ctx())
     table.sort(list)
     assert.are.same({ "BetterBags", "None", "Pawn" }, list)
+  end)
+
+  -- Issue #1303: items in a section by what a vendor pays, for the stack or for one.
+  it("offers the item orders, the two sell prices after the others", function()
+    override(db, "GetItemSortType", function() return const.ITEM_SORT_TYPE.SELL_PRICE_EACH end)
+    override(db, "SetItemSortType", function(_, kind, view, value) db._itemSort = { kind, view, value } end)
+    local order = catalog:Get("itemOrder", backpack)
+    assert.are.same({ "Alphabetically", "Quality", "Item Level", "Expansion", "Sell Price (Stack)", "Sell Price (Each)" },
+      order.items)
+    assert.are.equal("Sell Price (Each)", order.get(ctx()))
+    order.set(ctx(), "Sell Price (Stack)")
+    assert.are.same({ 0, 1, const.ITEM_SORT_TYPE.SELL_PRICE_STACK }, db._itemSort)
+    order.set(ctx(), "Sell Price (Each)")
+    assert.are.same({ 0, 1, const.ITEM_SORT_TYPE.SELL_PRICE_EACH }, db._itemSort)
+    local words = {}
+    for _, word in ipairs(order.keywords) do words[word] = true end
+    assert.is_true(words["sell price"] and words["vendor"] and true or false)
   end)
 
   it("reads a number within its range, and writes a number", function()

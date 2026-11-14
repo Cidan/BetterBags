@@ -15,6 +15,9 @@ local sort = addon:NewModule('Sort')
 ---@class Localization: AceModule
 local L =  addon:GetModule('Localization')
 
+---@class Items: AceModule
+local items = addon:GetModule('Items')
+
 ---@param aData ItemData
 ---@param bData ItemData
 ---@return boolean
@@ -28,6 +31,37 @@ local function invalidData(aData, bData)
     return true
   end
   return false
+end
+
+-- stackWorth is what a vendor pays for the stack an item's button shows: a virtual stack's
+-- total, else the item's own count.
+---@param data ItemData
+---@return number
+local function stackWorth(data)
+  return items:SellPriceOf(data) * (data.stackedCount or data.itemInfo.currentItemCount)
+end
+
+---@param data ItemData
+---@return number
+local function eachWorth(data)
+  return items:SellPriceOf(data)
+end
+
+-- byWorth orders two items by worth, highest first, then as the other item orders do.
+---@param aData ItemData
+---@param bData ItemData
+---@param worth fun(data: ItemData): number
+---@return boolean
+local function byWorth(aData, bData, worth)
+  local aWorth, bWorth = worth(aData), worth(bData)
+  if aWorth ~= bWorth then
+    return aWorth > bWorth
+  elseif aData.itemInfo.itemName ~= bData.itemInfo.itemName then
+    return aData.itemInfo.itemName < bData.itemInfo.itemName
+  elseif aData.itemInfo.currentItemCount ~= bData.itemInfo.currentItemCount then
+    return aData.itemInfo.currentItemCount > bData.itemInfo.currentItemCount
+  end
+  return aData.itemInfo.itemGUID < bData.itemInfo.itemGUID
 end
 
 ---@param kind BagKind
@@ -71,6 +105,10 @@ function sort:GetItemSortFunction(kind, view)
     return self.SortItemsByItemLevel
   elseif sortType == const.ITEM_SORT_TYPE.EXPANSION then
     return self.SortItemsByExpansion
+  elseif sortType == const.ITEM_SORT_TYPE.SELL_PRICE_STACK then
+    return self.SortItemsBySellPriceStack
+  elseif sortType == const.ITEM_SORT_TYPE.SELL_PRICE_EACH then
+    return self.SortItemsBySellPriceEach
   end
   assert(false, "Unknown sort type: " .. sortType)
   return function() end
@@ -238,6 +276,29 @@ function sort.SortItemsByExpansion(a, b)
   -- Finally, fall back to GUID for stable sort
   return aData.itemInfo.itemGUID < bData.itemInfo.itemGUID
 end
+
+---@param a Item
+---@param b Item
+---@return boolean
+function sort.SortItemsBySellPriceStack(a, b)
+  if a.isFreeSlot then return false end
+  if b.isFreeSlot then return true end
+  local aData, bData = a:GetItemData(), b:GetItemData()
+  if invalidData(aData, bData) then return false end
+  return byWorth(aData, bData, stackWorth)
+end
+
+---@param a Item
+---@param b Item
+---@return boolean
+function sort.SortItemsBySellPriceEach(a, b)
+  if a.isFreeSlot then return false end
+  if b.isFreeSlot then return true end
+  local aData, bData = a:GetItemData(), b:GetItemData()
+  if invalidData(aData, bData) then return false end
+  return byWorth(aData, bData, eachWorth)
+end
+
 ---@param a Item
 ---@param b Item
 ---@return boolean
@@ -320,6 +381,26 @@ function sort.SortItemDataByExpansion(aData, bData)
   return aData.itemInfo.itemGUID < bData.itemInfo.itemGUID
 end
 
+---@param aData ItemData
+---@param bData ItemData
+---@return boolean
+function sort.SortItemDataBySellPriceStack(aData, bData)
+  if aData.isFreeSlot or aData.isItemGap then return false end
+  if bData.isFreeSlot or bData.isItemGap then return true end
+  if invalidData(aData, bData) then return false end
+  return byWorth(aData, bData, stackWorth)
+end
+
+---@param aData ItemData
+---@param bData ItemData
+---@return boolean
+function sort.SortItemDataBySellPriceEach(aData, bData)
+  if aData.isFreeSlot or aData.isItemGap then return false end
+  if bData.isFreeSlot or bData.isItemGap then return true end
+  if invalidData(aData, bData) then return false end
+  return byWorth(aData, bData, eachWorth)
+end
+
 -- slotOrder is where a bag's slots go in slot order: the backpack's keyring (Classic Era, WoW: Forever), whose bag
 -- ID is below the backpack's, after every bag, as its number says (items:GetBagName).
 ---@param bagid number
@@ -359,6 +440,10 @@ function sort:GetItemDataSortFunction(kind, view)
     return self.SortItemDataByItemLevel
   elseif sortType == const.ITEM_SORT_TYPE.EXPANSION then
     return self.SortItemDataByExpansion
+  elseif sortType == const.ITEM_SORT_TYPE.SELL_PRICE_STACK then
+    return self.SortItemDataBySellPriceStack
+  elseif sortType == const.ITEM_SORT_TYPE.SELL_PRICE_EACH then
+    return self.SortItemDataBySellPriceEach
   end
   assert(false, "Unknown sort type: " .. sortType)
   return function() end

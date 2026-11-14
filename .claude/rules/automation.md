@@ -115,7 +115,8 @@ Vendor rule.
 - **Ends** when the Seller's sale ends: everything sold, the merchant closed (and sells nothing more),
   or the merchant buys nothing; reopening the merchant ends the sale first (it is cancelled). It prints,
   once at the end, what the merchant took and for how much (`C_CurrencyInfo.GetCoinTextureString`, each
-  stack's count when sent); the Seller says what the merchant would not buy.
+  stack's count when sent, times `items:SellPriceOf`, the price the Sell Price item orders sort by too,
+  item-sort.md §2); the Seller says what the merchant would not buy.
 
 ## 4. Destroying (`DestroyQueue`, `DestroyNext`; the vendor's destroy card and the key binding)
 

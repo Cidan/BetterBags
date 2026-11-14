@@ -197,12 +197,15 @@ SECTION_SORT_TYPE = {
 }
 ```
 
-**Item Sorting:**
+**Item Sorting** (`.claude/rules/item-sort.md`):
 ```lua
 ITEM_SORT_TYPE = {
   ALPHABETICALLY_THEN_QUALITY = 1,
   QUALITY_THEN_ALPHABETICALLY = 2,
-  ITEM_LEVEL = 3
+  ITEM_LEVEL = 3,
+  EXPANSION = 4,
+  SELL_PRICE_STACK = 5,
+  SELL_PRICE_EACH = 6,
 }
 ```
 
@@ -211,7 +214,8 @@ ITEM_SORT_TYPE = {
 | Function | Description | Parameters | Returns |
 |----------|-------------|------------|---------|
 | `GetSectionSortFunction(kind, view)` | Get section sort function | `BagKind`, `BagView` | `function` |
-| `GetItemSortFunction(kind, view)` | Get item sort function | `BagKind`, `BagView` | `function` |
+| `GetItemSortFunction(kind, view)` | Get item button sort function (no caller in the addon) | `BagKind`, `BagView` | `function` |
+| `GetItemDataSortFunction(kind, view)` | Get item data sort function, what the data pipeline sorts with | `BagKind`, `BagView` | `function` |
 | `SortSectionsByPriority(kind, a, b)` | Priority-based section sort | `BagKind`, `Section`, `Section` | `boolean, boolean` |
 
 **Sort Algorithms:**
@@ -225,6 +229,11 @@ ITEM_SORT_TYPE = {
 - Quality → Name → Count → GUID
 - Name → Quality → Count → GUID
 - Item Level → Name → Count → GUID
+- Expansion (oldest first) → Name → Count → GUID
+- Sell Price (Stack): what the stack the button shows sells for (`items:SellPriceOf` times a virtual stack's total, else the item's count), highest first → Name → Count → GUID
+- Sell Price (Each): what one sells for (`items:SellPriceOf`), highest first → Name → Count → GUID
+
+The sell price is Auto Sell's: the item's link's price once loaded, else its base item's, and 0 for an item no merchant buys (`hasNoValue`), so those go last.
 
 **Special Cases:**
 - Free slots always sort last
@@ -392,6 +401,7 @@ QueryParser:Query(input: string): QueryNode?
 ```lua
 sort:GetSectionSortFunction(kind: BagKind, view: BagView): function
 sort:GetItemSortFunction(kind: BagKind, view: BagView): function
+sort:GetItemDataSortFunction(kind: BagKind, view: BagView): function
 ```
 
 ### Trees Module

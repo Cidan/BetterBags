@@ -92,13 +92,6 @@ local function coins(copper)
   return GetCoinTextureString(copper)
 end
 
----@param data ItemData
----@return number
-local function priceOf(data)
-  local traits = data.itemInfo.traits
-  return (traits and traits.sellPrice) or data.itemInfo.sellPrice or 0
-end
-
 -- bySlot orders automation's entries by bag and slot.
 ---@param a AutomationEntry
 ---@param b AutomationEntry
@@ -479,7 +472,7 @@ function automation:FinishSale(sale, reason)
   local sold, value = 0, 0
   for _, item in ipairs(job.sold) do
     sold = sold + 1
-    value = value + (item.count or 1) * priceOf(item.data)
+    value = value + (item.count or 1) * items:SellPriceOf(item.data)
   end
   if sold > 0 then
     local what = sold == 1 and L:G("Sold %d item for %s.") or L:G("Sold %d items for %s.")

@@ -49,6 +49,10 @@ items:MarkItemAsNew(ctx, data)
 -- Get item category
 items:GetCategory(ctx, data)
 
+-- What a vendor pays for one, in copper: the link's price once loaded, else the base item's; 0 for an
+-- item no merchant buys (hasNoValue). Auto Sell's total and the Sell Price item orders read it.
+items:SellPriceOf(data)
+
 -- Restack items (internal sort)
 items:Restack(ctx, kind, callback)
 ```

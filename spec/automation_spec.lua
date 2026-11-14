@@ -97,6 +97,8 @@ describe("Automation", function()
       table.insert(asked, { own = own, ignoreRecent = ignoreRecent })
       return ofCategory[data.slotkey]
     end)
+    -- The price of one is the Items module's, the link's once loaded (items:SellPriceOf, spec/items_spec.lua).
+    override(items, "SellPriceOf", function(_, data) return data.itemInfo.traits.sellPrice end)
     override(categories, "AutomationOf", function(_, name) return actions[name] end)
     override(categories, "ConfirmsSaleOf", function(_, name) return confirms[name] == true end)
     override(categories, "DepositOf", function(_, name) return deposits[name] end)

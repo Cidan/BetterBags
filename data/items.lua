@@ -1801,6 +1801,28 @@ function items:MarkDrawOnClose(kind)
   end
 end
 
+-- OutOfOrder returns the slot keys of the first two items of one category in ordered, gaps aside, that
+-- sortFunc puts the other way round, or nil when each category's items are in order. A section shows
+-- its category's items in the order of the list (Phase10_PartitionIntoTabs), so only those are compared.
+---@param ordered ItemData[]
+---@param sortFunc fun(a: ItemData, b: ItemData): boolean
+---@return string? earlier
+---@return string? later
+function items:OutOfOrder(ordered, sortFunc)
+  local previous = {}
+  for _, item in ipairs(ordered) do
+    if not item.isItemGap then
+      local category = item.itemInfo.category or ""
+      local before = previous[category]
+      if before and sortFunc(item, before) then
+        return before.slotkey, item.slotkey
+      end
+      previous[category] = item
+    end
+  end
+  return nil
+end
+
 -- BuildOrderedItems computes the ordered item list for a sweep, holding a
 -- persistent empty gap wherever a displayed icon has left the bag, by diffing the
 -- previously committed layout (previousSortedItems) against this sweep's displayed
@@ -1925,19 +1947,19 @@ function items:BuildOrderedItems(ctx, kind, visibleItemsBySlotKey, emptySlotByBa
     end
   end
   local sortModule = addon:GetModule("Sort", true)
-  if sortModule and sortModule.GetItemDataSortFunction then
-    local sortFunc = sortModule:GetItemDataSortFunction(kind, view)
-    if sortFunc then
-      table.sort(newItems, sortFunc)
-    end
+  local sortFunc = sortModule and sortModule.GetItemDataSortFunction and sortModule:GetItemDataSortFunction(kind, view)
+  if sortFunc then
+    table.sort(newItems, sortFunc)
   end
   for _, item in ipairs(newItems) do
     table.insert(result, item)
   end
 
-  -- A kept rehashed item holds its old position, which can be out of sort order (its
-  -- category or sort keys may have changed), so closing the bag re-sorts it too.
-  if emittedGap or keptRehashed then
+  -- Kept items hold their old positions and new ones go last, which can be out of sort
+  -- order: a rehashed item's category or sort keys, or a sort key outside the hash (a
+  -- stack's count, which Sell Price (Stack) sorts by). Closing the bag re-sorts them.
+  local outOfOrder = sortFunc ~= nil and self:OutOfOrder(result, sortFunc) ~= nil
+  if emittedGap or keptRehashed or outOfOrder then
     self:MarkDrawOnClose(kind)
   end
 
@@ -3239,6 +3261,20 @@ function items:ReadLinkInfo(itemLink)
   end
   local name, _, _, _, minLevel, _, _, stackSize, _, _, sellPrice, _, _, bindType = C_Item.GetItemInfo(itemLink)
   return minLevel, stackSize, sellPrice, bindType, name ~= nil
+end
+
+-- SellPriceOf is what a vendor pays for one of an item, in copper: the item in the slot's price (its link's,
+-- in its traits) once its data has loaded, else its base item's; 0 for one no merchant buys (the slot's
+-- hasNoValue, which a price can disagree with). Auto Sell's total and the Sell Price item orders
+-- (util/sort.lua) read it, so both go by the same price.
+---@param data ItemData
+---@return number
+function items:SellPriceOf(data)
+  if data.containerInfo and data.containerInfo.hasNoValue then
+    return 0
+  end
+  local traits = data.itemInfo.traits
+  return (traits and traits.sellPrice) or data.itemInfo.sellPrice or 0
 end
 
 -- SlotLevelsOf works out an equipment item's slot values (search-indexing.md §16): the lowest item
