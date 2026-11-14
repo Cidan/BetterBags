@@ -1,0 +1,17 @@
+{
+  "id": 1794698819,
+  "version": "v0.9.2-23-gf46aeef",
+  "channel": "alpha",
+  "date": "2026-11-14",
+  "from": "d1457e6095779a11bc49a6f75602054effdd067d",
+  "to": "f46aeeff76fd9d83767536f674203d95a73fcd46",
+  "headline": "Adds a movable Food \u0026 Drink bar to BetterBags Next.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "Food \u0026 Drink bar in BetterBags Next",
+      "details": "A movable on-screen card in BetterBags Next shows food and drink from your backpack (highest or lowest item level), bags open or closed. Right-click to eat or drink, or drop it on the backpack to turn off. Set options under Food \u0026 Drink after Currencies, with a Food \u0026 Drink Masque group.",
+      "clients": []
+    }
+  ]
+}
