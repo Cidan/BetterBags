@@ -162,6 +162,7 @@ describe("NextSettingsContent", function()
     render:Init()
     tween:Init()
     UseNextCurrencies(db, override)
+    UseNextFoodDrink(db, override)
     pages:Clear()
     settings:Init()
     content:Init()
@@ -183,7 +184,8 @@ describe("NextSettingsContent", function()
         table.insert(list, page.group .. ": " .. page.title)
       end
       assert.are.same({ "BetterBags: General", "BetterBags: Appearance", "BetterBags: Item Colors",
-        "BetterBags: Categories", "BetterBags: Currencies", "Bags: Backpack", "Bags: Bank", "Profiles: Profiles",
+        "BetterBags: Categories", "BetterBags: Currencies", "BetterBags: Food & Drink", "Bags: Backpack", "Bags: Bank",
+        "Profiles: Profiles",
         "Integrations: QuickFind" }, list)
     end)
 
@@ -472,7 +474,9 @@ describe("NextSettingsContent", function()
         nextCurrencyCapBars = true, nextCurrencyGains = true, nextCurrencyHideEmpty = true,
         nextCurrencyItemsEverywhere = true, nextCurrencyTracker = true, nextCurrencyLayout = true,
         nextCurrencyScale = true, nextCurrencyBackground = true, nextCurrencyHideInCombat = true,
-        nextCurrencyGrow = true }
+        nextCurrencyGrow = true, nextFoodDrinkBar = true, nextFoodDrinkPick = true, nextFoodDrinkLayout = true,
+        nextFoodDrinkGrow = true, nextFoodDrinkScale = true, nextFoodDrinkBackground = true,
+        nextFoodDrinkHideInCombat = true }
       addon.hasGuildBank = true
       content:Init()
       local named = 0
@@ -499,8 +503,35 @@ describe("NextSettingsContent", function()
         end
       end
       -- The general pages' 38 (Enable Vendor Window, Enable Guild Bank Window and Enable QuickFind Integration the latest,
-      -- #1262), the Currencies page's 10 (currency.md §6), and each bag's 34.
-      assert.are.equal(38 + 10 + 3 * 34, named)
+      -- #1262), the Currencies page's 10 (currency.md §6), the Food & Drink page's 7 (food-drink.md §5), and each bag's 34.
+      assert.are.equal(38 + 10 + 7 + 3 * 34, named)
+    end)
+
+    -- The Food & Drink bar's options (food-drink.md §5): a page of their own after Currencies, BetterBags Next only.
+    it("puts the Food & Drink bar's options on a page of their own after Currencies, for BetterBags Next", function()
+      content:Init()
+      local ids = {}
+      for _, page in ipairs(pages.list) do
+        table.insert(ids, page.id)
+      end
+      local at
+      for i, id in ipairs(ids) do
+        if id == "fooddrink" then at = i end
+      end
+      assert.is_not_nil(at)
+      assert.are.equal("currencies", ids[at - 1])
+      local page = pages:Get("fooddrink")
+      assert.are.equal("next", page.design)
+      assert.are.equal(1, #page.tabs)
+      assert.are.equal("display", page.tabs[1].id)
+      local settingsShown = {}
+      for _, section in ipairs(pages:Sections(page.tabs[1])) do
+        for _, row in ipairs(section.rows) do
+          table.insert(settingsShown, row.setting)
+        end
+      end
+      assert.are.same({ "nextFoodDrinkBar", "nextFoodDrinkPick", "nextFoodDrinkLayout", "nextFoodDrinkGrow",
+        "nextFoodDrinkScale", "nextFoodDrinkBackground", "nextFoodDrinkHideInCombat" }, settingsShown)
     end)
 
     it("shows the bank's Layout without the backpack's Enable Groups", function()

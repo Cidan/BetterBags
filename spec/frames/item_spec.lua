@@ -1557,6 +1557,60 @@ describe("ItemFrame Static Buttons and Parent Removal Tests", function()
       assert.is_true(battlepayShown)
     end)
 
+    -- Asked: no new-item glow on the Food & Drink bar's buttons (food-drink.md §3), static draws of real bag slots.
+    -- Blizzard's own UpdateNewItem, which ResetVisuals calls, lights it on a slot the client flags new
+    -- (ContainerFrameItemButtonMixin:UpdateNewItem, Mainline/ContainerFrame.lua), looping until something stops it.
+    it("leaves no new-item glow on a static draw of a slot the client flags new", function()
+      local isNewItem = C_NewItems.IsNewItem
+      finally(function() C_NewItems.IsNewItem = isNewItem end)
+      C_NewItems.IsNewItem = function(bag, slot) return bag == 0 and slot == 7 end
+      -- A store item lights the store's highlight instead of the glow, the same way.
+      for _, battlepay in ipairs({ false, true }) do
+        local b = itemFrame:Create(btnCtx)
+        b:SetSlot(btnCtx, 0, 7)
+        local d = b:GetDecoration(btnCtx)
+        local shown = {}
+        local function texture(name)
+          return { Show = function() shown[name] = true end, Hide = function() shown[name] = false end,
+            SetAtlas = function() end }
+        end
+        local function anim(name)
+          return { IsPlaying = function() return shown[name] == true end, Play = function() shown[name] = true end,
+            Stop = function() shown[name] = false end }
+        end
+        d.NewItemTexture, d.BattlepayItemTexture = texture("glow"), texture("store")
+        d.flashAnim, d.newitemglowAnim = anim("flash"), anim("loop")
+        d.UpdateNewItem = function(me)
+          if C_NewItems.IsNewItem(me:GetBagID(), me:GetID()) then
+            if battlepay then
+              me.NewItemTexture:Hide()
+              me.BattlepayItemTexture:Show()
+            else
+              me.BattlepayItemTexture:Hide()
+              me.NewItemTexture:Show()
+            end
+            if not me.flashAnim:IsPlaying() and not me.newitemglowAnim:IsPlaying() then
+              me.flashAnim:Play()
+              me.newitemglowAnim:Play()
+            end
+          else
+            me.BattlepayItemTexture:Hide()
+            me.NewItemTexture:Hide()
+          end
+        end
+        b:SetStaticItemFromData(btnCtx, {
+          slotkey = "0_7", bagid = 0, slotid = 7, isItemEmpty = false,
+          questInfo = { isQuestItem = false },
+          containerInfo = { isReadable = false, isFiltered = false, hasNoValue = false },
+          itemInfo = { isBound = false, itemID = 2287, itemIcon = 133974, itemQuality = 1, itemLink = "item:2287",
+            currentItemCount = 10, classID = 0, isNewItem = true, isBattlePayItem = battlepay },
+        })
+        for _, part in ipairs({ "glow", "store", "flash", "loop" }) do
+          assert.is_false(shown[part] == true, part .. (battlepay and ", a store item" or ""))
+        end
+      end
+    end)
+
     it("SetFreeSlots should read emptySlotName and itemQuality from the passed data", function()
       local itemData = {
         slotkey = "0_6",

@@ -25,6 +25,8 @@ next/
 ├── glass.lua     # NextGlass: a theme's body as smoked glass: tint, light, rain, lightning (Panel.Glass)
 ├── sheen.lua     # NextSheen: a theme's panels catching the light as they fade in and out (Panel.Sheen)
 ├── panel.lua     # NextPanel: the panel both bags are made of, for either side of the screen
+├── screencard.lua    # NextScreenCard: a card that stays on screen (the currency tracker, the Food & Drink bar)
+├── fooddrinkbar.lua  # NextFoodDrinkBar: the food and the drink on two item buttons, a right click eats
 ├── bag.lua       # NextBag: the backpack's panel, on the right (addon.Bags.Backpack)
 └── bank.lua      # NextBank: the bank's panel, on the left (addon.Bags.Bank)
 ```
@@ -162,6 +164,21 @@ field, headed by the item, listing every category in its order with a new catego
 to where the item belongs when it was added to a category by hand. The item goes back to its slot while the player
 picks; a category picked files it as dropping it on that category's header does. The rules are in
 `.claude/rules/next-category-picker.md`.
+
+## Cards on the screen: the currency tracker and the Food & Drink bar
+
+`NextScreenCard` (`screencard.lua`) is a small card of the theme's (`Currency.Tracker`) that stays where it was dropped,
+the bags open or closed: it grows from a corner, is kept on the screen, is picked up and dropped with the shared lift,
+is put away by a drop on the open backpack, and hides in combat (when told) and pet battles. The currency tracker
+(`currencytracker.lua`, `.claude/rules/currency.md` §5) and the Food & Drink bar are kinds of it (`card:Extend`), each
+saying what is its own (`Option`, `Saved`, `Save`, `Home`, `Wants`, `LayOut`, ...).
+
+The Food & Drink bar (`fooddrinkbar.lua`, `NextFoodDrinkBar`) shows the food and the drink `FoodDrink`
+(`data/fooddrink.lua`) picks, each on one of BetterBags' own item buttons pointed at its stack (`item:SetSlot`). A right
+click eats or drinks, as on the item in the bags; a left click does nothing; a drag moves the bar. Switched on (Show Food
+& Drink Bar, the Food & Drink page) it comes out of the open backpack (`card:Emerge`); dropped on the backpack it is put
+away and switched off. Its buttons are in Masque's "Food & Drink" group. The backpack makes it and switches it off and on
+with BetterBags Next (`NextBag`). The rules are in `.claude/rules/food-drink.md`.
 
 ## The bank
 

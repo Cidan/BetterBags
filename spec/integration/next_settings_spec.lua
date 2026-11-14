@@ -119,7 +119,7 @@ describe("BetterBags Next's settings window on the whole addon", function()
       "categories > blizzard", "categories > settings",
       "categories > rule", "categories > items", "categories > ignored", "categories > automation",
       "currencies > tracked", "currencies > currencies", "currencies > items", "currencies > display",
-      "backpack > layout", "backpack > items", "backpack > categories", "backpack > order", "bank > layout", "bank > items",
+      "fooddrink > display", "backpack > layout", "backpack > items", "backpack > categories", "backpack > order", "bank > layout", "bank > items",
       "bank > categories", "bank > order", "guild > layout", "guild > items", "guild > categories", "guild > order",
       "profiles > profiles",
       "profiles > transfer", "quickfind > main" }, builtEveryTab(addon))

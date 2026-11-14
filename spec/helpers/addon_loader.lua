@@ -160,6 +160,35 @@ _G.UseNextCurrencies = function(database, override)
   addon:GetModule("Currencies"):Init()
 end
 
+-- UseNextFoodDrink readies BetterBags Next's Food & Drink bar (.claude/rules/food-drink.md) for a spec that builds the
+-- backpack, which makes the bar, or the settings window, which shows its options: the spec's Database answers them
+-- (every option its default, the bar put away), installed with the spec's own override so they are put back after each
+-- test, and FoodDrink, where the spec loaded it, starts with nothing picked. The bar is made again by the next backpack
+-- built, so it listens to that test's events whatever test came first. Call it where the spec sets up each test
+-- (before_each).
+---@param database table
+---@param override fun(tbl: table, key: string, value: any)
+_G.UseNextFoodDrink = function(database, override)
+  local bar = { out = false }
+  local options = { pick = "highest", layout = "row", growX = "left", growY = "down", scale = 100, background = true,
+    hideInCombat = true }
+  override(database, "GetNextFoodDrinkOption", function(_, name) return options[name] end)
+  override(database, "SetNextFoodDrinkOption", function(_, name, value) options[name] = value end)
+  override(database, "GetNextFoodDrinkBar", function() return bar.out, bar.x, bar.y end)
+  override(database, "SetNextFoodDrinkBar", function(_, out, x, y)
+    bar.out = out
+    if x ~= nil then bar.x, bar.y = x, y end
+  end)
+  local foodDrink = addon:GetModule("FoodDrink", true)
+  if foodDrink ~= nil then
+    foodDrink:Init()
+  end
+  local foodDrinkBar = addon:GetModule("NextFoodDrinkBar", true)
+  if foodDrinkBar ~= nil then
+    foodDrinkBar.instance = nil
+  end
+end
+
 -- NextIconName names what a BetterBags Next header button draws: its icon's file name without its
 -- folder or extension ("sort" for ...\\icons\\sort.png), or its atlas.
 ---@param button table

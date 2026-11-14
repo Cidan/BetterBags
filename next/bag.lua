@@ -36,6 +36,9 @@ local bagButton = addon:GetModule('BagButton')
 ---@class NextCurrencyStrip: AceModule
 local currencyStrip = addon:GetModule('NextCurrencyStrip')
 
+---@class NextFoodDrinkBar: AceModule
+local foodDrinkBar = addon:GetModule('NextFoodDrinkBar')
+
 local EMPTY_BAG_SLOT_TEXTURE = [[Interface\PaperDoll\UI-PaperDoll-Slot-Bag]]
 
 -- NextBag is BetterBagsNext's backpack (next.md): the panel on the right of the screen
@@ -52,6 +55,7 @@ local nextBag = addon:NewModule('NextBag')
 ---@field behavior {SwitchToGroup: fun(self: any, ctx: Context, id: number)}
 ---@field helper BackpackBehaviorProto The classic behavior, for its group dialogs.
 ---@field currencyStrip NextCurrencyStripFrame The currencies at the bottom, where the free slots were (currency.md).
+---@field foodDrinkBar NextFoodDrinkBarFrame The Food & Drink bar, which comes out of it and is put away in it (food-drink.md).
 local bagProto = nextPanel:Extend({}, 'NextBackpack')
 bagProto.watchesCooldowns = true
 bagProto.categorizes = true
@@ -59,7 +63,6 @@ bagProto.categorizes = true
 ---@param ctx Context
 ---@return NextBackpack
 function nextBag:Create(ctx)
-  local _ = ctx
   ---@type NextBackpack
   local b = nextPanel:Create(bagProto, {
     kind = const.BAG_KIND.BACKPACK,
@@ -78,6 +81,7 @@ function nextBag:Create(ctx)
       b:SwitchToGroup(ectx, id)
     end,
   }
+  b.foodDrinkBar = foodDrinkBar:Create(ctx, b)
   return b
 end
 
@@ -107,19 +111,22 @@ function bagProto:FooterWidth()
   return self.currencyStrip:MinWidth()
 end
 
--- Deactivate switches the backpack off with BetterBags Next (next.md §11): its currency tracker hides with it.
+-- Deactivate switches the backpack off with BetterBags Next (next.md §11): its currency tracker and its Food & Drink
+-- bar hide with it.
 ---@param ctx Context
 function bagProto:Deactivate(ctx)
   self.currencyStrip.tracker:SetActive(ctx, false)
+  self.foodDrinkBar:SetActive(ctx, false)
   nextPanel.proto.Deactivate(self, ctx)
 end
 
--- Activate catches the backpack up when BetterBags Next is switched back on: its currency tracker shows again where
--- it was left, when it was out.
+-- Activate catches the backpack up when BetterBags Next is switched back on: its currency tracker and its Food & Drink
+-- bar show again where they were left, when they were out.
 ---@param ctx Context
 function bagProto:Activate(ctx)
   nextPanel.proto.Activate(self, ctx)
   self.currencyStrip.tracker:SetActive(ctx, true)
+  self.foodDrinkBar:SetActive(ctx, true)
 end
 
 ---@return NextHeaderButton[]

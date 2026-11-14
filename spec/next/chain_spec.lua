@@ -61,7 +61,7 @@ local modules = { { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.
   { "NextDockCard", "next/dockcard.lua" }, { "NextDock", "next/dock.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" }, { "NextUIPanels", "next/uipanels.lua" }, { "NextOrnaments", "next/ornaments.lua" }, { "NextMenuButton", "next/menubutton.lua" }, { "NextGlitch", "next/glitch.lua" }, { "NextRain", "next/rain.lua" }, { "NextShatter", "next/shatter.lua" }, { "NextSnow", "next/snow.lua" }, { "NextThreads", "next/threads.lua" }, { "NextSmoke", "next/smoke.lua" }, { "NextBats", "next/bats.lua" }, { "NextBeam", "next/beam.lua" }, { "NextStopMotion", "next/stopmotion.lua" }, { "NextPaper", "next/paper.lua" }, { "NextGlass", "next/glass.lua" }, { "NextSheen", "next/sheen.lua" }, { "NextPanel", "next/panel.lua" },
   { "Currencies", "data/currencies.lua" }, { "NextCurrencyEntry", "next/currencyentry.lua" },
   { "NextCurrencyDrag", "next/currencydrag.lua" },
-  { "NextCurrencyTracker", "next/currencytracker.lua" }, { "NextCurrencyStrip", "next/currencystrip.lua" }, { "NextBag", "next/bag.lua" }, { "NextBank", "next/bank.lua" } }
+  { "NextScreenCard", "next/screencard.lua" }, { "NextCurrencyTracker", "next/currencytracker.lua" }, { "NextCurrencyStrip", "next/currencystrip.lua" }, { "Async", "core/async.lua" }, { "FoodDrink", "data/fooddrink.lua" }, { "NextFoodDrinkBar", "next/fooddrinkbar.lua" }, { "NextBag", "next/bag.lua" }, { "NextBank", "next/bank.lua" } }
 for _, m in ipairs(modules) do
   ResetModuleStub(m[1], m[2])
   LoadBetterBagsModule(m[2])
@@ -174,6 +174,7 @@ describe("NextChain", function()
 
   before_each(function()
     UseNextCurrencies(stubs.database, override)
+    UseNextFoodDrink(stubs.database, override)
     render:Init()
     tween:Init()
     motion:Init()
@@ -238,7 +239,11 @@ describe("NextChain", function()
     override(stubs.groups, "GetDefaultBankGroup", function() return bankGroups[10] end)
     override(stubs.events, "SendMessage", function(_, _, name, opts) table.insert(sent, { name, opts }) end)
     override(stubs.events, "RegisterMessage", function() end)
-    override(stubs.events, "RegisterEvent", function(_, name, fn) eventHandlers[name] = fn end)
+    -- Every handler of an event, as Events keeps them: the Food & Drink bar on the screen listens to the screen too.
+    override(stubs.events, "RegisterEvent", function(_, name, fn)
+      eventHandlers[name] = eventHandlers[name] or {}
+      table.insert(eventHandlers[name], fn)
+    end)
     override(stubs.events, "BucketEvent", function() end)
     override(stubs.searchBox, "CreateBox", function(_, kind, parent)
       local box = { kind = kind, frame = CreateFrame("Frame", nil, parent) }
@@ -428,10 +433,12 @@ describe("NextChain", function()
       click(backpack)
       settle()
       for _, event in ipairs({ "UI_SCALE_CHANGED", "DISPLAY_SIZE_CHANGED" }) do
-        assert.is_function(eventHandlers[event], event)
+        assert.is_true(#(eventHandlers[event] or {}) > 0, event)
       end
       UIParent:_SetRect(0, 0, 2400, 1200)
-      eventHandlers["UI_SCALE_CHANGED"](ctx())
+      for _, fn in ipairs(eventHandlers["UI_SCALE_CHANGED"]) do
+        fn(ctx())
+      end
       assert.are.equal(-(2400 - 2 * (style.WIDTH - style.FEATHER) - gap()), offset(backpack), "at once")
       assert.is_false(tween:IsPlaying(backpack))
     end)

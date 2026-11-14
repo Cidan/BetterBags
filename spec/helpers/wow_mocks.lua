@@ -3417,6 +3417,11 @@ _G.C_TradeSkillUI.GetItemCraftedQualityByItemInfo = function(itemInfo) return ni
 -- returns, but Blizzard's /use code treats its result as a truth value (ChatFrameUtilOverrides.lua),
 -- and an item with no spell returns nothing.
 _G.C_Item.GetItemSpell = function(itemInfo) return nil end
+-- C_Spell.GetSpellName(spellIdentifier) -> name, nothing for a spell the client does not have
+-- (SpellDocumentation.lua: "Returns nil if spell is not found"). Specs name spells in _G._spellNames[spellID].
+_G._spellNames = {}
+_G.C_Spell = _G.C_Spell or {}
+_G.C_Spell.GetSpellName = function(spellIdentifier) return _G._spellNames[spellIdentifier] end
 _G.C_Item.IsCosmeticItem = function(itemInfo) return false end
 _G.C_Item.GetItemUpgradeInfo = function(itemInfo) return nil end
 _G.C_Item.CanScrapItem = function(itemLocation) return false end

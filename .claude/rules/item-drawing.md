@@ -91,6 +91,17 @@ Virtual slot keys (like `"Container"`, `"Reagent Bag"`, or aggregated free space
   - The settings pane's item rows (`frames/itemrow.lua`) create their holder hidden the same way; a row draw shows it.
   - Coverage: `spec/frames/item_spec.lua` ("leaves every slot hidden and unparented until it is drawn", "makes the drawing button inside the hidden holder", "is visible once drawn into an open bag, not while the bag is closed, and not after release"), `spec/frames/bag_draw_ownership_spec.lua` ("leaves visible only the buttons it drew, and none once the bag closes"), `spec/itemrow_spec.lua` ("keeps a new row hidden until it is drawn"). The `ItemButton` mock's `Initialize` follows Blizzard's (bag, slot, extended state, combined background, then `Show`), so the tests see the buttons' own shown flags set inside a hidden holder.
 - **Bag and slot are set once, by Blizzard's `Initialize`.** `itemFrame:GetButton` sets up a physical slot's clickable button and its decoration with `initializeSlotButton`: Blizzard's `Initialize(bag, slot)` on retail, `Initialize(holder, bag, slot)` on WoW: Forever, whose launch build takes the container first and asks it whether it is combined (camelot-forever.md §11a), and `SetID` with `bagID` on Classic, whose buttons have none. Forever's launch build also has no `ItemSlotBackgroundCombinedBagsTemplate`, so the decoration's empty slot background is a plain texture in the `bags-item-slot64` atlas there (§11b).
+- **A button pointed at one slot, then another** (`item:SetSlot(ctx, bag, slot)`): a button made for no slot of its own
+  (`itemFrame:Create`), pointed by the caller, binds its holder's ID, its clickable button and its decoration with the same
+  `initializeSlotButton`. The Food & Drink bar's buttons move this way as what they offer moves (food-drink.md §3). Coverage:
+  `spec/frames/item_classic_spec.lua` ("points a button made for no slot at a bag slot, and at another", "points a retail
+  button at a slot through its Initialize").
+- **A static draw shows no new-item glow** (`SetStaticItemFromData`: it calls `ClearFlashItem` where an item draw calls
+  `UpdateNewItem`). On a button pointed at a bag slot (the Food & Drink bar's; asked: no new-item glow on those buttons),
+  Blizzard's own `UpdateNewItem`, which `ResetVisuals` calls on the button's first draw, lights the glow for a slot the
+  client flags new (`ContainerFrameItemButtonMixin:UpdateNewItem`, Mainline/ContainerFrame.lua: `C_NewItems.IsNewItem`) and
+  loops it until something stops it; a bag's own buttons and the item rows (on no real slot) are unchanged. Coverage:
+  `spec/frames/item_spec.lua` ("leaves no new-item glow on a static draw of a slot the client flags new").
 - **Acquisition & Release:** `itemFrame:GetButton(ctx, slotkey)` acquires a virtual button from `virtualPool` via `itemFrame:AcquireVirtualItem(ctx, slotkey)`. When views wipe or release item frames (`item:Wipe(ctx)`), virtual buttons are unmapped from `buttonsBySlotkey` and returned to `virtualPool`.
 
 ### 7a. Redrawing a Button Without Releasing It

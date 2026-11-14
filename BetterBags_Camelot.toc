@@ -124,6 +124,7 @@ data\refresh.lua
 data\seller.lua
 data\automation.lua
 data\currencies.lua
+data\fooddrink.lua
 data\changelogdata.lua
 data\changelog.lua
 
@@ -224,8 +225,10 @@ next\sheen.lua
 next\panel.lua
 next\currencydrag.lua
 next\currencyentry.lua
+next\screencard.lua
 next\currencytracker.lua
 next\currencystrip.lua
+next\fooddrinkbar.lua
 next\bag.lua
 next\bank.lua
 next\merchant.lua

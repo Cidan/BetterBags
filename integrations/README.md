@@ -57,7 +57,7 @@ Integrates with Masque for custom button skinning.
 
 **Features:**
 - Custom button skins for item buttons
-- Separate groups for Backpack, Bank and BetterBags Next's Vendor
+- Separate groups for Backpack, Bank and BetterBags Next's Vendor, Guild Bank and Food & Drink bar
 - Respects the theme's `Masque = false` (`Sonata:UsesMasque()`), taking buttons out of their groups when such a theme is applied
 - Dynamic button registration/removal
 - Blend mode fixes for proper display
@@ -73,6 +73,10 @@ Integrates with Masque for custom button skinning.
 - `BetterBags/Bank` - All bank item buttons
 - `BetterBags/Vendor` - BetterBags Next's vendor buttons (`next/vendorbutton.lua`): their square
   button, with its parts named (`Icon`, `IconBorder`, `Count`, `Highlight`), as an `Item` button
+- `BetterBags/Guild Bank` - BetterBags Next's guild bank buttons (`next/guildbutton.lua`)
+- `BetterBags/Food & Drink` - BetterBags Next's Food & Drink bar (`next/fooddrinkbar.lua`): BetterBags' own item
+  buttons, skinned on `item/NewButton` and `item/Updated` as the bags' are, in this group because they say so
+  (`item.masqueGroup`, `.claude/rules/food-drink.md` §3)
 
 **Event Handlers:**
 - `item/NewButton` - Register new item buttons

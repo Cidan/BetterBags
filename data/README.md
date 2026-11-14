@@ -319,6 +319,21 @@ only when acting on it (`StillThere`).
 - **Left alone** (`BlockedReason`): items whose data has not loaded, whose upgrade state is unknown, in
   an equipment set, or still refundable
 
+### Food & Drink (`fooddrink.lua`)
+
+What BetterBags Next's Food & Drink bar eats and drinks (`.claude/rules/food-drink.md` §1, §2).
+
+- **What counts**: `FoodDrink:Kind(data)` says "food", "drink", "both" or nothing for an item in the bags, by the spell it
+  casts when used (`C_Item.GetItemSpell`): its name compared with what the client calls three reference spells in its
+  own language (Food 433, Drink 430, Food & Drink 369166, read once with `C_Spell.GetSpellName`), and a mage's conjured
+  food by its spell ID (it is named Refreshment, as buff food is). Only consumables count; buff food and alcohol never do.
+- **The pick**: `FoodDrink:Picks()` is `{ food = pick?, drink = pick? }`, each the stack of the item the rule picks
+  (`nextFoodDrink.pick`: the highest or lowest item level; then the lower item ID; of that item, the smallest stack) with
+  the count of every stack of it.
+- **When**: on every committed read of the backpack (`items/RefreshBackpack/Done`) and `fooddrink/OptionsChanged`;
+  `fooddrink/Changed` is sent only when a pick changed. In combat nothing changes, and one read waits for combat to end
+  (`Async:AfterCombat`).
+
 ### Groups (`groups.lua`)
 
 A bag's tabs of categories (`.claude/rules/groups.md`): creating, renaming and deleting groups,

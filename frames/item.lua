@@ -685,7 +685,11 @@ function itemFrame.itemProto:SetItemFromData(ctx, data)
 	end
 	if decoration.UpdateQuestItem then decoration:UpdateQuestItem(isQuestItem, questID, isActive) end
 	elements:DrawItemQuest(decoration, questInfo)
-	if not self.staticData then
+	if self.staticData then
+		-- No new-item glow on a static draw: on a button pointed at a bag slot (the Food & Drink bar's), Blizzard's own
+		-- UpdateNewItem, which ResetVisuals calls, lights it for a slot the client flags new (item-drawing.md).
+		self:ClearFlashItem(ctx)
+	else
 		self:UpdateNewItem(ctx, data)
 	end
 	if decoration.UpdateJunkItem then decoration:UpdateJunkItem(data.itemInfo.itemQuality, noValue) end
@@ -1430,6 +1434,18 @@ local function initializeSlotButton(button, holder, bagID, slotID)
 	else
 		button:Initialize(bagID, slotID)
 	end
+end
+
+-- SetSlot points a button made for no slot of its own at a bag slot, and again at another (the Food & Drink bar's,
+-- food-drink.md §3): its holder, its interaction button and its decoration, as GetButton does once for a slot's own
+-- button. Classic's container button reads its bag from its parent's ID.
+---@param ctx Context
+---@param bagID number
+---@param slotID number
+function itemFrame.itemProto:SetSlot(ctx, bagID, slotID)
+	self.frame:SetID(bagID)
+	initializeSlotButton(self.button, self.frame, bagID, slotID)
+	initializeSlotButton(self:GetDecoration(ctx), self.frame, bagID, slotID)
 end
 
 ---@param ctx Context
