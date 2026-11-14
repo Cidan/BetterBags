@@ -1,0 +1,29 @@
+{
+  "id": 1794685547,
+  "version": "v0.9.2-20-g756d500",
+  "channel": "alpha",
+  "date": "2026-11-14",
+  "from": "5c053cf4b97577d59923b54a1b593c17290a7404",
+  "to": "756d500c633600d4e63e5ae546f367514e4992c2",
+  "headline": "Small bags now keep their tabs on screen when clamped, while the Plain theme improves docking margins and bag button menus.",
+  "entries": [
+    {
+      "category": "Fixed",
+      "title": "Tabs stay on screen with Clamp Bags to Screen",
+      "details": "When Clamp Bags to Screen is enabled, small bags placed or dragged near the edge of the screen now keep their tab rail fully visible instead of clipping off-screen.",
+      "clients": []
+    },
+    {
+      "category": "Improved",
+      "title": "Plain theme docks clear of screen edges",
+      "details": "Full-height docked panels using the Plain theme now keep an 8-pixel margin clear of the screen top and bottom, preventing frame borders and artwork from extending off-screen.",
+      "clients": []
+    },
+    {
+      "category": "Improved",
+      "title": "Plain bag button sorting and menu options",
+      "details": "Right-clicking the bag button in the Plain theme now sorts your items. Its dropdown menu also adds the sort action and a Small Bags toggle across bag, bank, vendor, and guild bank panels.",
+      "clients": []
+    }
+  ]
+}
