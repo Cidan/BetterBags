@@ -305,3 +305,34 @@ func TestRunEmptiesTheDataBeforeAnythingCanFail(t *testing.T) {
 		t.Errorf("output:\n%s", got)
 	}
 }
+
+// The changes a review accounts for: every commit's subject and every pull request commit's, from
+// BuildInput's own lines and the "* " lines GitHub writes into a squash merge's message, each once.
+func TestChangeListNamesEveryCommitOnce(t *testing.T) {
+	commits := []Commit{
+		{SHA: "sha2", Subject: "Plain theme (#20) (#21)", Body: "* Plain theme\n\nThe theme.\n\n* Plain: its bag button sorts\n\nRight click."},
+		{SHA: "sha1", Subject: "Keyring slots (#10)", Body: "Only open slots.\n- a list of what changed\n"},
+	}
+	pulls := map[string][]PullRequest{"sha2": {{Number: 21, Title: "Plain theme", Commits: []Commit{
+		{Subject: "Plain theme", Body: "The theme."}, {Subject: "plain: Its Bag Button Sorts"}, {Subject: "Plain: docks clear of the edges  "}}}}}
+	got := ChangeList(BuildInput("alpha", Range{Version: "v1"}, commits, pulls))
+	want := []string{"Keyring slots (#10)", "Plain theme (#20) (#21)", "Plain: its bag button sorts", "Plain: docks clear of the edges"}
+	if strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Errorf("changes:\n%s", strings.Join(got, "\n"))
+	}
+}
+
+// A squash merge's message holds every commit of its pull request, so the longest go whole; only a
+// message past maxMessage is cut.
+func TestBuildInputKeepsLongMessagesWhole(t *testing.T) {
+	long := strings.Repeat("A pull request commit's message. ", 1200)
+	input := BuildInput("release", Range{Version: "v1"}, []Commit{{SHA: "s", Subject: "Batch (#1184)", Body: long}}, nil)
+	if !strings.Contains(input, long) || strings.Contains(input, "(cut short)") {
+		t.Errorf("a %d-byte message was cut", len(long))
+	}
+	huge := strings.Repeat("x", maxMessage+10)
+	input = BuildInput("release", Range{Version: "v1"}, []Commit{{SHA: "s", Subject: "Huge", Body: huge}}, nil)
+	if !strings.Contains(input, strings.Repeat("x", maxMessage)+"\n(cut short)") || strings.Contains(input, strings.Repeat("x", maxMessage+1)) {
+		t.Errorf("a message past maxMessage was not cut at it")
+	}
+}

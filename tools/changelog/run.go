@@ -42,8 +42,10 @@ type Deps struct {
 
 const (
 	noChangesHeadline = "No changes in this build."
-	// maxMessage is how much of one commit message goes to Gemini; maxInput, of all of them.
-	maxMessage = 8000
+	// maxMessage is how much of one commit message goes to Gemini; maxInput, of all of them. A
+	// squash merge's message holds every commit of its pull request, so maxMessage stays above the
+	// longest on main (39 KB): what it cuts off never reaches the notes.
+	maxMessage = 64000
 	maxInput   = 400000
 )
 
@@ -89,6 +91,37 @@ func BuildInput(channel string, r Range, commits []Commit, pulls map[string][]Pu
 		}
 	}
 	return b.String()
+}
+
+// ChangeList lists the changes in a build's input that its notes must account for: every commit's
+// subject and every pull request commit's, from the lines BuildInput writes and the "* " lines
+// GitHub writes into a squash merge's message, oldest first and each once (pull request numbers
+// and case aside).
+func ChangeList(input string) []string {
+	var changes []string
+	seen := map[string]bool{}
+	for _, line := range strings.Split(input, "\n") {
+		var subject string
+		if s, ok := strings.CutPrefix(line, "=== Commit: "); ok {
+			subject = s
+		} else if s, ok := strings.CutPrefix(line, "* "); ok {
+			subject = s
+		} else {
+			continue
+		}
+		subject = strings.TrimSpace(subject)
+		key := subject
+		for pullReference.MatchString(key) {
+			key = pullReference.ReplaceAllString(key, "")
+		}
+		key = strings.ToLower(key)
+		if key == "" || seen[key] {
+			continue
+		}
+		seen[key] = true
+		changes = append(changes, subject)
+	}
+	return changes
 }
 
 type runner struct {
