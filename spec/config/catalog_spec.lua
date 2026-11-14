@@ -128,6 +128,13 @@ describe("The settings catalog", function()
     assert.has_error(function() catalog:Get("enableGroups", bank) end, "the bank has no setting enableGroups")
   end)
 
+  -- Asked (#1239): the tooltip said the tabs are at the bottom of the backpack, where only the classic bags draw them;
+  -- BetterBags Next's run down the panel's side, and both designs read this one description.
+  it("describes Enable Groups without naming where the tabs are drawn", function()
+    assert.are.equal("Show group tabs on the backpack. Groups allow you to organize categories into separate tabs. "
+      .. "When disabled, all categories are shown in a single view.", catalog:Get("enableGroups", backpack).description)
+  end)
+
   it("reads a choice as the item chosen, and writes the item picked", function()
     local order = catalog:Get("sectionOrder", backpack)
     assert.are.equal("dropdown", order.kind)
