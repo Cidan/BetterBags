@@ -441,7 +441,7 @@ define('enableGroups', {
   bag = true,
   only = { const.BAG_KIND.BACKPACK },
   title = 'Enable Groups',
-  description = 'Show group tabs at the bottom of the backpack. Groups allow you to organize categories into separate tabs. When disabled, all categories are shown in a single view.',
+  description = 'Show group tabs on the backpack. Groups allow you to organize categories into separate tabs. When disabled, all categories are shown in a single view.',
   keywords = { 'tabs', 'groups' },
   get = function(_, bag) return db:GetGroupsEnabled(bag.kind) end,
   set = function(ctx, value, bag)
