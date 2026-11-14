@@ -116,6 +116,11 @@ tracker's list its name. Drawn from the theme's `Currency` (§7), on whole pixel
 
 ## 5. The tracker (`NextCurrencyTracker`, `next/currencytracker.lua`)
 
+- **A card** (`NextScreenCard`, `next/screencard.lua`, food-drink.md §4): what this section says of it as a card (its
+  card art, the faint card, fading, growing from a corner, kept on the screen, picked up, dropped and remembered, put
+  away, combat and pet battles, BetterBags Next switched off) is the card's, shared with the Food & Drink bar; the
+  tracker says what is its own (its options, `nextCurrencyTracker`, its strip as where it is put away and what lights).
+  Its own specs pass unchanged over the shared card.
 - **A copy of the whole strip**: one at a time; dragging the strip again picks the one out up (it flies from where it is
   to the cursor). It is made with the backpack, in BetterBags Next's event scope (next-bagsystem.md §11).
 - **Popping out**: it shows what is tracked now (drawn as it pops: it may have been made after the currencies were

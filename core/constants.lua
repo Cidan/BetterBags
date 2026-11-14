@@ -795,6 +795,11 @@ const.DATABASE_DEFAULTS = {
     nextCurrency = { capBars = false, gains = true, hideEmpty = true, itemsEverywhere = true, layout = "row",
       scale = 100, background = true, hideInCombat = false, growX = "left", growY = "down" },
     nextCurrencyTracker = { out = false },
+    -- BetterBags Next's Food & Drink bar (.claude/rules/food-drink.md): which item level it picks, how it shows (these are
+    -- the only names there are), and whether it is out and where it was left.
+    nextFoodDrink = { pick = "highest", layout = "row", growX = "left", growY = "down", scale = 100, background = true,
+      hideInCombat = true },
+    nextFoodDrinkBar = { out = false },
     showBagButton = true,
     enableBankBag = true,
     showBankTabs = false,

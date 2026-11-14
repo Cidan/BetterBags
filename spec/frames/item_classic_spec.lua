@@ -512,6 +512,40 @@ describe("ItemFrame on Classic clients", function()
     assert.equal(1, cooldownCalls[1].bagID)
     assert.equal(decoration, cooldownCalls[1].button)
   end)
+
+  -- A button made for no slot of its own, pointed at one and then another (the Food & Drink bar's, food-drink.md §3):
+  -- Classic's container button reads its bag from its parent's ID and its slot from its own (no Initialize).
+  it("points a button made for no slot at a bag slot, and at another", function()
+    local ctx = context:New("classic_set_slot")
+    local item = itemFrame:Create(ctx)
+    item:SetSlot(ctx, 1, 7)
+    assert.are.equal(1, item.frame:GetID())
+    assert.are.equal(7, item.button:GetID())
+    assert.are.equal(1, item.button.bagID)
+    assert.are.equal(7, item._decoration:GetID())
+    assert.are.equal(1, item._decoration.bagID)
+    item:SetSlot(ctx, 0, 3)
+    assert.are.equal(0, item.frame:GetID())
+    assert.are.equal(3, item.button:GetID())
+    assert.are.equal(0, item.button.bagID)
+    assert.are.equal(3, item._decoration:GetID())
+  end)
+
+  -- Retail's container button keeps its bag and slot through its Initialize (ContainerFrame.lua: SetBagID writes an
+  -- attribute, so the bag ID taints nothing).
+  it("points a retail button at a slot through its Initialize", function()
+    override(addon, "isRetail", true)
+    override(addon, "isForever", false)
+    local ctx = context:New("retail_set_slot")
+    local item = itemFrame:Create(ctx)
+    local calls = {}
+    for _, b in ipairs({ item.button, item:GetDecoration(ctx) }) do
+      b.Initialize = function(me, bag, slot) table.insert(calls, { me, bag, slot }) end
+    end
+    item:SetSlot(ctx, 2, 5)
+    assert.are.same({ { item.button, 2, 5 }, { item._decoration, 2, 5 } }, calls)
+    assert.are.equal(2, item.frame:GetID())
+  end)
 end)
 
 describe("ItemFrame bag kind classification", function()

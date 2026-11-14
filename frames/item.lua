@@ -1432,6 +1432,18 @@ local function initializeSlotButton(button, holder, bagID, slotID)
 	end
 end
 
+-- SetSlot points a button made for no slot of its own at a bag slot, and again at another (the Food & Drink bar's,
+-- food-drink.md §3): its holder, its interaction button and its decoration, as GetButton does once for a slot's own
+-- button. Classic's container button reads its bag from its parent's ID.
+---@param ctx Context
+---@param bagID number
+---@param slotID number
+function itemFrame.itemProto:SetSlot(ctx, bagID, slotID)
+	self.frame:SetID(bagID)
+	initializeSlotButton(self.button, self.frame, bagID, slotID)
+	initializeSlotButton(self:GetDecoration(ctx), self.frame, bagID, slotID)
+end
+
 ---@param ctx Context
 ---@param slotkey string
 ---@return Item

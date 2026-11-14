@@ -58,7 +58,7 @@ for _, m in ipairs({ { "NextStyle", "next/style.lua" }, { "NextTween", "next/twe
   { "NextSparkles", "next/sparkles.lua" }, { "NextLift", "next/lift.lua" }, { "NextTabs", "next/tabs.lua" }, { "NextContent", "next/content.lua" },
   { "NextDockCard", "next/dockcard.lua" }, { "NextDock", "next/dock.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" }, { "NextUIPanels", "next/uipanels.lua" }, { "NextOrnaments", "next/ornaments.lua" }, { "NextMenuButton", "next/menubutton.lua" }, { "NextGlitch", "next/glitch.lua" }, { "NextRain", "next/rain.lua" }, { "NextShatter", "next/shatter.lua" }, { "NextSnow", "next/snow.lua" }, { "NextThreads", "next/threads.lua" }, { "NextSmoke", "next/smoke.lua" }, { "NextBats", "next/bats.lua" }, { "NextBeam", "next/beam.lua" }, { "NextStopMotion", "next/stopmotion.lua" }, { "NextPaper", "next/paper.lua" }, { "NextGlass", "next/glass.lua" }, { "NextSheen", "next/sheen.lua" }, { "NextPanel", "next/panel.lua" }, { "Currencies", "data/currencies.lua" }, { "NextCurrencyEntry", "next/currencyentry.lua" },
   { "NextCurrencyDrag", "next/currencydrag.lua" },
-  { "NextCurrencyTracker", "next/currencytracker.lua" }, { "NextCurrencyStrip", "next/currencystrip.lua" }, { "NextBag", "next/bag.lua" } }) do
+  { "NextScreenCard", "next/screencard.lua" }, { "NextCurrencyTracker", "next/currencytracker.lua" }, { "NextCurrencyStrip", "next/currencystrip.lua" }, { "Async", "core/async.lua" }, { "FoodDrink", "data/fooddrink.lua" }, { "NextFoodDrinkBar", "next/fooddrinkbar.lua" }, { "NextBag", "next/bag.lua" } }) do
   ResetModuleStub(m[1], m[2])
   LoadBetterBagsModule(m[2])
 end
@@ -111,6 +111,7 @@ describe("NextBag", function()
 
   before_each(function()
     UseNextCurrencies(stubs.database, override)
+    UseNextFoodDrink(stubs.database, override)
     render:Init()
     tween:Init()
     motion:Init()
@@ -874,6 +875,20 @@ describe("NextBag", function()
       assert.is_false(bag.searchBox.frame:IsShown())
       assert.is_not_nil(bag.tabs:Tab(3), "Ore listed")
       assert.are.equal(1, updates)
+    end)
+
+    -- The Food & Drink bar comes out of the backpack and is put away in it (food-drink.md §4); what switching does to it
+    -- is the bar's own (spec/next/fooddrinkbar_spec.lua).
+    it("makes the Food & Drink bar and switches it off and on with BetterBags Next", function()
+      local bag = nextBag:Create(ctx())
+      bag.moneyFrame.Update = function() end
+      local b = bag.foodDrinkBar
+      assert.is_not_nil(b)
+      assert.are.equal(bag, b:Home())
+      bag:Deactivate(ctx())
+      assert.is_false(b.active)
+      bag:Activate(ctx())
+      assert.is_true(b.active)
     end)
   end)
 

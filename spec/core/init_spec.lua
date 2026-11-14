@@ -49,7 +49,8 @@ describe("Core Init and Enable flow", function()
       "QuickFind", "Refresh", "ItemLoader", "Views",
       "Async", "Context", "Debug", "Form", "Bucket", "TooltipScanner", "Groups",
       "EquipmentSets", "BagButton", "ItemRowFrame", "Perf", "PerfSessions", "RenderRecorder", "Simulator", "Render", "Window", "Sonata", "NextSettings", "NextSettingsContent", "Tabs", "ChangelogWindow", "NextBag", "NextBank", "NextVendor",
-      "GuildBank", "NextGuildBank", "Automation", "Seller", "ProfessionShoppingList", "Currencies", "NextShatter",
+      "GuildBank", "NextGuildBank", "Automation", "Seller", "ProfessionShoppingList", "Currencies", "FoodDrink",
+      "NextShatter",
       "NextSmoke", "NextBats", "NextBeam", "NextPaper", "NextSheen"
     }
 
@@ -239,6 +240,18 @@ describe("Core Init and Enable flow", function()
     addon:OnEnable()
     assert.spy(c.Init).was.called(1)
     assert.spy(c.Enable).was.called(1)
+  end)
+
+  -- BetterBags Next's Food & Drink picks (food-drink.md §2) read the bags from their OnEnable; the bar draws them as soon
+  -- as the backpack is made (found on the whole addon: the bar read the picks before they were started).
+  it("starts and enables the Food & Drink picks", function()
+    local f = addon:GetModule("FoodDrink")
+    f.Init = spy.new(function() end)
+    f.Enable = spy.new(function() end)
+    addon:OnInitialize()
+    addon:OnEnable()
+    assert.spy(f.Init).was.called(1)
+    assert.spy(f.Enable).was.called(1)
   end)
 
   -- Every sale goes through the seller (automation.md §3), which listens to merchants and their errors.

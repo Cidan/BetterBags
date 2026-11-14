@@ -281,6 +281,21 @@ describe("Masque integration", function()
     end)
   end)
 
+  -- BetterBags Next's Food & Drink bar (food-drink.md §3): BetterBags' own item buttons, drawn as the bags' are, in a
+  -- group of their own.
+  describe("Food & Drink buttons", function()
+    it("skins a bar button in the Food & Drink group, not the backpack's, and again on each draw", function()
+      local item, decoration = newButton(const.BAG_KIND.BACKPACK)
+      item.masqueGroup = "Food & Drink"
+      send("item/NewButton", item, decoration)
+      assert.is_true(groups["Food & Drink"].Buttons[decoration])
+      assert.is_nil(groups["Backpack"].Buttons[decoration])
+      send("item/Updated", item, decoration)
+      assert.are.same({ "skin", "skin" }, groups["Food & Drink"].log)
+      assert.is_true(masque:IsSkinned(decoration))
+    end)
+  end)
+
   -- BetterBags Next's guild bank buttons (next/guildbutton.lua, guild-bank.md §5): Blizzard's own item
   -- buttons, in a group of their own, made once and reused, so skinned when announced and when a theme
   -- with Masque applies.

@@ -68,6 +68,8 @@ function masque:OnEnable()
   self.groups["Vendor"]:RegisterCallback(self.OnSkinChange, self)
   self.groups["Guild Bank"] = Masque:Group('BetterBags', 'Guild Bank')
   self.groups["Guild Bank"]:RegisterCallback(self.OnSkinChange, self)
+  self.groups["Food & Drink"] = Masque:Group('BetterBags', 'Food & Drink')
+  self.groups["Food & Drink"]:RegisterCallback(self.OnSkinChange, self)
 
   -- The group each item decoration was last added to. Item buttons are redrawn without
   -- being released (and so removed) in between, and Masque's AddButton does nothing for a
@@ -80,7 +82,9 @@ function masque:OnEnable()
   local function skin(item, decoration)
     if not item.kind then return end
     if not sonata:UsesMasque() then return end
-    local group = item.kind == const.BAG_KIND.BANK and self.groups["Bank"] or self.groups["Backpack"]
+    -- An item button of a group of its own (the Food & Drink bar's, food-drink.md §3), else its bag's.
+    local group = item.masqueGroup and self.groups[item.masqueGroup]
+      or item.kind == const.BAG_KIND.BANK and self.groups["Bank"] or self.groups["Backpack"]
     if self.added[decoration] == group then
       group:ReSkin(decoration)
     else

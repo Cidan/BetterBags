@@ -1158,6 +1158,117 @@ currencyOption('nextCurrencyTracker', {
   write = function(value) db:SetNextCurrencyTracker(value) end,
 })
 
+-- BetterBags Next's Food & Drink bar (food-drink.md §5, the Food & Drink page): which food and drink it picks and how the
+-- bar shows. Each saves the player's choice (one of the Food & Drink options, unless it says how to read and write its
+-- own) and tells the bar and FoodDrink (fooddrink/OptionsChanged), which read it again.
+---@param id string
+---@param def table
+local function foodDrinkOption(id, def)
+  local name = def.option
+  def.option = nil
+  def.get = def.get or function() return db:GetNextFoodDrinkOption(name) end
+  local write = def.write or function(value) db:SetNextFoodDrinkOption(name, value) end
+  def.write = nil
+  def.set = function(ctx, value)
+    write(value)
+    events:SendMessage(ctx, 'fooddrink/OptionsChanged')
+  end
+  define(id, def)
+end
+
+foodDrinkOption('nextFoodDrinkBar', {
+  kind = "toggle",
+  title = 'Show Food & Drink Bar',
+  description = 'Two buttons that stay on screen, your bags open or closed: the food and the drink in your bags. Right-click '
+    .. 'one to eat or drink it. On, it comes out of your backpack; dropping it back on your backpack puts it away.',
+  keywords = { 'food', 'drink', 'eat', 'water', 'bar', 'button', 'show', 'detach', 'float' },
+  get = function()
+    local out = db:GetNextFoodDrinkBar()
+    return out
+  end,
+  write = function(value) db:SetNextFoodDrinkBar(value) end,
+})
+
+local foodDrinkPicks = { ["Highest Item Level"] = "highest", ["Lowest Item Level"] = "lowest" }
+
+foodDrinkOption('nextFoodDrinkPick', {
+  kind = "dropdown",
+  title = 'Pick',
+  description = 'Which of your food and drink the bar offers: the highest item level, or the lowest to use up old food '
+    .. 'first. Buff food and drinks with alcohol are never offered.',
+  keywords = { 'food', 'drink', 'item level', 'highest', 'lowest', 'best', 'choose' },
+  items = { 'Highest Item Level', 'Lowest Item Level' },
+  get = function() return choiceOf(foodDrinkPicks, db:GetNextFoodDrinkOption('pick')) end,
+  write = function(value) db:SetNextFoodDrinkOption('pick', foodDrinkPicks[value]) end,
+})
+
+local foodDrinkLayouts = { ["Row"] = "row", ["Column"] = "column" }
+
+foodDrinkOption('nextFoodDrinkLayout', {
+  kind = "dropdown",
+  title = 'Bar Layout',
+  description = 'How the Food & Drink bar lays out its buttons: in a row, or in a column.',
+  keywords = { 'food', 'drink', 'bar', 'layout', 'row', 'column' },
+  items = { 'Row', 'Column' },
+  get = function() return choiceOf(foodDrinkLayouts, db:GetNextFoodDrinkOption('layout')) end,
+  write = function(value) db:SetNextFoodDrinkOption('layout', foodDrinkLayouts[value]) end,
+})
+
+-- One choice for the layout shown, as the currency tracker's Tracker Grows: Left or Right in a row, Up or Down in a
+-- column (the bar keeps both).
+foodDrinkOption('nextFoodDrinkGrow', {
+  kind = "dropdown",
+  title = 'Bar Grows',
+  description = 'Which way the Food & Drink bar grows as a button comes or goes: left from its right edge or right from '
+    .. 'its left edge in a row; down from its top or up from its bottom in a column.',
+  keywords = { 'food', 'drink', 'bar', 'grow', 'direction', 'anchor', 'left', 'right', 'up', 'down' },
+  itemsFunction = function()
+    if db:GetNextFoodDrinkOption('layout') == 'row' then
+      return { 'Left', 'Right' }
+    end
+    return { 'Up', 'Down' }
+  end,
+  get = function()
+    if db:GetNextFoodDrinkOption('layout') == 'row' then
+      return db:GetNextFoodDrinkOption('growX') == 'right' and 'Right' or 'Left'
+    end
+    return db:GetNextFoodDrinkOption('growY') == 'up' and 'Up' or 'Down'
+  end,
+  write = function(value)
+    local growth = currencyGrowth[value]
+    db:SetNextFoodDrinkOption(growth[1], growth[2])
+  end,
+})
+
+foodDrinkOption('nextFoodDrinkScale', {
+  option = 'scale',
+  kind = "slider",
+  title = 'Bar Scale',
+  description = 'The scale of the Food & Drink bar, in percent.',
+  keywords = { 'food', 'drink', 'bar', 'size', 'scale', 'zoom' },
+  min = 50,
+  max = 200,
+  step = 5,
+})
+
+foodDrinkOption('nextFoodDrinkBackground', {
+  option = 'background',
+  kind = "toggle",
+  title = 'Bar Background',
+  description = "The Food & Drink bar's card behind its buttons. Off, the card shows faintly only while the pointer is "
+    .. 'over it, to grab it by.',
+  keywords = { 'food', 'drink', 'bar', 'background', 'card', 'border', 'transparent' },
+})
+
+foodDrinkOption('nextFoodDrinkHideInCombat', {
+  option = 'hideInCombat',
+  kind = "toggle",
+  title = 'Hide Bar in Combat',
+  description = 'Fade the Food & Drink bar out while you are in combat, where nothing on it can be eaten, and back in '
+    .. 'after.',
+  keywords = { 'food', 'drink', 'bar', 'combat', 'hide', 'fade' },
+})
+
 define('scale', {
   kind = "slider",
   bag = true,

@@ -604,6 +604,65 @@ function DB:SetNextCurrencyTracker(out, x, y)
   end
 end
 
+---@alias NextFoodDrinkOption "pick"|"layout"|"growX"|"growY"|"scale"|"background"|"hideInCombat"
+
+-- The values a Food & Drink option is checked against: the rule, the bar's layouts and the ways it grows
+-- (food-drink.md §5).
+local FOOD_DRINK_CHOICES = {
+  pick = { highest = true, lowest = true },
+  layout = { row = true, column = true },
+  growX = { left = true, right = true },
+  growY = { up = true, down = true },
+}
+
+-- nextFoodDrinkOption checks a Food & Drink option's name: one of the defaults' (const.DATABASE_DEFAULTS), nothing else.
+---@param name string
+local function nextFoodDrinkOption(name)
+  if const.DATABASE_DEFAULTS.profile.nextFoodDrink[name] == nil then
+    error("unknown BetterBags Next Food & Drink option: " .. tostring(name))
+  end
+end
+
+-- GetNextFoodDrinkOption returns how BetterBags Next's Food & Drink bar picks and shows (food-drink.md §5): which item
+-- level it picks ("highest" or "lowest"), its layout ("row" or "column"), which way it grows (growX "left" or "right",
+-- growY "down" or "up"), its scale (percent), its background, and whether it hides in combat.
+---@param name NextFoodDrinkOption
+---@return any
+function DB:GetNextFoodDrinkOption(name)
+  nextFoodDrinkOption(name)
+  return DB.data.profile.nextFoodDrink[name]
+end
+
+---@param name NextFoodDrinkOption
+---@param value any
+function DB:SetNextFoodDrinkOption(name, value)
+  nextFoodDrinkOption(name)
+  local choices = FOOD_DRINK_CHOICES[name]
+  if choices ~= nil and not choices[value] then
+    error("not a Food & Drink " .. name .. ": " .. tostring(value))
+  end
+  DB.data.profile.nextFoodDrink[name] = value
+end
+
+-- GetNextFoodDrinkBar returns whether the Food & Drink bar is out, and where it was left: the corner it grows from, in
+-- UIParent's units from the screen's top left; nothing before it was first placed. Put away, it remembers where it was.
+---@return boolean out, number? x, number? y
+function DB:GetNextFoodDrinkBar()
+  local t = DB.data.profile.nextFoodDrinkBar
+  return t.out == true, t.x, t.y
+end
+
+---@param out boolean
+---@param x? number
+---@param y? number
+function DB:SetNextFoodDrinkBar(out, x, y)
+  local t = DB.data.profile.nextFoodDrinkBar
+  t.out = out
+  if x ~= nil then
+    t.x, t.y = x, y
+  end
+end
+
 ---@alias NextSmallChain "apart"|"backpack"|"companion"
 
 -- GetNextSmallChain returns which small panel anchors a chained pair (docs/next-small-mode.md):

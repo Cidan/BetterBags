@@ -459,6 +459,99 @@ describe("What each setting asks the bags for", function()
     end)
   end)
 
+  -- BetterBags Next's Food & Drink bar (food-drink.md §5, the Food & Drink page): each saves its choice and tells the
+  -- bar and FoodDrink (fooddrink/OptionsChanged); the bags' items are neither read nor recalculated.
+  describe("BetterBags Next's Food & Drink bar", function()
+    local options, place
+
+    before_each(function()
+      options = { pick = "highest", layout = "row", growX = "left", growY = "down", scale = 100, background = true,
+        hideInCombat = true }
+      place = { out = false }
+      override(db, "GetNextFoodDrinkOption", function(_, name) return options[name] end)
+      override(db, "SetNextFoodDrinkOption", function(_, name, value) options[name] = value end)
+      override(db, "GetNextFoodDrinkBar", function() return place.out, place.x, place.y end)
+      override(db, "SetNextFoodDrinkBar", function(_, out, x, y)
+        place.out = out
+        if x ~= nil then place.x, place.y = x, y end
+      end)
+    end)
+
+    for _, case in ipairs({ { "Bar Background", "background" }, { "Hide Bar in Combat", "hideInCombat" } }) do
+      it("saves " .. case[1] .. " on or off and tells the bar, reading nothing", function()
+        local found = settings(case[1])
+        assert.are.equal(1, #found)
+        assert.are.equal("toggle", found[1].kind)
+        local was = options[case[2]]
+        assert.are.equal(was, found[1].get(ctx()))
+        found[1].set(ctx(), not was)
+        assert.are.equal(not was, options[case[2]])
+        assert.are.same({ "fooddrink/OptionsChanged" }, messages())
+      end)
+    end
+
+    it("saves which item level it picks by its name", function()
+      local found = settings("Pick")
+      assert.are.equal(1, #found)
+      assert.are.same({ "Highest Item Level", "Lowest Item Level" }, found[1].items)
+      assert.are.equal("Highest Item Level", found[1].get(ctx()))
+      found[1].set(ctx(), "Lowest Item Level")
+      assert.are.equal("lowest", options.pick)
+      assert.are.equal("Lowest Item Level", found[1].get(ctx()))
+      assert.are.same({ "fooddrink/OptionsChanged" }, messages())
+    end)
+
+    it("saves the bar's layout by its name", function()
+      local found = settings("Bar Layout")
+      assert.are.equal(1, #found)
+      assert.are.same({ "Row", "Column" }, found[1].items)
+      assert.are.equal("Row", found[1].get(ctx()))
+      found[1].set(ctx(), "Column")
+      assert.are.equal("column", options.layout)
+      assert.are.equal("Column", found[1].get(ctx()))
+      assert.are.same({ "fooddrink/OptionsChanged" }, messages())
+    end)
+
+    it("saves which way the bar grows: left or right in a row, up or down in a column", function()
+      local grow = settings("Bar Grows")[1]
+      assert.are.equal("dropdown", grow.kind)
+      assert.are.same({ "Left", "Right" }, grow.itemsFunction())
+      assert.are.equal("Left", grow.get(ctx()))
+      grow.set(ctx(), "Right")
+      assert.are.equal("right", options.growX)
+      assert.are.same({ "fooddrink/OptionsChanged" }, messages())
+      options.layout = "column"
+      assert.are.same({ "Up", "Down" }, grow.itemsFunction())
+      assert.are.equal("Down", grow.get(ctx()))
+      grow.set(ctx(), "Up")
+      assert.are.equal("up", options.growY)
+      assert.are.equal("right", options.growX, "the other way kept")
+    end)
+
+    it("saves the bar's scale, 50% to 200% in steps of 5", function()
+      local found = settings("Bar Scale")
+      assert.are.equal(1, #found)
+      assert.are.same({ 50, 200, 5 }, { found[1].min, found[1].max, found[1].step })
+      assert.are.equal(100, found[1].get(ctx()))
+      found[1].set(ctx(), 135)
+      assert.are.equal(135, options.scale)
+      assert.are.same({ "fooddrink/OptionsChanged" }, messages())
+    end)
+
+    it("takes the bar out or puts it away, keeping where it was left", function()
+      place.x, place.y = 300, 200
+      local found = settings("Show Food & Drink Bar")
+      assert.are.equal(1, #found)
+      assert.is_false(found[1].get(ctx()))
+      found[1].set(ctx(), true)
+      assert.are.same({ true, 300, 200 }, { place.out, place.x, place.y })
+      assert.is_true(found[1].get(ctx()))
+      assert.are.same({ "fooddrink/OptionsChanged" }, messages())
+      found[1].set(ctx(), false)
+      assert.is_false(place.out)
+    end)
+  end)
+
   -- BetterBagsNext (next.md §11): turning it on or off switches the bags at once, no reload; a switch
   -- refused (combat, the bank, a vendor) says so, and the window shows the setting again.
   it("switches the bags without a reload, and says when the switch is refused", function()

@@ -280,7 +280,8 @@ gone), it shows only what the bags in use read, and nothing the classic window h
     Currency (§8).
   - **Next only:** the Guild Bank page (the classic bags have no guild bank); Appearance: Theme
     (SonataNext), the Size tab (Icon Scale, Bag Scale, Autosize Bags, Fit Names While Open) and the Animation tab (next-themes-animation.md §20); the Currencies page
-    (currency.md §6: the classic bags keep their Currency page). The classic themes' picker (item buttons) is not shown
+    (currency.md §6: the classic bags keep their Currency page); the Food & Drink page (food-drink.md §5, after
+    Currencies). The classic themes' picker (item buttons) is not shown
     in Next (asked).
   - Everything else, both.
 - **Show What's New on Login** (General → What's New, `changelogOnLogin` in the catalog,

@@ -550,6 +550,20 @@ function content:Init()
       } },
     },
   })
+  -- BetterBags Next's Food & Drink bar (food-drink.md §5): whether it is out, what it picks, and how it shows. A right
+  -- click on the bar's card opens it.
+  pages:Define({
+    id = "fooddrink", group = L:G("BetterBags"), title = L:G("Food & Drink"), design = "next",
+    description = L:G("Your food and drink on two buttons that stay on screen: right-click one to eat or drink it."),
+    tabs = {
+      { id = "display", title = L:G("Display"), sections = {
+        { title = L:G("Food & Drink Bar"), rows = { { setting = 'nextFoodDrinkBar' }, { setting = 'nextFoodDrinkPick' } } },
+        { title = L:G("Bar"), rows = { { setting = 'nextFoodDrinkLayout' }, { setting = 'nextFoodDrinkGrow' },
+          { setting = 'nextFoodDrinkScale' }, { setting = 'nextFoodDrinkBackground' },
+          { setting = 'nextFoodDrinkHideInCombat' } } },
+      } },
+    },
+  })
   bagPage("backpack", { name = 'Backpack', kind = const.BAG_KIND.BACKPACK })
   bagPage("bank", { name = 'Bank', kind = const.BAG_KIND.BANK })
   -- BetterBags Next's guild bank (guild-bank.md §5), on a client with one; the classic bags have none.

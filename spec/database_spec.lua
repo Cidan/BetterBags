@@ -121,6 +121,9 @@ const.DATABASE_DEFAULTS = {
     nextCurrency = { capBars = false, gains = true, hideEmpty = true, itemsEverywhere = true, layout = "row",
       scale = 100, background = true, hideInCombat = false, growX = "left", growY = "down" },
     nextCurrencyTracker = { out = false },
+    nextFoodDrink = { pick = "highest", layout = "row", growX = "left", growY = "down", scale = 100, background = true,
+      hideInCombat = true },
+    nextFoodDrinkBar = { out = false },
     showBagButton = true,
     enableBankBag = true,
     showBankTabs = false,
@@ -618,6 +621,48 @@ describe("Database", function()
         assert.are.equal(340, y)
         DB:SetNextCurrencyTracker(false)
         out, x, y = DB:GetNextCurrencyTracker()
+        assert.is_false(out)
+        assert.are.equal(120, x, "put away, it remembers where it was")
+        assert.are.equal(340, y)
+      end)
+    end)
+
+    -- The Food & Drink bar (food-drink.md §5).
+    describe("BetterBags Next's Food & Drink bar", function()
+      it("picks the highest item level, in a row growing left, hidden in combat, until told", function()
+        assert.are.equal("highest", DB:GetNextFoodDrinkOption("pick"))
+        DB:SetNextFoodDrinkOption("pick", "lowest")
+        assert.are.equal("lowest", DB:GetNextFoodDrinkOption("pick"))
+        assert.are.equal("row", DB:GetNextFoodDrinkOption("layout"))
+        DB:SetNextFoodDrinkOption("layout", "column")
+        assert.are.equal("column", DB:GetNextFoodDrinkOption("layout"))
+        assert.are.equal("left", DB:GetNextFoodDrinkOption("growX"))
+        assert.are.equal("down", DB:GetNextFoodDrinkOption("growY"))
+        assert.are.equal(100, DB:GetNextFoodDrinkOption("scale"))
+        assert.is_true(DB:GetNextFoodDrinkOption("background"))
+        assert.is_true(DB:GetNextFoodDrinkOption("hideInCombat"))
+        DB:SetNextFoodDrinkOption("hideInCombat", false)
+        assert.is_false(DB:GetNextFoodDrinkOption("hideInCombat"))
+        assert.has_error(function() DB:GetNextFoodDrinkOption("capBars") end)
+        assert.has_error(function() DB:SetNextFoodDrinkOption("capBars", true) end)
+        assert.has_error(function() DB:SetNextFoodDrinkOption("pick", "middle") end)
+        assert.has_error(function() DB:SetNextFoodDrinkOption("layout", "list") end)
+        assert.has_error(function() DB:SetNextFoodDrinkOption("growX", "up") end)
+        assert.has_error(function() DB:SetNextFoodDrinkOption("growY", "left") end)
+      end)
+
+      it("keeps whether the bar is out and where it was left", function()
+        local out, x, y = DB:GetNextFoodDrinkBar()
+        assert.is_false(out)
+        assert.is_nil(x)
+        assert.is_nil(y)
+        DB:SetNextFoodDrinkBar(true, 120, 340)
+        out, x, y = DB:GetNextFoodDrinkBar()
+        assert.is_true(out)
+        assert.are.equal(120, x)
+        assert.are.equal(340, y)
+        DB:SetNextFoodDrinkBar(false)
+        out, x, y = DB:GetNextFoodDrinkBar()
         assert.is_false(out)
         assert.are.equal(120, x, "put away, it remembers where it was")
         assert.are.equal(340, y)
