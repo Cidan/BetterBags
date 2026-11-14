@@ -106,12 +106,18 @@ local function newDecoration(item)
         item._decoration._frameLevel = level
       end,
       CreateTexture = function(_, _, layer)
+        -- TextureBase (SimpleTextureBaseAPIDocumentation.lua): SetTexture(asset, wrapModeHorizontal?, wrapModeVertical?,
+        -- filterMode?) and SetAtlas(atlas, useAtlasSize?, filterMode?) each replace what the other set; GetTexture and
+        -- GetAtlas return it.
         return {
           _shown = false,
           _layer = layer,
-          SetTexture = function(t, path) t._texture = path end,
-          SetAtlas = function(t, atlas) t._atlas = atlas end,
+          SetTexture = function(t, path, _, _, filterMode) t._texture, t._filterMode, t._atlas = path, filterMode, nil end,
+          SetAtlas = function(t, atlas, _, filterMode) t._atlas, t._filterMode, t._texture = atlas, filterMode, nil end,
+          GetTexture = function(t) return t._texture end,
+          GetAtlas = function(t) return t._atlas end,
           SetSize = function(t, w, h) t._w, t._h = w, h end,
+          GetSize = function(t) return t._w, t._h end,
           SetPoint = function() end,
           SetAlpha = function(t, a) t._alpha = a end,
           SetTexCoord = function() end,
@@ -1755,17 +1761,23 @@ describe("Empty slot family icon overlay", function()
     itemFrame:Init()
   end)
 
-  it("draws a centered, semi-transparent family icon atlas on a specialized empty slot", function()
+  -- The bag types' glyphs are BetterBags' own 64 x 64 files (tools/textures/next_icons.py), drawn smaller than they
+  -- are: smooth, as the header glyphs (next-themes.md §11).
+  it("draws the bag type's glyph file, smooth, centered and semi-transparent on a specialized empty slot", function()
     local btnCtx = ctx:New("famicon")
     local item = itemFrame:GetButton(btnCtx, "0_9")
+    local quiver = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\quiver.png"
     item:SetFreeSlots(btnCtx, {
       slotkey = "0_9", bagid = 0, slotid = 9,
-      itemInfo = { emptySlotName = "Herb Bag", emptySlotFamilyIcon = "Mobile-Herbalism" },
+      itemInfo = { emptySlotName = "Quiver", emptySlotFamilyIcon = quiver },
     }, -1)
     local overlay = item._decoration.BetterBagsFamilyIcon
     assert.is_not_nil(overlay)
     assert.is_true(overlay._shown)
-    assert.are.equal("Mobile-Herbalism", overlay._atlas)
+    assert.are.equal(quiver, overlay:GetTexture())
+    assert.is_nil(overlay:GetAtlas())
+    assert.are.equal("TRILINEAR", overlay._filterMode)
+    assert.are.same({ 24, 24 }, { overlay:GetSize() })
     assert.are.equal(0.4, overlay._alpha)
   end)
 
@@ -1798,7 +1810,7 @@ describe("Empty slot family icon overlay", function()
     -- Aggregated "stack" button: itemInfo carries no itemQuality -> nil reaches the API (no border).
     item:SetFreeSlots(btnCtx, {
       slotkey = "5_1", bagid = 5, slotid = 1,
-      itemInfo = { emptySlotName = "Reagent Bag", emptySlotFamilyIcon = "Mobile-Herbalism" },
+      itemInfo = { emptySlotName = "Reagent Bag", emptySlotFamilyIcon = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\reagentbag.png" },
     }, 2)
     assert.is_true(called)
     assert.is_nil(captured)
@@ -1825,7 +1837,7 @@ describe("Empty slot family icon overlay", function()
     item:ClearItem(btnCtx)
     item:SetFreeSlots(btnCtx, btn, 1, true)
     assert.is_true(item._decoration.BetterBagsFamilyIcon._shown)
-    assert.are.equal("REAGENT", item._decoration.BetterBagsFamilyIcon._atlas)
+    assert.are.equal("REAGENT", item._decoration.BetterBagsFamilyIcon:GetTexture())
 
     -- Simulate a redraw: WipeGlobalSections -> Release (ClearItem) then re-draw individual.
     item:ClearItem(btnCtx)

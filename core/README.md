@@ -45,7 +45,7 @@ Contains all constant values, enumerations, and configuration defaults used thro
 - **Sort Types**: `SECTION_SORT_TYPE`, `ITEM_SORT_TYPE`
 - **Item Quality**: Quality levels and color mappings
 - **Expansions**: Expansion type mappings
-- **Bag Families**: Specialty bag type definitions
+- **Bag Families**: Specialty bag type definitions, and `EMPTY_SLOT_FAMILY_ICON`: each bag family's glyph file for its empty slots (`EMPTY_SLOT_FAMILY_ICON_DEFAULT`, the reagent bag's, for a family with none; `.claude/rules/item-drawing.md` §11)
 - **UI Offsets**: Layout constants for UI positioning
 - **Database Defaults**: Default configuration values
 

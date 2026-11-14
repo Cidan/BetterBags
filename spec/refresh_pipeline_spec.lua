@@ -403,6 +403,19 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       mockContainer[0] = { { itemID = 101, guid = "guid-101" }, {} }
     end)
 
+    -- Issue #1300: the keyring is left out of free space, so its family never reached its empty slots and they drew
+    -- no glyph. They draw the key (asked, item-drawing.md §11); the backpack's own empty slot draws none.
+    it("draws the key glyph in the keyring's open slots", function()
+      override(const, "EMPTY_SLOT_FAMILY_ICON", { [256] = "KEY" })
+      override(const, "EMPTY_SLOT_FAMILY_ICON_DEFAULT", "REAGENT")
+      local slotInfo = refreshBackpack({ wipe = true })
+      local glyphs = {}
+      for _, item in ipairs(slotInfo.sortedItems) do
+        if item.isFreeSlot then glyphs[item.slotkey] = item.itemInfo.emptySlotFamilyIcon or "none" end
+      end
+      assert.are.same({ ["-1_1"] = "KEY", ["-1_2"] = "KEY", ["-1_3"] = "KEY", ["-1_4"] = "KEY", ["0_2"] = "none" }, glyphs)
+    end)
+
     it("reads the first row of an empty keyring and none of its padlocked slots", function()
       local slotInfo = refreshBackpack({ wipe = true })
       assert.are.same({ "-1_1", "-1_2", "-1_3", "-1_4" }, keyringSlotKeys(slotInfo))

@@ -122,9 +122,9 @@ local function bagKindFromBagID(bagid)
 	return const.BAG_KIND.BACKPACK
 end
 
--- Size of the small family-bag glyph drawn in the center of a specialized empty slot. The
--- source atlas is large (e.g. Mobile-Herbalism is 128x128); this sizes it well under the
--- 37x37 slot so it reads as an icon and not a slot background.
+-- Size of the small bag-type glyph drawn in the center of a specialized empty slot. The
+-- glyph files are 64 x 64 (tools/textures/next_icons.py); this sizes them well under the
+-- 37x37 slot so they read as an icon and not a slot background.
 local FAMILY_ICON_SIZE = 24
 -- The glyph is drawn at reduced opacity so it hints at the bag type without dominating the slot.
 local FAMILY_ICON_ALPHA = 0.4
@@ -1012,12 +1012,13 @@ function itemFrame.itemProto:SetFreeSlots(ctx, data, count, nocount)
 
 	self.freeSlotName = data.itemInfo and data.itemInfo.emptySlotName or ""
 
-	-- Specialized bags (reagent, quiver, soul, herb, ...) carry a pre-resolved glyph atlas,
-	-- drawn centered and semi-transparent. Generic bags leave it nil, so the overlay stays hidden.
+	-- Specialized bags (reagent, quiver, soul, herb, ...) carry a pre-resolved glyph file,
+	-- drawn centered and semi-transparent, smooth at a third of its size (TRILINEAR, as the
+	-- header glyphs). Generic bags leave it nil, so the overlay stays hidden.
 	local familyIcon = data.itemInfo and data.itemInfo.emptySlotFamilyIcon
 	local familyTexture = getFamilyIconTexture(decoration)
 	if familyIcon then
-		familyTexture:SetAtlas(familyIcon)
+		familyTexture:SetTexture(familyIcon, nil, nil, "TRILINEAR")
 		familyTexture:SetSize(FAMILY_ICON_SIZE, FAMILY_ICON_SIZE)
 		familyTexture:Show()
 	else

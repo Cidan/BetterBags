@@ -275,7 +275,9 @@ close button included.
   button), classic bags (a backpack), small and full size (arrows
   in, arrows out), bank tabs (a tabbed panel), Warbank deposit (an arrow into a tray), deposit and
   withdraw gold (a coin stack with an arrow), filter (a funnel), sell junk (a price tag), repair (a
-  hammer), guild repair (a hammer with a guild shield).
+  hammer), guild repair (a hammer with a guild shield). The same tool draws the bag types' glyphs,
+  drawn in a specialized bag's empty slots on every client and in both bags, not by the theme
+  (item-drawing.md §11).
 - **Drawn smooth:** `SetTexture(file, nil, nil, "TRILINEAR")` (`SimpleTextureBaseAPIDocumentation`:
   `filterMode`), as Blizzard draws its map tiles on every client, so a 64-pixel glyph drawn at 22 units
   (often 14 to 22 pixels) stays smooth, and stays sharp on large screens.

@@ -1,6 +1,7 @@
 ---
 paths:
   - "frames/item.lua"
+  - "tools/textures/next_icons.py"
   - "frames/itemrow.lua"
   - "spec/frames/item_spec.lua"
   - "spec/frames/item_classic_spec.lua"
@@ -151,38 +152,57 @@ Active search query evaluation is performed upstream during the data sweep phase
 The view rendering layer (`views/views.lua`) is strictly read-only and presentation-driven.
 - **Rule:** Methods like `GetOrCreateSection` must never mutate database state or call `categories:CreateCategory`. All dynamic category creation and search-group resolution must occur upstream in the data sweep phase before `slotInfo` is dispatched to views.
 
-### 11. Empty-Slot Family Glyph (Specialized Bags, All Clients)
-Empty slots that belong to a **specialized** bag — one with a non-zero *bag family* (reagent
-bags on retail; quivers, ammo pouches, soul/herb/enchanting/… bags on classic) — draw a small,
-centered, semi-transparent glyph so the slot's restriction is visible at a glance. Generic bags
-(family `0`) draw nothing.
+### 11. Empty-Slot Bag-Type Glyph (Specialized Bags, All Clients)
+Empty slots that belong to a **specialized** bag — one with a non-zero *bag family* (the reagent
+bag on retail; quivers, ammo pouches, soul/herb/enchanting/… bags on classic; the keyring) — draw a
+small, centered, semi-transparent glyph of their bag type, so the slot's restriction is visible at a
+glance. Generic bags (family `0`) draw nothing.
+- **The glyphs** (issue #1300: a quiver's empty slots drew the herb leaf, the one glyph every
+  specialized bag shared; asked: "can we make our own icons for the reagent bag types? all of the
+  possible ones. we should generate it like we do all our other art"). BetterBags' own files, made by
+  `tools/textures/next_icons.py` with the header glyphs (next-themes.md §11): `textures/next/icons/*.png`,
+  64 × 64, white, the shape in the alpha, the same 20-unit grid and 1.5-unit stroke. One for every
+  family a bag holds (warcraft.wiki.gg ItemFamily) and the retail Reagent Bag, in
+  `const.EMPTY_SLOT_FAMILY_ICON`: `1` quiver (an arrow), `2` ammo pouch (two cartridges), `4` soul bag
+  (a skull: a soul shard's crystal would read as the gem bag's, and both are on TBC), `8` leatherworking
+  (a stretched hide), `16` inscription (a quill), `32` herb (a three-leaf sprig), `64` enchanting
+  (sparkles), `128` engineering (a wrench: the gear is the settings button's), `256` keyring (a key),
+  `512` gem (a cut gem), `1024` mining (a pickaxe), `32768` tackle box (a fishing hook), `65536`
+  cooking (a pot with steam), `"ReagentBag"` (a mortar and pestle). The other ItemFamily bits
+  (soulbound equipment, pets, currency, quest items, toys, the retail professions) are families of
+  items, not of bags.
+- **A family with no glyph draws the reagent bag's** (`const.EMPTY_SLOT_FAMILY_ICON_DEFAULT`; asked:
+  "bags we don't know should just get the general glyph for a reagent"). Families match exactly. Not
+  seen in game: whether a retail profession bag reports its one bit or more than one (a herb bag
+  `0x20` with Alchemy's `0x200000`); one reporting more draws the reagent glyph. A `/bbdb` dump answers
+  it: its `bagNames` record `C_Container.GetContainerNumFreeSlots`' family for every bag
+  (data-driven.md, `ItemProbe:BagNames`).
 - **Detection is by bag family, not bag id.** `C_Container.GetContainerNumFreeSlots(bagID)`
-  returns `numFreeSlots, bagFamily` (verified in the API docs; `bagFamily` is `Nilable`). The
-  family bit values are the keys of `const.ITEM_BAG_FAMILY`. Classic profession bags (quiver,
-  soul/herb/enchanting/…) all report a non-zero family, so no per-client branch is needed for them.
-- **The retail Reagent Bag is the one exception — it is id-based, not family-based.** Blizzard's
+  returns `numFreeSlots, bagFamily` (verified in the API docs; `bagFamily` is `Nilable`). Classic
+  profession bags (quiver, soul/herb/enchanting/…) all report a non-zero family, so no per-client
+  branch is needed for them.
+- **The retail Reagent Bag is id-based, not family-based.** Blizzard's
   own `ContainerFrame_IsReagentBag(id)` is literally `return id == 5`, and
   `GetContainerNumFreeSlots(5)` reports family **0**. A family-only check therefore silently skips
   it (the bug behind "no icon on retail"). `Phase5_UpdateFreeSlots` substitutes the symbolic
   `const.REAGENT_BAG_FAMILY_KEY` (`"ReagentBag"`) as the family when `bagFamily == 0` and
-  `const.BACKPACK_ONLY_REAGENT_BAGS[bagid]` is set. The resolver and override map treat that string
-  key exactly like a numeric family (override `EMPTY_SLOT_FAMILY_ICON["ReagentBag"]` for a
-  reagent-specific glyph — e.g. the retail-only `bags-icon-reagents` atlas — else the default). The
-  substitution only fires when the API family is 0, so if a client ever reports a real family for
-  the reagent bag, the numeric path wins unchanged.
+  `const.BACKPACK_ONLY_REAGENT_BAGS[bagid]` is set. The resolver and the glyph map treat that string
+  key exactly like a numeric family. The substitution only fires when the API family is 0, so if a
+  client ever reports a real family for the reagent bag, the numeric path wins unchanged.
+- **The keyring is id-based too.** It is not free space (`IncludeBagInFreeSpace`, keyring.md), so
+  `Phase5` leaves it out of `emptySlotsByBag` and its family never reached its slots: they drew no
+  glyph. `Phase6_EnrichData` gives the backpack keyring's empty slots (`isBackpackKeyring`:
+  `Enum.BagIndex.Keyring`, read with the backpack, as every keyring check asks) the keys' family,
+  `256`, so its open slots in Show Bags draw the key (asked).
 - **Resolution is data-phase, per the Pure Presentation Principle (§1) — the draw layer never
   resolves it.** `items:GetEmptySlotFamilyIcon(family)` (`data/items.lua`) maps a family key to a
-  texture **atlas name**: `nil` for family `0`/`nil` (no glyph), an explicit
-  `const.EMPTY_SLOT_FAMILY_ICON[family]` override if present, else the shared
-  `const.EMPTY_SLOT_FAMILY_ICON_DEFAULT`. The map is empty by default (every specialized bag shares
-  the default glyph); it exists so distinct per-family icons are a one-line data addition later.
-- **Values are texture ATLAS names, not file paths** (drawn via `Texture:SetAtlas`). The default is
-  `"Mobile-Herbalism"` (a 128×128 atlas, sized down in the draw layer), confirmed present on both
-  retail and classic clients. (The earlier `Interface\PaperDoll\UI-PaperDoll-Slot-Bag` file path was
-  replaced by the atlas at the user's request.)
+  glyph **file**: `nil` for family `0`/`nil` (no glyph), `const.EMPTY_SLOT_FAMILY_ICON[family]`, else
+  `const.EMPTY_SLOT_FAMILY_ICON_DEFAULT`. (The glyph was first the file
+  `Interface\PaperDoll\UI-PaperDoll-Slot-Bag`, then Blizzard's `Mobile-Herbalism` atlas, a green herb
+  leaf, for every specialized bag.)
 - **Threading (data phase).** `Phase5_UpdateFreeSlots` captures the family into
   `emptySlotsByBag[bagid].family`. `Phase6_EnrichData` (now taking `emptySlotsByBag`) resolves and
-  stores the ready atlas name on each empty slot's `itemInfo.emptySlotFamilyIcon`. This one field
+  stores the ready glyph file on each empty slot's `itemInfo.emptySlotFamilyIcon`. This one field
   reaches **all four** empty-slot render paths: the individual free-space buttons (reuse the
   harvested `itemInfo`), the aggregated/combined free-space "stack" button (`Phase10_PartitionIntoTabs`
   builds it a **fresh** `itemInfo` with `emptySlotName` + `emptySlotFamilyIcon` from
@@ -206,13 +226,26 @@ centered, semi-transparent glyph so the slot's restriction is visible at a glanc
   glyph, and no quality").
 - **Draw (`frames/item.lua`).** `SetFreeSlots` reads `data.itemInfo.emptySlotFamilyIcon` and, when
   set, shows a lazily-created `OVERLAY` texture on the **themed decoration** (`decoration.BetterBagsFamilyIcon`
-  via `getFamilyIconTexture`) via `SetAtlas` — 24×24, centered, `0.4` alpha (re-applying `SetSize`
-  after `SetAtlas`, since `SetAtlas` can otherwise snap to the atlas's native 128×128) — else hides
-  it. The overlay lives on the **decoration** (the visual layer), not `self.button` (the interaction
+  via `getFamilyIconTexture`) via `SetTexture(file, nil, nil, "TRILINEAR")` — 24×24 (`SetSize`
+  after the texture), centered, `0.4` alpha — else hides it. `TRILINEAR`
+  (`SimpleTextureBaseAPIDocumentation`'s `filterMode`, on every client's branch) keeps the 64-pixel
+  glyph smooth drawn at a third of its size, as the header glyphs. The render recorder names it
+  `glyph=<file name>` (render-recorder.md). The overlay lives on the **decoration** (the visual layer), not `self.button` (the interaction
   layer), and in the `OVERLAY` layer so it sits above the empty-slot art. It is hidden in
   `SetItemFromData` (any real item drawn into the slot) and `ClearItem`. No `items:`/database call
   happens at draw time.
-- **Coverage:** `spec/items_spec.lua` ("Empty slot family icons (specialized bags)": resolver
-  semantics, `Phase5` family capture, `Phase6` icon resolution incl. the generic-bag nil case) and
-  `spec/frames/item_spec.lua` ("Empty slot family icon overlay": shown on specialized slots, hidden
-  on generic slots and when the slot is redrawn as an item).
+- **Left as they are (found in review).** The `SetSize(24, 24)` after the texture undoes nothing
+  `SetTexture` does (it was there because `SetAtlas` could take the atlas's size); it is kept so the
+  glyph is 24×24 on every draw, as before. On Next it also resets the whole-pixel size `NextItemFit`
+  gave the glyph until the grid is fitted again, as the `SetAtlas` draw did (next-pixel-perfect.md).
+  And on Classic Era the keyring's empty slots are drawn in place in Show Bags only when
+  `C_Container.GetBagName(-2)` names the keyring (`drawsEmptySlotsInPlace`); Blizzard titles the
+  keyring itself there (`Classic/ContainerFrame_Shared.lua`), so whether Era shows the key needs an
+  in-game check. On WoW: Forever they are drawn (keyring.md §1: a Forever screenshot showed them).
+- **Coverage:** `spec/core/constants_spec.lua` ("gives every specialized bag type a glyph of its own,
+  shipped with BetterBags": the map, the default, each file a 64 × 64 RGBA PNG), `spec/items_spec.lua`
+  ("Empty slot family icons (specialized bags)": resolver semantics, `Phase5` family capture, `Phase6`
+  icon resolution incl. the generic-bag nil case, the backpack keyring's key and no other bag's),
+  `spec/refresh_pipeline_spec.lua` ("draws the key glyph in the keyring's open slots", through the whole
+  read into Show Bags) and `spec/frames/item_spec.lua` ("Empty slot family icon overlay": the file drawn
+  smooth, shown on specialized slots, hidden on generic slots and when the slot is redrawn as an item).

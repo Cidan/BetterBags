@@ -126,6 +126,18 @@ local function guildTabOf(bagid)
   return const.GUILD_BANK_BAGS and const.GUILD_BANK_BAGS[bagid]
 end
 
+-- The bag family of keys, which only the keyring holds (const.EMPTY_SLOT_FAMILY_ICON).
+local KEYRING_FAMILY = 256
+
+-- isBackpackKeyring says whether a bag is the keyring the backpack reads (Classic Era, WoW: Forever; keyring.md):
+-- live retail's enum has a Keyring member and no keyring, and on the Classic clients -1 is the bank.
+---@param bagid number
+---@return boolean
+local function isBackpackKeyring(bagid)
+  return Enum.BagIndex ~= nil and Enum.BagIndex.Keyring ~= nil and bagid == Enum.BagIndex.Keyring
+    and const.BACKPACK_BAGS[bagid] ~= nil
+end
+
 -- drawsEmptySlotsInPlace says whether the slot-order view (Show Bags, a bank or guild tab by itself)
 -- draws a bag's empty slots in place (Phase9_Sort): a bag with a name, a Warbank tab (retail reports
 -- no name for them) and a guild bank tab (not a bag).
@@ -1325,6 +1337,11 @@ function items:Phase6_EnrichData(ctx, kind, itemData, emptySlotsByBag)
       currentItem.itemInfo = currentItem.itemInfo or {}
       currentItem.itemInfo.emptySlotName = name
       local bagFamily = emptySlotsByBag and emptySlotsByBag[bagid] and emptySlotsByBag[bagid].family
+      -- The keyring is not free space, so Phase5 leaves it out of emptySlotsByBag: its slots are given the keys'
+      -- family here.
+      if isBackpackKeyring(bagid) then
+        bagFamily = KEYRING_FAMILY
+      end
       currentItem.itemInfo.emptySlotFamilyIcon = self:GetEmptySlotFamilyIcon(bagFamily)
       currentItem.itemInfo.itemQuality = details.quality or const.ITEM_QUALITY.Common
     end
@@ -3186,10 +3203,10 @@ function items:GetBagTypeFromBagID(bagid)
   end
 end
 
--- GetEmptySlotFamilyIcon returns the small centered overlay icon for an empty slot that
--- belongs to a specialized bag, keyed by the bag's family bit value (see
--- const.ITEM_BAG_FAMILY). Generic bags (family 0 or nil) return nil, meaning no overlay.
--- A specialized family with no per-family override falls back to the shared default glyph.
+-- GetEmptySlotFamilyIcon returns the glyph file drawn in an empty slot that belongs to a
+-- specialized bag, keyed by the bag's family bit value (const.EMPTY_SLOT_FAMILY_ICON). Generic
+-- bags (family 0 or nil) return nil, meaning no glyph. A family with no glyph of its own draws
+-- the reagent bag's.
 ---@param family number|nil
 ---@return string|nil
 function items:GetEmptySlotFamilyIcon(family)

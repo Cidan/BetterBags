@@ -331,7 +331,7 @@ describe("RenderRecorder", function()
     reagent._decoration.IconBorder:SetVertexColor(0.12, 1, 0, 1)
     reagent._decoration.IconBorder:Show()
     reagent._decoration.BetterBagsFamilyIcon = reagent._decoration:CreateTexture()
-    reagent._decoration.BetterBagsFamilyIcon:SetAtlas("Mobile-Herbalism")
+    reagent._decoration.BetterBagsFamilyIcon:SetTexture("Interface\\AddOns\\BetterBags\\textures\\next\\icons\\reagentbag.png")
     local item = button("0_1", 92, "item")
     bag.globalSections = { ["Free Space"] = {
       frame = w.frame, title = { GetText = function() return "Free Space" end }, maxItemsPerRow = 7,
@@ -340,7 +340,7 @@ describe("RenderRecorder", function()
     bag.currentView = nil
     local text = table.concat(recorder:Snapshot(w), "\n")
     assert.is_truthy(text:find("  item -1_7 @10.0,100.0 37.0x37.0 free count=1 name=Keyring border=off padlock=true mouse=false glyph=none", 1, true), text)
-    assert.is_truthy(text:find("  item 5_1 @51.0,100.0 37.0x37.0 free count=1 name=Reagent Bag border=0.12,1.00,0.00 padlock=false mouse=true glyph=Mobile-Herbalism", 1, true), text)
+    assert.is_truthy(text:find("  item 5_1 @51.0,100.0 37.0x37.0 free count=1 name=Reagent Bag border=0.12,1.00,0.00 padlock=false mouse=true glyph=reagentbag.png", 1, true), text)
     assert.is_truthy(text:find("  item 0_1 @92.0,100.0 37.0x37.0 item border=off padlock=false mouse=true glyph=none", 1, true), text)
   end)
 

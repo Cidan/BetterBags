@@ -87,7 +87,7 @@ Individual item button implementation with full WoW item functionality.
 - Junk coin at a vendor (Blizzard's `UpdateJunkItem`), redrawn when a vendor opens or closes through the sweep's junk mark (`data.junkMarked`, one of the inputs a skipped redraw compares; `.claude/rules/item-drawing.md` §7b)
 - Dimming what does not fit Blizzard's item context (`itemFrame.GetItemContextMatchResult`): the answer the sweep worked out (`data.itemContextMatchResult`), except while a spell targets an item (Feed Pet, an enchant, a sharpening stone) or after one the sweep's answer was worked out under, when Blizzard is asked again, since those start and end with no bag refresh (`.claude/rules/item-drawing.md` §8)
 - Stack management
-- Free slot display
+- Free slot display: a specialized bag's empty slots draw its bag type's glyph (a quiver's arrow, a herb bag's sprig, the keyring's key, ...; BetterBags' own files from `tools/textures/next_icons.py`), small, centered and faint, the reagent bag's for a bag type with none (`.claude/rules/item-drawing.md` §11)
 
 **Main Class:**
 ```lua
