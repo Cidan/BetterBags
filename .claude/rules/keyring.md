@@ -5,6 +5,7 @@ paths:
   - "core/era/constants.lua"
   - "spec/sort_spec.lua"
   - "spec/refresh_pipeline_spec.lua"
+  - "spec/items_spec.lua"
 ---
 # The Keyring
 
@@ -58,3 +59,10 @@ place.
 Coverage: `spec/sort_spec.lua` ("the backpack's keyring": after every bag on Classic Era and Forever, the Classic Era
 bank first, live retail's enum ID left alone), `spec/refresh_pipeline_spec.lua` ("lists the keyring's section after
 every bag's", through the whole read with the real slot order).
+
+## 3. The key glyph in its slots
+
+The keyring's open slots in Show Bags draw the key, the keyring's bag-type glyph (asked, issue #1300). It is left out
+of free space, so `Phase6_EnrichData` gives the backpack keyring's slots the keys' family (256) itself
+(item-drawing.md §11). Coverage: `spec/refresh_pipeline_spec.lua` ("draws the key glyph in the keyring's open
+slots"), `spec/items_spec.lua` ("gives the backpack keyring's empty slots the keys' glyph, and no other bag").

@@ -137,6 +137,38 @@ describe("Constants Module Offsets", function()
     assert.is_true(count >= 4)
   end)
 
+  -- Issue #1300: a quiver's empty slots drew the herb leaf, the one glyph every specialized bag shared. Each bag
+  -- type now has its own (item-drawing.md §11, tools/textures/next_icons.py): every bag family a bag holds, and the
+  -- retail Reagent Bag, a file of its own BetterBags ships; a bag type with none draws the reagent glyph (asked:
+  -- "bags we don't know should just get the general glyph for a reagent").
+  it("gives every specialized bag type a glyph of its own, shipped with BetterBags", function()
+    loadfile("core/constants.lua")("BetterBags")
+    local const = addon:GetModule("Constants")
+    local icons = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\"
+    local names = {
+      [1] = "quiver", [2] = "ammopouch", [4] = "soulbag", [8] = "leatherworking", [16] = "inscription",
+      [32] = "herb", [64] = "enchanting", [128] = "engineering", [256] = "keyring", [512] = "gem",
+      [1024] = "mining", [32768] = "tacklebox", [65536] = "cooking", [const.REAGENT_BAG_FAMILY_KEY] = "reagentbag",
+    }
+    local want = {}
+    for family, name in pairs(names) do want[family] = icons .. name .. ".png" end
+    assert.are.same(want, const.EMPTY_SLOT_FAMILY_ICON)
+    assert.are.equal(icons .. "reagentbag.png", const.EMPTY_SLOT_FAMILY_ICON_DEFAULT)
+    for family, path in pairs(const.EMPTY_SLOT_FAMILY_ICON) do
+      local file = path:gsub("^Interface\\AddOns\\BetterBags\\", ""):gsub("\\", "/")
+      local f = io.open(file, "rb")
+      assert.is_not_nil(f, tostring(family) .. ": " .. file .. " (tools/textures/next_icons.py)")
+      local data = f:read("*a")
+      f:close()
+      local function u32(i)
+        local a, b, c, d = data:byte(i, i + 3)
+        return ((a * 256 + b) * 256 + c) * 256 + d
+      end
+      assert.are.equal("\137PNG\r\n\26\n", data:sub(1, 8), file)
+      assert.are.same({ 64, 64, 8, 6 }, { u32(17), u32(21), data:byte(25), data:byte(26) }, file .. ": 64 x 64 RGBA")
+    end
+  end)
+
   -- Items, sections and rows only glide to their new places when the player turns it on
   -- (render-pipeline.md §4c).
   -- BetterBags Next's bags start on opposite edges of the screen, not chained (next.md §12).

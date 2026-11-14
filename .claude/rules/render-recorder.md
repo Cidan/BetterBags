@@ -57,8 +57,9 @@ One line per part, positions relative to the window's top left (`@x,y WxH`):
   button's line adds what it shows: how it was last drawn (`item`, `free count=<n> name=<bag>`,
   `empty`), `border=<r,g,b>` or `off` (the decoration's `IconBorder`), `padlock=<bool>` (Blizzard's
   "extended" slot frame, `UpdateExtended`, on the button or the decoration), `mouse=<bool>` (the
-  interaction button's `IsMouseEnabled`) and `glyph=<atlas>` or `none` (the empty slot glyph).
-  Added for free slots on WoW: Forever that showed a padlock and a quality border.
+  interaction button's `IsMouseEnabled`) and `glyph=<file name>` or `none` (the empty slot's bag-type
+  glyph, `quiver.png`, `reagentbag.png`, ...: item-drawing.md §11). Added for free slots on WoW: Forever
+  that showed a padlock and a quality border.
 - For a bag, `padding items left=<px> right=<px> | sections left=<px> right=<px> | <border>`: how
   far the outermost shown item buttons and sections (titles included) are from each side of the
   window, then the theme's border. A backdrop: `border backdrop left=<edge> right=<edge> | visible

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-# Makes BetterBags Next's glyphs: its header buttons' (next-themes.md §11) and its controls': white line art in the style of
+# Makes BetterBags Next's glyphs: its header buttons' (next-themes.md §11), its controls', and the bag types' drawn in a
+# specialized bag's empty slots (item-drawing.md §11, every client and both bags): white line art in the style of
 # Blizzard's uitools-icon family (its settings gear, measured from the atlas: a 20-unit grid, a 1.5-unit
 # stroke, about 1.5 to 18.5 across), 64 x 64, the shape in the alpha so the panel tints it. Each glyph
 # is signed-distance shapes (strokes, fills, knock-outs), sampled once per pixel with a one-pixel edge.
@@ -83,6 +84,30 @@ def union(*fs):
 def cut(f, g, gap=0.0):
     # f with g (grown by gap) knocked out of it.
     return lambda x, y: max(f(x, y), -(g(x, y) - gap))
+
+def disc(cx, cy, r):
+    return lambda x, y: math.hypot(x - cx, y - cy) - r
+
+def capsule(ax, ay, bx, by, r):
+    return lambda x, y: seg(x, y, ax, ay, bx, by) - r
+
+def outline(f, w=S):
+    # The edge of a filled shape, stroked.
+    return lambda x, y: abs(f(x, y)) - w / 2
+
+def quad(p0, p1, p2, n=16):
+    # Points along the curve from p0 to p2 that bends toward p1.
+    pts = []
+    for i in range(n + 1):
+        t = i / n
+        a, b, c = (1 - t) ** 2, 2 * (1 - t) * t, t * t
+        pts.append((a * p0[0] + b * p1[0] + c * p2[0], a * p0[1] + b * p1[1] + c * p2[1]))
+    return pts
+
+def along(ox, oy, deg):
+    # Places points by how far they are along a direction from an origin (u) and across it (v).
+    c, s = math.cos(math.radians(deg)), math.sin(math.radians(deg))
+    return lambda u, v: (ox + u * c - v * s, oy + u * s + v * c)
 
 def render(shape):
     cov = []
@@ -253,6 +278,141 @@ def circle():
     # the texture, its edge one pixel in from the texture's, so it is round however it is cut in half.
     return lambda x, y: math.hypot(x - 10, y - 10) - (10 - PX)
 
+# The bag types' glyphs (item-drawing.md §11): one for each bag family a bag holds, and the retail Reagent Bag's,
+# drawn small and faint in the bag's empty slots. Asked, for issue #1300 (a quiver's empty slots drew the herb leaf
+# every specialized bag shared): "can we make our own icons for the reagent bag types? all of the possible ones".
+
+def arrow():
+    # The quiver: an arrow pointing up and right, its head filled, two fletchings at its tail.
+    p = along(3.9, 16.1, -45)
+    length = 14.0 * math.sqrt(2)
+    d = (math.sqrt(0.5), -math.sqrt(0.5))
+    head = fill([p(length, 0), p(length - 4.8, 2.5), p(length - 4.8, -2.5)])
+    return union(head, line(*p(1.0, 0), *p(length - 4.0, 0)),
+                 chevron(*p(3.6, 0), d[0], d[1], 2.6), chevron(*p(6.4, 0), d[0], d[1], 2.6))
+
+def cartridge(cx, w, top=3.0, bottom=17.0):
+    r = w / 2
+    shoulder = top + 5.0
+    left = quad((cx - r, shoulder), (cx - r, top + 1.2), (cx, top), 10)
+    right = quad((cx, top), (cx + r, top + 1.2), (cx + r, shoulder), 10)
+    return left + right[1:] + [(cx + r, bottom), (cx - r, bottom)]
+
+def cartridges():
+    # The ammo pouch: two cartridges standing side by side, each with the line where its bullet sits.
+    parts = []
+    for cx in (5.4, 14.6):
+        parts += [stroke(cartridge(cx, 5.2), True), line(cx - 2.6, 9.0, cx + 2.6, 9.0)]
+    return union(*parts)
+
+def skull():
+    # The soul bag: a skull, its eyes and nose filled, two teeth in its jaw (a soul shard's crystal would be the gem's).
+    head = stroke(arc_points(10, 8.6, 6.6, 140, 400, 30) + [(13.6, 14.4), (13.6, 17.4), (6.4, 17.4), (6.4, 14.4)], True)
+    eyes = union(disc(7.4, 9.6, 1.8), disc(12.6, 9.6, 1.8))
+    nose = fill([(10, 11.9), (11.0, 13.7), (9.0, 13.7)])
+    teeth = union(line(8.8, 15.0, 8.8, 17.4, 1.1), line(11.2, 15.0, 11.2, 17.4, 1.1))
+    return union(head, eyes, nose, teeth)
+
+def hide():
+    # The leatherworking bag: a stretched hide, its head, four legs and tail.
+    right = [(10, 2.4), (11.6, 2.8), (12.0, 4.6), (15.2, 2.6), (17.2, 4.2), (14.8, 7.2), (14.0, 10.2),
+             (14.8, 13.2), (17.2, 15.8), (15.4, 17.6), (12.4, 15.6), (11.0, 17.2), (10, 18.0)]
+    left = [(20 - x, y) for (x, y) in reversed(right[1:-1])]
+    return stroke(right + left, True)
+
+def quill():
+    # The inscription bag: a quill, nib down and left, its vane wider on one side and bent a little.
+    p = along(3.0, 17.0, -45)
+    length = 14.4 * math.sqrt(2)
+    start = 6.0
+    side1, side2 = [], []
+    for i in range(25):
+        t = i / 24
+        u = start + (length - start) * t
+        bend = 0.9 * math.sin(math.pi * t)
+        taper = math.sin(math.pi * t) ** 0.7 * (0.55 + 0.45 * t)
+        side1.append(p(u, bend - 3.4 * taper))
+        side2.append(p(u, bend + 2.4 * taper))
+    return union(stroke(side1 + list(reversed(side2)), True), line(*p(0.6, 0), *p(length - 2.2, 0.6)))
+
+def leaf(bx, by, deg, length, width, n=16):
+    p = along(bx, by, deg)
+    a, b = [], []
+    for i in range(n + 1):
+        t = i / n
+        w = width * math.sin(math.pi * t) ** 0.9 * (1.0 - 0.25 * t)
+        a.append(p(length * t, -w))
+        b.append(p(length * t, w))
+    return a + list(reversed(b))[1:-1]
+
+def sprig():
+    # The herb bag: a sprig, its stem and three leaves.
+    stem = stroke([(10, 18.0), (10.2, 13.0), (10, 8.2)])
+    return union(stem, stroke(leaf(10, 8.4, -90, 6.6, 2.6), True), stroke(leaf(10.1, 14.0, -150, 6.6, 2.4), True),
+                 stroke(leaf(10.1, 11.2, -30, 6.6, 2.4), True))
+
+def star(cx, cy, r, k=0.18):
+    # A four-pointed star, its sides curving in toward its middle.
+    pts = []
+    tips = [(cx, cy - r), (cx + r, cy), (cx, cy + r), (cx - r, cy)]
+    for i in range(4):
+        a, b = tips[i], tips[(i + 1) % 4]
+        bend = (cx + ((a[0] + b[0]) / 2 - cx) * k, cy + ((a[1] + b[1]) / 2 - cy) * k)
+        pts += quad(a, bend, b, 12)[:-1]
+    return pts
+
+def sparkles():
+    # The enchanting bag: a large star, a small filled one beside it.
+    return union(stroke(star(8.4, 11.2, 7.0), True), fill(star(15.2, 4.6, 3.2)))
+
+def wrench():
+    # The engineering bag: a wrench, its head up and right, its jaw open (the gear is the settings button's).
+    body = union(disc(13.2, 6.8, 4.2), capsule(13.2, 6.8, 4.4, 15.6, 1.8))
+    return outline(cut(body, capsule(13.2, 6.8, 18.0, 2.0, 1.7)))
+
+def key():
+    # The keyring: a key, its bow, shaft and two teeth.
+    p = along(6.2, 6.2, 45)
+    return union(ring(6.2, 6.2, 3.4), line(*p(3.4, 0), *p(14.8, 0)), line(*p(11.4, 0), *p(11.4, 2.8)),
+                 line(*p(14.0, 0), *p(14.0, 2.8)))
+
+def cutGem():
+    # The gem bag: a cut gem, its table, girdle and facets.
+    body = stroke([(6.4, 3.4), (13.6, 3.4), (17.4, 8.0), (10, 17.6), (2.6, 8.0)], True)
+    facets = union(stroke([(6.4, 3.6), (7.6, 8.0), (10, 17.0)]), stroke([(13.6, 3.6), (12.4, 8.0), (10, 17.0)]))
+    return union(body, line(2.8, 8.0, 17.2, 8.0), facets)
+
+def pickaxe():
+    # The mining bag: a pickaxe, its filled curved head across the top of its handle.
+    d = (math.sqrt(0.5), -math.sqrt(0.5))
+    n = (math.sqrt(0.5), math.sqrt(0.5))
+    hx, hy = 11.6, 8.4
+    t1 = (hx - n[0] * 8.0, hy - n[1] * 8.0)
+    t2 = (hx + n[0] * 8.0, hy + n[1] * 8.0)
+    outer = quad(t1, (hx + d[0] * 6.8, hy + d[1] * 6.8), t2, 20)
+    inner = quad(t2, (hx + d[0] * 0.8, hy + d[1] * 0.8), t1, 20)
+    return union(fill(outer + inner[1:-1]), line(hx - d[0] * 11.6, hy - d[1] * 11.6, hx + d[0] * 1.2, hy + d[1] * 1.2))
+
+def hook():
+    # The tackle box: a fishing hook, its eye, shank, bend, point and barb.
+    bend = stroke([(12.6, 12.0)] + arc_points(8.6, 12.0, 4.0, 0, 180, 20) + [(4.6, 7.6)])
+    return union(ring(12.6, 3.4, 1.4, 1.3), line(12.6, 4.8, 12.6, 12.4), bend, line(4.6, 7.4, 7.2, 10.0, 1.3))
+
+def pot():
+    # The cooking bag: a pot, its rim and handles, steam rising from it.
+    r = 2.6
+    body = stroke([(4.4, 9.4)] + arc_points(4.4 + r, 17.2 - r, r, 180, 90, 8)
+                  + arc_points(15.6 - r, 17.2 - r, r, 90, 0, 8) + [(15.6, 9.4)])
+    handles = union(line(15.6, 11.8, 17.8, 11.8), line(2.2, 11.8, 4.4, 11.8))
+    steam = [stroke([(x + 0.8 * math.sin(2 * math.pi * i / 16.0), 1.8 + i / 16.0 * 5.2) for i in range(17)])
+             for x in (6.6, 10.0, 13.4)]
+    return union(body, line(2.6, 9.4, 17.4, 9.4), handles, *steam)
+
+def mortar():
+    # The reagent bag, and any bag type without a glyph of its own: a mortar and its rim, the pestle leaning in it.
+    pestle = outline(union(capsule(9.6, 9.2, 15.4, 3.8, 1.2), disc(15.4, 3.8, 1.9)))
+    return union(stroke(arc_points(10, 10.0, 6.6, 0, 180, 24)), line(2.6, 10.0, 17.4, 10.0), pestle)
+
 GLYPHS = {
     "settings": gear, "close": close, "anchor": anchorFree, "anchorshown": anchorShown, "lock": lock, "bags": bag,
     "small": shrink, "full": expand,
@@ -260,6 +420,9 @@ GLYPHS = {
     "filter": filt, "selljunk": tag, "repair": repair, "guildrepair": guildRepair,
     "chevron": chevronDown, "back": chevronLeft, "check": check, "search": magnifier, "plus": plus,
     "circle": circle, "minimize": minimize, "maximize": maximize,
+    "quiver": arrow, "ammopouch": cartridges, "soulbag": skull, "leatherworking": hide, "inscription": quill,
+    "herb": sprig, "enchanting": sparkles, "engineering": wrench, "keyring": key, "gem": cutGem, "mining": pickaxe,
+    "tacklebox": hook, "cooking": pot, "reagentbag": mortar,
 }
 
 if __name__ == "__main__":

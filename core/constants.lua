@@ -310,12 +310,14 @@ const.ITEM_BAG_FAMILY = {
   [1024] = L:G("Mining Bag"),
 }
 
--- EMPTY_SLOT_FAMILY_ICON_DEFAULT is the small glyph drawn, centered and semi-transparent,
--- in the empty slots of any specialized (non-zero bag family) bag: reagent bags, quivers,
--- soul/herb/enchanting bags, etc. Values in this system are texture ATLAS names (drawn via
--- Texture:SetAtlas), not file paths. Mobile-Herbalism is present on both retail and classic
--- clients, so it is a safe cross-version default.
-const.EMPTY_SLOT_FAMILY_ICON_DEFAULT = "Mobile-Herbalism"
+-- The glyphs drawn, small, centered and faint, in the empty slots of a specialized (non-zero bag
+-- family) bag: BetterBags' own files (tools/textures/next_icons.py, item-drawing.md §11), drawn
+-- with Texture:SetTexture.
+local BAG_TYPE_GLYPHS = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\"
+
+-- EMPTY_SLOT_FAMILY_ICON_DEFAULT is the glyph of a specialized bag whose family has none of its
+-- own: the reagent bag's.
+const.EMPTY_SLOT_FAMILY_ICON_DEFAULT = BAG_TYPE_GLYPHS .. "reagentbag.png"
 
 -- On retail the dedicated Reagent Bag (bag id 5) is identified by id, not by a bag-family bit
 -- (C_Container.GetContainerNumFreeSlots reports family 0 for it), so it is keyed in
@@ -323,12 +325,26 @@ const.EMPTY_SLOT_FAMILY_ICON_DEFAULT = "Mobile-Herbalism"
 -- bags keep their real numeric family bits.
 const.REAGENT_BAG_FAMILY_KEY = "ReagentBag"
 
--- EMPTY_SLOT_FAMILY_ICON maps a bag-family bit value (see ITEM_BAG_FAMILY), or the symbolic
--- REAGENT_BAG_FAMILY_KEY, to a distinct overlay atlas name. Families with no explicit entry
--- fall back to EMPTY_SLOT_FAMILY_ICON_DEFAULT (resolved by items:GetEmptySlotFamilyIcon).
--- Empty by default — every specialized bag shares the default glyph for now; add per-family
--- atlases here to differentiate them.
-const.EMPTY_SLOT_FAMILY_ICON = {}
+-- EMPTY_SLOT_FAMILY_ICON maps a bag-family bit value, or the symbolic REAGENT_BAG_FAMILY_KEY, to
+-- its glyph: every family a bag holds (warcraft.wiki.gg ItemFamily: the quiver and ammo pouch, the
+-- profession bags, the keyring, the tackle box and the cooking bag). Resolved by
+-- items:GetEmptySlotFamilyIcon.
+const.EMPTY_SLOT_FAMILY_ICON = {
+  [1] = BAG_TYPE_GLYPHS .. "quiver.png",
+  [2] = BAG_TYPE_GLYPHS .. "ammopouch.png",
+  [4] = BAG_TYPE_GLYPHS .. "soulbag.png",
+  [8] = BAG_TYPE_GLYPHS .. "leatherworking.png",
+  [16] = BAG_TYPE_GLYPHS .. "inscription.png",
+  [32] = BAG_TYPE_GLYPHS .. "herb.png",
+  [64] = BAG_TYPE_GLYPHS .. "enchanting.png",
+  [128] = BAG_TYPE_GLYPHS .. "engineering.png",
+  [256] = BAG_TYPE_GLYPHS .. "keyring.png",
+  [512] = BAG_TYPE_GLYPHS .. "gem.png",
+  [1024] = BAG_TYPE_GLYPHS .. "mining.png",
+  [32768] = BAG_TYPE_GLYPHS .. "tacklebox.png",
+  [65536] = BAG_TYPE_GLYPHS .. "cooking.png",
+  [const.REAGENT_BAG_FAMILY_KEY] = BAG_TYPE_GLYPHS .. "reagentbag.png",
+}
 
 ---@enum WindowKind
 const.WINDOW_KIND = {

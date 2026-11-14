@@ -169,7 +169,7 @@ end
 -- buttonState describes what an item button shows: how it was last drawn ("item", "free" with
 -- its count and bag name, "empty"), its quality border's color, Blizzard's padlock (the frame
 -- ContainerFrameItemButtonMixin:UpdateExtended shows on a slot past the bag's usable slots,
--- which also stops the mouse), whether it takes the mouse, and the empty slot glyph.
+-- which also stops the mouse), whether it takes the mouse, and the empty slot glyph (its file's name).
 ---@param cell Item
 ---@return string
 local function buttonState(cell)
@@ -185,7 +185,11 @@ local function buttonState(cell)
   end
   local button = cell.button
   local padlock = (button ~= nil and shown(button.extendedFrame)) or (decoration ~= nil and shown(decoration.extendedFrame))
-  local glyph = decoration ~= nil and shown(decoration.BetterBagsFamilyIcon) and decoration.BetterBagsFamilyIcon:GetAtlas() or "none"
+  local glyph = "none"
+  if decoration ~= nil and shown(decoration.BetterBagsFamilyIcon) then
+    local file = decoration.BetterBagsFamilyIcon:GetTexture()
+    glyph = type(file) == "string" and file:match("([^\\/]+)$") or tostring(file)
+  end
   table.insert(parts, string.format("border=%s padlock=%s mouse=%s glyph=%s", border, tostring(padlock),
     tostring(button ~= nil and button:IsMouseEnabled() == true), tostring(glyph)))
   return table.concat(parts, " ")

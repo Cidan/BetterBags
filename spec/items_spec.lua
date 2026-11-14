@@ -3039,4 +3039,37 @@ describe("Empty slot family icons (specialized bags)", function()
     _G.C_Item.GetItemSubClassInfo = origSub
     _G.GetInventoryItemLink = origLink
   end)
+
+  -- The keyring is left out of free space (emptySlotsByBag), so Phase6 gives its slots the keys' family itself; only
+  -- the backpack's keyring: live retail's enum has a Keyring member (-1) and no keyring, and on the Classic clients
+  -- -1 is the bank (keyring.md).
+  it("Phase6_EnrichData gives the backpack keyring's empty slots the keys' glyph, and no other bag", function()
+    const.EMPTY_SLOT_FAMILY_ICON_DEFAULT = "REAGENT"
+    const.EMPTY_SLOT_FAMILY_ICON = { [256] = "KEY" }
+    local origBackpack, origKeyring = const.BACKPACK_BAGS, _G.Enum.BagIndex.Keyring
+    _G.Enum.BagIndex.Keyring = -1
+    const.BACKPACK_BAGS = { [-1] = -1, [0] = 0 }
+    local origIID = _G.C_Container.ContainerIDToInventoryID
+    _G.C_Container.ContainerIDToInventoryID = function() return nil end
+    local origSub = _G.C_Item.GetItemSubClassInfo
+    _G.C_Item.GetItemSubClassInfo = function() return "Bag" end
+    local origLink = _G.GetInventoryItemLink
+    _G.GetInventoryItemLink = function() return nil end
+
+    local function enrich(kind)
+      local itemData = { ["-1_1"] = { bagid = -1, slotid = 1, slotkey = "-1_1", isItemEmpty = true, itemInfo = {} } }
+      items:Phase6_EnrichData(addon:GetModule("Context"):New("TestKeyringGlyph"), kind, itemData, {})
+      return itemData["-1_1"].itemInfo.emptySlotFamilyIcon
+    end
+    local backpack = enrich(const.BAG_KIND.BACKPACK)
+    const.BACKPACK_BAGS = { [0] = 0 }
+    local bank = enrich(const.BAG_KIND.BANK)
+
+    const.BACKPACK_BAGS, _G.Enum.BagIndex.Keyring = origBackpack, origKeyring
+    _G.C_Container.ContainerIDToInventoryID = origIID
+    _G.C_Item.GetItemSubClassInfo = origSub
+    _G.GetInventoryItemLink = origLink
+    assert.are.equal("KEY", backpack)
+    assert.is_nil(bank)
+  end)
 end)
