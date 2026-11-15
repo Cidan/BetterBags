@@ -462,7 +462,7 @@ its setters once even though its data is unchanged.
 | Resizable Window (`GetBagSizeMode`) | the bag's window (`ApplySizeSettings` on draw) | `bags/Redraw` |
 | Show Full Section Names | `frames/section.lua` (every section draw) | `bags/Redraw` |
 | Quality Glow Intensity | `frames/item.lua` `DrawQualityGlow` | `bags/Redraw`, buttons |
-| Show Item Level, Show Item Level Color (`GetItemLevelOptions`) | `frames/item.lua` | `bags/Redraw`, buttons |
+| Show Item Level, Show Item Level Color, Show Keystone Level (`GetItemLevelOptions`) | `frames/item.lua` | `bags/Redraw`, buttons |
 | Theme (`Sonata:ApplyTheme`) | window decorations, element styles | `bags/Redraw` (the Sonata generation it bumps redraws the buttons) |
 
 Settings that look like presentation but are read by the data phase are recalculated

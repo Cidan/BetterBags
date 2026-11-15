@@ -1133,6 +1133,29 @@ describe("ItemFrame Static Buttons and Parent Removal Tests", function()
           assert.equal(2, fullDraws)
         end)
 
+        -- Issue #202: a keystone's level is read from its link, which the record holds, so a keystone
+        -- whose level changed draws again.
+        it("draws a keystone again when its level changes", function()
+          local savedOptions, savedKind = database.GetItemLevelOptions, item.kind
+          finally(function() database.GetItemLevelOptions, item.kind = savedOptions, savedKind end)
+          database.GetItemLevelOptions = function() return { enabled = true, color = false, keystone = true } end
+          item.kind = const.BAG_KIND.BACKPACK
+          local function key(level)
+            return data({ function(d)
+              d.itemInfo.classID = 5
+              d.itemInfo.keystoneLevel = level
+              d.itemInfo.itemLink = "|cnIQ4:|Hkeystone:180653:503:" .. tostring(level) .. ":10:0:0:0|h[Keystone]|h|r"
+            end })
+          end
+          item:SetItemFromData(btnCtx, key(12))
+          item:SetItemFromData(btnCtx, key(12))
+          assert.equal(1, fullDraws)
+          assert.equal("12", item.ilvlText:GetText())
+          item:SetItemFromData(btnCtx, key(13))
+          assert.equal(2, fullDraws)
+          assert.equal("13", item.ilvlText:GetText())
+        end)
+
         it("skips the setters but still points the button at the new data", function()
           local again = data()
           item:SetItemFromData(btnCtx, again)
@@ -1506,6 +1529,76 @@ describe("ItemFrame Static Buttons and Parent Removal Tests", function()
       item:DrawItemLevel(itemData)
       assert.equal("210", item.ilvlText:GetText())
       assert.is_true(item.ilvlText:IsShown())
+    end)
+
+    -- Issue #202: a keystone shows its level where gear shows its item level, by its own setting
+    -- (Show Keystone Level), in Blizzard's color for that level with Show Item Level Color on.
+    describe("keystone level (issue #202)", function()
+      local savedOptions, savedKind
+
+      -- A keystone is a reagent (Enum.ItemClass.Reagent, 5, ItemConstantsDocumentation); its level is
+      -- read from its link with the rest of its item info (items:KeystoneLevel).
+      local function keystone(level)
+        return {
+          slotkey = "0_6", bagid = 0, slotid = 6, isItemEmpty = false,
+          itemInfo = {
+            classID = 5, currentItemLevel = 1, keystoneLevel = level,
+            itemLink = "|cnIQ4:|Hkeystone:180653:503:" .. tostring(level) .. ":10:0:0:0|h[Keystone]|h|r",
+          },
+        }
+      end
+
+      local function options(enabled, colored, keystoneShown)
+        database.GetItemLevelOptions = function() return { enabled = enabled, color = colored, keystone = keystoneShown } end
+      end
+
+      before_each(function()
+        savedOptions, savedKind = database.GetItemLevelOptions, item.kind
+        item.kind = const.BAG_KIND.BACKPACK
+      end)
+
+      after_each(function()
+        database.GetItemLevelOptions, item.kind = savedOptions, savedKind
+      end)
+
+      it("shows a keystone's level in Blizzard's color for that level", function()
+        options(true, true, true)
+        item:DrawItemLevel(keystone(12))
+        assert.equal("12", item.ilvlText:GetText())
+        assert.is_true(item.ilvlText:IsShown())
+        local r, g, b = C_ChallengeMode.GetKeystoneLevelRarityColor(12):GetRGB()
+        assert.are.same({ r, g, b, 1 }, { item.ilvlText:GetTextColor() })
+      end)
+
+      it("shows it in white with Show Item Level Color off", function()
+        options(true, false, true)
+        item:DrawItemLevel(keystone(7))
+        assert.equal("7", item.ilvlText:GetText())
+        assert.are.same({ 1, 1, 1, 1 }, { item.ilvlText:GetTextColor() })
+      end)
+
+      it("shows it with Show Item Level off, by its own setting", function()
+        options(false, true, true)
+        item:DrawItemLevel(keystone(12))
+        assert.equal("12", item.ilvlText:GetText())
+        assert.is_true(item.ilvlText:IsShown())
+      end)
+
+      it("shows nothing on a keystone with Show Keystone Level off", function()
+        options(true, true, true)
+        item:DrawItemLevel(keystone(12))
+        options(true, true, false)
+        item:DrawItemLevel(keystone(12))
+        assert.is_false(item.ilvlText:IsShown())
+      end)
+
+      it("still shows nothing on a reagent that is no keystone", function()
+        options(true, true, true)
+        item:DrawItemLevel(keystone(12))
+        item:DrawItemLevel({ slotkey = "0_6", bagid = 0, slotid = 6, isItemEmpty = false,
+          itemInfo = { classID = 5, currentItemLevel = 60, itemLink = "item:12345" } })
+        assert.is_false(item.ilvlText:IsShown())
+      end)
     end)
 
     it("UpdateUpgrade should show UpgradeIcon if isUpgrade is true", function()

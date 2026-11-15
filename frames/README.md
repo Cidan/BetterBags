@@ -80,6 +80,7 @@ Individual item button implementation with full WoW item functionality.
 **Key Features:**
 - Item display with icon, count, quality
 - Item level display
+- A keystone's level in the same place, by its own setting (Show Keystone Level), in Blizzard's color for that level with Show Item Level Color on (`ShowKeystoneLevel`; `.claude/rules/keystone-level.md`)
 - Item level colors refresh when max item level changes
 - Cooldown tracking
 - Search highlighting

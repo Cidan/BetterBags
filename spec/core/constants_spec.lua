@@ -315,6 +315,15 @@ describe("Constants Module Offsets", function()
     assert.is_true(const.DATABASE_DEFAULTS.profile.quickFindEnabled)
   end)
 
+  -- Issue #202: a keystone's level shows on its button unless switched off, in the bags that can hold one.
+  it("shows keystone levels in the backpack and the bank by default", function()
+    loadfile("core/constants.lua")("BetterBags")
+    local const = addon:GetModule("Constants")
+    local itemLevel = const.DATABASE_DEFAULTS.profile.itemLevel
+    assert.is_true(itemLevel[const.BAG_KIND.BACKPACK].keystone)
+    assert.is_true(itemLevel[const.BAG_KIND.BANK].keystone)
+  end)
+
   it("should have SCROLLBAR_WIDTH defined in the era constants offsets", function()
     loadfile("core/constants.lua")("BetterBags")
     loadfile("core/era/constants.lua")("BetterBags")

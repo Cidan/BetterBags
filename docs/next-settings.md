@@ -133,7 +133,8 @@ bags'), and Currency (Blizzard's backpack currency list, which Next's footer doe
 
 4. **Layout:** *Order:* Section Order, Item Order. *Tabs* (backpack): Enable Groups. *Slots:* Show
    All Free Space Slots, Preserve Empty Slots as Gaps.
-5. **Items:** *Item Level:* Show Item Level, Show Item Level Color. *Quality:* Quality Glow
+5. **Items:** *Item Level:* Show Item Level, Show Item Level Color, Show Keystone Level (retail; the
+   backpack and the bank). *Quality:* Quality Glow
    Intensity. *Stacking:* All Items Recent, Flash Stacks, Merge Stacks, Merge Unstackable, Don't
    Merge Partial Stacks, Split Transmogged Items, Unmerge on Interactions.
 6. **Categories:** *Automatic:* Equipment Location, Expansion, Equipment Set, Recent Items, Trade

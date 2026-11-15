@@ -501,6 +501,22 @@ function itemFrame.itemProto:ShowItemLevel(data)
 	self.ilvlText:Show()
 end
 
+-- ShowKeystoneLevel shows a keystone's level where gear shows its item level, in Blizzard's color for
+-- that level with Show Item Level Color on.
+---@param data ItemData
+function itemFrame.itemProto:ShowKeystoneLevel(data)
+	self.blank = false
+	local level = data.itemInfo.keystoneLevel
+	self.ilvlText:SetText(tostring(level))
+	if database:GetItemLevelOptions(self.kind).color then
+		local r, g, b = C_ChallengeMode.GetKeystoneLevelRarityColor(level):GetRGB()
+		self.ilvlText:SetTextColor(r, g, b, 1)
+	else
+		self.ilvlText:SetTextColor(1, 1, 1, 1)
+	end
+	self.ilvlText:Show()
+end
+
 ---@param data ItemData
 function itemFrame.itemProto:DrawItemLevel(data)
 	self.blank = false
@@ -515,6 +531,16 @@ function itemFrame.itemProto:DrawItemLevel(data)
 	local ilvlOpts = database:GetItemLevelOptions(self.kind)
 	local mergeOpts = database:GetStackingOptions(self.kind)
 	local ilvl = data.itemInfo.currentItemLevel
+
+	-- A keystone's level has its own setting, Show Keystone Level, whatever Show Item Level says.
+	if data.itemInfo.keystoneLevel ~= nil then
+		if ilvlOpts.keystone then
+			self:ShowKeystoneLevel(data)
+		else
+			self.ilvlText:Hide()
+		end
+		return
+	end
 
 	if not ilvlOpts.enabled then
 		self.ilvlText:Hide()

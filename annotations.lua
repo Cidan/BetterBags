@@ -399,6 +399,7 @@ function EquipmentManager_UnpackLocation(location) end
 ---@field currentItemCount number
 ---@field category string
 ---@field currentItemLevel number
+---@field keystoneLevel? number A keystone's level, from its link (items:KeystoneLevel); nil for any other item.
 ---@field equipmentSets string[]|nil
 ---@field tooltipText string
 

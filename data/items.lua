@@ -3974,10 +3974,23 @@ function items:ItemInfoOf(props, slot)
     currentItemCount = slot.currentItemCount,
     category = "",
     currentItemLevel = slot.currentItemLevel,
+    keystoneLevel = self:KeystoneLevel(props.itemLink),
     equipmentSets = slot.equipmentSets,
     tooltipText = slot.tooltipText or "",
     tooltipMarks = slot.tooltipMarks,
   } --[[@as ItemInfo]]
+end
+
+-- KeystoneLevel returns a keystone's level, the third value of its link
+-- (keystone:itemID:challengeModeID:level:affixes, warcraft.wiki.gg Hyperlinks), the same for every
+-- keystone item; nil for any other link.
+---@param link? string
+---@return number?
+function items:KeystoneLevel(link)
+  if link == nil then
+    return nil
+  end
+  return tonumber(string.match(link, "|Hkeystone:%d+:%d+:(%d+)"))
 end
 
 -- FinishItemData ends a read of an item, for every kind of slot: the highest item level seen (item

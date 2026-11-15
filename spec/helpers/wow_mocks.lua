@@ -2245,6 +2245,14 @@ _G.NORMAL_FONT_COLOR = _G.NORMAL_FONT_COLOR or CreateColor(1, 0.82, 0, 1)
 _G.HIGHLIGHT_FONT_COLOR = _G.HIGHLIGHT_FONT_COLOR or CreateColor(1, 1, 1, 1)
 _G.DISABLED_FONT_COLOR = _G.DISABLED_FONT_COLOR or CreateColor(0.5, 0.5, 0.5, 1)
 
+-- C_ChallengeMode.GetKeystoneLevelRarityColor(level) -> levelScore, a ColorMixin, never nil
+-- (ChallengeModeInfoDocumentation, retail). Its colors are game data, not in the UI source: this
+-- stand-in gives each level its own, red the level / 100.
+_G.C_ChallengeMode = _G.C_ChallengeMode or {}
+_G.C_ChallengeMode.GetKeystoneLevelRarityColor = function(level)
+  return CreateColor(level / 100, 0.5, 0.25)
+end
+
 -- C_Texture.GetAtlasInfo(atlas) -> AtlasInfo, or nothing for an atlas the client lacks (TextureUtilsDocumentation,
 -- every client): width, height, tilesHorizontally, tilesVertically, and more. Atlas data is the game's, not the UI
 -- source's: specs register the atlases they draw with MockAtlas(name, width, height, tilesHorizontally,
