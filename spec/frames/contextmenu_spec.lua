@@ -329,7 +329,15 @@ describe("ContextMenu 'Show Bags' toggle", function()
 
     it("puts Drag to Resize first and Bag Anchor third in the bank's menu, its sorts together after it", function()
       local menuList = contextMenu:CreateContextMenu(newBag(const.BAG_KIND.BANK, false))
-      assert.are.same({ "Drag to Resize", "Show Bags", "Bag Anchor", "Sort Bank", "Clean Up Warbank", "What's New",
+      assert.are.same({ "Drag to Resize", "Show Bags", "Bag Anchor", "Sort Bank", "Clean Up Warbank",
+        "Deposit All Warbound Items", "Include tradeable reagents", "What's New", "Open Options Screen", "Close Menu" },
+        texts(menuList))
+    end)
+
+    it("leaves the Warbank's deposit out of the bank's menu where there is no Warbank (WoW: Forever)", function()
+      addon.hasWarbank = false
+      local menuList = contextMenu:CreateContextMenu(newBag(const.BAG_KIND.BANK, false))
+      assert.are.same({ "Drag to Resize", "Show Bags", "Bag Anchor", "Sort Bank", "What's New",
         "Open Options Screen", "Close Menu" }, texts(menuList))
     end)
 
@@ -359,6 +367,64 @@ describe("ContextMenu 'Show Bags' toggle", function()
         assert.are.same("Drag to Resize", entry.tooltipTitle)
         assert.is_true(entry.tooltipOnButton)
       end
+    end)
+  end)
+
+  -- The Warbank's deposit (issue #750): Blizzard's Deposit All Warbound Items button and its Include tradeable reagents
+  -- checkbox, hidden with the rest of Blizzard's bank (bags/bank.lua), as entries of the bank's menu; and Sort Bank only
+  -- sorts (it used to deposit every reagent into the character bank first, unseen).
+  describe("the Warbank's deposit", function()
+    local deposits, bankDeposits
+
+    before_each(function()
+      addon.isRetail = true
+      addon.hasWarbank = true
+      override(_G.C_Container, "SortAccountBankBags", function() end)
+      deposits, bankDeposits = {}, 0
+      override(_G.C_Bank, "AutoDepositItemsIntoBank", function(bankType) table.insert(deposits, bankType) end)
+      override(_G, "_cvars", {})
+    end)
+
+    local function bankBag()
+      local bag = newBag(const.BAG_KIND.BANK, false)
+      -- The bank's deposit, which asks first when a refund would end (warbound_deposit_spec.lua).
+      bag.behavior = { DepositWarboundItems = function() bankDeposits = bankDeposits + 1 end }
+      return bag
+    end
+
+    it("deposits through the bank's deposit, which asks first when a refund would end", function()
+      local entry = findEntry(contextMenu:CreateContextMenu(bankBag()), "Deposit All Warbound Items")
+      assert.is_true(entry.notCheckable)
+      assert.are.equal("Deposit All Warbound Items", entry.tooltipTitle)
+      assert.is_string(entry.tooltipText)
+      entry.func()
+      assert.are.equal(1, bankDeposits)
+      assert.are.same({}, deposits, "never past the bank's question")
+    end)
+
+    it("toggles Blizzard's own setting for including tradeable reagents", function()
+      _G._cvars.bankAutoDepositReagents = "0"
+      local entry = findEntry(contextMenu:CreateContextMenu(bankBag()), "Include tradeable reagents")
+      assert.is_falsy(entry.notCheckable)
+      assert.are.equal("Include tradeable reagents", entry.tooltipTitle)
+      assert.is_string(entry.tooltipText)
+      assert.is_false(entry.checked())
+      entry.func()
+      assert.are.equal("1", _G._cvars.bankAutoDepositReagents)
+      assert.is_true(entry.checked())
+      entry.func()
+      assert.are.equal("0", _G._cvars.bankAutoDepositReagents)
+      assert.is_false(entry.checked())
+      assert.are.same({}, deposits)
+      assert.are.equal(0, bankDeposits)
+    end)
+
+    it("sorts the bank with Sort Bank, depositing nothing", function()
+      local entry = findEntry(contextMenu:CreateContextMenu(bankBag()), "Sort Bank")
+      entry.func()
+      assert.are.same({ "bags/SortBank" }, sentMessages)
+      assert.are.same({}, deposits)
+      assert.are.equal(0, bankDeposits)
     end)
   end)
 

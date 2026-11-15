@@ -43,7 +43,7 @@ local function showTooltip(button, bag)
   elseif addon.isRetail then
     GameTooltip:AddDoubleLine(L:G("Right Click"), L:G("Sort Bank"), 1, 0.81, 0, 1, 1, 1)
     if addon.hasWarbank then
-      GameTooltip:AddDoubleLine(L:G("Shift Right Click"), L:G("Deposit Warbank Items"), 1, 0.81, 0, 1, 1, 1)
+      GameTooltip:AddDoubleLine(L:G("Shift Right Click"), ACCOUNT_BANK_DEPOSIT_BUTTON_LABEL, 1, 0.81, 0, 1, 1, 1)
     end
   end
   if CursorHasItem() then
@@ -57,7 +57,8 @@ local function showTooltip(button, bag)
 end
 
 -- Sort is the menu button's right click: it sorts the bag (on the retail bank, the bank type
--- of the active tab), or with Shift deposits into the Warbank. A theme's Sort action button
+-- of the active tab), or with Shift deposits into the Warbank through the bank's own deposit,
+-- which asks first when a refund would end (DepositWarboundItems). A theme's Sort action button
 -- (frames/bagactions.lua) does the same.
 ---@param ctx Context
 ---@param bag Bag
@@ -69,7 +70,7 @@ function menuButton:Sort(ctx, bag)
   if not addon.hasWarbank then
     events:SendMessage(ctx, "bags/SortBank")
   elseif IsShiftKeyDown() then
-    C_Bank.AutoDepositItemsIntoBank(Enum.BankType.Account)
+    bag.behavior:DepositWarboundItems()
   elseif const.ACCOUNT_BANK_BAGS and const.ACCOUNT_BANK_BAGS[bag.bankTab] then
     events:SendMessage(ctx, "bags/SortWarbank")
   else

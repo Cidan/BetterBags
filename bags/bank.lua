@@ -90,6 +90,40 @@ function bank:SuppressBlizzardBankPanel()
 	BankPanel:Show()
 end
 
+-- WarboundDepositEndsRefunds says whether depositing every warbound item would put one in the Warbank that can
+-- still be refunded, ending its refund: Blizzard's Deposit All Warbound Items button asks first then
+-- (BankPanelItemDepositButtonMixin:GetItemDepositConfirmationPopup, BankFrame.lua), looking in the bags as it does.
+---@return boolean
+function bank:WarboundDepositEndsRefunds()
+	return ItemUtil.IteratePlayerInventory(function(itemLocation)
+		return C_Bank.IsItemAllowedInBankType(Enum.BankType.Account, itemLocation) and C_Item.CanBeRefunded(itemLocation)
+	end)
+end
+
+-- DepositWarbound puts every warbound item in the bags into the Warbank, as Blizzard's Deposit All Warbound Items
+-- does (with its Include tradeable reagents setting, the bankAutoDepositReagents CVar): at once, or, when that would
+-- end a refund, only once the player accepts the question ask shows, which calls deposit then.
+---@param ask fun(deposit: fun())
+function bank:DepositWarbound(ask)
+	local function deposit()
+		C_Bank.AutoDepositItemsIntoBank(Enum.BankType.Account)
+	end
+	if self:WarboundDepositEndsRefunds() then
+		ask(deposit)
+	else
+		deposit()
+	end
+end
+
+-- DepositWarboundItems is the classic bank's Warbank deposit (its menu, its menu button's Shift right click), asking
+-- Blizzard's own question first when a refund would end: the popup its button shows, which deposits once accepted
+-- (StaticPopupDialogs.ACCOUNT_BANK_DEPOSIT_ALL_NO_REFUND_CONFIRM, BankFrame.lua).
+function bank.proto:DepositWarboundItems()
+	bank:DepositWarbound(function()
+		StaticPopup_Show("ACCOUNT_BANK_DEPOSIT_ALL_NO_REFUND_CONFIRM", nil, nil, { bankType = Enum.BankType.Account })
+	end)
+end
+
 -- OnShow sets the bank up and shows its window; onShown runs once the window has finished showing.
 ---@param ctx Context
 ---@param onShown? fun()

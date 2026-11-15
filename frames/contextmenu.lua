@@ -316,9 +316,6 @@ function contextMenu:CreateContextMenu(bag)
 			tooltipText = L:G("Click to sort the bank."),
 			func = function()
 				PlaySound(SOUNDKIT.IG_BACKPACK_CLOSE)
-				if addon.isRetail and C_Bank and C_Bank.AutoDepositItemsIntoBank then
-					C_Bank.AutoDepositItemsIntoBank(Enum.BankType.Character)
-				end
 				events:SendMessage(context:New("SortBank"), "bags/SortBank")
 			end,
 		})
@@ -331,6 +328,30 @@ function contextMenu:CreateContextMenu(bag)
 				func = function()
 					PlaySound(SOUNDKIT.IG_BACKPACK_CLOSE)
 					events:SendMessage(context:New("SortWarbank"), "bags/SortWarbank")
+				end,
+			})
+		end
+		-- Blizzard's Deposit All Warbound Items button and its Include tradeable reagents checkbox, hidden with the rest
+		-- of its bank (bags/bank.lua), in Blizzard's words.
+		if addon.hasWarbank then
+			table.insert(menuList, {
+				text = ACCOUNT_BANK_DEPOSIT_BUTTON_LABEL,
+				notCheckable = true,
+				tooltipTitle = ACCOUNT_BANK_DEPOSIT_BUTTON_LABEL,
+				tooltipText = L:G("Click to put every warbound item in your bags into the Warbank."),
+				func = function()
+					bag.behavior:DepositWarboundItems()
+				end,
+			})
+			table.insert(menuList, {
+				text = BANK_DEPOSIT_INCLUDE_REAGENTS_CHECKBOX_LABEL,
+				tooltipTitle = BANK_DEPOSIT_INCLUDE_REAGENTS_CHECKBOX_LABEL,
+				tooltipText = L:G("Click to toggle putting your tradeable reagents into the Warbank too when you deposit all warbound items."),
+				checked = function()
+					return GetCVarBool("bankAutoDepositReagents")
+				end,
+				func = function()
+					SetCVar("bankAutoDepositReagents", not GetCVarBool("bankAutoDepositReagents"))
 				end,
 			})
 		end

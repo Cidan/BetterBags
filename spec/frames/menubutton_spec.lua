@@ -34,7 +34,7 @@ local menuButton = addon:GetModule("BagMenuButton")
 local events = addon:GetModule("Events")
 
 describe("BagMenuButton", function()
-  local sent, shownMenu, registered, sorted, created, deposited, toggledSearch
+  local sent, shownMenu, registered, sorted, created, deposited, toggledSearch, warboundDeposits
   local savedFlags, savedGlobals
 
   -- Stubs this file made are removed, so a later spec file can load the real modules.
@@ -50,6 +50,8 @@ describe("BagMenuButton", function()
     bag.frame:SetFrameLevel(500)
     function bag:Sort() sorted = sorted + 1 end
     function bag:CreateCategoryForItemInCursor() created = created + 1 end
+    -- The bank's deposit, which asks first when a refund would end (bags/bank.lua, warbound_deposit_spec.lua).
+    bag.behavior = { DepositWarboundItems = function() warboundDeposits = warboundDeposits + 1 end }
     return bag
   end
 
@@ -59,7 +61,7 @@ describe("BagMenuButton", function()
 
   before_each(function()
     sent, registered = {}, {}
-    sorted, created, toggledSearch = 0, 0, 0
+    sorted, created, toggledSearch, warboundDeposits = 0, 0, 0, 0
     deposited = nil
     shownMenu = nil
     firstTime = false
@@ -173,11 +175,12 @@ describe("BagMenuButton", function()
       assert.is_nil(deposited)
     end)
 
-    it("deposits into the Warbank with Shift", function()
+    -- Through the bank, which asks first when the deposit would end a refund, as Blizzard's button does (issue #750).
+    it("deposits into the Warbank with Shift, through the bank's deposit", function()
       _G.IsShiftKeyDown = function() return true end
-      _G.Enum.BankType = _G.Enum.BankType or { Character = 0, Account = 2 }
       click(menuButton:Create(newBag(const.BAG_KIND.BANK, 6)), "RightButton")
-      assert.are.equal(Enum.BankType.Account, deposited)
+      assert.are.equal(1, warboundDeposits)
+      assert.is_nil(deposited, "never past the bank's question")
       assert.are.same({}, sent)
     end)
 
@@ -236,7 +239,7 @@ describe("BagMenuButton", function()
       local button = menuButton:Create(newBag(const.BAG_KIND.BANK))
       button:GetScript("OnEnter")(button)
       assert.are.same({ "Left Click = Open Menu", "Shift Left Click = Search Bags", "Right Click = Sort Bank",
-        "Shift Right Click = Deposit Warbank Items" }, lines)
+        "Shift Right Click = Deposit All Warbound Items" }, lines)
       lines = {}
       addon.hasWarbank = false
       button:GetScript("OnEnter")(button)

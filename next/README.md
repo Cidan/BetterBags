@@ -201,8 +201,10 @@ with BetterBags Next (`NextBag`). The rules are in `.claude/rules/food-drink.md`
 
 The bank reuses the classic bank's code wherever it is not drawing: `BankBehavior`'s group dialogs
 and purchase rule (`bank.proto`, with the Next bank as its `bag`), `BankBehavior:SuppressBlizzardBankPanel`,
-`BagMenuButton:Sort`, and `BankSlots:OpenTabConfig`, `GetBagSocketIndex` and `PickupBag` (retail
-TOCs only). It never touches Blizzard's bank panel or ends the bank interaction from `OnHide`.
+`BankBehavior:DepositWarbound` (its Deposit All Warbound Items, asking in `NextDialog` over the bank first when the
+deposit would end a refund; `.claude/rules/warbank-deposit.md`), `BagMenuButton:Sort`, and `BankSlots:OpenTabConfig`,
+`GetBagSocketIndex` and `PickupBag` (retail TOCs only). It never touches Blizzard's bank panel or ends the bank
+interaction from `OnHide`.
 
 ## Writing Next code
 

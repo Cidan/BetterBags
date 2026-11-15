@@ -35,6 +35,7 @@ local stubs = {
   menuButton = trackStub("BagMenuButton"),
   sectionFrame = trackStub("SectionFrame"),
   categories = trackStub("Categories"),
+  dialog = trackStub("NextDialog"),
 }
 
 -- Every value this spec replaces, put back after each test.
@@ -76,6 +77,8 @@ local EMPTY_BAG_SLOT = [[Interface\PaperDoll\UI-PaperDoll-Slot-Bag]]
 describe("NextBank", function()
   local buttons, sent, messages, eventsRegistered, buckets, calls
   local db, allGroups, slotInfo, purchased, nextPurchasable, moneyMade, hidden
+  -- A Warbank deposit would end a refund (BankBehavior:WarboundDepositEndsRefunds); a dialog is shown.
+  local refundable, dialogShown
 
   local function fakeButton(slotkey)
     local b = { slotkey = slotkey, frame = CreateFrame("Frame"), released = 0 }
@@ -135,7 +138,9 @@ describe("NextBank", function()
     motion:Init()
     buttons, sent, messages, eventsRegistered, buckets = {}, {}, {}, {}, {}
     calls = { suppressed = 0, bankTypes = {}, cleared = 0, closed = 0, deposits = {}, sorts = {}, menus = {},
-      created = 0, purchaseUpdates = 0, tabConfigs = {}, pickups = {}, context = 0, cooldowns = 0, placed = {} }
+      created = 0, purchaseUpdates = 0, tabConfigs = {}, pickups = {}, context = 0, cooldowns = 0, placed = {},
+      dialogs = {}, dialogHides = 0 }
+    refundable, dialogShown = false, false
     db = { groupsEnabled = true, active = 2, showBankTabs = false, view = SECTION_GRID, previous = nil, inBagSearch = true }
     allGroups = {
       [2] = { id = 2, name = "Bank", bankType = CHAR, isDefault = true },
@@ -239,6 +244,26 @@ describe("NextBank", function()
       return nil
     end)
     override(stubs.menuButton, "Sort", function(_, _, bag) table.insert(calls.sorts, { "menu", bag }) end)
+    -- As BankBehavior:DepositWarbound deposits (warbound_deposit_spec.lua): at once, or once ask's question is accepted.
+    override(stubs.bankBehavior, "DepositWarbound", function(_, ask)
+      local function deposit() C_Bank.AutoDepositItemsIntoBank(ACCOUNT) end
+      if refundable then
+        ask(deposit)
+      else
+        deposit()
+      end
+    end)
+    override(stubs.dialog, "owner", nil)
+    override(stubs.dialog, "Show", function(self, owner, opts)
+      table.insert(calls.dialogs, { owner = owner, opts = opts })
+      self.owner = owner
+      dialogShown = true
+    end)
+    override(stubs.dialog, "IsShown", function() return dialogShown end)
+    override(stubs.dialog, "Hide", function()
+      calls.dialogHides = calls.dialogHides + 1
+      dialogShown = false
+    end)
     override(C_Bank, "FetchPurchasedBankTabData", function(bankType) return purchased[bankType] end)
     override(C_Bank, "FetchNextPurchasableBankTabData", function(bankType) return nextPurchasable[bankType] end)
     override(C_Bank, "CloseBankFrame", function() calls.closed = calls.closed + 1 end)
@@ -538,7 +563,8 @@ describe("NextBank", function()
       -- Its anchor only while small (docs/next-bag-anchor.md); its sort (a right click on its title) and the switch to small
       -- bags (the backpack's size button's) in the menu too (asked: "add the missing button interactions to the plain drop
       -- down menu").
-      assert.are.same({ "Show Bank Tabs", "Deposit Warbank Items", "Sort Bank", "Small Bags", "Open Options Screen" }, names)
+      assert.are.same({ "Show Bank Tabs", "Deposit All Warbound Items", "Sort Bank", "Small Bags", "Open Options Screen" },
+        names)
       assert.is_true(list[2].checked())
       db.showBankTabs = false
       assert.is_false(list[2].checked())
@@ -577,9 +603,63 @@ describe("NextBank", function()
       click(bank.depositButton)
       assert.are.equal(1, #sentNamed("config/Open"))
       assert.are.same({ ACCOUNT }, calls.deposits)
+      assert.are.same({}, calls.dialogs, "nothing to ask: no refund would end")
       click(bank.closeButton)
       finishTweens()
       assert.is_false(bank:IsShown())
+    end)
+
+    -- Blizzard's Deposit All Warbound Items button asks first when the deposit would end a refund (issue #750); the bank
+    -- asks it in the dialog every question is asked in, over itself, in Blizzard's words.
+    it("asks over the bank before a deposit that would end a refund, and deposits once answered", function()
+      local bank = opened()
+      refundable = true
+      click(bank.depositButton)
+      assert.are.same({}, calls.deposits)
+      local shown = calls.dialogs[1]
+      assert.are.equal(bank.frame, shown.owner)
+      assert.are.equal("Deposit All Warbound Items", shown.opts.title)
+      assert.are.equal(ACCOUNT_BANK_DEPOSIT_ALL_NO_REFUND_CONFIRM, shown.opts.text)
+      assert.are.same({ "Cancel", "Deposit" }, { shown.opts.buttons[1].text, shown.opts.buttons[2].text })
+      assert.are.equal("Danger", shown.opts.buttons[2].style)
+      shown.opts.buttons[1].onClick(ctx(), "")
+      assert.are.same({}, calls.deposits, "Cancel deposits nothing")
+      shown.opts.buttons[2].onClick(ctx(), "")
+      assert.are.same({ ACCOUNT }, calls.deposits)
+    end)
+
+    -- There is one dialog: showing it again would replace another window's question unanswered (NextDialog).
+    it("asks nothing, and deposits nothing, over a dialog another window shows", function()
+      local bank = opened()
+      refundable = true
+      dialogShown = true
+      click(bank.depositButton)
+      assert.are.same({}, calls.dialogs)
+      assert.are.same({}, calls.deposits)
+    end)
+
+    it("deposits as its button does for the menu button's Shift right click (BagMenuButton:Sort)", function()
+      local bank = opened()
+      bank.behavior:DepositWarboundItems()
+      assert.are.same({ ACCOUNT }, calls.deposits)
+      refundable = true
+      bank.behavior:DepositWarboundItems()
+      assert.are.equal(bank.frame, calls.dialogs[1].owner)
+      assert.are.same({ ACCOUNT }, calls.deposits)
+    end)
+
+    -- NextDialog:Hide answers its first button, Cancel (panel_controls_spec.lua, "NextDialog").
+    it("closes its own question as it hides, and leaves another window's", function()
+      local bank = opened()
+      refundable = true
+      click(bank.depositButton)
+      bank:Hide(ctx())
+      assert.are.equal(1, calls.dialogHides)
+      assert.is_false(dialogShown)
+      local other = opened()
+      stubs.dialog.owner, dialogShown = CreateFrame("Frame"), true
+      other:Hide(ctx())
+      assert.are.equal(1, calls.dialogHides)
     end)
 
     -- Its sort button gave its place to its anchor button (docs/next-bag-anchor.md: asked, "replace the 'clean up bags'

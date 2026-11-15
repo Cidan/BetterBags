@@ -283,7 +283,8 @@ function WholeAddon.Load(opts)
   setGlobal("GetInventoryItemQuality", function() return nil end)
   setGlobal("GetScreenWidth", function() return UIParent:GetWidth() end)
   setGlobal("GetScreenHeight", function() return UIParent:GetHeight() end)
-  setGlobal("C_CVar", { SetCVar = function() end, SetCVarBitfield = function() end, GetCVar = function() end })
+  setGlobal("C_CVar", { SetCVar = function() end, SetCVarBitfield = function() end, GetCVar = function() end,
+    GetCVarBool = function() end })
   -- Blizzard_ItemButton/Mainline/ItemButtonTemplate.lua: the button's own method when it has one.
   setGlobal("SetItemButtonTexture", function(button, texture)
     if not button then return end

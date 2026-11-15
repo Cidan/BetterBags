@@ -1782,9 +1782,40 @@ _G.C_AddOns.IsAddOnLoaded = function(name)
   return loaded, loaded
 end
 
+-- ContainerFrame_GetContainerNumSlots(bagId) -> maxNumSlots, currentNumSlots, ported as is from
+-- Blizzard_UIPanels_Game/Mainline/ContainerFrame.lua: the backpack of an account without an authenticator shows 4
+-- padlocked slots more.
 _G.ContainerFrame_GetContainerNumSlots = function(bagID)
-  local numSlots = _G.C_Container and _G.C_Container.GetContainerNumSlots(bagID) or 16
-  return bagID, numSlots
+  local currentNumSlots = _G.C_Container and _G.C_Container.GetContainerNumSlots(bagID) or 16
+  local maxNumSlots = currentNumSlots
+  if bagID == 0 and not _G.IsAccountSecured() then
+    maxNumSlots = currentNumSlots + 4
+  end
+  return maxNumSlots, currentNumSlots
+end
+
+-- ItemUtil.IterateBagSlots(bag, callback) and ItemUtil.IteratePlayerInventory(callback), ported as is from
+-- Blizzard_FrameXMLUtil/ItemUtil.lua: callback gets the ItemLocation of every item in the backpack and the bags in the
+-- bag slots (the reagent bag too), and the iteration stops, answering true, at the first it answers true for.
+_G.ItemUtil = _G.ItemUtil or {}
+_G.ItemUtil.IterateBagSlots = function(bag, callback)
+  for slot = 1, _G.ContainerFrame_GetContainerNumSlots(bag) do
+    local itemLocation = _G.ItemLocation:CreateFromBagAndSlot(bag, slot)
+    if _G.C_Item.DoesItemExist(itemLocation) then
+      if callback(itemLocation) then
+        return true
+      end
+    end
+  end
+  return false
+end
+_G.ItemUtil.IteratePlayerInventory = function(callback)
+  for bag = _G.Enum.BagIndex.Backpack, _G.NUM_TOTAL_BAG_FRAMES do
+    if _G.ItemUtil.IterateBagSlots(bag, callback) then
+      return true
+    end
+  end
+  return false
 end
 
 -- The parts of an item button (Blizzard_ItemButton ItemButtonTemplate.xml): the ItemButton
@@ -3355,6 +3386,55 @@ end
 _G.C_Bank.FetchNextPurchasableBankTabData = function(bankType)
   return _G._nextPurchasableBankTab[bankType]
 end
+-- BankDocumentation.lua: IsItemAllowedInBankType(bankType, itemLocation) -> isItemAllowedInBankType (bool,
+-- non-nilable); AutoDepositItemsIntoBank(bankType), no returns. Specs list the items a bank type takes in
+-- _G._itemsAllowedInBankType[bankType]["bag:slot"]; each deposit's bank type is recorded in _G._autoDeposits.
+_G._itemsAllowedInBankType = {}
+_G.C_Bank.IsItemAllowedInBankType = function(bankType, itemLocation)
+  local bag, slot = itemLocation:GetBagAndSlot()
+  local allowed = _G._itemsAllowedInBankType[bankType]
+  return bag ~= nil and allowed ~= nil and allowed[bag .. ":" .. slot] == true
+end
+_G._autoDeposits = {}
+_G.C_Bank.AutoDepositItemsIntoBank = function(bankType)
+  table.insert(_G._autoDeposits, bankType)
+end
+
+-- Console variables (CVarDocumentation.lua): C_CVar.GetCVar(name) -> value (string, nilable), SetCVar(name, value),
+-- GetCVarBool(name) -> bool (nilable), kept in _G._cvars by name as the client keeps them, strings; and Blizzard's
+-- wrappers over them, ported as is from Blizzard_SharedXMLBase/CvarUtil.lua (SetCVar takes a boolean as "1" or "0").
+_G._cvars = {}
+_G.C_CVar = _G.C_CVar or {}
+_G.C_CVar.GetCVar = function(name) return _G._cvars[name] end
+_G.C_CVar.SetCVar = function(name, value) _G._cvars[name] = value end
+_G.C_CVar.GetCVarBool = function(name)
+  local value = _G._cvars[name]
+  if value == nil then
+    return nil
+  end
+  return value ~= "0"
+end
+_G.C_CVar.SetCVarBitfield = _G.C_CVar.SetCVarBitfield or function() end
+_G.SetCVar = function(name, value)
+  if type(value) == "boolean" then
+    return _G.C_CVar.SetCVar(name, value and "1" or "0")
+  else
+    return _G.C_CVar.SetCVar(name, value and tostring(value) or nil)
+  end
+end
+_G.GetCVar = function(name)
+  return _G.C_CVar.GetCVar(name)
+end
+_G.GetCVarBool = function(name)
+  return _G.C_CVar.GetCVarBool(name)
+end
+
+-- Blizzard's strings for its bank's item deposit (GlobalStrings, enUS).
+_G.ACCOUNT_BANK_DEPOSIT_BUTTON_LABEL = "Deposit All Warbound Items"
+_G.CHARACTER_BANK_DEPOSIT_BUTTON_LABEL = "Deposit All Reagents"
+_G.BANK_DEPOSIT_INCLUDE_REAGENTS_CHECKBOX_LABEL = "Include tradeable reagents"
+_G.ACCOUNT_BANK_DEPOSIT_ALL_NO_REFUND_CONFIRM = "You are about to deposit refundable items into the bank.|n|n"
+  .. "|cnRED_FONT_COLOR:All warbound items will have their refund timers removed.|r|n|nWould you like to continue?"
 
 -- C_Container Setup
 _G.C_Container = _G.C_Container or {}

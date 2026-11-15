@@ -474,8 +474,9 @@ reusing their code wherever it is not drawing.
   bank's do (refresh-scheduler.md §11a); the classic bank loads the same way.
 - **Title:** the group shown (Bank, Warbank, a custom group), or the Blizzard bank tab's name.
 - **Header buttons** (from the screen edge): close (`uitools-icon-close`); settings; Show Bank Tabs
-  (retail); Deposit Warbound Items (retail with a Warbank: `C_Bank.AutoDepositItemsIntoBank` for
-  the account bank, the menu button's Shift right click); its anchor (while small, next-bag-anchor.md §30b), where its sort
+  (retail); Deposit All Warbound Items (retail with a Warbank: `bankProto:DepositWarboundItems`, the menu button's
+  Shift right click, asking in `NextDialog` over the bank first when the deposit would end a refund, warbank-deposit.md);
+  its anchor (while small, next-bag-anchor.md §30b), where its sort
   button was. A right click on its title sorts it, where the client can sort the bank (`CanSort`: `C_Container.SortBankBags`
   or `SortBankBags`): the menu button's right click (`BagMenuButton:Sort`: the Warbank's sort while a Warbank tab shows,
   else the bank's; with Shift it deposits), its tooltip saying so. Their icons are the theme's glyphs (next-themes.md §11).
