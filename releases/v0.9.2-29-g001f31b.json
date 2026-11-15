@@ -1,0 +1,17 @@
+{
+  "id": 1794730806,
+  "version": "v0.9.2-29-g001f31b",
+  "channel": "alpha",
+  "date": "2026-11-15",
+  "from": "d59cdbd6679c84a15ad8889a14c660702b1f9472",
+  "to": "001f31b0c5b578335d2368a37f9b20bd00120df3",
+  "headline": "You can now export and import individual categories without overwriting your existing setup.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "Export and import individual categories",
+      "details": "Your categories now have an Export button left of Rename on the Categories page, and Import Categories accepts one category without replacing your setup. Importing shows how many items move and lets you replace or keep both on conflicts. Auto Sell, Destroy, and Auto Deposit are not shared.",
+      "clients": []
+    }
+  ]
+}
