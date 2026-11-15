@@ -24,8 +24,9 @@ describe("NextStyle timings", function()
   end)
 end)
 
--- The Size tab's Icon Scale (docs/next-appearance-size.md): an item button is the theme's icon size
--- times the player's scale; the grid keeps the theme's width, so a row fits as many as it can.
+-- Each bag's Icon Scale (its page's Size tab, docs/next-appearance-size.md): an item button is the theme's icon size
+-- times the bag's scale; the grid keeps the theme's width, so a row fits as many as it can. The style holds no scale:
+-- it sizes a button for the scale it is asked about (IconAt).
 describe("NextStyle Icon Scale", function()
   local base
 
@@ -45,55 +46,52 @@ describe("NextStyle Icon Scale", function()
   end)
 
   after_each(function()
-    style:SetIconScale(100)
     style:Use(base)
   end)
 
   it("draws item buttons at the theme's icon size at 100%", function()
-    assert.are.equal(100, style.iconScale)
+    assert.is_nil(style.iconScale, "no scale of its own")
     assert.are.equal(base.Layout.Icon, style.ICON)
-    assert.are.equal(base.Layout.Icon, style.CARD_HEIGHT)
+    assert.are.equal(base.Layout.Icon, style:IconAt(100))
+    assert.are.equal(base.Layout.Icon, style:CardHeightAt(style:IconAt(100)))
     assert.are.equal(gridWidth(base.Layout), style.GRID_WIDTH)
   end)
 
   it("scales the item buttons, in whole pixels, keeping the grid's width and the vendor's card width", function()
     local cardWidth, body, width = style.VENDOR_CARD_WIDTH, style.BODY_WIDTH, style.WIDTH
-    style:SetIconScale(150)
-    assert.are.equal(66, style.ICON, "44 x 1.5")
-    assert.are.equal(gridWidth(base.Layout), style.GRID_WIDTH)
+    assert.are.equal(66, style:IconAt(150), "44 x 1.5")
     assert.are.same({ cardWidth, body, width }, { style.VENDOR_CARD_WIDTH, style.BODY_WIDTH, style.WIDTH })
-    assert.are.equal(66, style.CARD_HEIGHT, "as tall as its icon")
-    style:SetIconScale(75)
-    assert.are.equal(33, style.ICON)
-    assert.are.equal(44, style.CARD_HEIGHT, "never shorter than its name and price need")
-    style:SetIconScale(55)
-    assert.are.equal(24, style.ICON, "24.2, whole")
+    assert.are.equal(66, style:CardHeightAt(66), "as tall as its icon")
+    assert.are.equal(33, style:IconAt(75))
+    assert.are.equal(44, style:CardHeightAt(33), "never shorter than its name and price need")
+    assert.are.equal(24, style:IconAt(55), "24.2, whole")
+    assert.are.equal(base.Layout.Icon, style.ICON, "the theme's own size, whatever a bag is scaled to")
   end)
 
   -- Asked: "account for the fact that themes can set icon scale!"
-  it("scales whatever icon size the theme sets, and keeps the scale across themes", function()
+  it("scales whatever icon size the theme sets", function()
     local quiet = copy(base)
     quiet.Layout.Icon = 38
-    style:SetIconScale(150)
     style:Use(quiet)
-    assert.are.equal(57, style.ICON, "the theme's 38 x 1.5")
-    assert.are.equal(57, style.CARD_HEIGHT)
+    assert.are.equal(38, style.ICON)
+    assert.are.equal(57, style:IconAt(150), "the theme's 38 x 1.5")
+    assert.are.equal(57, style:CardHeightAt(57))
     assert.are.equal(gridWidth(quiet.Layout), style.GRID_WIDTH)
     style:Use(base)
-    assert.are.equal(66, style.ICON)
+    assert.are.equal(66, style:IconAt(150))
   end)
 
   -- A theme application makes new font objects, which can never be freed (next-themes.md): a slider
   -- dragged through its steps must not make one per step.
-  it("makes no font object when the scale changes", function()
+  it("makes no font object sizing a button for a scale", function()
     local made = 0
     local createFont = _G.CreateFont
     _G.CreateFont = function(...)
       made = made + 1
       return createFont(...)
     end
-    style:SetIconScale(120)
-    style:SetIconScale(80)
+    style:IconAt(120)
+    style:IconAt(80)
     _G.CreateFont = createFont
     assert.are.equal(0, made)
   end)

@@ -31,11 +31,12 @@ local catalog = addon:NewModule('SettingsCatalog')
 
 -- A bag with settings of its own.
 ---@class (exact) SettingBag
----@field name string "Backpack", "Bank" or "Guild Bank".
+---@field name string "Backpack", "Bank", "Guild Bank" or "Vendor".
 ---@field kind BagKind
 
 -- How a setting is defined. A bag's setting (bag = true) gets the bag in every function, a text
--- naming it may be a function of it, and only (when set) lists the kinds of bag that have it.
+-- naming it may be a function of it, and only (when set) lists the kinds of bag that have it: without it, every bag
+-- that holds items (ITEM_BAGS).
 ---@class (exact) SettingDefinition
 ---@field kind SettingKind
 ---@field bag? boolean
@@ -93,6 +94,17 @@ local function lower(bag)
   return string.lower(bag.name)
 end
 
+-- BetterBags Next's vendor reads no bag the data engine reads, so its panel's kind is UNDEFINED (next/vendor.lua); its
+-- settings are kept under it.
+local VENDOR = const.BAG_KIND.UNDEFINED
+
+-- The bags whose items BetterBags sorts, stacks and files in categories: a bag's setting without only is theirs. The
+-- vendor shows a merchant's items, and has only the settings that name it.
+local ITEM_BAGS = { const.BAG_KIND.BACKPACK, const.BAG_KIND.BANK, const.BAG_KIND.GUILD }
+
+-- Every bag with a window of BetterBags Next's: each has its own Size tab.
+local NEXT_BAGS = { const.BAG_KIND.BACKPACK, const.BAG_KIND.BANK, const.BAG_KIND.GUILD, VENDOR }
+
 -- choiceOf returns the item of a choice whose value is value, or nil.
 ---@param choices table<string, any>
 ---@param value any
@@ -106,8 +118,8 @@ local function choiceOf(choices, value)
   return nil
 end
 
--- Bags returns the bags with settings of their own: the backpack, the bank, and the guild bank
--- (BetterBags Next's, guild-bank.md §5) on a client with one.
+-- Bags returns the bags with settings of their own: the backpack, the bank, the guild bank (BetterBags Next's,
+-- guild-bank.md §5) on a client with one, and BetterBags Next's vendor (next-vendor.md).
 ---@return SettingBag[]
 function catalog:Bags()
   local bags = {
@@ -117,6 +129,7 @@ function catalog:Bags()
   if addon.hasGuildBank then
     table.insert(bags, { name = 'Guild Bank', kind = const.BAG_KIND.GUILD })
   end
+  table.insert(bags, { name = 'Vendor', kind = VENDOR })
   return bags
 end
 
@@ -130,8 +143,8 @@ function catalog:Ids()
   return ids
 end
 
--- Has says whether a setting exists, for a bag when given: a setting limited to some kinds of bag
--- (only) is not another bag's.
+-- Has says whether a setting exists, for a bag when given: a bag's setting is only the kinds of bag it names (only), or
+-- every bag that holds items (ITEM_BAGS).
 ---@param id string
 ---@param bag? SettingBag
 ---@return boolean
@@ -140,8 +153,8 @@ function catalog:Has(id, bag)
   if def == nil then
     return false
   end
-  if def.only ~= nil and bag ~= nil then
-    for _, kind in ipairs(def.only) do
+  if bag ~= nil and def.bag then
+    for _, kind in ipairs(def.only or ITEM_BAGS) do
       if kind == bag.kind then
         return true
       end
@@ -242,8 +255,12 @@ define('showBagButton', {
   end,
 })
 
+-- Each bag's switch is on its own page's General tab (asked: "all the enable/disable toggles in general need to move to a
+-- general tab in each respective bag menu").
 define('enableBankBags', {
   kind = "toggle",
+  bag = true,
+  only = { const.BAG_KIND.BANK },
   title = 'Enable Bank Bags',
   description = 'Enable BetterBags for bank. If disabled, the default Blizzard bank UI will be used. Requires a UI reload to take effect.',
   keywords = { 'bank', 'blizzard bank', 'reload' },
@@ -302,6 +319,8 @@ define('nextEnabled', {
 -- guild bank, whose frames would change hands open, leaving the setting as it was.
 define('nextVendor', {
   kind = "toggle",
+  bag = true,
+  only = { VENDOR },
   title = 'Enable Vendor Window',
   description = 'If enabled, BetterBags Next shows vendors in its own window, their items in your categories. '
     .. 'If disabled, the default Blizzard vendor window is used, and a category whose Auto Sell confirms is sold by '
@@ -315,6 +334,8 @@ define('nextVendor', {
 
 define('nextGuildBank', {
   kind = "toggle",
+  bag = true,
+  only = { const.BAG_KIND.GUILD },
   title = 'Enable Guild Bank Window',
   description = 'If enabled, BetterBags Next shows the guild bank in its own window, its items in your categories. '
     .. 'If disabled, the default Blizzard guild bank window is used. Switches at once, away from the guild bank.',
@@ -897,68 +918,87 @@ define('sectionWideRows', {
   end,
 })
 
+-- Each BetterBags Next bag's Size tab, the vendor's too (asked: "every appearance -> size option needs to become per-bag,
+-- and move to a size tab in each respective bag"; docs/next-appearance-size.md). Each tells the panels which bag changed:
+-- that bag's draws itself again, and every small one is refitted; nothing is read or recalculated.
 define('nextIconScale', {
   kind = "slider",
+  bag = true,
+  only = NEXT_BAGS,
   title = 'Icon Scale',
-  description = "How big item buttons are in BetterBags Next's bags, in percent of the theme's size. "
-    .. 'A row fits as many as its width allows.',
+  description = function(bag)
+    return 'How big item buttons are in the ' .. lower(bag) .. ", in percent of the theme's size. "
+      .. 'A row fits as many as its width allows.'
+  end,
   keywords = { 'size', 'icon', 'button', 'item', 'zoom', 'per row' },
   min = 50,
   max = 150,
   step = 5,
-  get = function() return db:GetNextIconScale() end,
-  set = function(ctx, value)
-    db:SetNextIconScale(value)
-    events:SendMessage(ctx, 'next/ScalesChanged')
+  get = function(_, bag) return db:GetNextIconScale(bag.kind) end,
+  set = function(ctx, value, bag)
+    db:SetNextIconScale(bag.kind, value)
+    events:SendMessage(ctx, 'next/ScalesChanged', bag.kind)
   end,
 })
 
 define('nextBagScale', {
   kind = "slider",
+  bag = true,
+  only = NEXT_BAGS,
   title = 'Bag Scale',
-  description = "The scale of BetterBags Next's small bags, in percent. Full-height bags on the edges of "
-    .. 'the screen keep their size.',
+  description = function(bag)
+    return 'The scale of the ' .. lower(bag) .. ' while it is a small bag, in percent. Full height on the edge of the '
+      .. 'screen, it keeps its size.'
+  end,
   keywords = { 'size', 'scale', 'zoom', 'small', 'window' },
   min = 50,
   max = 150,
   step = 5,
-  get = function() return db:GetNextBagScale() end,
-  set = function(ctx, value)
-    db:SetNextBagScale(value)
-    events:SendMessage(ctx, 'next/ScalesChanged')
+  get = function(_, bag) return db:GetNextBagScale(bag.kind) end,
+  set = function(ctx, value, bag)
+    db:SetNextBagScale(bag.kind, value)
+    events:SendMessage(ctx, 'next/ScalesChanged', bag.kind)
   end,
 })
 
 -- Asked: "it should make it so the bag grows on the vertical (Y axis) to hold all items + free space the user currently has,
--- keeping the X size as is. it should be a toggle option, and it should default on" (next-small-autosize.md). The panels fit
--- themselves again on next/AutosizeChanged: nothing is read or recalculated.
+-- keeping the X size as is. it should be a toggle option, and it should default on" (next-small-autosize.md); the vendor's
+-- off (asked). The panels fit themselves again on next/AutosizeChanged.
 define('nextAutosize', {
   kind = "toggle",
-  title = 'Autosize Bags',
-  description = "Small bags are as tall as everything they hold and their Free Space, growing and shrinking as items come "
-    .. 'and go, as far as the screen allows; their width stays as you set it. Off, a small bag keeps the height you give it '
-    .. 'with its resize grips.',
-  keywords = { 'height', 'autosize', 'auto', 'fit', 'grow', 'shrink', 'tall', 'small', 'window', 'resize', 'size' },
-  get = function() return db:GetNextAutosize() end,
-  set = function(ctx, value)
-    db:SetNextAutosize(value)
-    events:SendMessage(ctx, 'next/AutosizeChanged')
+  bag = true,
+  only = NEXT_BAGS,
+  title = 'Autosize',
+  description = function(bag)
+    return 'While it is a small bag, the ' .. lower(bag) .. ' is as tall as everything it holds and its Free Space, '
+      .. 'growing and shrinking as items come and go, as far as the screen allows; its width stays as you set it. Off, it '
+      .. 'keeps the height you give it with its resize grips.'
+  end,
+  keywords = { 'height', 'autosize', 'auto', 'fit', 'grow', 'shrink', 'tall', 'small', 'window', 'resize', 'size', 'bags' },
+  get = function(_, bag) return db:GetNextAutosize(bag.kind) end,
+  set = function(ctx, value, bag)
+    db:SetNextAutosize(bag.kind, value)
+    events:SendMessage(ctx, 'next/AutosizeChanged', bag.kind)
   end,
 })
 
 -- Asked: "with an option to enable/disable this behavior in settings, default disable. with it disabled, behavior is as it is
--- now" (next.md §14g). The panels fit themselves again on next/FitNamesChanged: nothing is read or recalculated.
+-- now" (next.md §14g). The panels fit themselves again on next/FitNamesChanged.
 define('nextFitNamesWhileOpen', {
   kind = "toggle",
+  bag = true,
+  only = NEXT_BAGS,
   title = 'Fit Names While Open',
-  description = "Small bags widen while they are open whenever a section's name or the bag's title would otherwise be cut "
-    .. 'short, and narrow back to their size once it fits again. Off, a small bag fits its names as it opens and when you '
-    .. 'let go of its resize grip.',
+  description = function(bag)
+    return 'While it is a small bag, the ' .. lower(bag) .. " widens while it is open whenever a section's name or its "
+      .. 'title would otherwise be cut short, and narrows back to its size once it fits again. Off, it fits its names as it '
+      .. 'opens and when you let go of its resize grip.'
+  end,
   keywords = { 'width', 'names', 'title', 'section', 'cut', 'truncated', 'fit', 'small', 'window', 'resize' },
-  get = function() return db:GetNextFitNamesWhileOpen() end,
-  set = function(ctx, value)
-    db:SetNextFitNamesWhileOpen(value)
-    events:SendMessage(ctx, 'next/FitNamesChanged')
+  get = function(_, bag) return db:GetNextFitNamesWhileOpen(bag.kind) end,
+  set = function(ctx, value, bag)
+    db:SetNextFitNamesWhileOpen(bag.kind, value)
+    events:SendMessage(ctx, 'next/FitNamesChanged', bag.kind)
   end,
 })
 

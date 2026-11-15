@@ -188,6 +188,8 @@ describe("NextGuildBank", function()
     override(stubs.items, "GetAllSlotInfo", function() return { [GUILD] = data.slotInfo } end)
     override(stubs.database, "GetNextChain", function() return "apart" end)
     override(stubs.database, "GetNextSize", function() return "full" end)
+    -- Each bag's Icon Scale (its page's Size tab), at 100%.
+    override(stubs.database, "GetNextIconScale", function() return 100 end)
     -- What a small panel reads, whichever test runs first (patterns-specs.md: shuffled, a test had found them missing).
     override(stubs.database, "GetNextSmallChain", function() return "apart" end)
     override(stubs.database, "GetNextSmallPlace", function() return nil end)

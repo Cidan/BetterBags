@@ -20,30 +20,25 @@ local pixel = addon:GetModule('NextPixel')
 ---@field Color table<string, number[]> The theme's palette.
 local style = addon:NewModule('NextStyle')
 
--- The player's Icon Scale (the Size tab, docs/next-appearance-size.md), in percent: SetIconScale.
-style.iconScale = 100
-
 -- How far past its end each ease swings (next/tween.lua): outBack about a tenth, outBackSoft a
 -- fiftieth. Opening with one, the body must reach that much past the screen edge (OVERREACH).
 local OVERSHOOT = { outBack = 0.1, outBackSoft = 0.02 }
 
--- SetIconScale sets the player's Icon Scale (docs/next-appearance-size.md), in percent, and sizes the
--- item buttons for it (sizeIcons). Nothing else changes, and no font object is made: a slider dragged
--- through its steps calls it on every step.
+-- IconAt is how big an item button is at a bag's Icon Scale (its page's Size tab, docs/next-appearance-size.md), in
+-- percent: the theme's icon size (Layout.Icon) times it, in whole units, as every other size is. Each bag's canvas asks
+-- with its own scale as it lays out (NextCanvas:Icon); nothing is kept, and no font object is made.
 ---@param percent number
-function style:SetIconScale(percent)
-  self.iconScale = percent
-  self:sizeIcons()
+---@return number
+function style:IconAt(percent)
+  return math.max(1, math.floor(self.Theme.Layout.Icon * percent / 100 + 0.5))
 end
 
--- sizeIcons sizes the item buttons: the theme's icon size (Layout.Icon) times the Icon Scale, in whole
--- pixels, as every other size is. A vendor's card is as tall as its icon, and never shorter than the theme's
--- icon size, which two lines of name and a price beside the icon need.
----@private
-function style:sizeIcons()
-  local theme = self.Theme.Layout.Icon
-  self.ICON = math.max(1, math.floor(theme * self.iconScale / 100 + 0.5))
-  self.CARD_HEIGHT = math.max(self.ICON, theme)
+-- CardHeightAt is how tall a vendor's card is with an icon that big: as tall as its icon, and never shorter than the
+-- theme's icon size, which two lines of name and a price beside the icon need.
+---@param icon number
+---@return number
+function style:CardHeightAt(icon)
+  return math.max(icon, self.Theme.Layout.Icon)
 end
 
 -- palette returns a theme's palette as colors: each { r, g, b, a } as given, and each entry naming one of the
@@ -79,9 +74,9 @@ function style:Use(theme, keepFonts)
   local L, M = theme.Layout, theme.Motion
   self.Color = palette(theme)
 
-  -- Item buttons are the theme's icon size times the player's Icon Scale (sizeIcons); the grid keeps the
-  -- theme's own, so a row fits as many buttons as its width allows.
-  self:sizeIcons()
+  -- The theme's icon size: a bag's item buttons are this times its Icon Scale (IconAt); the grid keeps the theme's own,
+  -- so a row fits as many buttons as its width allows.
+  self.ICON = self:IconAt(100)
   self.GAP = L.Gap
   self.PER_ROW = L.PerRow
   self.GUTTER = L.Gutter

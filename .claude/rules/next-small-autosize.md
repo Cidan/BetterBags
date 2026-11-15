@@ -6,7 +6,7 @@ paths:
   - "spec/next/vendor_spec.lua"
   - "spec/next/pixel_perfect_spec.lua"
 ---
-### 14i. Autosize Bags (Appearance → Size)
+### 14i. Autosize Bags (each bag's Size tab)
 
 Asked (2026-11-06): "we need to add a new feature to betterbags: autosize bags. this feature should go in appearance next to
 size, and it should make it so the bag grows on the vertical (Y axis) to hold all items + free space the user currently has,
@@ -23,10 +23,13 @@ content (window.md §3) and are unchanged.
 
 #### The setting
 
-- `nextAutosize` (profile, **on** by default; `DB:Get/SetNextAutosize`), **Autosize Bags** on Appearance → Size, after Bag
-  Scale and before Fit Names While Open (`next/settings/content.lua`; next-settings.md). Its switch sends
-  `next/AutosizeChanged`; `chain:AutosizeChanged` refits every open small panel at once (`Update`, snapping: `FitSmall`), as
-  Fit Names While Open's does; a closed one takes its height as it opens.
+- Each bag's own (`nextSizeOptions[kind].autosize`, **on** by default, the vendor's **off** (asked: "the default for vendor
+  is to have autosize off actually"); `DB:Get/SetNextAutosize(kind)`), **Autosize** on its page's Size tab, after Bag Scale
+  and before Fit Names While Open (`next/settings/content.lua`; next-bag-settings.md). Before, one Autosize Bags on
+  Appearance → Size autosized every bag; a profile that turned it off has it off for every bag (`DB:SplitSizeOptions`).
+  Every read in `next/panel.lua` takes the panel's own kind. Its switch sends `next/AutosizeChanged` with its bag's kind;
+  `chain:AutosizeChanged` refits every open small panel at once (`Update`, snapping: `FitSmall`), as Fit Names While Open's
+  does; a closed one takes its height as it opens.
 - AceDB saves only what differs from a default, so every profile starts with it on, including a player's who gave a small bag
   a height with its grips: that height stays saved (`nextSmallSizes[kind].height`) and is the bag's again once the setting is
   off.

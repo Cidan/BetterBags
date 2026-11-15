@@ -185,9 +185,34 @@ describe("NextSettingsContent", function()
       end
       assert.are.same({ "BetterBags: General", "BetterBags: Appearance", "BetterBags: Item Colors",
         "BetterBags: Categories", "BetterBags: Currencies", "BetterBags: Food & Drink", "Bags: Backpack", "Bags: Bank",
-        "Profiles: Profiles",
+        "Bags: Vendor", "Profiles: Profiles",
         "Integrations: QuickFind" }, list)
     end)
+
+    -- Asked: "we need to add a bag menu for all our bag windows, so we have Backpack, Bank, and Guild Bank, we need to add
+    -- Vendor as well". BetterBags Next's vendor (the classic bags leave vendors to Blizzard), after the guild bank.
+    it("lists the vendor's page after the guild bank's, while BetterBags Next is in use", function()
+      addon.hasGuildBank = true
+      local bags = {}
+      for _, page in ipairs(pages:List()) do
+        if page.group == "Bags" then table.insert(bags, page.id) end
+      end
+      assert.are.same({ "backpack", "bank", "guild", "vendor" }, bags)
+      local page = pages:Get("vendor")
+      assert.are.same({ name = "Vendor", kind = const.BAG_KIND.UNDEFINED }, page.bag)
+      assert.are.equal("next", page.design)
+      design = "classic"
+      assert.is_false(pages:IsShown(page), "the classic bags have no vendor window")
+    end)
+
+    -- The vendor shows a merchant's items: whether BetterBags Next shows vendors at all, and how big its window is.
+    it("gives the vendor a General tab and a Size tab, bound to it", function()
+      assert.are.same({
+        { "General", "Vendor Window", { "nextVendor" } },
+        { "Size", "Size", { "nextIconScale", "nextBagScale", "nextAutosize", "nextFitNamesWhileOpen" } },
+      }, idsOf(pages:Get("vendor")))
+    end)
+
 
     -- Categories are defined once, on their own page (category-lifecycle.md §6), for both designs; a
     -- bag arranges them on its Categories tab.
@@ -244,7 +269,7 @@ describe("NextSettingsContent", function()
       assert.are.same({ const.BAG_KIND.BACKPACK, const.BAG_KIND.BANK }, kinds("CreateSettingsTab"))
       addon.hasGuildBank = true
       assert.are.same({ const.BAG_KIND.BACKPACK, const.BAG_KIND.BANK, const.BAG_KIND.GUILD }, kinds("CreateSettingsTab"),
-        "the guild bank like any bag")
+        "the guild bank like any bag; the vendor's page files no items in categories")
       design = "classic"
       assert.are.same({ const.BAG_KIND.BACKPACK, const.BAG_KIND.BANK }, kinds("CreateSettingsTab"), "the classic bags have none")
       design = "next"
@@ -322,7 +347,7 @@ describe("NextSettingsContent", function()
       end
       addon.isRetail = true
       assert.are.same({ "General", "Appearance", "Item Colors", "Categories", "Currency", "Backpack", "Bank",
-        "Profiles", "QuickFind" }, listed())
+        "Profiles", "QuickFind" }, listed(), "no vendor page: the classic bags leave vendors to Blizzard")
       addon.isRetail = false
       addon.isMists = true
       assert.are.equal("Currency", listed()[5])
@@ -369,8 +394,8 @@ describe("NextSettingsContent", function()
 
     it("puts the bags' general settings on General, the classic bags' own only for them", function()
       assert.are.same({
-        { "General", "Bags", { "nextEnabled", "enableBankBags", "nextVendor [next]", "nextGuildBank [next]", "showBagButton",
-          "clampBagsToScreen", "bagFading [classic]", "animateItemMovement [classic]" } },
+        { "General", "Bags", { "nextEnabled", "showBagButton", "clampBagsToScreen", "bagFading [classic]",
+          "animateItemMovement [classic]" } },
         { "General", "Interactions", { "interactionTrade", "interactionBank", "interactionWarbank", "interactionVendor",
           "interactionMail", "interactionAuctionHouse", "interactionGuildBank", "interactionVoidStorage",
           "interactionScrapper", "interactionItemUpgrade" } },
@@ -417,10 +442,13 @@ describe("NextSettingsContent", function()
       assert.are.same({ "Trade", "Bank", "Vendor", "Mail", "AuctionHouse" }, listed({ isClassic = true }), "Classic Era")
     end)
 
-    it("gives every bag its layout, items and categories, bound to it", function()
+    -- Asked: "all the enable/disable toggles in general need to move to a general tab in each respective bag menu", and
+    -- "every appearance -> size option needs to become per-bag, and move to a size tab in each respective bag".
+    it("gives every bag its general settings, layout, size, items and categories, bound to it", function()
       local page = pages:Get("bank")
       assert.are.equal(const.BAG_KIND.BANK, page.bag.kind)
       assert.are.same({
+        { "General", "Bank Window", { "enableBankBags" } },
         { "Layout", "Order", { "sectionOrder", "itemOrder" } },
         { "Layout", "Sections [next]", { "sectionColumns", "sectionCompact", "sectionFill", "sectionSpan", "sectionWideRows" } },
         { "Layout", "Tabs", { "enableGroups" } },
@@ -428,6 +456,7 @@ describe("NextSettingsContent", function()
         { "Layout", "Window [classic]", { "resizableWindow", "snapToContent", "itemsPerRow", "columns", "opacity",
           "scale" } },
         { "Layout", "Sections [classic]", { "fullSectionNames" } },
+        { "Size", "Size", { "nextIconScale", "nextBagScale", "nextAutosize", "nextFitNamesWhileOpen" } },
         { "Items", "Item Level", { "itemLevel", "itemLevelColor", "keystoneLevel" } },
         { "Items", "Quality", { "glowIntensity" } },
         { "Items", "Stacking", { "markRecentItems", "newItemFlash", "mergeStacks", "mergeUnstackable",
@@ -436,6 +465,23 @@ describe("NextSettingsContent", function()
           "filterRecentItems", "filterTradeSkill", "filterType", "filterSubtype" } },
         { "Order", "Category Order", { "Category Order" } },
       }, idsOf(page))
+      local tabs = {}
+      for _, tab in ipairs(page.tabs) do
+        table.insert(tabs, tab.id .. (tab.design and (" [" .. tab.design .. "]") or ""))
+      end
+      assert.are.same({ "general", "layout", "size [next]", "items", "categories", "order" }, tabs)
+    end)
+
+    -- The backpack is always BetterBags' (it has no switch to leave it to Blizzard), so it has no General tab; the guild
+    -- bank's has Enable Guild Bank Window.
+    it("gives the guild bank its switch on its General tab, and the backpack none", function()
+      local tabs = {}
+      for _, tab in ipairs(pages:Get("backpack").tabs) do table.insert(tabs, tab.id) end
+      assert.are.same({ "layout", "size", "items", "categories", "order" }, tabs)
+      local guild = idsOf(pages:Get("guild"))
+      assert.are.same({ "General", "Guild Bank Window", { "nextGuildBank" } }, guild[1])
+      assert.are.same({ "Size", "Size", { "nextIconScale", "nextBagScale", "nextAutosize", "nextFitNamesWhileOpen" } },
+        guild[8])
     end)
 
     -- Issue #202: keystones are retail's (Mythic+), so Show Keystone Level shows on retail only.
@@ -492,7 +538,7 @@ describe("NextSettingsContent", function()
       for _, tab in ipairs(pages:Get("bank").tabs) do
         table.insert(tabs, tab.id)
       end
-      assert.are.same({ "layout", "items", "categories", "order" }, tabs)
+      assert.are.same({ "general", "layout", "size", "items", "categories", "order" }, tabs)
       settings:Open("bank", "categories")
       assert.is_nil(made, "not on the Categories tab")
       settings:Open("bank", "order")
@@ -501,14 +547,14 @@ describe("NextSettingsContent", function()
     end)
 
     it("makes the list the whole of the Order tab, its section's title hidden", function()
-      local sections = pages:Sections(pages:Get("bank").tabs[4])
+      local sections = pages:Sections(pages:Get("bank").tabs[6])
       assert.are.equal(1, #sections)
       assert.is_true(sections[1].titleHidden())
       assert.are.equal(1, #sections[1].rows)
     end)
 
     it("is found by the words a player would look for it by", function()
-      local row = pages:Sections(pages:Get("bank").tabs[4])[1].rows[1]
+      local row = pages:Sections(pages:Get("bank").tabs[6])[1].rows[1]
       local words = {}
       for _, word in ipairs(row.keywords) do
         words[word] = true
@@ -561,10 +607,12 @@ describe("NextSettingsContent", function()
           end
         end
       end
-      -- The general pages' 48 (the ten Interactions the latest, interaction-bags.md; before them Enable Vendor Window,
-      -- Enable Guild Bank Window and Enable QuickFind Integration, #1262), the Currencies page's 10 (currency.md §6), the
-      -- Food & Drink page's 7 (food-drink.md §5), and each bag's 35 (Show Keystone Level the latest, #202).
-      assert.are.equal(48 + 10 + 7 + 3 * 35, named)
+      -- The general pages' 41 (the ten Interactions the latest, interaction-bags.md; Enable QuickFind Integration, #1262;
+      -- Enable Bank Bags, Enable Vendor Window and Enable Guild Bank Window moved to their bags, and the Size tab's four to
+      -- every bag), the Currencies page's 10 (currency.md §6), the Food & Drink page's 7 (food-drink.md §5), each bag's 39
+      -- (its Size tab's four the latest, Show Keystone Level before them, #202), the bank's and the guild bank's switch on
+      -- their General tabs, and the vendor's 5 (its switch and its Size tab).
+      assert.are.equal(41 + 10 + 7 + 3 * 39 + 2 + 5, named)
     end)
 
     -- The Food & Drink bar's options (food-drink.md §5): a page of their own after Currencies, BetterBags Next only.
@@ -671,26 +719,39 @@ describe("NextSettingsContent", function()
       assert.are.same({ "Bag Theme", "Settings Window" }, { settings.page.sections[1].title, settings.page.sections[2].title })
     end)
 
-    -- Asked: "make 'Theme' here a tab, and add a tab for 'Size'; here we have a slider for 'icon scale' in
-    -- the bag, and another slider for 'bag scale'" (docs/next-appearance-size.md).
-    -- Then Fit Names While Open after them (next.md §14g): "with an option to enable/disable this behavior in settings".
-    -- And Autosize Bags beside the scales (next-small-autosize.md): "this feature should go in appearance next to size".
-    it("has a Theme tab and, with BetterBags Next, a Size tab with Icon Scale, Bag Scale, Autosize Bags and Fit Names While Open", function()
-      override(db, "GetNextIconScale", function() return 120 end)
-      override(db, "GetNextBagScale", function() return 85 end)
-      override(db, "GetNextAutosize", function() return false end)
-      override(db, "GetNextFitNamesWhileOpen", function() return true end)
-      assert.are.same({ "theme", "size", "animation" }, shownTabIds())
+    -- The Size tab was Appearance's (asked: "make 'Theme' here a tab, and add a tab for 'Size'", docs/next-appearance-size.md)
+    -- until each bag had its own (asked: "every appearance -> size option needs to become per-bag, and move to a size tab
+    -- in each respective bag, and remove Size from the Appearance menu").
+    it("has a Theme tab and, with BetterBags Next, an Animation tab, and no Size tab", function()
+      assert.are.same({ "theme", "animation" }, shownTabIds())
       settings:Open("appearance", "size")
+      assert.are.equal("theme", settings.tabId, "no Size tab to open")
+    end)
+
+    -- Each bag's Size tab shows its own Icon Scale, Bag Scale, Autosize and Fit Names While Open, and writes its own.
+    it("shows each bag's Size tab with its own values, and writes that bag's", function()
+      local scales = { [const.BAG_KIND.BACKPACK] = 120, [const.BAG_KIND.UNDEFINED] = 85 }
+      local written = {}
+      override(db, "GetNextIconScale", function(_, kind) return scales[kind] end)
+      override(db, "SetNextIconScale", function(_, kind, value) written[#written + 1] = { kind, value } end)
+      override(db, "GetNextBagScale", function(_, kind) return kind == const.BAG_KIND.UNDEFINED and 70 or 100 end)
+      override(db, "GetNextAutosize", function(_, kind) return kind ~= const.BAG_KIND.UNDEFINED end)
+      override(db, "GetNextFitNamesWhileOpen", function(_, kind) return kind == const.BAG_KIND.UNDEFINED end)
+      settings:Open("backpack", "size")
       assert.are.equal("size", settings.tabId)
-      assert.is_true(settings.tabs.frame:IsShown())
       local titles = {}
       for _, row in ipairs(rowsShown()) do table.insert(titles, row.label:GetText()) end
-      assert.are.same({ "Icon Scale", "Bag Scale", "Autosize Bags", "Fit Names While Open" }, titles)
+      assert.are.same({ "Icon Scale", "Bag Scale", "Autosize", "Fit Names While Open" }, titles)
       assert.are.equal(120, rowTitled("Icon Scale").control:GetValue())
-      assert.are.equal(85, rowTitled("Bag Scale").control:GetValue())
-      assert.is_false(rowTitled("Autosize Bags").control:GetChecked())
+      assert.is_true(rowTitled("Autosize").control:GetChecked())
+      assert.is_false(rowTitled("Fit Names While Open").control:GetChecked())
+      settings:Open("vendor", "size")
+      assert.are.equal(85, rowTitled("Icon Scale").control:GetValue())
+      assert.are.equal(70, rowTitled("Bag Scale").control:GetValue())
+      assert.is_false(rowTitled("Autosize").control:GetChecked(), "the vendor's")
       assert.is_true(rowTitled("Fit Names While Open").control:GetChecked())
+      rowTitled("Icon Scale").option.set(addon:GetModule("Context"):New("spec"), 110)
+      assert.are.same({ { const.BAG_KIND.UNDEFINED, 110 } }, written)
     end)
 
     it("has only the Theme tab with the classic bags, which size themselves on each bag's page", function()
@@ -774,14 +835,16 @@ describe("NextSettingsContent", function()
       assert.are.equal("Appearance > Animation", settings.page.sections[1].title)
     end)
 
-    it("finds Icon Scale with BetterBags Next", function()
+    it("finds each bag's Icon Scale with BetterBags Next", function()
       override(db, "GetMaxItemLevel", function() return 100 end)
       override(db, "GetNextIconScale", function() return 100 end)
       override(db, "GetNextBagScale", function() return 100 end)
       -- Its search box is in the window.
       settings:Open("appearance")
       settings:Search(addon:GetModule("Context"):New("spec"), "icon scale")
-      assert.are.equal("Appearance > Size", settings.page.sections[1].title)
+      local found = {}
+      for _, section in ipairs(settings.page.sections) do table.insert(found, section.title) end
+      assert.are.same({ "Backpack > Size", "Bank > Size", "Vendor > Size" }, found)
     end)
   end)
 
@@ -1020,26 +1083,37 @@ describe("NextSettingsContent", function()
       return row ~= nil and row.frame:IsShown()
     end
 
-    it("shows Enable Guild Bank Window only on a client with a guild bank", function()
+    -- Asked: "all the enable/disable toggles in general need to move to a general tab in each respective bag menu".
+    it("shows each bag's switch on its own page's General tab, and none on General", function()
       settings:Open("general")
       render:Flush()
-      assert.is_true(shown("Enable Vendor Window"))
+      assert.is_false(shown("Enable Bank Bags"))
+      assert.is_false(shown("Enable Vendor Window"))
       assert.is_false(shown("Enable Guild Bank Window"))
+      settings:Open("bank", "general")
+      render:Flush()
+      assert.is_true(shown("Enable Bank Bags"))
+      settings:Open("vendor", "general")
+      render:Flush()
+      assert.is_true(shown("Enable Vendor Window"))
       settings:Close()
       addon.hasGuildBank = true
-      settings:Open("general")
+      settings:Open("guild", "general")
       render:Flush()
-      assert.is_true(shown("Enable Vendor Window"))
+      assert.are.equal("guild", settings.pageId)
       assert.is_true(shown("Enable Guild Bank Window"))
     end)
 
-    it("shows neither while the classic bags are in use", function()
+    it("shows only the bank's while the classic bags are in use, which leave vendors and the guild bank to Blizzard", function()
       design = "classic"
       addon.hasGuildBank = true
-      settings:Open("general")
+      settings:Open("bank", "general")
       render:Flush()
-      assert.is_false(shown("Enable Vendor Window"))
-      assert.is_false(shown("Enable Guild Bank Window"))
+      assert.is_true(shown("Enable Bank Bags"))
+      local listed = {}
+      for _, page in ipairs(pages:List()) do listed[page.id] = true end
+      assert.is_nil(listed.vendor)
+      assert.is_nil(listed.guild)
     end)
   end)
 

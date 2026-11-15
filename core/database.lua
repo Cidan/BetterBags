@@ -339,52 +339,74 @@ local function nextScale(value)
   return math.max(50, math.min(150, math.floor(value + 0.5)))
 end
 
--- GetNextIconScale returns how big BetterBags Next's item buttons are, in percent of the Next theme's
--- icon size.
+-- Each BetterBags Next bag has its own Size tab (its settings page): kind is the bag's, the vendor's UNDEFINED (next/vendor.lua).
+
+-- sizeOption is one of a bag's Size tab settings. The logout's strip (initialization.md §7) removes one left at its
+-- default, and a bag's table once all of its are: a panel drawn after it reads the default.
+---@param kind BagKind
+---@param key string
+---@return any
+local function sizeOption(kind, key)
+  local options = DB.data.profile.nextSizeOptions
+  local own = options and options[kind]
+  if own == nil or own[key] == nil then
+    return const.DATABASE_DEFAULTS.profile.nextSizeOptions[kind][key]
+  end
+  return own[key]
+end
+
+-- GetNextIconScale returns how big a BetterBags Next bag's item buttons are, in percent of the Next theme's icon size.
+---@param kind BagKind
 ---@return number
-function DB:GetNextIconScale()
-  return DB.data.profile.nextIconScale
+function DB:GetNextIconScale(kind)
+  return sizeOption(kind, "iconScale")
 end
 
+---@param kind BagKind
 ---@param value number
-function DB:SetNextIconScale(value)
-  DB.data.profile.nextIconScale = nextScale(value)
+function DB:SetNextIconScale(kind, value)
+  DB.data.profile.nextSizeOptions[kind].iconScale = nextScale(value)
 end
 
--- GetNextBagScale returns the scale of BetterBags Next's small panels, in percent; full panels are
--- always at their size.
+-- GetNextBagScale returns the scale of a BetterBags Next bag's small panel, in percent; a full panel is always at its size.
+---@param kind BagKind
 ---@return number
-function DB:GetNextBagScale()
-  return DB.data.profile.nextBagScale
+function DB:GetNextBagScale(kind)
+  return sizeOption(kind, "bagScale")
 end
 
+---@param kind BagKind
 ---@param value number
-function DB:SetNextBagScale(value)
-  DB.data.profile.nextBagScale = nextScale(value)
+function DB:SetNextBagScale(kind, value)
+  DB.data.profile.nextSizeOptions[kind].bagScale = nextScale(value)
 end
 
--- GetNextFitNamesWhileOpen returns whether BetterBags Next's small panels follow what they show while open: wider when a
--- section's name or the title would be cut short, back once it fits (next.md §14g).
+-- GetNextFitNamesWhileOpen returns whether a BetterBags Next bag's small panel follows what it shows while open: wider when
+-- a section's name or the title would be cut short, back once it fits (next.md §14g).
+---@param kind BagKind
 ---@return boolean
-function DB:GetNextFitNamesWhileOpen()
-  return DB.data.profile.nextFitNamesWhileOpen
+function DB:GetNextFitNamesWhileOpen(kind)
+  return sizeOption(kind, "fitNamesWhileOpen")
 end
 
+---@param kind BagKind
 ---@param on boolean
-function DB:SetNextFitNamesWhileOpen(on)
-  DB.data.profile.nextFitNamesWhileOpen = on
+function DB:SetNextFitNamesWhileOpen(kind, on)
+  DB.data.profile.nextSizeOptions[kind].fitNamesWhileOpen = on
 end
 
--- GetNextAutosize returns whether BetterBags Next's small panels are as tall as what they show (Autosize Bags,
+-- GetNextAutosize returns whether a BetterBags Next bag's small panel is as tall as what it shows (Autosize,
 -- next-small-autosize.md): growing and shrinking with it while open, never past the screen.
+---@param kind BagKind
 ---@return boolean
-function DB:GetNextAutosize()
-  return DB.data.profile.nextAutosize
+function DB:GetNextAutosize(kind)
+  return sizeOption(kind, "autosize")
 end
 
+---@param kind BagKind
 ---@param on boolean
-function DB:SetNextAutosize(on)
-  DB.data.profile.nextAutosize = on
+function DB:SetNextAutosize(kind, on)
+  DB.data.profile.nextSizeOptions[kind].autosize = on
 end
 
 ---@alias NextSize "full"|"small"
@@ -2043,6 +2065,31 @@ function DB:SplitSectionOrder()
   end
 end
 
+-- The Size tab's settings when one set sized every BetterBags Next bag (Appearance > Size): each old key, the bag's own it
+-- became (nextSizeOptions), and its old default.
+local SHARED_SIZE_OPTIONS = {
+  nextIconScale = { "iconScale", 100 },
+  nextBagScale = { "bagScale", 100 },
+  nextFitNamesWhileOpen = { "fitNamesWhileOpen", false },
+  nextAutosize = { "autosize", true },
+}
+
+-- SplitSizeOptions gives every BetterBags Next bag, the vendor too, the Size tab's settings a player chose when one set
+-- sized them all. A setting at its old default was never saved (AceDB strips it at logout) and cannot be told from one
+-- chosen: each bag keeps its own default (the vendor is not autosized). The old keys are dropped, so it runs once.
+function DB:SplitSizeOptions()
+  local profile = DB.data.profile
+  for old, new in pairs(SHARED_SIZE_OPTIONS) do
+    local chosen = profile[old]
+    if chosen ~= nil and chosen ~= new[2] then
+      for _, options in pairs(profile.nextSizeOptions) do
+        options[new[1]] = chosen
+      end
+    end
+    profile[old] = nil
+  end
+end
+
 function DB:Migrate()
 
   --[[
@@ -2422,6 +2469,13 @@ function DB:Migrate()
   if renamedThemes[DB.data.profile.theme] ~= nil then
     DB.data.profile.theme = renamedThemes[DB.data.profile.theme]
   end
+
+  --[[
+    BetterBags Next's Size tab sized every bag at once until each bag had its own (2026-11-14). Last: the profile
+    system's migration above may switch to another profile, whose old keys it splits.
+    Do not remove before Q3'27.
+  ]]--
+  DB:SplitSizeOptions()
 end
 
 -- ============================================================
@@ -2527,9 +2581,11 @@ function DB:CopyFromProfile(sourceName)
 
   -- Copy from source to current profile
   DB.data:CopyProfile(sourceName)
-  -- The copy has the source's rules, in the version the source has, and its order, split or not.
+  -- The copy has the source's rules, in the version the source has, its order, split or not, and its Size tab, one for
+  -- every bag or one per bag.
   DB:MigrateSearchRules()
   DB:SplitSectionOrder()
+  DB:SplitSizeOptions()
   return true, "Profile copied successfully"
 end
 

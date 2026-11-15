@@ -132,6 +132,8 @@ describe("NextBag", function()
     override(stubs.database, "SetActiveGroup", function(_, _, id) activeGroup = id end)
     override(stubs.database, "GetNextChain", function() return "apart" end)
     override(stubs.database, "GetNextSize", function() return "full" end)
+    -- Each bag's Icon Scale (its page's Size tab), at 100%.
+    override(stubs.database, "GetNextIconScale", function() return 100 end)
     -- Its anchor (docs/next-bag-anchor.md): free; a full-size bag shows none.
     override(stubs.database, "GetNextAnchorState", function() return "free" end)
     override(stubs.database, "GetNextSectionColumns", function() return 1 end)

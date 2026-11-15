@@ -68,9 +68,10 @@ to its width, Fit Names While Open, and the bug reviews of them.
     each in whole pixels), measured once per search. The vendor's section names and counts are never secret: they are
     category names and button counts, and the canvas keys tables by section names already (`byName`, `heldCells`), which
     a secret could not be.
-- **Fit Names While Open** (`nextFitNamesWhileOpen`, profile, off by default; `DB:Get/SetNextFitNamesWhileOpen`; Appearance
-  → Size, after Bag Scale; its switch sends `next/FitNamesChanged`, and `chain:FitNamesChanged` fits every open small panel
-  again, `Update` snapping). Asked: "with an option to enable/disable this behavior in settings, default disable. with it
+- **Fit Names While Open** (each bag's own, `nextSizeOptions[kind].fitNamesWhileOpen`, off by default;
+  `DB:Get/SetNextFitNamesWhileOpen(kind)`; on its page's Size tab, after Autosize, next-bag-settings.md; its switch sends
+  `next/FitNamesChanged` with its bag's kind, and `chain:FitNamesChanged` fits every open small panel again, `Update`
+  snapping; `FollowNames` reads its own panel's kind). Asked: "with an option to enable/disable this behavior in settings, default disable. with it
   disabled, behavior is as it is now". Off, nothing changes a small panel's width while it is open: a section with a long
   name looted in while it shows may be cut until it next opens or a grip is let go. On, while a small panel is open
   (`FollowNames`), every draw (`Draw` after `Bind`, its footer's text set first, before the render; the vendor's `Draw`

@@ -77,7 +77,7 @@ local chain = addon:GetModule("NextChain")
 local uiPanels = addon:GetModule("NextUIPanels")
 
 describe("NextVendor", function()
-  local eventsRegistered, buckets, timers, calls, data, asked, messages
+  local eventsRegistered, buckets, timers, calls, data, asked, messages, iconScale
 
   local function ctx() return context:New("spec") end
 
@@ -181,9 +181,18 @@ describe("NextVendor", function()
     override(stubs.items, "ExpireRecentItems", function() return false end)
     override(stubs.database, "GetNextChain", function() return "apart" end)
     override(stubs.database, "GetNextSize", function() return "full" end)
+    -- The vendor's Size tab (its settings page), asked by its kind, UNDEFINED (no bag the data engine reads).
+    iconScale = 100
+    override(stubs.database, "GetNextIconScale", function(_, kind)
+      assert.are.equal(const.BAG_KIND.UNDEFINED, kind, "the vendor's Icon Scale")
+      return iconScale
+    end)
     override(stubs.database, "GetNextFitNamesWhileOpen", function() return false end)
-    -- Autosize Bags (next-small-autosize.md), off but where a test turns it on.
-    override(stubs.database, "GetNextAutosize", function() return false end)
+    -- Autosize (next-small-autosize.md), off as the vendor's is by default, but where a test turns it on.
+    override(stubs.database, "GetNextAutosize", function(_, kind)
+      assert.are.equal(const.BAG_KIND.UNDEFINED, kind, "the vendor's Autosize")
+      return false
+    end)
     -- What a small panel reads, whichever test runs first (patterns-specs.md: shuffled, a test had found them missing).
     override(stubs.database, "GetNextSmallChain", function() return "apart" end)
     override(stubs.database, "GetNextSmallPlace", function() return nil end)
@@ -932,11 +941,10 @@ describe("NextVendor", function()
       local cell = section.entries[1].item
       assert.are.equal(style.ICON, cell.icon:GetWidth())
       local top = select(5, section.entries[3].item.frame:GetPoint(1))
-      style:SetIconScale(150)
+      iconScale = 150
       v:ApplyScales(ctx())
       local after = section.entries[1].item
       local raised = select(5, section.entries[3].item.frame:GetPoint(1))
-      style:SetIconScale(100)
       assert.are.equal(66, after.icon:GetWidth())
       assert.are.equal(66, after.frame:GetHeight())
       assert.are.equal(top - 22, raised, "a row taller by what the icon grew")
@@ -2247,10 +2255,9 @@ describe("NextVendor", function()
             override(stubs.database, "GetClampBagsToScreen", function() return true end)
             undo = layout.UseScreen(screen[1], screen[2], screen[3])
             local v = open()
-            style:SetIconScale(scale)
+            iconScale = scale
             v:ApplyScales(ctx())
             local ok, offs = pcall(offGrid, v)
-            style:SetIconScale(100)
             assert.is_true(ok, tostring(offs))
             assert.are.same({}, offs)
           end)

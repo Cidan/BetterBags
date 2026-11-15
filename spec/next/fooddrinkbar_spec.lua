@@ -14,6 +14,9 @@ local function trackStub(name)
   return mod
 end
 
+local const = trackStub("Constants")
+const.BAG_KIND = const.BAG_KIND or { UNDEFINED = -1, BACKPACK = 0, BANK = 1 }
+
 local stubs = {
   L = trackStub("Localization"), events = trackStub("Events"), nextDrag = trackStub("NextDrag"),
   database = trackStub("Database"), itemFrame = trackStub("ItemFrame"), itemFit = trackStub("NextItemFit"),
@@ -48,8 +51,8 @@ describe("NextFoodDrinkBar", function()
 
   local function ctx() return context:New("spec") end
 
-  local function fire(name)
-    for _, fn in ipairs(messages[name] or {}) do fn(ctx()) end
+  local function fire(name, ...)
+    for _, fn in ipairs(messages[name] or {}) do fn(ctx(), ...) end
     for _, fn in ipairs(registered[name] or {}) do fn(ctx(), name) end
   end
 
@@ -135,6 +138,11 @@ describe("NextFoodDrinkBar", function()
     end)
     override(stubs.nextDrag, "IsActive", function() return false end)
     override(stubs.database, "GetNextFoodDrinkOption", function(_, name) return options[name] end)
+    -- The backpack's Icon Scale (its page's Size tab): the bar comes out of the backpack, and sizes its buttons as it does.
+    override(stubs.database, "GetNextIconScale", function(_, kind)
+      assert.are.equal(0, kind, "the backpack's Icon Scale")
+      return 100
+    end)
     override(stubs.database, "GetNextFoodDrinkBar", function() return place.out, place.x, place.y end)
     override(stubs.database, "SetNextFoodDrinkBar", function(_, out, x, y)
       place.out = out
@@ -376,10 +384,6 @@ describe("NextFoodDrinkBar", function()
 
   -- Found by the bug review (food-drink.md §6).
   describe("found by review", function()
-    after_each(function()
-      style:SetIconScale(100)
-    end)
-
     -- The bags switched to BetterBags Next mid-session: the picks were read while the classic bags were in use, and
     -- nothing changes them again for a while.
     it("shows the picks already read as it is made", function()
@@ -391,18 +395,28 @@ describe("NextFoodDrinkBar", function()
       assert.are.same({ "food" }, b.order)
     end)
 
-    it("follows Icon Scale, as the bags' buttons do", function()
+    it("follows the backpack's Icon Scale, as the backpack's buttons do, and no other bag's", function()
       place = { out = true, x = 900, y = 300 }
       picks.food = pick(0, 3, 2287, 10)
       local b = create()
       finishTweens()
       local before = b.buttons.food.frame:GetWidth()
-      override(stubs.database, "GetNextIconScale", function() return 150 end)
-      fire("next/ScalesChanged")
+      local scales = { [0] = 100, [1] = 150 }
+      override(stubs.database, "GetNextIconScale", function(_, kind) return scales[kind] end)
+      local laidOut = 0
+      local layOut = b.LayOut
+      override(b, "LayOut", function(me) laidOut = laidOut + 1 return layOut(me) end)
+      fire("next/ScalesChanged", 1)
       finishTweens()
+      assert.are.equal(0, laidOut, "not laid out again for the bank's scale")
+      assert.are.equal(before, b.buttons.food.frame:GetWidth(), "the bank's scale")
+      scales[0] = 150
+      fire("next/ScalesChanged", 0)
+      finishTweens()
+      assert.are.equal(1, laidOut)
       local size = b.buttons.food.frame:GetWidth()
       assert.is_true(size > before)
-      assert.are.equal(pixel:Length(b.frame, style.ICON), size)
+      assert.are.equal(pixel:Length(b.frame, style:IconAt(150)), size)
     end)
 
     -- Masque sizes a skin to the button as it skins it, on the draw's item/Updated: each draw comes at the button's size.
@@ -418,7 +432,6 @@ describe("NextFoodDrinkBar", function()
       finishTweens()
       assert.are.equal(food.frame:GetWidth(), food.drawnAt)
       override(stubs.database, "GetNextIconScale", function() return 100 end)
-      style:SetIconScale(100)
       b:ApplyStyle(ctx())
       finishTweens()
       assert.are.equal(food.frame:GetWidth(), food.drawnAt)

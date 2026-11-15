@@ -184,7 +184,7 @@ describe("BetterBags Next's currencies", function()
     override(stubs.items, "ExpireRecentItems", function() return false end)
     -- Its anchor free (docs/next-bag-anchor.md): a full-size bag shows none.
     for name, value in pairs({ GetGroupsEnabled = false, GetActiveGroup = 1, GetNextChain = "apart",
-      GetNextSize = "full", GetInBagSearch = true, GetBagView = 2, GetNextAnchorState = "free" }) do
+      GetNextSize = "full", GetInBagSearch = true, GetBagView = 2, GetNextAnchorState = "free", GetNextIconScale = 100 }) do
       override(stubs.database, name, function() return value end)
     end
     override(stubs.database, "GetNextTabOrder", function() return {} end)

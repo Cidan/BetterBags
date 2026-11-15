@@ -363,11 +363,9 @@ describe("BetterBags Next, pixel perfect", function()
   for _, scale in ipairs({ 85, 115 }) do
     it("puts item buttons on whole pixels at an Icon Scale of " .. scale .. "%", function()
       db.iconScale = scale
-      style:SetIconScale(scale)
       useScreen(3396, 1362, 0.65)
       local bag = open(function(c) return nextBag:Create(c) end, BACKPACK)
       local problems = offGrid(bag)
-      style:SetIconScale(100)
       assert.are.same({}, problems)
     end)
   end

@@ -75,10 +75,10 @@ describe("SonataNext", function()
 
   local function ctx() return context:New("spec") end
 
-  -- The Size tab's Icon Scale (docs/next-appearance-size.md) is the player's, kept across themes: Next's
-  -- style starts at the saved one, before the theme is handed to it.
-  it("starts Next's style at the saved Icon Scale, then the saved theme", function()
-    assert.are.same({ { 120, 0 } }, scales, "before any theme was handed over")
+  -- Each bag has its own Icon Scale (its page's Size tab, docs/next-appearance-size.md), which its canvas reads as it lays
+  -- out: Next's style holds none, so starting it hands it the saved theme alone.
+  it("starts Next's style at the saved theme, setting no Icon Scale", function()
+    assert.are.same({}, scales)
     assert.are.equal("Default", used[1].Name)
   end)
 

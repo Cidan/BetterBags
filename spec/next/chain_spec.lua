@@ -225,6 +225,8 @@ describe("NextChain", function()
     -- No tab order saved (docs/next-batch-2.md §5).
     override(stubs.database, "GetNextTabOrder", function() return {} end)
     override(stubs.database, "GetNextSize", function() return "full" end)
+    -- Each bag's Icon Scale (its page's Size tab), at 100%.
+    override(stubs.database, "GetNextIconScale", function() return 100 end)
     -- Its anchor (docs/next-bag-anchor.md): free; a full-size bag shows none.
     override(stubs.database, "GetNextAnchorState", function() return "free" end)
     override(stubs.database, "GetNextSectionColumns", function() return 1 end)
