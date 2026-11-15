@@ -274,60 +274,54 @@ describe("What each setting asks the bags for", function()
     assert.are.same({}, messages())
   end)
 
-  -- BetterBags Next's Size tab (docs/next-appearance-size.md): each saves its percentage and tells the
-  -- panels, which size themselves; the bags' items are neither read nor recalculated.
+  -- Each BetterBags Next bag's Size tab (docs/next-appearance-size.md), the vendor's too: each saves the bag's percentage
+  -- and tells the panels which bag it was, so that bag's sizes itself; the bags' items are neither read nor recalculated.
   for _, case in ipairs({ { "Icon Scale", "GetNextIconScale", "SetNextIconScale" },
     { "Bag Scale", "GetNextBagScale", "SetNextBagScale" } }) do
-    it("saves " .. case[1] .. " and tells BetterBags Next's panels, reading nothing", function()
-      local value = 100
-      override(db, case[2], function() return value end)
-      override(db, case[3], function(_, v) value = v end)
+    it("saves a bag's " .. case[1] .. " and tells BetterBags Next's panels which bag, reading nothing", function()
+      local values = {}
+      override(db, case[2], function(_, kind) return values[kind] or 100 end)
+      override(db, case[3], function(_, kind, v) values[kind] = v end)
       local found = settings(case[1])
-      assert.are.equal(1, #found)
-      assert.are.equal("slider", found[1].kind)
-      assert.are.same({ 50, 150, 5 }, { found[1].min, found[1].max, found[1].step })
-      assert.are.equal(100, found[1].get(ctx()))
-      found[1].set(ctx(), 125)
-      assert.are.equal(125, value)
-      assert.are.same({ "next/ScalesChanged" }, messages())
+      assert.are.equal(3, #found, "the backpack's, the bank's and the vendor's")
+      for i, option in ipairs(found) do
+        assert.are.equal("slider", option.kind)
+        assert.are.same({ 50, 150, 5 }, { option.min, option.max, option.step })
+        assert.are.equal(100, option.get(ctx()))
+        option.set(ctx(), 100 + 5 * i)
+      end
+      assert.are.same({ [0] = 105, [1] = 110, [-1] = 115 }, values)
+      assert.are.same({ { "next/ScalesChanged", 0 }, { "next/ScalesChanged", 1 }, { "next/ScalesChanged", -1 } },
+        (function()
+          local out = {}
+          for _, m in ipairs(sent) do out[#out + 1] = { m.message, m.args[1] } end
+          return out
+        end)())
     end)
   end
 
-  -- Fit Names While Open (next.md §14g): it saves its choice and tells BetterBags Next's panels, which fit every open small
-  -- one again; the bags' items are neither read nor recalculated.
-  it("saves Fit Names While Open on or off and tells BetterBags Next's panels, reading nothing", function()
-    local on = false
-    override(db, "GetNextFitNamesWhileOpen", function() return on end)
-    override(db, "SetNextFitNamesWhileOpen", function(_, value) on = value end)
-    local found = settings("Fit Names While Open")
-    assert.are.equal(1, #found)
-    assert.are.equal("toggle", found[1].kind)
-    assert.is_false(found[1].get(ctx()))
-    found[1].set(ctx(), true)
-    assert.is_true(on)
-    assert.are.same({ "next/FitNamesChanged" }, messages())
-    found[1].set(ctx(), false)
-    assert.is_false(on)
-    assert.are.same({ "next/FitNamesChanged", "next/FitNamesChanged" }, messages())
-  end)
-
-  -- Autosize Bags (next-small-autosize.md): it saves its choice and tells BetterBags Next's panels, which fit every open
-  -- small one again; the bags' items are neither read nor recalculated.
-  it("saves Autosize Bags on or off and tells BetterBags Next's panels, reading nothing", function()
-    local on = true
-    override(db, "GetNextAutosize", function() return on end)
-    override(db, "SetNextAutosize", function(_, value) on = value end)
-    local found = settings("Autosize Bags")
-    assert.are.equal(1, #found)
-    assert.are.equal("toggle", found[1].kind)
-    assert.is_true(found[1].get(ctx()))
-    found[1].set(ctx(), false)
-    assert.is_false(on)
-    assert.are.same({ "next/AutosizeChanged" }, messages())
-    found[1].set(ctx(), true)
-    assert.is_true(on)
-    assert.are.same({ "next/AutosizeChanged", "next/AutosizeChanged" }, messages())
-  end)
+  -- Fit Names While Open (next.md §14g) and Autosize (next-small-autosize.md), each bag's: each saves the bag's choice and
+  -- tells BetterBags Next's panels which bag, so its open small panel fits again; the bags' items are neither read nor
+  -- recalculated.
+  for _, case in ipairs({ { "Fit Names While Open", "GetNextFitNamesWhileOpen", "SetNextFitNamesWhileOpen",
+    "next/FitNamesChanged" }, { "Autosize", "GetNextAutosize", "SetNextAutosize", "next/AutosizeChanged" } }) do
+    it("saves a bag's " .. case[1] .. " on or off and tells BetterBags Next's panels which bag, reading nothing", function()
+      local on = {}
+      override(db, case[2], function(_, kind) return on[kind] == true end)
+      override(db, case[3], function(_, kind, value) on[kind] = value end)
+      local found = settings(case[1])
+      assert.are.equal(3, #found, "the backpack's, the bank's and the vendor's")
+      assert.are.equal("toggle", found[2].kind)
+      assert.is_false(found[2].get(ctx()))
+      found[2].set(ctx(), true)
+      assert.are.same({ [1] = true }, on)
+      assert.are.same({ case[4] }, messages())
+      assert.are.same({ 1 }, sent[1].args)
+      found[3].set(ctx(), true)
+      assert.are.same({ [1] = true, [-1] = true }, on)
+      assert.are.same({ -1 }, sent[2].args)
+    end)
+  end
 
   -- BetterBags Next's Animation tab (next-themes.md §20): each switch saves its effect on or off and tells BetterBags
   -- Next, which lays the switches over the theme in use again; the bags' items are neither read nor recalculated.

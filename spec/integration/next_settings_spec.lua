@@ -91,6 +91,37 @@ describe("BetterBags Next's settings window on the whole addon", function()
     assert.are.same({}, handle.errors)
   end)
 
+  -- Asked: "make sure that current user options translate to the option set for all bags (1 -> many should be the same as
+  -- 1) -- defaults for all bags are the current defaults", and "the default for vendor is to have autosize off actually".
+  -- A profile saved when one Size tab sized every bag (Appearance > Size), loaded on the whole addon.
+  it("gives every bag the Size tab the player set for them all, each bag's own Size tab showing it", function()
+    local addon = start({ next = true, profile = function(defaults)
+      defaults.nextIconScale, defaults.nextBagScale, defaults.nextFitNamesWhileOpen = 120, 85, true
+    end })
+    local database, const = addon:GetModule("Database"), addon:GetModule("Constants")
+    local K = const.BAG_KIND
+    for _, kind in ipairs({ K.BACKPACK, K.BANK, K.GUILD, K.UNDEFINED }) do
+      assert.are.same({ 120, 85, true }, { database:GetNextIconScale(kind), database:GetNextBagScale(kind),
+        database:GetNextFitNamesWhileOpen(kind) }, "bag " .. kind)
+      assert.are.equal(kind ~= K.UNDEFINED, database:GetNextAutosize(kind), "Autosize, left at its default: bag " .. kind)
+    end
+    assert.is_nil(database:GetData().profile.nextIconScale, "one for every bag no more")
+    for _, panel in ipairs({ addon.Bags.Backpack, addon.Bags.Bank, addon.Bags.GuildBank }) do
+      assert.are.equal(addon:GetModule("NextStyle"):IconAt(120), panel.content:Icon(), "bag " .. panel.kind)
+    end
+    local settings = addon:GetModule("NextSettings")
+    settings:Open("vendor", "size")
+    assert.are.equal(120, rowOf(settings, "nextIconScale").control:GetValue())
+    assert.is_false(rowOf(settings, "nextAutosize").control:GetChecked(), "the vendor's off")
+    rowOf(settings, "nextIconScale").option.set(ctx(addon), 90)
+    assert.are.equal(90, database:GetNextIconScale(K.UNDEFINED))
+    assert.are.equal(120, database:GetNextIconScale(K.BACKPACK), "the backpack's stays")
+    settings:Open("backpack", "size")
+    assert.are.equal(120, rowOf(settings, "nextIconScale").control:GetValue())
+    assert.is_true(rowOf(settings, "nextAutosize").control:GetChecked())
+    assert.are.same({}, handle.errors)
+  end)
+
   -- Asked of the default of largest section first: "i did mean bbn here".
   it("leaves the classic bags' sections alphabetical, and each design keeps its own through a switch", function()
     local addon = start()
@@ -114,14 +145,15 @@ describe("BetterBags Next's settings window on the whole addon", function()
     addon:GetModule("Events"):SendMessage(ctx(addon), "config/Open")
     assert.is_true(settings:IsShown())
     assert.is_nil(addon:GetModule("Config").configFrame, "no classic window")
-    assert.are.same({ "general > main", "appearance > theme", "appearance > size", "appearance > animation",
+    assert.are.same({ "general > main", "appearance > theme", "appearance > animation",
       "itemcolors > main",
       "categories > blizzard", "categories > settings",
       "categories > rule", "categories > items", "categories > ignored", "categories > automation",
       "currencies > tracked", "currencies > currencies", "currencies > items", "currencies > display",
-      "fooddrink > display", "backpack > layout", "backpack > items", "backpack > categories", "backpack > order", "bank > layout", "bank > items",
-      "bank > categories", "bank > order", "guild > layout", "guild > items", "guild > categories", "guild > order",
-      "profiles > profiles",
+      "fooddrink > display", "backpack > layout", "backpack > size", "backpack > items", "backpack > categories",
+      "backpack > order", "bank > general", "bank > layout", "bank > size", "bank > items", "bank > categories",
+      "bank > order", "guild > general", "guild > layout", "guild > size", "guild > items", "guild > categories",
+      "guild > order", "vendor > general", "vendor > size", "profiles > profiles",
       "profiles > transfer", "quickfind > main" }, builtEveryTab(addon))
     settings:Close()
     assert.are.same({}, handle.errors, "closing")
@@ -241,8 +273,9 @@ describe("BetterBags Next's settings window on the whole addon", function()
     assert.is_true(settings:IsShown())
     assert.are.same({ "general > main", "appearance > theme", "itemcolors > main", "categories > blizzard",
       "categories > settings", "categories > rule", "categories > items", "categories > ignored", "categories > automation", "currency > main",
-      "backpack > layout", "backpack > items", "backpack > categories", "backpack > order", "bank > layout", "bank > items",
-      "bank > categories", "bank > order", "profiles > profiles", "profiles > transfer", "quickfind > main" }, builtEveryTab(addon))
+      "backpack > layout", "backpack > items", "backpack > categories", "backpack > order", "bank > general",
+      "bank > layout", "bank > items", "bank > categories", "bank > order", "profiles > profiles", "profiles > transfer",
+      "quickfind > main" }, builtEveryTab(addon))
     settings:Open("backpack", "layout")
     assert.is_not_nil(rowOf(settings, "itemsPerRow"), "rows and columns, for the classic bags")
     assert.is_not_nil(rowOf(settings, "columns"))

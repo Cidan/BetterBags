@@ -120,6 +120,12 @@ const.DATABASE_DEFAULTS = {
     anchorPositions = { [0] = {}, [1] = {} },
     anchorState = { [0] = { enabled = false, shown = false }, [1] = { enabled = false, shown = false } },
     nextSectionSort = { [0] = { [2] = 2, [4] = 2 }, [1] = { [2] = 2, [4] = 2 } },
+    nextSizeOptions = {
+      [0] = { iconScale = 100, bagScale = 100, fitNamesWhileOpen = false, autosize = true },
+      [1] = { iconScale = 100, bagScale = 100, fitNamesWhileOpen = false, autosize = true },
+      [2] = { iconScale = 100, bagScale = 100, fitNamesWhileOpen = false, autosize = true },
+      [-1] = { iconScale = 100, bagScale = 100, fitNamesWhileOpen = false, autosize = false },
+    },
     sectionSort = { [0] = { [1] = 1, [2] = 1, [3] = 1, [4] = 1 }, [1] = { [1] = 1, [2] = 1, [3] = 1, [4] = 1 } },
     itemSort = { [0] = { [1] = 2, [2] = 2, [3] = 2, [4] = 2 }, [1] = { [1] = 2, [2] = 2, [3] = 2, [4] = 2 } },
     customSectionSort = { [0] = {}, [1] = {} },
@@ -223,6 +229,102 @@ describe("Database Migration", function()
       DB:Migrate()
       assert.are.equal(const.SECTION_SORT_TYPE.ALPHABETICALLY, profile.nextSectionSort[0][GRID])
       profile.sectionSort[0][GRID] = const.SECTION_SORT_TYPE.ALPHABETICALLY
+    end)
+  end)
+
+  -- BetterBags Next's Size tab sized every bag at once (Appearance > Size) until each bag had its own (its page's Size tab).
+  -- Asked: "make sure that current user options translate to the option set for all bags (1 -> many should be the same as
+  -- 1) -- defaults for all bags are the current defaults", and "the default for vendor is to have autosize off actually".
+  describe("BetterBags Next's Size tab, one per bag", function()
+    local KINDS = { 0, 1, 2, -1 }
+
+    local function reset()
+      for _, kind in ipairs(KINDS) do
+        DB.data.profile.nextSizeOptions[kind] = { iconScale = 100, bagScale = 100, fitNamesWhileOpen = false,
+          autosize = kind ~= -1 }
+      end
+    end
+
+    before_each(reset)
+    after_each(reset)
+
+    it("gives every bag, the vendor too, what the player chose for them all", function()
+      local profile = DB.data.profile
+      profile.nextIconScale, profile.nextBagScale = 120, 85
+      profile.nextFitNamesWhileOpen, profile.nextAutosize = true, false
+      DB:Migrate()
+      for _, kind in ipairs(KINDS) do
+        assert.are.same({ iconScale = 120, bagScale = 85, fitNamesWhileOpen = true, autosize = false },
+          profile.nextSizeOptions[kind], kind)
+      end
+      for _, old in ipairs({ "nextIconScale", "nextBagScale", "nextFitNamesWhileOpen", "nextAutosize" }) do
+        assert.is_nil(profile[old], old .. " dropped")
+      end
+    end)
+
+    -- A setting at its default was never saved (AceDB strips it at logout) and cannot be told from one chosen: each bag
+    -- takes its own default, the vendor's Autosize off.
+    it("leaves each bag its own default where the player chose none, the vendor not autosized", function()
+      local profile = DB.data.profile
+      profile.nextIconScale, profile.nextAutosize = 100, true
+      DB:Migrate()
+      for _, kind in ipairs({ 0, 1, 2 }) do
+        assert.are.same({ iconScale = 100, bagScale = 100, fitNamesWhileOpen = false, autosize = true },
+          profile.nextSizeOptions[kind], kind)
+      end
+      assert.are.same({ iconScale = 100, bagScale = 100, fitNamesWhileOpen = false, autosize = false },
+        profile.nextSizeOptions[-1], "the vendor's")
+      assert.is_nil(profile.nextIconScale)
+      assert.is_nil(profile.nextAutosize)
+    end)
+
+    it("carries it over once, so what the player sets for a bag afterwards stands", function()
+      local profile = DB.data.profile
+      profile.nextIconScale = 120
+      DB:Migrate()
+      profile.nextSizeOptions[1].iconScale = 90
+      DB:Migrate()
+      assert.are.equal(90, profile.nextSizeOptions[1].iconScale)
+      assert.are.equal(120, profile.nextSizeOptions[0].iconScale)
+    end)
+
+    -- Found by the bug review: the profile system's migration, later in the same load, switches a character still on
+    -- its own profile to an existing Default, which may hold the old keys.
+    it("gives the Default profile the load switches to what it chose for every bag", function()
+      local start = DB:GetCurrentProfileName()
+      local own = UnitName("player") .. " - " .. GetRealmName()
+      DB.data:SetProfile(own)
+      DB.data.profile.__profileSystemMigrated = false
+      DB.data.sv.profiles["Default"] = { nextIconScale = 120, nextAutosize = false, __profileSystemMigrated = true }
+      DB:Migrate()
+      assert.are.equal("Default", DB:GetCurrentProfileName())
+      for _, kind in ipairs(KINDS) do
+        assert.are.equal(120, DB:GetNextIconScale(kind), kind)
+        assert.is_false(DB:GetNextAutosize(kind), kind)
+      end
+      assert.is_nil(DB.data.profile.nextIconScale)
+      DB:SetNextIconScale(1, 90)
+      DB:Migrate()
+      assert.are.equal(90, DB:GetNextIconScale(1), "what the player set for a bag since stands")
+      DB.data:DeleteProfile(own, true)
+      reset()
+      DB:SwitchToProfile(start)
+    end)
+
+    it("carries over what a profile copied here chose, before it was ever loaded", function()
+      local start = DB:GetCurrentProfileName()
+      DB:CreateProfile("Size Target")
+      DB.data.sv.profiles["Old Size"] = { nextBagScale = 70, nextAutosize = false }
+      DB:CopyFromProfile("Old Size")
+      for _, kind in ipairs(KINDS) do
+        assert.are.equal(70, DB.data.profile.nextSizeOptions[kind].bagScale, kind)
+        assert.is_false(DB.data.profile.nextSizeOptions[kind].autosize, kind)
+        assert.are.equal(100, DB.data.profile.nextSizeOptions[kind].iconScale, kind)
+      end
+      assert.is_nil(DB.data.profile.nextBagScale)
+      DB:SwitchToProfile(start)
+      DB.data:DeleteProfile("Size Target", true)
+      DB.data:DeleteProfile("Old Size", true)
     end)
   end)
 

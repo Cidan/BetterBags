@@ -6,6 +6,9 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class Context: AceModule
 local context = addon:GetModule('Context')
 
+---@class Constants: AceModule
+local const = addon:GetModule('Constants')
+
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 
@@ -92,7 +95,7 @@ function bar:Create(ctx, panel)
   return b
 end
 
--- Watch follows the picks, the options, the Size tab's scales and the screen (its card follows what hides it:
+-- Watch follows the picks, the options, the backpack's Icon Scale and the screen (its card follows what hides it:
 -- NextScreenCard).
 ---@private
 function barProto:Watch()
@@ -112,11 +115,12 @@ function barProto:Watch()
       self:UpdateShown(ctx)
     end
   end)
-  -- Icon Scale sizes its buttons as the bags' (NextChain:ScalesChanged). The order listeners run in is not kept through a
-  -- switch of designs, so it takes the scale itself before it lays out.
-  events:RegisterMessage('next/ScalesChanged', function()
-    style:SetIconScale(database:GetNextIconScale())
-    self:LayOut()
+  -- The backpack's Icon Scale (its page's Size tab) sizes its buttons as the backpack's: it lays out again when the
+  -- backpack's scales change (kind), or every bag's (none).
+  events:RegisterMessage('next/ScalesChanged', function(_, kind)
+    if kind == nil or kind == const.BAG_KIND.BACKPACK then
+      self:LayOut()
+    end
   end)
   -- Its buttons on the new pixel grid; the card places itself again (NextScreenCard).
   for _, event in ipairs({ 'UI_SCALE_CHANGED', 'DISPLAY_SIZE_CHANGED' }) do
@@ -186,12 +190,12 @@ function barProto:Draw(ctx)
   self:UpdateShown(ctx)
 end
 
--- LayOut sizes, draws and places the buttons in a row or a column, each the theme's item size (style.ICON) and its gap
--- apart, the card Pad round them, on whole pixels; buttons that moved glide there (Motion) while it shows. Each is
--- sized before it is drawn: Masque sizes a skin to the button as the draw's item/Updated skins it. A pick is drawn as a
--- row of the item list is (no new-item glow, no upgrade arrow), with the count of every stack of it, never dimmed by a
--- search in the bags. Held or coming out, it is at the lift's scale, whose grid is not its own: it lays out once at
--- rest (layOutLater, NextScreenCard).
+-- LayOut sizes, draws and places the buttons in a row or a column, each the backpack's item size (the theme's icon size
+-- times the backpack's Icon Scale, NextStyle:IconAt) and the theme's gap apart, the card Pad round them, on whole pixels;
+-- buttons that moved glide there (Motion) while it shows. Each is sized before it is drawn: Masque sizes a skin to the
+-- button as the draw's item/Updated skins it. A pick is drawn as a row of the item list is (no new-item glow, no upgrade
+-- arrow), with the count of every stack of it, never dimmed by a search in the bags. Held or coming out, it is at the
+-- lift's scale, whose grid is not its own: it lays out once at rest (layOutLater, NextScreenCard).
 function barProto:LayOut()
   local frame = self.frame
   if self.held ~= nil or self.emerging ~= nil then
@@ -201,7 +205,7 @@ function barProto:LayOut()
   self.layOutLater = nil
   frame:SetScale(self:Scale())
   local pad = pixel:Length(frame, self:Theme().Pad)
-  local size = pixel:Length(frame, style.ICON)
+  local size = pixel:Length(frame, style:IconAt(database:GetNextIconScale(const.BAG_KIND.BACKPACK)))
   local gap = pixel:Length(frame, style.GAP)
   local row = self:Layout() ~= "column"
   local ctx

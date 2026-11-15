@@ -50,6 +50,9 @@ describe("The settings catalog", function()
 
   local backpack = { name = "Backpack", kind = 0 }
   local bank = { name = "Bank", kind = 1 }
+  local guild = { name = "Guild Bank", kind = 2 }
+  -- BetterBags Next's vendor: no bag the data engine reads, so its kind is UNDEFINED (next/vendor.lua).
+  local vendor = { name = "Vendor", kind = -1 }
 
   before_each(function()
     saved, sent = {}, {}
@@ -90,11 +93,12 @@ describe("The settings catalog", function()
     end
   end)
 
-  it("lists the bags with settings of their own, the guild bank only where the client has one", function()
-    assert.are.same({ { name = "Backpack", kind = 0 }, { name = "Bank", kind = 1 } }, catalog:Bags())
+  -- Asked: "we need to add a bag menu for all our bag windows, so we have Backpack, Bank, and Guild Bank, we need to add
+  -- Vendor as well".
+  it("lists the bags with settings of their own, the guild bank only where the client has one, then the vendor", function()
+    assert.are.same({ backpack, bank, vendor }, catalog:Bags())
     addon.hasGuildBank = true
-    assert.are.same({ { name = "Backpack", kind = 0 }, { name = "Bank", kind = 1 }, { name = "Guild Bank", kind = 2 } },
-      catalog:Bags())
+    assert.are.same({ backpack, bank, guild, vendor }, catalog:Bags())
   end)
 
   it("refuses a setting it does not define, naming it", function()
@@ -124,9 +128,32 @@ describe("The settings catalog", function()
     assert.is_true(catalog:Has("enableGroups", backpack))
     assert.is_false(catalog:Has("enableGroups", bank))
     assert.is_true(catalog:Has("mergeStacks", bank))
+    assert.is_true(catalog:Has("mergeStacks", guild))
     assert.is_true(catalog:Has("inBagSearch"))
     assert.is_false(catalog:Has("noSuchSetting"))
     assert.has_error(function() catalog:Get("enableGroups", bank) end, "the bank has no setting enableGroups")
+  end)
+
+  -- The vendor shows a merchant's items in cards: it has none of the bags' settings of how items are sorted, stacked
+  -- and filed, only those that name it (its Size tab and Enable Vendor Window).
+  it("gives the vendor only the settings that name it", function()
+    for _, id in ipairs(catalog:Ids()) do
+      local def = catalog.defs[id]
+      if def.bag then
+        local named = false
+        for _, kind in ipairs(def.only or {}) do
+          if kind == vendor.kind then named = true end
+        end
+        assert.are.equal(named, catalog:Has(id, vendor), id)
+      end
+    end
+    for _, id in ipairs({ "nextIconScale", "nextBagScale", "nextAutosize", "nextFitNamesWhileOpen", "nextVendor" }) do
+      assert.is_true(catalog:Has(id, vendor), id)
+    end
+    for _, id in ipairs({ "mergeStacks", "sectionOrder", "itemLevel", "filterType", "glowIntensity" }) do
+      assert.is_false(catalog:Has(id, vendor), id)
+    end
+    assert.has_error(function() catalog:Get("mergeStacks", vendor) end, "the vendor has no setting mergeStacks")
   end)
 
   -- Issue #202: a keystone's level on its button, by a setting of its own beside the item level's. The guild bank
@@ -215,44 +242,73 @@ describe("The settings catalog", function()
     assert.is_true(toggle.disabled())
   end)
 
-  -- Asked of a small bag fitting its names: "with an option to enable/disable this behavior in settings, default disable".
-  it("turns BetterBags Next's Fit Names While Open on and off, one setting for every bag", function()
-    local on = false
-    override(db, "GetNextFitNamesWhileOpen", function() return on end)
-    override(db, "SetNextFitNamesWhileOpen", function(_, value) on = value end)
-    local toggle = catalog:Get("nextFitNamesWhileOpen")
+  -- Asked of a small bag fitting its names: "with an option to enable/disable this behavior in settings, default disable";
+  -- then: "every appearance -> size option needs to become per-bag".
+  it("turns a bag's Fit Names While Open on and off, that bag's alone", function()
+    local on = {}
+    override(db, "GetNextFitNamesWhileOpen", function(_, kind) return on[kind] == true end)
+    override(db, "SetNextFitNamesWhileOpen", function(_, kind, value) on[kind] = value end)
+    local toggle = catalog:Get("nextFitNamesWhileOpen", bank)
     assert.are.equal("toggle", toggle.kind)
     assert.are.equal("Fit Names While Open", toggle.title)
     assert.is_truthy(toggle.description:find("cut short", 1, true))
+    assert.is_truthy(toggle.description:find("bank", 1, true), "names its bag")
     local words = {}
     for _, word in ipairs(toggle.keywords) do words[word] = true end
     assert.is_true(words.width and words.names and words.title)
     assert.is_false(toggle.get(ctx()))
     toggle.set(ctx(), true)
-    assert.is_true(on)
+    assert.are.same({ [1] = true }, on)
     assert.is_true(toggle.get(ctx()))
-    assert.are.same({ { message = "next/FitNamesChanged", args = {} } }, sent)
+    assert.is_false(catalog:Get("nextFitNamesWhileOpen", backpack).get(ctx()), "the backpack's stays")
+    assert.are.same({ { message = "next/FitNamesChanged", args = { 1 } } }, sent)
   end)
 
   -- Asked: "autosize bags ... it should make it so the bag grows on the vertical (Y axis) to hold all items + free space the
-  -- user currently has, keeping the X size as is. it should be a toggle option".
-  it("turns BetterBags Next's Autosize Bags on and off, one setting for every bag", function()
-    local on = true
-    override(db, "GetNextAutosize", function() return on end)
-    override(db, "SetNextAutosize", function(_, value) on = value end)
-    local toggle = catalog:Get("nextAutosize")
+  -- user currently has, keeping the X size as is. it should be a toggle option"; then, per bag.
+  it("turns a bag's Autosize on and off, that bag's alone", function()
+    local on = { [0] = true, [-1] = false }
+    override(db, "GetNextAutosize", function(_, kind) return on[kind] end)
+    override(db, "SetNextAutosize", function(_, kind, value) on[kind] = value end)
+    local toggle = catalog:Get("nextAutosize", backpack)
     assert.are.equal("toggle", toggle.kind)
-    assert.are.equal("Autosize Bags", toggle.title)
+    assert.are.equal("Autosize", toggle.title)
     assert.is_truthy(toggle.description:find("Free Space", 1, true))
+    assert.is_truthy(toggle.description:find("backpack", 1, true), "names its bag")
     local words = {}
     for _, word in ipairs(toggle.keywords) do words[word] = true end
     assert.is_true(words.height and words.autosize and words.fit)
     assert.is_true(toggle.get(ctx()))
     toggle.set(ctx(), false)
-    assert.is_false(on)
+    assert.is_false(on[0])
     assert.is_false(toggle.get(ctx()))
-    assert.are.same({ { message = "next/AutosizeChanged", args = {} } }, sent)
+    catalog:Get("nextAutosize", vendor).set(ctx(), true)
+    assert.is_true(on[-1])
+    assert.is_false(on[0], "the backpack's stays")
+    assert.are.same({ { message = "next/AutosizeChanged", args = { 0 } }, { message = "next/AutosizeChanged", args = { -1 } } },
+      sent)
   end)
+
+  for _, case in ipairs({ { "nextIconScale", "Icon Scale", "GetNextIconScale", "SetNextIconScale" },
+    { "nextBagScale", "Bag Scale", "GetNextBagScale", "SetNextBagScale" } }) do
+    it("saves a bag's " .. case[2] .. ", that bag's alone, and tells its panel", function()
+      local scales = { [0] = 100, [1] = 100, [2] = 100, [-1] = 100 }
+      override(db, case[3], function(_, kind) return scales[kind] end)
+      override(db, case[4], function(_, kind, value) scales[kind] = value end)
+      addon.hasGuildBank = true
+      for _, bag in ipairs({ backpack, bank, guild, vendor }) do
+        local slider = catalog:Get(case[1], bag)
+        assert.are.equal("slider", slider.kind)
+        assert.are.equal(case[2], slider.title)
+        assert.is_truthy(slider.description:find(string.lower(bag.name), 1, true), bag.name)
+        assert.are.same({ 50, 150, 5 }, { slider.min, slider.max, slider.step })
+      end
+      catalog:Get(case[1], vendor).set(ctx(), 125)
+      assert.are.same({ [0] = 100, [1] = 100, [2] = 100, [-1] = 125 }, scales)
+      assert.are.equal(125, catalog:Get(case[1], vendor).get(ctx()))
+      assert.are.same({ { message = "next/ScalesChanged", args = { -1 } } }, sent)
+    end)
+  end
 
   it("saves a bag's section columns and fill order, the fill off at one column", function()
     local columns, fill = {}, {}
@@ -304,10 +360,22 @@ describe("The settings catalog", function()
   end)
 
   it("says which settings take effect after a reload", function()
-    assert.is_true(catalog:Get("enableBankBags").reload)
+    assert.is_true(catalog:Get("enableBankBags", bank).reload)
     assert.is_nil(catalog:Get("inBagSearch").reload)
-    catalog:Get("enableBankBags").set(ctx(), false)
+    catalog:Get("enableBankBags", bank).set(ctx(), false)
     assert.is_false(db._bankBag)
+  end)
+
+  -- Asked: "all the enable/disable toggles in general need to move to a general tab in each respective bag menu": each is
+  -- its bag's own setting.
+  it("gives each bag's Enable switch to its bag alone", function()
+    addon.hasGuildBank = true
+    for id, owner in pairs({ enableBankBags = bank, nextVendor = vendor, nextGuildBank = guild }) do
+      for _, bag in ipairs(catalog:Bags()) do
+        assert.are.equal(bag.kind == owner.kind, catalog:Has(id, bag), id .. " for the " .. bag.name)
+      end
+      assert.has_error(function() catalog:Get(id) end, "the setting " .. id .. " belongs to a bag")
+    end
   end)
 
   it("says a change was refused", function()
@@ -338,22 +406,22 @@ describe("The settings catalog", function()
     end)
     override(db, "GetNextVendorEnabled", function() return true end)
     override(db, "GetNextGuildBankEnabled", function() return false end)
-    local vendor, guild = catalog:Get("nextVendor"), catalog:Get("nextGuildBank")
-    assert.are.equal("toggle", vendor.kind)
-    assert.are.equal("toggle", guild.kind)
-    assert.are.equal("Enable Vendor Window", vendor.title)
-    assert.are.equal("Enable Guild Bank Window", guild.title)
-    assert.is_true(vendor.get(ctx()))
-    assert.is_false(guild.get(ctx()))
-    assert.is_true(vendor.set(ctx(), false) ~= false)
-    assert.is_true(guild.set(ctx(), true) ~= false)
+    local vendorWindow, guildWindow = catalog:Get("nextVendor", vendor), catalog:Get("nextGuildBank", guild)
+    assert.are.equal("toggle", vendorWindow.kind)
+    assert.are.equal("toggle", guildWindow.kind)
+    assert.are.equal("Enable Vendor Window", vendorWindow.title)
+    assert.are.equal("Enable Guild Bank Window", guildWindow.title)
+    assert.is_true(vendorWindow.get(ctx()))
+    assert.is_false(guildWindow.get(ctx()))
+    assert.is_true(vendorWindow.set(ctx(), false) ~= false)
+    assert.is_true(guildWindow.set(ctx(), true) ~= false)
     allow = false
-    assert.is_false(vendor.set(ctx(), true))
-    assert.is_false(guild.set(ctx(), false))
+    assert.is_false(vendorWindow.set(ctx(), true))
+    assert.is_false(guildWindow.set(ctx(), false))
     assert.are.same({ { "vendor", false, true }, { "guild", true, true }, { "vendor", true, true }, { "guild", false, true } },
       asked)
-    assert.is_nil(vendor.reload, "no reload")
-    assert.is_nil(guild.reload, "no reload")
+    assert.is_nil(vendorWindow.reload, "no reload")
+    assert.is_nil(guildWindow.reload, "no reload")
     assert.are.same({}, sent)
   end)
 

@@ -141,6 +141,7 @@ nextContent.MIN_COLUMN_CELLS = 2
 ---@field dragSlotY? number Where the last render put the dragged section's gap.
 ---@field dragSlotX? number The same, from its left, in section columns.
 ---@field columnSource? fun(): number, string?, boolean?, number?, boolean? How many columns its bag is set to, how they fill, whether wide sections span them, how many rows make a section wide, and whether they are compact (SetColumnSource).
+---@field iconSource? fun(): number Its bag's Icon Scale, in percent (SetIconSource).
 ---@field grid? NextColumnSplit The columns its last render laid out, none for one column.
 ---@field heldCells table<string, number> The cells each section takes to stay within its bag's Wide Column Limit, held while it shows (neededCells).
 ---@field heldRows? number The limit it holds them for.
@@ -550,7 +551,7 @@ end
 function canvasProto:claim(ctx, section, slotkey, claims)
   local button = self.buttonSource:GetButton(ctx, slotkey)
   claims[button] = true
-  local icon = pixel:Length(self.frame, style.ICON)
+  local icon = pixel:Length(self.frame, self:Icon())
   -- A section waiting in a dock card is drawn on the card's grid: its buttons are the dock's to size and place (LayoutSection,
   -- when Pulse sees it bound again).
   if self.away[section] ~= nil then
@@ -645,18 +646,49 @@ function canvasProto:SetCards(on)
   self:Invalidate()
 end
 
+-- SetIconSource names what says its bag's Icon Scale (its page's Size tab), in percent: read each time it lays out, as
+-- its columns are (SetColumnSource). Without one its buttons are the theme's size.
+---@param source? fun(): number
+function canvasProto:SetIconSource(source)
+  self.iconSource = source
+end
+
+-- Icon is how big its item buttons are, in units: the theme's icon size times its bag's Icon Scale (NextStyle:IconAt).
+---@return number
+function canvasProto:Icon()
+  if self.iconSource == nil then
+    return style.ICON
+  end
+  return style:IconAt(self.iconSource())
+end
+
+-- cellWidth is how wide a cell is, in units: its icon, or a card.
+---@private
+---@return number
+function canvasProto:cellWidth()
+  return self.cards and style.VENDOR_CARD_WIDTH or self:Icon()
+end
+
+-- cellHeight is how tall a row of cells is, in units: its icon, or a card, never shorter than its text needs.
+---@private
+---@return number
+function canvasProto:cellHeight()
+  local icon = self:Icon()
+  return self.cards and style:CardHeightAt(icon) or icon
+end
+
 -- CellWidth is how wide a button is, without the gap, for the current theme: its icon, or a card; in
 -- whole pixels on the canvas's grid.
 ---@return number
 function canvasProto:CellWidth()
-  return pixel:Length(self.frame, self.cards and style.VENDOR_CARD_WIDTH or style.ICON)
+  return pixel:Length(self.frame, self:cellWidth())
 end
 
 -- CellHeight is how tall a row of buttons is, without the gap, for the current theme: an item button
--- (the theme's icon times the player's Icon Scale), or a card (CARD_HEIGHT); in whole pixels.
+-- (the theme's icon times its bag's Icon Scale), or a card (CardHeightAt); in whole pixels.
 ---@return number
 function canvasProto:CellHeight()
-  return pixel:Length(self.frame, self.cards and style.CARD_HEIGHT or style.ICON)
+  return pixel:Length(self.frame, self:cellHeight())
 end
 
 -- PerRow is how many cells a row holds in layoutWidth (the width to lay out for, in units: a panel's own, never rounded
@@ -664,7 +696,7 @@ end
 ---@param layoutWidth number
 ---@return number
 function canvasProto:PerRow(layoutWidth)
-  local step = (self.cards and style.VENDOR_CARD_WIDTH or style.ICON) + style.GAP
+  local step = self:cellWidth() + style.GAP
   return math.max(1, math.floor((layoutWidth + style.GAP) / step + 1e-6))
 end
 
@@ -673,7 +705,7 @@ end
 ---@param perRow number
 ---@return number
 function canvasProto:RowWidth(perRow)
-  return perRow * ((self.cards and style.VENDOR_CARD_WIDTH or style.ICON) + style.GAP) - style.GAP
+  return perRow * (self:cellWidth() + style.GAP) - style.GAP
 end
 
 -- cellsOf is how many cells a place in a row takes: the columns it spans.
@@ -1570,7 +1602,7 @@ end
 ---@param cells number
 ---@return number cellWidth, number gap
 function canvasProto:gridLengths(grid, cells)
-  local cellWidth, gap = pixel:Lengths(grid, self.cards and style.VENDOR_CARD_WIDTH or style.ICON, style.GAP)
+  local cellWidth, gap = pixel:Lengths(grid, self:cellWidth(), style.GAP)
   if cells > 1 then
     gap = math.max(0, math.min(gap, pixel:Floor(grid, (self:RowWidth(cells) - cells * cellWidth) / (cells - 1))))
   end
@@ -1613,12 +1645,14 @@ function canvasProto:LayoutSection(section, width, layoutWidth)
     block:SetPoint("TOPLEFT", section.cells, "TOPLEFT", 0, 0)
     section.block:Layout(width)
   end
+  local icon = self:Icon()
   for j, entry in ipairs(section.entries) do
     local item = entry.item
     if item ~= nil then
-      -- A card styles itself for the grid it is now on (it was made before it was placed).
+      -- A card styles itself for the grid it is now on and the icon size its bag lays out by (it was made before it was
+      -- placed).
       if item.Fit ~= nil then
-        item:Fit()
+        item:Fit(icon)
       end
       if not self.cards and math.abs(item.frame:GetWidth() - cellWidth) > 0.001 then
         ctx = ctx or addon:GetModule('Context'):New('NextCanvas_LayoutSection')
@@ -1658,7 +1692,7 @@ function canvasProto:MeasureSection(section, grid, width, layoutWidth)
   width = pixel:Floor(grid, width)
   local perRow = self:PerRow(layoutWidth)
   local cellWidth, gap = self:gridLengths(grid, section.gridCells or perRow)
-  local cellHeight, header = pixel:Lengths(grid, self.cards and style.CARD_HEIGHT or style.ICON, style.SECTION_HEADER)
+  local cellHeight, header = pixel:Lengths(grid, self:cellHeight(), style.SECTION_HEADER)
   local m = { width = width, perRow = perRow, cellWidth = cellWidth, cellHeight = cellHeight, step = cellWidth + gap,
     rowStep = cellHeight + gap }
   -- A block is as tall as it says, under the header.

@@ -86,8 +86,9 @@ tables (wago.tools DB2, retail 12.1.5.70783, Mists Classic, TBC Anniversary and 
 - **No new-item glow** (asked: "eliminate new item glow just on these buttons"): a static draw clears it
   (`ClearFlashItem`, item-drawing.md). Blizzard's own `UpdateNewItem`, which the item button's first draw calls through
   `ResetVisuals`, lit it, looping, on food just bought. The bags' own buttons keep theirs.
-- **Laid out** (`LayOut`) in a row or a column, each button the bags' item size (`style.ICON`, so Icon Scale on the Size
-  tab, `next/ScalesChanged`) and their gap (`style.GAP`) apart, the card's `Pad` round them, on whole pixels of the card's
+- **Laid out** (`LayOut`) in a row or a column, each button the backpack's item size (the bar comes out of the backpack:
+  `style:IconAt` of the backpack's Icon Scale, on its page's Size tab; again on `next/ScalesChanged` for the backpack,
+  next-bag-settings.md §5) and their gap (`style.GAP`) apart, the card's `Pad` round them, on whole pixels of the card's
   grid (again when the UI scale or the display changes). Each button is sized before it is drawn: Masque sizes a skin to
   the button as the draw's `item/Updated` skins it. Held or coming out, the card is at the lift's scale, whose grid is not
   its own: a layout asked for then (a pick changing) waits until it is at rest (`layOutLater`, the card's `settle`), the

@@ -196,6 +196,14 @@ describe("NextContent", function()
     assert.are.equal(1, buttons["0_1"].sized)
   end)
 
+  -- Its bag's Icon Scale (its page's Size tab), read as it draws.
+  it("sizes its buttons to its bag's Icon Scale", function()
+    canvas:SetIconSource(function() return 150 end)
+    bind(data({ categories = { { name = "A" } }, items = { item("0_1", "A") } }))
+    assert.are.equal(style:IconAt(150), buttons["0_1"].frame:GetWidth())
+    canvas:SetIconSource(nil)
+  end)
+
   it("titles each section and counts what it holds", function()
     bind(data({
       categories = { { name = "Armor" } },
@@ -799,17 +807,32 @@ describe("NextContent", function()
       assert.are.same({ style.ICON, style.ICON }, { canvas:CellWidth(), canvas:CellHeight() })
     end)
 
-    -- Icon Scale sizes a card's icon too, and its name and price still need the theme's icon size (issue #1221).
-    it("steps down by the scaled icon size, for a card never less than its text needs", function()
+    -- Icon Scale sizes a card's icon too, and its name and price still need the theme's icon size (issue #1221). The scale
+    -- is its bag's (its page's Size tab), read from where its panel says (SetIconSource) each time it lays out.
+    it("steps down by its bag's scaled icon size, for a card never less than its text needs", function()
       local theme = style.Theme.Layout.Icon
-      style:SetIconScale(150)
+      local scale = 150
+      canvas:SetIconSource(function() return scale end)
       canvas:SetCards(true)
-      assert.are.same({ style.VENDOR_CARD_WIDTH, style.ICON }, { canvas:CellWidth(), canvas:CellHeight() })
-      style:SetIconScale(50)
+      assert.are.same({ style.VENDOR_CARD_WIDTH, style:IconAt(150) }, { canvas:CellWidth(), canvas:CellHeight() })
+      assert.are.equal(style:IconAt(150), canvas:Icon())
+      scale = 50
       assert.are.same({ style.VENDOR_CARD_WIDTH, theme }, { canvas:CellWidth(), canvas:CellHeight() })
       canvas:SetCards(false)
-      assert.are.same({ style.ICON, style.ICON }, { canvas:CellWidth(), canvas:CellHeight() })
-      style:SetIconScale(100)
+      assert.are.same({ style:IconAt(50), style:IconAt(50) }, { canvas:CellWidth(), canvas:CellHeight() })
+      assert.are.equal(style:IconAt(50) + style.GAP, canvas:RowWidth(2) - canvas:RowWidth(1), "rows step by its icons")
+      canvas:SetIconSource(nil)
+      assert.are.same({ style.ICON, style.ICON }, { canvas:CellWidth(), canvas:CellHeight() }, "the theme's size without one")
+    end)
+
+    -- Each canvas its own bag's: one scaled leaves another as it was.
+    it("sizes its buttons by its own bag's Icon Scale, not another's", function()
+      local other = addon:GetModule("NextContent"):Create(UIParent)
+      canvas:SetIconSource(function() return 150 end)
+      other:SetIconSource(function() return 100 end)
+      assert.are.equal(style:IconAt(150), canvas:CellWidth())
+      assert.are.equal(style.ICON, other:CellWidth())
+      canvas:SetIconSource(nil)
     end)
 
     -- BetterBags Next draws its item buttons on whole screen pixels (docs/next-pixel-perfect.md): each button

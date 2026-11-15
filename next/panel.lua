@@ -452,6 +452,8 @@ function nextPanel:Create(proto, opts)
   sonataNext:RegisterWidget(p)
   p:Watch()
   p.content:SetHeaderHandler(p)
+  -- Its buttons at its own bag's Icon Scale (its page's Size tab), read each time it lays out.
+  p.content:SetIconSource(function() return database:GetNextIconScale(p.kind) end)
   if not opts.noDrag then
     p.content:SetColumnSource(function() return p:SectionColumns() end)
     nextDrag:Register(p)
@@ -494,11 +496,11 @@ function panelProto:MovingParts()
   return skip
 end
 
--- PixelState says what a pixel check report needs to know of the panel's state: its size and its scales.
+-- PixelState says what a pixel check report needs to know of the panel's state: its size and its bag's scales.
 ---@return string
 function panelProto:PixelState()
   return string.format("%s, Bag Scale %d%%, Icon Scale %d%%", self:IsSmall() and "small" or "full",
-    database:GetNextBagScale(), database:GetNextIconScale())
+    database:GetNextBagScale(self.kind), database:GetNextIconScale(self.kind))
 end
 
 -- PixelLayout describes the panel's column for a pixel check report (data-driven.md): the canvas (its anchor, where
@@ -571,12 +573,14 @@ function nextPanel:SetSize(ctx, size)
       table.insert(morphing, panel)
     end
   end
-  -- Autosized (next-small-autosize.md), every panel switching to small takes the height of what it shows there before any works
-  -- out where it glides to: a bag chained beside another is placed from that one's top, centered for its height where it was
-  -- never moved.
-  if size == "small" and database:GetNextAutosize() then
+  -- Every panel switching to small whose bag is autosized (next-small-autosize.md) takes the height of what it shows there
+  -- before any works out where it glides to: a bag chained beside another is placed from that one's top, centered for its
+  -- height where it was never moved.
+  if size == "small" then
     for _, panel in ipairs(morphing) do
-      panel:PrepareHeight()
+      if database:GetNextAutosize(panel.kind) then
+        panel:PrepareHeight()
+      end
     end
   end
   for _, panel in ipairs(morphing) do
@@ -2021,13 +2025,13 @@ function panelProto:takeScale()
 end
 
 -- Scale is the scale the panel is drawn at for its size (docs/next-appearance-size.md): a small panel's
--- Bag Scale, 1 for a full panel docked to its screen edge (asked: "bag scale should just not apply when
--- docked to the side"). A small panel's size is in its own units, as its content is laid out; its place
+-- bag's Bag Scale (its page's Size tab), 1 for a full panel docked to its screen edge (asked: "bag scale should just not
+-- apply when docked to the side"). A small panel's size is in its own units, as its content is laid out; its place
 -- is on the screen, in UIParent's: on screen it is its size times this.
 ---@return number
 function panelProto:Scale()
   if self:IsSmall() then
-    return database:GetNextBagScale() / 100
+    return database:GetNextBagScale(self.kind) / 100
   end
   return 1
 end
@@ -2137,7 +2141,7 @@ end
 function panelProto:RestingHeight()
   local s, unit = self:Scale(), self:PixelUnit()
   local h
-  if database:GetNextAutosize() then
+  if database:GetNextAutosize(self.kind) then
     h = self:FittedHeight()
   else
     local _, saved = database:GetNextSmallSize(self.kind)
@@ -2490,7 +2494,7 @@ function panelProto:clampPlace(x, y)
   local s = self:Scale()
   if not database:GetClampBagsToScreen() then
     local _, chained = chain:SmallPair()
-    if database:GetNextAutosize() and chained ~= self then
+    if database:GetNextAutosize(self.kind) and chained ~= self then
       local screen = UIParent:GetHeight()
       y = math.max(math.min(y, screen), math.min(screen, self:SmallHeight() * s))
     end
@@ -2591,7 +2595,7 @@ end
 function panelProto:saveSized(x, y)
   local _, heldY, side, edge = self:HeldCorner()
   local cx, cy = self:CornerOf(x, y, side, edge)
-  if database:GetNextAutosize() and chain:SmallAnchorOf(self) == nil then
+  if database:GetNextAutosize(self.kind) and chain:SmallAnchorOf(self) == nil then
     cy = edge == "TOP" and math.min(cy, heldY) or math.max(cy, heldY)
   end
   self:SetCorner(cx, cy, side, edge)
@@ -2871,7 +2875,7 @@ function panelProto:FitSmall()
   -- Its tabs may have been set, shown or hidden while it was closed (ApplyClamp).
   self:ApplyClamp()
   local width, height, fitted = self:SmallSize()
-  if self.restingWidth ~= fitted and database:GetNextAutosize() then
+  if self.restingWidth ~= fitted and database:GetNextAutosize(self.kind) then
     self.smallWidth, self.restingWidth = width, fitted
     render:RenderNow(self.root, { ctx = context:New("NextPanelFit") })
     height = self:RestingHeight()
@@ -3688,7 +3692,7 @@ function panelProto:StopSizing()
   frame:StopMovingOrSizing()
   local x, y, w, h = frame:GetLeft(), frame:GetTop(), frame:GetWidth(), frame:GetHeight()
   local from, side = self.sizingFrom, self.sizing
-  local autosize = database:GetNextAutosize()
+  local autosize = database:GetNextAutosize(self.kind)
   self:recordSizing("let go")
   self.content:SetInstant(false)
   -- Sizing placed everything at once, which leaves nothing to glide from: in columns the snap moves them, by hundreds of
@@ -3919,7 +3923,7 @@ function panelProto:FollowNames(later)
   if not self:IsSmall() or not self.frame:IsShown() or self.closing or self.opening then
     return "closed"
   end
-  if not database:GetNextFitNamesWhileOpen() then
+  if not database:GetNextFitNamesWhileOpen(self.kind) then
     return "off"
   end
   local partner = chainedPartner(self)
@@ -3994,7 +3998,7 @@ function panelProto:FollowHeight(later)
   if not self:IsSmall() or not self.frame:IsShown() or self.closing then
     return "closed"
   end
-  if not database:GetNextAutosize() then
+  if not database:GetNextAutosize(self.kind) then
     return "off"
   end
   local partner = chainedPartner(self)
@@ -4069,7 +4073,7 @@ function panelProto:ResetSize(side)
   -- partner by); autosized and apart, the one it holds.
   local s = self:Scale()
   local heldY = select(2, self:HeldCorner())
-  local held = database:GetNextAutosize() and chain:SmallAnchorOf(self) == nil
+  local held = database:GetNextAutosize(self.kind) and chain:SmallAnchorOf(self) == nil
   local toTop
   if self:HeldEdge() == "TOP" then
     toTop = held and heldY or y0

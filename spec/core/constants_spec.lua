@@ -204,26 +204,23 @@ describe("Constants Module Offsets", function()
     assert.are.equal("Default", const.DATABASE_DEFAULTS.profile.nextTheme)
   end)
 
-  -- BetterBags Next's Size tab (docs/next-appearance-size.md): the theme's icons, the bag at its size.
-  it("keeps BetterBags Next's icons and bags at 100% by default", function()
+  -- Each BetterBags Next bag's Size tab (docs/next-appearance-size.md, next-settings.md §4), by kind, the vendor's under
+  -- UNDEFINED (next/vendor.lua): the theme's icons and the bag at its size; Fit Names While Open off (next.md §14g, asked:
+  -- "default disable"); Autosize on (next-small-autosize.md, asked: "it should default on i think"), but the vendor's
+  -- (asked: "the default for vendor is to have autosize off actually"). Asked: "defaults for all bags are the current defaults".
+  it("sizes each of BetterBags Next's bags by itself: 100%, names fitted as they open, autosized but the vendor", function()
     loadfile("core/constants.lua")("BetterBags")
     local const = addon:GetModule("Constants")
-    assert.are.equal(100, const.DATABASE_DEFAULTS.profile.nextIconScale)
-    assert.are.equal(100, const.DATABASE_DEFAULTS.profile.nextBagScale)
-  end)
-
-  -- Fit Names While Open (next.md §14g). Asked: "with an option to enable/disable this behavior in settings, default disable".
-  it("keeps BetterBags Next's small bags at their width while they are open by default", function()
-    loadfile("core/constants.lua")("BetterBags")
-    local const = addon:GetModule("Constants")
-    assert.is_false(const.DATABASE_DEFAULTS.profile.nextFitNamesWhileOpen)
-  end)
-
-  -- Autosize Bags (next-small-autosize.md). Asked: "it should be a toggle option, and it should default on i think".
-  it("autosizes BetterBags Next's small bags' height by default", function()
-    loadfile("core/constants.lua")("BetterBags")
-    local const = addon:GetModule("Constants")
-    assert.is_true(const.DATABASE_DEFAULTS.profile.nextAutosize)
+    local options = const.DATABASE_DEFAULTS.profile.nextSizeOptions
+    local K = const.BAG_KIND
+    for _, kind in ipairs({ K.BACKPACK, K.BANK, K.GUILD }) do
+      assert.are.same({ iconScale = 100, bagScale = 100, fitNamesWhileOpen = false, autosize = true }, options[kind], kind)
+    end
+    assert.are.same({ iconScale = 100, bagScale = 100, fitNamesWhileOpen = false, autosize = false }, options[K.UNDEFINED],
+      "the vendor's")
+    for _, old in ipairs({ "nextIconScale", "nextBagScale", "nextFitNamesWhileOpen", "nextAutosize" }) do
+      assert.is_nil(const.DATABASE_DEFAULTS.profile[old], old .. ": one for every bag no more")
+    end
   end)
 
   -- BetterBags Next's currencies (currency.md §6). Asked: cap bars off by default.

@@ -323,15 +323,17 @@ Not verified in game yet: how the small panels look, the glide, and moving them.
 §14g, resizing a small panel, is in next-small-resize.md, and its continuation, fitting its title and its sections'
 names (Fit Names While Open), in next-small-names.md.
 
-### 14h. Bag Scale (Appearance → Size)
+### 14h. Bag Scale (each bag's Size tab)
 
-Asked: a "bag scale" slider on Appearance's Size tab; "bag scale should just not apply when docked to
+Asked: a "bag scale" slider on Appearance's Size tab (since on each bag's own, next-bag-settings.md); "bag scale should just not apply when docked to
 the side"; and, on the risk of drags and chaining in a scaled panel: "it's not risk, it's just work ...
 just get it done with tests" (docs/next-appearance-size.md).
 
-- **The setting:** `nextBagScale` (profile, a whole percentage in 50 to 150, 100 by default;
-  `DB:Get/SetNextBagScale`), one value for every Next panel, so chained bags match. Its slider sends
-  `next/ScalesChanged`; the chain (`chain:ScalesChanged`) has every panel draw again (`ApplyScales`), then refits
+- **The setting:** `nextSizeOptions[kind].bagScale` (profile, a whole percentage in 50 to 150, 100 by default;
+  `DB:Get/SetNextBagScale(kind)`), each bag's own (asked: "every appearance -> size option needs to become per-bag"), so
+  two chained bags may differ: each is placed in UIParent's units and sized in its own, times its own `Scale()`. Its
+  slider sends `next/ScalesChanged` with its bag's kind; the chain (`chain:ScalesChanged`) has that bag's panel draw
+  again (`ApplyScales`), then refits
   every open small panel (`Update`, snapping: `FitSmall`, which takes the scale); a closed one refits as it opens. The
   refit refits a panel whose size glides too, its glide ended first (found by the second bug review: a glide under way
   kept the old scale and size), so a panel the draw set gliding toward its width at the new scale while still at the old

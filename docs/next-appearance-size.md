@@ -1,5 +1,9 @@
 # Appearance: a Theme tab and a Size tab (BetterBags Next)
 
+> Since 2026-11-14 the Size tab is each bag's own, on its settings page (Backpack, Bank, Guild Bank, Vendor), and
+> Appearance has none: see `.claude/rules/next-bag-settings.md`. What follows is the plan as it was built, one Size
+> tab for every bag.
+
 ## As asked (2026-10-23)
 
 > make "Theme" here a tab, and add a tab for "Size"; here we have a slider for "icon scale" in the bag,

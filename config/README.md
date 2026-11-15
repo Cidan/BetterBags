@@ -14,8 +14,11 @@ Every setting defined once: its kind (toggle, dropdown, slider), name, descripti
 choices or range, how it is read and written, and what it sends so the bags show it (`bags/Redraw` for
 what only changes how the bags look, `bags/Rederive` for what the data phase reads, `bags/FullRefreshAll`
 for what a bag read depends on). A bag's settings are bound to a bag when asked for:
-`catalog:Get(id, bag)`. The window builds its rows from it; `spec/config/settings_effects_spec.lua`
-checks what each setting sends.
+`catalog:Get(id, bag)`, the bags being the backpack, the bank, the guild bank and BetterBags Next's vendor
+(`catalog:Bags()`). A bag's setting is the bags' that hold items unless it names its kinds (`only`): each bag's
+switch is its own (Enable Bank Bags, Enable Vendor Window, Enable Guild Bank Window), and each bag's Size tab is
+every bag's, the vendor's too (`.claude/rules/next-bag-settings.md`). The window builds its rows from it;
+`spec/config/settings_effects_spec.lua` checks what each setting sends.
 
 ### config.lua (`Config`)
 

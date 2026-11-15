@@ -223,17 +223,27 @@ describe("BetterBags Next's small mode", function()
     -- Clamp Bags to Screen (window.md §3a): on here, so a small panel stays on the screen; off by default.
     db.clamp = true
     override(stubs.database, "GetClampBagsToScreen", function() return db.clamp end)
-    -- The Size tab's scales (docs/next-appearance-size.md), in percent.
+    -- Each bag's Size tab (docs/next-appearance-size.md), asked by its kind: every bag the same (db.iconScale, ...), but a
+    -- bag a test gives its own (db.own.iconScale[kind]). The scales in percent.
     db.iconScale, db.bagScale = 100, 100
-    override(stubs.database, "GetNextIconScale", function() return db.iconScale end)
-    override(stubs.database, "GetNextBagScale", function() return db.bagScale end)
+    db.own = { iconScale = {}, bagScale = {}, fitNames = {}, autosize = {} }
+    local function perBag(key)
+      return function(_, kind)
+        assert(kind ~= nil, "a bag's " .. key .. " is asked for without its kind")
+        local own = db.own[key][kind]
+        if own ~= nil then return own end
+        return db[key]
+      end
+    end
+    override(stubs.database, "GetNextIconScale", perBag("iconScale"))
+    override(stubs.database, "GetNextBagScale", perBag("bagScale"))
     -- Fit Names While Open (next.md §14g): off by default.
     db.fitNames = false
-    override(stubs.database, "GetNextFitNamesWhileOpen", function() return db.fitNames end)
-    -- Autosize Bags (next-small-autosize.md): on by default, off here, so the specs of sizes the player gives see them;
+    override(stubs.database, "GetNextFitNamesWhileOpen", perBag("fitNames"))
+    -- Autosize (next-small-autosize.md): on by default, off here, so the specs of sizes the player gives see them;
     -- "autosizing its height" turns it on.
     db.autosize = false
-    override(stubs.database, "GetNextAutosize", function() return db.autosize end)
+    override(stubs.database, "GetNextAutosize", perBag("autosize"))
     -- No tab order saved (docs/next-batch-2.md §5).
     override(stubs.database, "GetNextTabOrder", function() return {} end)
     override(stubs.database, "GetGroupsEnabled", function() return false end)
@@ -3668,6 +3678,18 @@ describe("BetterBags Next's small mode", function()
         assert.are.same({}, cut(bag))
       end)
 
+      -- Each bag's own Fit Names While Open (its page's Size tab): on for every bag but the backpack.
+      it("follows its own bag's Fit Names While Open, not another's", function()
+        inColumns()
+        db.fitNames = true
+        db.own.fitNames[BACKPACK] = false
+        local bag = backpack()
+        holding(bag, { { "A", 1 }, { "B", 1 } })
+        holding(bag, { { "A", 1 }, { LONG, 1 } })
+        assert.are.equal(columnsWidth(8), bag.frame:GetWidth(), "the backpack's is off")
+        assert.are.equal("off", bag:FollowNames())
+      end)
+
       -- glidingFor starts the panel's size gliding: for its names (the setting on), a grip let go 300 wider, or a Shift-click
       -- back to its default from a saved width. It returns the section whose name the panel shows second.
       local function glidingFor(how)
@@ -4853,6 +4875,19 @@ describe("BetterBags Next's small mode", function()
         resize(bag, "RIGHT", columnsWidth(6) + 5, bag.frame:GetHeight())
         settle()
         assert.are.same({ columnsWidth(6), 300 }, db.sizes[BACKPACK])
+      end)
+
+      -- Each bag's own Autosize (its page's Size tab): the backpack's off while every other bag's is on.
+      it("follows its own bag's Autosize, not another's", function()
+        db.own.autosize[BACKPACK] = false
+        db.sizes[BACKPACK] = { columnsWidth(8), 300 }
+        local bag = holds(64)
+        assert.are.equal(300, bag.frame:GetHeight(), "the height the player gave it")
+        assert.are.equal("off", bag:FollowHeight())
+        db.own.autosize[BACKPACK] = nil
+        bag:FitSmall()
+        settle()
+        assert.are.equal(fitted(bag), bag.frame:GetHeight())
       end)
 
       it("takes the height the player gave it once turned off, and fits again once turned on (next/AutosizeChanged)", function()
@@ -6378,12 +6413,9 @@ describe("BetterBags Next's small mode", function()
       end)
     end)
 
-    after_each(function()
-      style:SetIconScale(100)
-    end)
-
-    local function scalesChanged()
-      for _, fn in ipairs(handlers["next/ScalesChanged"] or {}) do fn(ctx()) end
+    -- scalesChanged sends next/ScalesChanged as a bag's Size tab does: for that bag (kind), or every bag.
+    local function scalesChanged(kind)
+      for _, fn in ipairs(handlers["next/ScalesChanged"] or {}) do fn(ctx(), kind) end
     end
 
     local function opened(create)
@@ -6401,7 +6433,7 @@ describe("BetterBags Next's small mode", function()
 
     local function perRow(panel)
       local width = panel.root:PreRender().Width - panel.scroll:GetGutterWidth()
-      return math.floor((width + style.GAP) / (style.ICON + style.GAP))
+      return math.floor((width + style.GAP) / (panel.content:Icon() + style.GAP))
     end
 
     describe("Icon Scale", function()
@@ -6419,7 +6451,8 @@ describe("BetterBags Next's small mode", function()
         db.iconScale = 150
         scalesChanged()
         render:Flush()
-        assert.are.equal(66, style.ICON)
+        assert.are.equal(66, bag.content:Icon())
+        assert.are.equal(44, style.ICON, "the theme's size stays")
         assert.are.same({ 66, 66 }, { buttons["0_1"].frame:GetSize() })
         assert.are.equal(5, perRow(bag), "fewer per row")
         motion:Step(1)
@@ -6459,13 +6492,13 @@ describe("BetterBags Next's small mode", function()
       -- The default small width is the width of the columns the full body's width holds (asked: "default should
       -- probably be exact too"), so it leaves no room past its last column at any Icon Scale.
       local function defaultWidth()
-        local step = style.ICON + style.GAP
+        local step = style:IconAt(db.iconScale) + style.GAP
         local columns = math.floor((style.GRID_WIDTH + style.GAP) / step)
         return 2 * style.PAD + scrollbox:GutterWidthFor({ Symmetric = true }) + columns * step - style.GAP
       end
 
       it("opens a small panel at the width of the columns its default holds, at any Icon Scale", function()
-        style:SetIconScale(120)
+        db.iconScale = 120
         assert.is_true(defaultWidth() < style.BODY_WIDTH, "the full body's width leaves room past its columns")
         local bag = opened(function(c) return nextBag:Create(c) end)
         assert.are.equal(defaultWidth(), bag.frame:GetWidth())
@@ -6482,6 +6515,37 @@ describe("BetterBags Next's small mode", function()
         db.iconScale = 150
         scalesChanged()
         assert.are.equal(700, bag.frame:GetWidth(), "the size the player gave it")
+      end)
+
+      -- Asked: "every appearance -> size option needs to become per-bag, and move to a size tab in each respective bag".
+      it("draws each bag's buttons at its own Icon Scale, redrawing only the bag whose scale changed", function()
+        db.size = "full"
+        herbs(3)
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        bag:Draw(ctx(), slots[BACKPACK], function() end)
+        local bank = opened(function(c) return nextBank:Create(c) end)
+        render:Flush()
+        local drawn = {}
+        for _, panel in ipairs({ bag, bank }) do
+          local apply = panel.ApplyScales
+          panel.ApplyScales = function(p, c)
+            drawn[#drawn + 1] = p.kind
+            return apply(p, c)
+          end
+        end
+        db.own.iconScale[BANK] = 150
+        scalesChanged(BANK)
+        render:Flush()
+        assert.are.same({ BANK }, drawn, "the backpack's buttons stay as they are")
+        assert.are.equal(66, bank.content:Icon())
+        assert.are.equal(44, bag.content:Icon())
+        assert.are.same({ 44, 44 }, { buttons["0_1"].frame:GetSize() })
+        db.own.iconScale[BACKPACK] = 50
+        scalesChanged(BACKPACK)
+        render:Flush()
+        assert.are.same({ BANK, BACKPACK }, drawn)
+        assert.are.same({ 22, 22 }, { buttons["0_1"].frame:GetSize() })
+        assert.are.equal(66, bank.content:Icon(), "the bank's stays")
       end)
     end)
 
@@ -6520,6 +6584,18 @@ describe("BetterBags Next's small mode", function()
         local bank = nextBank:Create(ctx())
         assert.are.equal(0.5, bank.frame:GetScale())
         assert.are.same({ style.Small.Margin, (UIParent:GetHeight() + smallHeight() * 0.5) / 2 }, { onScreen(bank) })
+      end)
+
+      it("scales each small bag by its own Bag Scale", function()
+        db.own.bagScale[BANK] = 50
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        local bank = opened(function(c) return nextBank:Create(c) end)
+        assert.are.equal(1, bag.frame:GetScale())
+        assert.are.equal(0.5, bank.frame:GetScale())
+        db.own.bagScale[BACKPACK] = 150
+        scalesChanged(BACKPACK)
+        assert.are.equal(1.5, bag.frame:GetScale())
+        assert.are.equal(0.5, bank.frame:GetScale(), "the bank's stays")
       end)
 
       it("leaves a full panel, docked to its screen edge, at its size", function()

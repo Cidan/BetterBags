@@ -105,10 +105,12 @@ const.DATABASE_DEFAULTS = {
     quickFindEnabled = true,
     nextChain = "apart",
     nextTabOrder = {},
-    nextIconScale = 100,
-    nextBagScale = 100,
-    nextFitNamesWhileOpen = false,
-    nextAutosize = true,
+    nextSizeOptions = {
+      [0] = { iconScale = 100, bagScale = 100, fitNamesWhileOpen = false, autosize = true },
+      [1] = { iconScale = 100, bagScale = 100, fitNamesWhileOpen = false, autosize = true },
+      [2] = { iconScale = 100, bagScale = 100, fitNamesWhileOpen = false, autosize = true },
+      [-1] = { iconScale = 100, bagScale = 100, fitNamesWhileOpen = false, autosize = false },
+    },
     nextSize = "small",
     nextSmallPlaces = {},
     nextSmallCorners = {},
@@ -400,43 +402,58 @@ describe("Database", function()
       assert.are.same({ backpack = { 2, 1, 0 } }, DB.data.profile.nextTabOrder)
     end)
 
-    -- BetterBags Next's Size tab (docs/next-appearance-size.md): percentages, whole, kept in 50 to 150.
-    for _, case in ipairs({ { "GetNextIconScale", "SetNextIconScale", "nextIconScale" },
-      { "GetNextBagScale", "SetNextBagScale", "nextBagScale" } }) do
-      it(case[1] .. " / " .. case[2] .. ", 100 until set, whole and kept in 50 to 150", function()
-        assert.are.equal(100, DB[case[1]](DB))
-        DB[case[2]](DB, 120)
-        assert.are.equal(120, DB[case[1]](DB))
-        assert.are.equal(120, DB.data.profile[case[3]])
-        DB[case[2]](DB, 87.6)
-        assert.are.equal(88, DB[case[1]](DB))
-        DB[case[2]](DB, 10)
-        assert.are.equal(50, DB[case[1]](DB))
-        DB[case[2]](DB, 400)
-        assert.are.equal(150, DB[case[1]](DB))
-        DB[case[2]](DB, "nonsense")
-        assert.are.equal(100, DB[case[1]](DB))
+    -- Each BetterBags Next bag's Size tab (docs/next-appearance-size.md), by its kind (the vendor's: UNDEFINED):
+    -- percentages, whole, kept in 50 to 150, each bag's its own.
+    for _, case in ipairs({ { "GetNextIconScale", "SetNextIconScale", "iconScale" },
+      { "GetNextBagScale", "SetNextBagScale", "bagScale" } }) do
+      it(case[1] .. " / " .. case[2] .. ", a bag's own, 100 until set, whole and kept in 50 to 150", function()
+        for _, kind in ipairs({ 0, 1, 2, -1 }) do
+          assert.are.equal(100, DB[case[1]](DB, kind), kind)
+        end
+        DB[case[2]](DB, 1, 120)
+        assert.are.equal(120, DB[case[1]](DB, 1))
+        assert.are.equal(120, DB.data.profile.nextSizeOptions[1][case[3]])
+        assert.are.equal(100, DB[case[1]](DB, 0), "the backpack's stays")
+        assert.are.equal(100, DB[case[1]](DB, -1), "the vendor's stays")
+        DB[case[2]](DB, -1, 87.6)
+        assert.are.equal(88, DB[case[1]](DB, -1))
+        DB[case[2]](DB, -1, 10)
+        assert.are.equal(50, DB[case[1]](DB, -1))
+        DB[case[2]](DB, -1, 400)
+        assert.are.equal(150, DB[case[1]](DB, -1))
+        DB[case[2]](DB, -1, "nonsense")
+        assert.are.equal(100, DB[case[1]](DB, -1))
+        assert.are.equal(120, DB[case[1]](DB, 1))
       end)
     end
 
-    -- Fit Names While Open (next.md §14g): off until turned on.
-    it("GetNextFitNamesWhileOpen / SetNextFitNamesWhileOpen, off until turned on", function()
-      assert.is_false(DB:GetNextFitNamesWhileOpen())
-      DB:SetNextFitNamesWhileOpen(true)
-      assert.is_true(DB:GetNextFitNamesWhileOpen())
-      assert.is_true(DB.data.profile.nextFitNamesWhileOpen)
-      DB:SetNextFitNamesWhileOpen(false)
-      assert.is_false(DB:GetNextFitNamesWhileOpen())
+    -- Fit Names While Open (next.md §14g): off until turned on, a bag's own.
+    it("GetNextFitNamesWhileOpen / SetNextFitNamesWhileOpen, a bag's own, off until turned on", function()
+      for _, kind in ipairs({ 0, 1, 2, -1 }) do
+        assert.is_false(DB:GetNextFitNamesWhileOpen(kind), kind)
+      end
+      DB:SetNextFitNamesWhileOpen(2, true)
+      assert.is_true(DB:GetNextFitNamesWhileOpen(2))
+      assert.is_true(DB.data.profile.nextSizeOptions[2].fitNamesWhileOpen)
+      assert.is_false(DB:GetNextFitNamesWhileOpen(0), "the backpack's stays")
+      DB:SetNextFitNamesWhileOpen(2, false)
+      assert.is_false(DB:GetNextFitNamesWhileOpen(2))
     end)
 
-    -- Autosize Bags (next-small-autosize.md): on until turned off.
-    it("GetNextAutosize / SetNextAutosize, on until turned off", function()
-      assert.is_true(DB:GetNextAutosize())
-      DB:SetNextAutosize(false)
-      assert.is_false(DB:GetNextAutosize())
-      assert.is_false(DB.data.profile.nextAutosize)
-      DB:SetNextAutosize(true)
-      assert.is_true(DB:GetNextAutosize())
+    -- Autosize (next-small-autosize.md): on until turned off, a bag's own; the vendor's off until turned on (asked).
+    it("GetNextAutosize / SetNextAutosize, a bag's own, on until turned off but the vendor's", function()
+      assert.is_true(DB:GetNextAutosize(0))
+      assert.is_true(DB:GetNextAutosize(1))
+      assert.is_true(DB:GetNextAutosize(2))
+      assert.is_false(DB:GetNextAutosize(-1), "the vendor's")
+      DB:SetNextAutosize(0, false)
+      assert.is_false(DB:GetNextAutosize(0))
+      assert.is_false(DB.data.profile.nextSizeOptions[0].autosize)
+      assert.is_true(DB:GetNextAutosize(1), "the bank's stays")
+      DB:SetNextAutosize(-1, true)
+      assert.is_true(DB:GetNextAutosize(-1))
+      DB:SetNextAutosize(0, true)
+      assert.is_true(DB:GetNextAutosize(0))
     end)
 
     it("GetNextSize / SetNextSize, small until switched, and nothing but a size", function()
@@ -775,6 +792,22 @@ describe("Database", function()
       logout()
       DB:Init()
       assert.is_false(addon.loggingOut)
+    end)
+
+    -- A panel drawn after it (a render a timer flushes; initialization.md §7) reads its bag's Size tab: a bag left at
+    -- its defaults has no table of them then, and one changed keeps only what was changed.
+    it("reads each bag's Size tab at its default once the logout stripped it", function()
+      _G.BetterBagsDB = nil
+      DB:Init()
+      DB:SetNextIconScale(1, 120)
+      logout()
+      assert.is_nil(rawget(DB.data.profile.nextSizeOptions, 0), "the backpack's, at its defaults, stripped")
+      assert.is_nil(rawget(DB.data.profile.nextSizeOptions[1], "autosize"), "the bank's Autosize, stripped")
+      assert.are.same({ 100, 100, false, true }, { DB:GetNextIconScale(0), DB:GetNextBagScale(0),
+        DB:GetNextFitNamesWhileOpen(0), DB:GetNextAutosize(0) })
+      assert.are.same({ 120, 100, false, true }, { DB:GetNextIconScale(1), DB:GetNextBagScale(1),
+        DB:GetNextFitNamesWhileOpen(1), DB:GetNextAutosize(1) })
+      assert.is_false(DB:GetNextAutosize(-1), "the vendor's default")
     end)
   end)
 

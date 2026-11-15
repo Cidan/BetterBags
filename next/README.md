@@ -77,7 +77,7 @@ object is there; the panels provide the members they use (`Show`, `Hide`, `Toggl
 
 The vendor (`vendor.lua`, `addon.Vendor`) and the guild bank (`guildbank.lua`, `addon.Bags.GuildBank`) stand in for
 Blizzard's merchant and guild bank frames, each while its own switch is on (Enable Vendor Window, Enable Guild Bank
-Window): `core/bagsystem.lua` switches either off and on at once (`.claude/rules/next-bagsystem.md` §11g). Switched off
+Window, each on its page's General tab in the settings): `core/bagsystem.lua` switches either off and on at once (`.claude/rules/next-bagsystem.md` §11g). Switched off
 (`Deactivate`), a panel is marked `off` and answers no visit, its Blizzard frame is given back and shows the vendor or
 the guild bank, and `Activate` switches it on again. The vendor's item cards (`vendorbutton.lua`) show Blizzard's
 tooltips as its merchant frame does: the item's over the card, and over each cost besides gold (a crest, a currency, an
@@ -134,7 +134,8 @@ it, `RestingLayoutWidth`), its continuation in `.claude/rules/next-small-names.m
 
 ## A small panel's height
 
-With **Autosize Bags** on (the default) a small panel is as tall as what it shows: its header, every section and Free
+With **Autosize** on (each bag's own, on its page's Size tab; the default, but the vendor's) a small panel is as tall as
+what it shows: its header, every section and Free
 Space as last laid out (the scroll box's `FitHeight`, kept by the render root) and its footer, so nothing scrolls; never
 shorter than its tab rail nor past the screen (`NextPanel:RestingHeight`, `FittedHeight`). It takes that height as it opens
 and glides to it a frame after anything it shows changes (`FollowHeight`, which waits as `FollowNames` does, and glides with

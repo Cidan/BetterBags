@@ -108,6 +108,9 @@ end
 ---@field buyback? NextBuybackItem
 ---@field repair? NextRepairEntry
 ---@field log? NextLogCard
+---@field iconSize? number The icon size, in units, the canvas that placed it last lays out by (Fit); the theme's until then.
+---@field styledIcon? number The icon size, in units, it was last styled at (Style).
+---@field unit? number The screen pixel's size on the grid it was styled for (Style).
 local buttonProto = {}
 addon:GetModule('Perf'):RegisterPrototype(buttonProto, 'NextVendorButtonFrame')
 
@@ -247,10 +250,12 @@ function buttonProto:Style()
   -- that changes (a card is made before the canvas it goes in).
   local frame = self.frame
   self.unit = pixel:Unit(frame)
-  -- Its icon follows Icon Scale. A small one sits in the card's middle, the card as tall as its text needs
-  -- (CARD_HEIGHT); a large one leaves its name and price less room.
-  self.iconSize = style.ICON
-  local icon, height, width = pixel:Lengths(frame, style.ICON, style.CARD_HEIGHT, style.VENDOR_CARD_WIDTH)
+  -- Its icon follows the vendor's Icon Scale: the size the canvas placing it lays out by (Fit), the theme's until it is
+  -- placed. A small one sits in the card's middle, the card as tall as its text needs (CardHeightAt); a large one leaves
+  -- its name and price less room.
+  local iconSize = self.iconSize or style.ICON
+  self.styledIcon = iconSize
+  local icon, height, width = pixel:Lengths(frame, iconSize, style:CardHeightAt(iconSize), style.VENDOR_CARD_WIDTH)
   frame:SetSize(width, height)
   self.button:SetSize(icon, icon)
   self.icon:SetSize(icon, icon)
@@ -305,10 +310,12 @@ function buttonProto:sizeDurability()
   pixel:Width(self.durability, math.max(1, self.icon:GetWidth() * (self.durabilityFraction or 1)))
 end
 
--- Fit styles the card again when the grid it is drawn on, or the Icon Scale, is not the one it was styled for:
--- the canvas calls it as it places the card (docs/next-pixel-perfect.md).
-function buttonProto:Fit()
-  if self.unit == nil or math.abs(self.unit - pixel:Unit(self.frame)) > 1e-9 or self.iconSize ~= style.ICON then
+-- Fit styles the card again when the grid it is drawn on, or the icon size its canvas lays out by (its bag's Icon
+-- Scale), is not the one it was styled for: the canvas calls it as it places the card (docs/next-pixel-perfect.md).
+---@param icon number The canvas's icon size, in units (NextCanvas:Icon).
+function buttonProto:Fit(icon)
+  if self.unit == nil or math.abs(self.unit - pixel:Unit(self.frame)) > 1e-9 or self.styledIcon ~= icon then
+    self.iconSize = icon
     self:Style()
     -- Styling drew its icon, count and highlight again, over Masque's skin: Masque's integration skins it
     -- again on this, so its skin goes last, as after a theme.

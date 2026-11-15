@@ -84,35 +84,39 @@ function chain:Register(panel, role)
     self.watching = true
     events:RegisterEvent("UI_SCALE_CHANGED", function(ctx) self:Update(ctx, true) end)
     events:RegisterEvent("DISPLAY_SIZE_CHANGED", function(ctx) self:Update(ctx, true) end)
-    events:RegisterMessage("next/ScalesChanged", function(ctx) self:ScalesChanged(ctx) end)
+    events:RegisterMessage("next/ScalesChanged", function(ctx, kind) self:ScalesChanged(ctx, kind) end)
     events:RegisterMessage("next/FitNamesChanged", function(ctx) self:FitNamesChanged(ctx) end)
     events:RegisterMessage("next/AutosizeChanged", function(ctx) self:AutosizeChanged(ctx) end)
     events:RegisterMessage("bags/ClampChanged", function(ctx) self:ClampChanged(ctx) end)
   end
 end
 
--- ScalesChanged applies the Size tab's scales (docs/next-appearance-size.md, next/ScalesChanged from its
--- sliders): the item buttons' size, then every panel (ApplyScales), then where the panels rest, a small
--- one refitted to the screen (Update, snapping).
+-- ScalesChanged applies a bag's Size tab's scales (docs/next-appearance-size.md, next/ScalesChanged from its sliders,
+-- with its kind; none for every bag): that bag's panel draws its buttons at its Icon Scale (ApplyScales), then every
+-- panel rests where it does now, a small one refitted to the screen at its Bag Scale (Update, snapping): a chained
+-- partner is placed from the panel that changed.
 ---@param ctx Context
-function chain:ScalesChanged(ctx)
-  style:SetIconScale(database:GetNextIconScale())
+---@param kind? BagKind
+function chain:ScalesChanged(ctx, kind)
   for _, panel in ipairs(self:Panels()) do
-    panel:ApplyScales(ctx)
+    if kind == nil or panel.kind == kind then
+      panel:ApplyScales(ctx)
+    end
   end
   self:Update(ctx, true)
 end
 
--- FitNamesChanged follows Fit Names While Open (next/FitNamesChanged from its switch, next.md §14g): every open small panel
--- is fitted again to what it shows now (Update, snapping: FitSmall); a closed one is fitted as it opens.
+-- FitNamesChanged follows a bag's Fit Names While Open (next/FitNamesChanged from its switch, next.md §14g): every open
+-- small panel is fitted again to what it shows now (Update, snapping: FitSmall), the bag that changed by its new choice,
+-- a chained partner placed from it; a closed one is fitted as it opens.
 ---@param ctx Context
 function chain:FitNamesChanged(ctx)
   self:Update(ctx, true)
 end
 
--- AutosizeChanged follows Autosize Bags (next/AutosizeChanged from its switch, next-small-autosize.md): every open small panel
--- takes the height it has now at once, what it shows or the height the player gave it (Update, snapping: FitSmall); a closed
--- one takes it as it opens.
+-- AutosizeChanged follows a bag's Autosize (next/AutosizeChanged from its switch, next-small-autosize.md): every open small
+-- panel takes the height it has now at once, what it shows or the height the player gave it, each by its own bag's choice
+-- (Update, snapping: FitSmall); a closed one takes it as it opens.
 ---@param ctx Context
 function chain:AutosizeChanged(ctx)
   self:Update(ctx, true)

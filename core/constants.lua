@@ -762,16 +762,19 @@ const.DATABASE_DEFAULTS = {
     -- The order the player moved each BetterBags Next tab rail's tabs to, by rail ("backpack", "bank",
     -- "bankTabs", "guild", "vendor"): tab ids, those not in it after them (docs/next-batch-2.md §5).
     nextTabOrder = {},
-    -- BetterBags Next's Size tab (docs/next-appearance-size.md), in percent: item buttons at the theme's
-    -- icon size times nextIconScale; small panels at nextBagScale (full panels are always at 100).
-    nextIconScale = 100,
-    nextBagScale = 100,
-    -- Whether a small panel follows what it shows while it is open, widening when a section's name or its title would be
-    -- cut short and narrowing back once it fits (next.md §14g); off, it fits as it opens and as a grip is let go.
-    nextFitNamesWhileOpen = false,
-    -- Whether a small panel is as tall as what it shows (Autosize Bags, next-small-autosize.md), growing and shrinking with it
-    -- while open; off, it is the height the player gave it, or a share of the screen.
-    nextAutosize = true,
+    -- Each BetterBags Next bag's Size tab (its settings page, docs/next-appearance-size.md), by its kind, the vendor's under
+    -- UNDEFINED (next/vendor.lua): its item buttons at the theme's icon size times iconScale and its small panel at bagScale,
+    -- in percent (a full panel is always at 100); whether its small panel follows what it shows while it is open, widening
+    -- when a section's name or its title would be cut short and narrowing back once it fits (fitNamesWhileOpen, next.md
+    -- §14g; off, it fits as it opens and as a grip is let go); and whether it is as tall as what it shows (autosize,
+    -- next-small-autosize.md), growing and shrinking with it while open (off, the height the player gave it, or a share of
+    -- the screen). The vendor is not autosized until turned on (asked).
+    nextSizeOptions = {
+      [const.BAG_KIND.BACKPACK] = { iconScale = 100, bagScale = 100, fitNamesWhileOpen = false, autosize = true },
+      [const.BAG_KIND.BANK] = { iconScale = 100, bagScale = 100, fitNamesWhileOpen = false, autosize = true },
+      [const.BAG_KIND.GUILD] = { iconScale = 100, bagScale = 100, fitNamesWhileOpen = false, autosize = true },
+      [const.BAG_KIND.UNDEFINED] = { iconScale = 100, bagScale = 100, fitNamesWhileOpen = false, autosize = false },
+    },
     -- BetterBags Next's panels: "small" movable ones, the default, or "full" height on the screen's
     -- edges (docs/next-small-mode.md); where each kind's small panel was left before it held its bottom corner (its top
     -- left, read once), the corner it holds (docs/next-bag-anchor.md), its anchor ("free" saves nothing), and the
