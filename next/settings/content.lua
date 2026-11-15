@@ -276,13 +276,21 @@ local function importCategories(ctx)
     say(L:G("Import Categories"), L:G("Paste a category configuration string to import first."))
     return
   end
+  local data, message = db:ReadImport(text)
+  if data == nil then
+    say(L:G("Import Categories"), L:G("The categories could not be imported: ") .. tostring(message))
+    return
+  end
+  -- One category (#1250) is added to yours, as the Categories page asks.
+  if data.category then
+    categoryEditor:AskImport(owner(), data.category, function()
+      area:SetText("")
+    end)
+    return
+  end
   ask(L:G("Import Categories"), L:G("This replaces your categories with the ones imported. Continue?"), L:G("Import"),
     "Primary", function()
-      local ok, message = db:ImportSettings(text)
-      if not ok then
-        say(L:G("Import Categories"), L:G("The categories could not be imported: ") .. tostring(message))
-        return
-      end
+      db:ApplyImport(data)
       area:SetText("")
       offerReload(L:G("Categories Imported"), L:G("Your categories were imported. Reload the UI to apply them?"))
     end)
@@ -648,7 +656,8 @@ function content:Init()
       } },
       { id = "transfer", title = L:G("Import / Export"), sections = {
         { title = L:G("Export"), rows = {
-          { text = L:G("Export your categories to a string you can share. Only categories are included, no other settings.") },
+          { text = L:G("Export your categories to a string you can share. Only categories are included, no other settings. "
+            .. "To share one category, use Export on its page under Categories.") },
           { buttons = { { text = L:G("Export Categories"), style = "Primary", onClick = exportCategories } } },
           { title = L:G("Export Categories"), keywords = { "export", "share" }, block = function(parent)
             self.exportArea = rows:CreateArea(parent, { height = 120, help = L:G("Export your categories, then copy them with Ctrl+C.") })
@@ -656,7 +665,8 @@ function content:Init()
           end },
         } },
         { title = L:G("Import"), rows = {
-          { text = L:G("Paste a category configuration string and import it. It replaces your categories.") },
+          { text = L:G("Paste a category configuration string and import it. A string of your categories replaces "
+            .. "them; a string of one category is added to them.") },
           { title = L:G("Import Categories"), keywords = { "import", "share" }, block = function(parent)
             self.importArea = rows:CreateArea(parent, { height = 120, help = L:G("Paste a string here with Ctrl+V.") })
             return self.importArea

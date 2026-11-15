@@ -123,6 +123,13 @@ categories:UpdateCategory(ctx, name, { automation = "sell", confirmSale = false,
 -- Make a Blizzard category the player's (false for a name a category has); the caller recalculates the bags
 categories:Convert(ctx, name)
 
+-- Add a category shared as text (DB:ReadImport's category) as one of yours named name, or with replace put it in
+-- place of yours of that name (keeping its place and what it does on its own); its items move to it, the bags are
+-- recalculated. False for a name taken, or to replace one that is not yours (.claude/rules/import-export.md §7)
+categories:ImportCategory(ctx, shared, name, replace)
+-- How many of its items are filed in a category of yours other than name now (nil: a new one)
+categories:MovesOnImport(shared, name)
+
 -- After every committed read: categories of the player's named as a Blizzard category the read's items have
 -- become converted ones (their group by and its sections go), the bags recalculated once if any did
 categories:ConvertNamed(ctx, names)

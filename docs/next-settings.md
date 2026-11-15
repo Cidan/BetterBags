@@ -144,7 +144,8 @@ bags'), and Currency (Blizzard's backpack currency list, which Next's footer doe
 
 7. **Profiles:** the active profile (switching asks, then reloads), the characters on each, New,
    Copy, Rename, Delete, Reset to Defaults. **Import / Export:** export the categories to a text
-   area, import from one.
+   area, import from one: a string of your categories replaces them, a string of one category (made with
+   Export on that category's page) is added to them.
 
 **Integrations**
 

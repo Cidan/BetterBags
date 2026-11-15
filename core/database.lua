@@ -1969,8 +1969,88 @@ function DB:GetGroupOrder(kind, groupID)
   return group and group.order or groupID  -- Default to ID if order not set
 end
 
+-- itemSet returns the item IDs a list holds, each true, or nil when it holds none. An item ID is a whole number above 0
+-- and below 2^31 (an int32): a pasted string can hold any number, and one like inf would be saved as a key the next
+-- load cannot read.
+---@param list any
+---@return table<number, boolean>?
+local function itemSet(list)
+  if type(list) ~= "table" then
+    return nil
+  end
+  local set
+  for id, on in pairs(list) do
+    if type(id) == "number" and id > 0 and id < 2 ^ 31 and id == math.floor(id) and on == true then
+      set = set or {}
+      set[id] = true
+    end
+  end
+  return set
+end
+
+-- colorOf returns a color of three or four parts, each from 0 to 1, or nil for anything else.
+---@param color any
+---@return number[]?
+local function colorOf(color)
+  if type(color) ~= "table" or (#color ~= 3 and #color ~= 4) then
+    return nil
+  end
+  local copy = {}
+  for i = 1, #color do
+    local part = color[i]
+    if type(part) ~= "number" or not (part >= 0 and part <= 1) then
+      return nil
+    end
+    copy[i] = part
+  end
+  return copy
+end
+
+-- sharedCategory returns what a category shares (#1250, .claude/rules/import-export.md §7): its name, rule, items,
+-- Ignored Items, group by, color, bags, the bags it is hidden in, its note and Skip Recent Items, each of the shape it
+-- has. What it does on its own (Auto Sell, Auto Deposit), its place in the order and what each bag set for it (pins,
+-- tabs) stay with the player. Made alike for a category of yours to export and for one read from a pasted string,
+-- whose fields may be anything; nil for one with no name.
+---@param filter any
+---@return CustomCategoryFilter?
+local function sharedCategory(filter)
+  if type(filter) ~= "table" or type(filter.name) ~= "string" or strtrim(filter.name) == "" then
+    return nil
+  end
+  local shared = { name = strtrim(filter.name), itemList = itemSet(filter.itemList) or {} }
+  shared.ignoredItems = itemSet(filter.ignoredItems)
+  local query = type(filter.searchCategory) == "table" and filter.searchCategory.query
+  if type(query) == "string" and strtrim(query) ~= "" then
+    shared.searchCategory = { query = strtrim(query) }
+  end
+  for _, groupBy in pairs(const.SEARCH_CATEGORY_GROUP_BY) do
+    if filter.groupBy == groupBy then
+      shared.groupBy = groupBy
+    end
+  end
+  shared.color = colorOf(filter.color)
+  local enabled = {}
+  for _, kind in ipairs(categoryKinds()) do
+    if type(filter.enabled) == "table" and type(filter.enabled[kind]) == "boolean" then
+      enabled[kind] = filter.enabled[kind]
+    end
+    if type(filter.hidden) == "table" and filter.hidden[kind] == true then
+      shared.hidden = shared.hidden or {}
+      shared.hidden[kind] = true
+    end
+  end
+  shared.enabled = normalizeEnabled(enabled)
+  if type(filter.note) == "string" and filter.note ~= "" then
+    shared.note = filter.note
+  end
+  if filter.skipRecent == true then
+    shared.skipRecent = true
+  end
+  return shared
+end
+
 -- Export category configuration: "!BB2!", then Serialization:Encode's Base64 (#1317). Before, "!BB" and a Lua table
--- constructor in Base64, which ImportSettings still reads.
+-- constructor in Base64, which ReadImport still reads.
 ---@return string
 function DB:ExportSettings()
   ---@class Serialization: AceModule
@@ -1991,16 +2071,32 @@ function DB:ExportSettings()
   return "!BB2!" .. serialization:Encode(exportData)
 end
 
--- Import category configuration from a string ExportSettings wrote, of either format. The string is read as data,
--- never run.
+-- ExportCategory writes one category of yours to share (#1250): "!BB2!", then Serialization:Encode of
+-- { version = 3, category = what it shares (sharedCategory) }. Nothing for a name that is not a category of yours.
+---@param name string
+---@return string?
+function DB:ExportCategory(name)
+  local filter = DB.data.profile.customCategoryFilters[name]
+  if filter == nil then
+    return nil
+  end
+  ---@class Serialization: AceModule
+  local serialization = addon:GetModule('Serialization')
+  return "!BB2!" .. serialization:Encode({ version = 3, category = sharedCategory(filter) })
+end
+
+-- ReadImport reads a string ExportSettings or ExportCategory wrote, of either format, as data, never run
+-- (.claude/rules/import-export.md): your categories, which ApplyImport puts in place, or { version, category } with
+-- only what a category shares (sharedCategory), which Categories:ImportCategory adds. It returns nil and why for a
+-- string it cannot read.
 ---@param dataString string
----@return boolean, string
-function DB:ImportSettings(dataString)
+---@return table?, string?
+function DB:ReadImport(dataString)
   ---@class Serialization: AceModule
   local serialization = addon:GetModule('Serialization')
 
   if not dataString or dataString == "" then
-    return false, "Import data is empty"
+    return nil, "Import data is empty"
   end
 
   -- Remove whitespace
@@ -2013,18 +2109,31 @@ function DB:ImportSettings(dataString)
   elseif dataString:match("^!BB") then
     importData, err = serialization:DecodeLegacy(dataString:sub(4))
   else
-    return false, "Invalid import string: Missing !BB prefix. Please make sure you copied the full export string."
+    return nil, "Invalid import string: Missing !BB prefix. Please make sure you copied the full export string."
   end
   if not importData then
-    return false, "Failed to read import data: " .. err
+    return nil, "Failed to read import data: " .. err
   end
 
-  -- Validate version
-  if not importData.version or type(importData.version) ~= "number" then
-    return false, "Invalid import data format"
+  if type(importData.version) ~= "number" then
+    return nil, "Invalid import data format"
   end
+  if importData.category ~= nil then
+    local category = sharedCategory(importData.category)
+    if category == nil then
+      return nil, "Invalid import data format"
+    end
+    return { version = importData.version, category = category }
+  end
+  return importData
+end
 
-  -- Apply the imported category configuration
+-- ApplyImport puts the categories ReadImport read (a whole set) in place of yours, as they were exported, then brings
+-- them to the current shape and rules.
+---@param importData table
+function DB:ApplyImport(importData)
+  ---@class Serialization: AceModule
+  local serialization = addon:GetModule('Serialization')
   if importData.customCategoryFilters then
     DB.data.profile.customCategoryFilters = serialization:DeepCopy(importData.customCategoryFilters)
   end
@@ -2048,7 +2157,6 @@ function DB:ImportSettings(dataString)
   DB:NormalizeCategories()
   -- Exports before version 3 hold rules of search rule version 1.
   DB:MigrateSearchRules(importData.version >= 3 and 2 or 1)
-  return true, "Category configuration imported successfully"
 end
 
 -- SplitSectionOrder gives BetterBags Next, once, a Section Order a player chose when both designs shared one.

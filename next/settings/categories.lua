@@ -552,6 +552,125 @@ local function askNewCategory(owner, rule)
   end)
 end
 
+-- freeName returns name and the first number from 2 no category's name has: "Herbs (2)".
+---@param name string
+---@return string
+local function freeName(name)
+  local n = 2
+  while categories:DoesCategoryExist(format("%s (%d)", name, n)) do
+    n = n + 1
+  end
+  return format("%s (%d)", name, n)
+end
+
+-- AskImport adds a category shared as text (#1250: Import Categories with a string of one, content.lua), asking in the
+-- dialog every question is asked in. A name no category has asks whether to import it; one of yours asks whether to
+-- replace it (asking again, saying what stays) or keep both, naming the one imported; a plugin's, or a group by's
+-- section, can only be kept beside. The last question says how many of its items move to it from your other
+-- categories, and, for one that groups, when its Group By goes: it becomes a converted category, as Rename says
+-- (category-lifecycle.md §11). Once it is imported, done is called, and it says so, with a button showing it on this
+-- page.
+---@param owner Frame The window its dialogs show over.
+---@param shared CustomCategoryFilter
+---@param done fun(ctx: Context, name: string)
+function editor:AskImport(owner, shared, done)
+  local title = L:G("Import Category")
+  local function moving(name)
+    local moves = categories:MovesOnImport(shared, name)
+    if moves == 0 then
+      return ""
+    elseif moves == 1 then
+      return " " .. L:G("1 of its items is in another category of yours now, and moves to it.")
+    end
+    return " " .. format(L:G("%d of its items are in other categories of yours now, and move to it."), moves)
+  end
+  -- ungrouped says its Group By goes, imported as target: a new category with a Blizzard category's name, or one made
+  -- from a Blizzard category it replaces (replacing), never groups.
+  local groups = shared.groupBy ~= nil and shared.groupBy ~= GROUP_BY.NONE
+  local function ungrouped(target, replacing)
+    local converts = replacing and replacing.blizzard or (replacing == nil and items:KnowsBlizzardCategory(target))
+    if not groups or not converts then
+      return ""
+    end
+    return " " .. format(L:G("'%s' is a built-in Blizzard category, so the one imported is a converted category. "
+      .. "Converted categories can't be grouped, so its Group By will be turned off."), target)
+  end
+  local function import(ctx, name, replace)
+    if not categories:ImportCategory(ctx, shared, name, replace) then
+      local why = replace and L:G("The category '%s' could not be imported: it was deleted meanwhile.")
+        or L:G("The category '%s' could not be imported: a category of that name was made meanwhile.")
+      nextDialog:Show(owner, { title = title, text = format(why, name),
+        buttons = { { text = L:G("OK"), onClick = function() end } } })
+      return
+    end
+    done(ctx, name)
+    nextDialog:Show(owner, {
+      title = L:G("Category Imported"), text = format(L:G("'%s' is one of your categories now."), name),
+      buttons = {
+        { text = L:G("OK"), onClick = function() end },
+        { text = L:G("Show Category"), style = "Primary", onClick = function()
+          self:Show(name)
+          settings:Open("categories")
+        end },
+      },
+    })
+  end
+  local name = shared.name
+  local existing = categories:GetCategoryByName(name)
+  if existing == nil then
+    nextDialog:Show(owner, {
+      title = title, text = format(L:G("Import the category '%s'?"), name) .. moving(nil) .. ungrouped(name),
+      buttons = {
+        { text = L:G("Cancel"), onClick = function() end },
+        { text = L:G("Import"), style = "Primary", onClick = function(ctx) import(ctx, name, false) end },
+      },
+    })
+    return
+  end
+  local buttons = {
+    { text = L:G("Cancel"), onClick = function() end },
+    { text = L:G("Keep Both"), onClick = function()
+      askName(owner, title, L:G("Name the category imported:") .. moving(nil), L:G("Import"), freeName(name), nil,
+        function(ctx, chosen)
+          local warning = ungrouped(chosen)
+          if warning == "" then
+            import(ctx, chosen, false)
+            return
+          end
+          nextDialog:Show(owner, {
+            title = title, text = strtrim(warning),
+            buttons = {
+              { text = L:G("Cancel"), onClick = function() end },
+              { text = L:G("Import"), style = "Primary", onClick = function(c) import(c, chosen, false) end },
+            },
+          })
+        end)
+    end },
+  }
+  local text
+  if existing.isGroupBySubcategory then
+    text = format(L:G("'%s' is a section the category '%s' groups into. Keep both, naming the one imported?"), name,
+      existing.groupByParent or name:match("^(.-) %- ") or name)
+  elseif isPlugins(existing) then
+    text = format(L:G("A plugin's category is named '%s'. Keep both, naming the one imported?"), name)
+  else
+    text = format(L:G("You already have a category named '%s'. Replace it with the one imported, or keep both?"), name)
+    table.insert(buttons, { text = L:G("Replace"), style = "Danger", onClick = function()
+      nextDialog:Show(owner, {
+        title = title,
+        text = format(L:G("Replace the category '%s' with the one imported? Its rule, items, bags and color become the "
+          .. "imported ones; its place in the list, what it does on its own and each bag's pins and tabs stay."), name)
+          .. moving(name) .. ungrouped(name, existing),
+        buttons = {
+          { text = L:G("Cancel"), onClick = function() end },
+          { text = L:G("Replace"), style = "Danger", onClick = function(ctx) import(ctx, name, true) end },
+        },
+      })
+    end })
+  end
+  nextDialog:Show(owner, { title = title, text = text, buttons = buttons })
+end
+
 -- bagItemsOf calls fn with every item in the bags given (their committed items), with its bag.
 ---@param bags SettingBag[]
 ---@param fn fun(bag: SettingBag, slotkey: string, data: ItemData)
@@ -988,17 +1107,18 @@ function listProto:paintRow(row)
 end
 
 ---------------------------------------------------------------------------------------------------
--- Rename and Delete, in the header.
+-- Export, Rename and Delete, in the header.
 
 ---@class NextCategoryActions
 ---@field frame Frame
 ---@field owner Frame
+---@field export NextButtonFrame
 ---@field rename NextButtonFrame
 ---@field delete NextButtonFrame
 local actionsProto = {}
 addon:GetModule('Perf'):RegisterPrototype(actionsProto, 'NextCategoryActions')
 
--- CreateActions makes the page's buttons (pages.lua actions): Rename and Delete, for your categories.
+-- CreateActions makes the page's buttons (pages.lua actions): Export, Rename and Delete, for your categories.
 ---@param parent Frame
 ---@param owner Frame The window its dialogs show over.
 ---@return NextCategoryActions
@@ -1006,6 +1126,7 @@ function editor:CreateActions(parent, owner)
   local frame = CreateFrame("Frame", nil, parent)
   ---@type NextCategoryActions
   local actions = setmetatable({ frame = frame, owner = owner }, { __index = actionsProto })
+  actions.export = nextButton:Create(frame, { text = L:G("Export"), onClick = function() actions:ShowExport() end })
   actions.rename = nextButton:Create(frame, { text = L:G("Rename"), onClick = function() actions:AskRename() end })
   actions.delete = nextButton:Create(frame, {
     text = L:G("Delete"), style = "Danger", onClick = function() actions:AskDelete() end,
@@ -1026,8 +1147,11 @@ function actionsProto:Style()
   self.delete.frame:SetPoint("TOPRIGHT", self.frame, "TOPRIGHT", 0, 0)
   self.rename.frame:ClearAllPoints()
   self.rename.frame:SetPoint("TOPRIGHT", self.delete.frame, "TOPLEFT", -gap, 0)
+  self.export.frame:ClearAllPoints()
+  self.export.frame:SetPoint("TOPRIGHT", self.rename.frame, "TOPLEFT", -gap, 0)
   local shown = self.rename.frame:IsShown()
-  local width = shown and (self.rename.frame:GetWidth() + gap + self.delete.frame:GetWidth()) or pixel:Unit(self.frame)
+  local width = shown and (self.export.frame:GetWidth() + gap + self.rename.frame:GetWidth() + gap
+    + self.delete.frame:GetWidth()) or pixel:Unit(self.frame)
   self.frame:SetSize(width, pixel:Length(self.frame, B.Height))
 end
 
@@ -1037,9 +1161,26 @@ function actionsProto:Refresh(ctx)
   local _ = ctx
   local filter = editor:Chosen()
   local yours = filter ~= nil and not isPlugins(filter)
+  self.export.frame:SetShown(yours)
   self.rename.frame:SetShown(yours)
   self.delete.frame:SetShown(yours)
   self:Style()
+end
+
+-- ShowExport shows the chosen category as text to share (#1250, DB:ExportCategory), selected to copy, in the dialog
+-- every question is asked in: what it is, never what it does on its own, which whoever imports it chooses.
+function actionsProto:ShowExport()
+  local name = editor.selected
+  if name == nil then
+    return
+  end
+  nextDialog:Show(self.owner, {
+    title = L:G("Export Category"),
+    text = format(L:G("Copy the category '%s' with Ctrl+C to share it. What it does on its own (Auto Sell, Auto "
+      .. "Deposit) stays here: whoever imports it chooses their own."), name),
+    input = { text = database:ExportCategory(name), help = L:G("Category string") },
+    buttons = { { text = L:G("Close"), onClick = function() end } },
+  })
 end
 
 -- AskRename renames the chosen category, keeping it chosen, or says why it cannot. Renaming one made from a Blizzard

@@ -185,7 +185,7 @@ A complete lexer and parser for search query syntax, supporting complex boolean 
 
 ### Serialization (`serialization.lua`)
 
-The text a player shares their categories as (`DB:ExportSettings`, `DB:ImportSettings`; `.claude/rules/import-export.md`).
+The text a player shares their categories, or one category, as (`DB:ExportSettings`, `DB:ExportCategory`, `DB:ReadImport`; `.claude/rules/import-export.md`).
 Pasted text is untrusted, so it is read as data and never run.
 
 | Function | Description | Returns |

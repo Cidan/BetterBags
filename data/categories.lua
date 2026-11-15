@@ -936,6 +936,68 @@ function categories:Convert(ctx, name)
   return true
 end
 
+-- ImportCategory adds a category shared as text (#1250; DB:ReadImport's category, only what one shares) as a category
+-- of yours named name: a new one, on top of the order like any new one, or with replace the one of yours of that name,
+-- which takes the shared rule, items, Ignored Items, group by (never for one made from a Blizzard category), color,
+-- bags, Hide In, note and Skip Recent Items, and keeps its place, what it does on its own and what each bag set for it.
+-- Its items move to it from where they were filed (an item has one home), whether this client knows them or not. The
+-- bags are recalculated. It returns false, changing nothing, for a name a category has, or to replace one that is not
+-- yours.
+---@param ctx Context
+---@param shared CustomCategoryFilter
+---@param name string
+---@param replace? boolean
+---@return boolean
+function categories:ImportCategory(ctx, shared, name, replace)
+  local filter = database:GetItemCategory(name)
+  if (replace and filter == nil) or (not replace and self:DoesCategoryExist(name)) then
+    return false
+  end
+  local rule = shared.searchCategory and { query = shared.searchCategory.query } or nil
+  if filter then
+    self:changed()
+    for id in pairs(filter.itemList) do
+      if not shared.itemList[id] then
+        database:DeleteItemFromCategory(id, name)
+      end
+    end
+    filter.searchCategory = rule
+    filter.groupBy = not filter.blizzard and shared.groupBy or nil
+    filter.color = shared.color
+    filter.enabled = shared.enabled
+    filter.hidden = shared.hidden
+    filter.ignoredItems = shared.ignoredItems
+    filter.note = shared.note
+    filter.skipRecent = shared.skipRecent
+    events:SendMessage(ctx, 'categories/Changed')
+  else
+    self:CreateCategory(ctx, { name = name, save = true, itemList = {}, searchCategory = rule, groupBy = shared.groupBy,
+      color = shared.color, enabled = shared.enabled, hidden = shared.hidden, ignoredItems = shared.ignoredItems,
+      note = shared.note, skipRecent = shared.skipRecent })
+  end
+  for id in pairs(shared.itemList) do
+    database:SaveItemToCategory(id, name)
+  end
+  events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
+  return true
+end
+
+-- MovesOnImport returns how many of a shared category's items are filed in a category of yours other than name now,
+-- and would move to it on ImportCategory (name nil: a new one, so every one filed).
+---@param shared CustomCategoryFilter
+---@param name? string
+---@return number
+function categories:MovesOnImport(shared, name)
+  local count = 0
+  for id in pairs(shared.itemList) do
+    local home = database:GetItemCategoryByItemID(id).name
+    if home ~= nil and home ~= name then
+      count = count + 1
+    end
+  end
+  return count
+end
+
 -- GetSortedSearchCategories returns the categories with a rule in the order (category-lifecycle.md §7):
 -- by priority, ties by name, the first winning an item more than one matches.
 ---@return CustomCategoryFilter[]

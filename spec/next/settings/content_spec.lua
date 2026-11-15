@@ -1018,14 +1018,23 @@ describe("NextSettingsContent", function()
   end)
 
   describe("Import / Export", function()
-    local imported
+    local read, whole, done
 
     before_each(function()
-      imported = { true, "" }
+      whole = { version = 3, customCategoryFilters = {} }
+      read, done = { whole }, nil
       override(db, "ExportSettings", function() return "!BB:exported" end)
-      override(db, "ImportSettings", function(_, text)
-        table.insert(calls, { "ImportSettings", text })
-        return imported[1], imported[2]
+      override(db, "ReadImport", function(_, text)
+        table.insert(calls, { "ReadImport", text })
+        return read[1], read[2]
+      end)
+      override(db, "ApplyImport", function(_, data)
+        table.insert(calls, { "ApplyImport", data })
+        return true, "Category configuration imported successfully"
+      end)
+      override(addon:GetModule("NextSettingsCategories"), "AskImport", function(_, over, category, onImported)
+        table.insert(calls, { "AskImport", over, category })
+        done = onImported
       end)
       settings:Open("profiles", "transfer")
     end)
@@ -1039,23 +1048,37 @@ describe("NextSettingsContent", function()
     it("imports the categories pasted after asking, and offers to reload", function()
       content.importArea.area:SetText("!BB:pasted")
       click(button("Import Categories"))
+      assert.are.same({ { "ReadImport", "!BB:pasted" } }, calls)
       answer("Import")
-      assert.are.same({ { "ImportSettings", "!BB:pasted" } }, calls)
+      assert.are.same({ { "ReadImport", "!BB:pasted" }, { "ApplyImport", whole } }, calls)
       assert.are.equal("", content.importArea.area:GetText())
       answer("Reload")
       assert.are.equal(1, reloads)
     end)
 
-    it("says what is wrong: nothing pasted, or a string it cannot read", function()
+    it("says what is wrong, before asking anything: nothing pasted, or a string it cannot read", function()
       click(button("Import Categories"))
       assert.are.equal("Paste a category configuration string to import first.", nextDialog.text:GetText())
       answer("OK")
-      imported = { false, "bad string" }
+      read = { nil, "bad string" }
       content.importArea.area:SetText("junk")
       click(button("Import Categories"))
-      answer("Import")
       assert.are.equal("The categories could not be imported: bad string", nextDialog.text:GetText())
+      answer("OK")
+      assert.are.same({ { "ReadImport", "junk" } }, calls)
       assert.are.equal("junk", content.importArea.area:GetText())
+    end)
+
+    -- #1250: a string of one category is added, as the Categories page asks.
+    it("hands a string of one category to the Categories page, emptying the box once it is imported", function()
+      local category = { name = "Herbs", itemList = {} }
+      read = { { version = 3, category = category } }
+      content.importArea.area:SetText("!BB2:one")
+      click(button("Import Categories"))
+      assert.are.same({ { "ReadImport", "!BB2:one" }, { "AskImport", settings.frame, category } }, calls)
+      assert.are.equal("!BB2:one", content.importArea.area:GetText())
+      done(nil, "Herbs")
+      assert.are.equal("", content.importArea.area:GetText())
     end)
   end)
 

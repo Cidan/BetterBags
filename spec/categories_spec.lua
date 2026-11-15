@@ -869,6 +869,132 @@ describe("Categories", function()
     end)
   end)
 
+  -- #1250: one category shared as text (DB:ReadImport's category: what it is, never what it does on its own).
+  describe("a category shared as text (ImportCategory)", function()
+    local ctx, sent, savedSend
+
+    local function shared(extra)
+      local s = { name = "Herbs", itemList = { [765] = true, [2447] = true }, searchCategory = { query = "type = herb" },
+        groupBy = 2, color = { 0.1, 0.8, 0.2 }, enabled = { [0] = true, [1] = false, [2] = true }, hidden = { [2] = true },
+        ignoredItems = { [99] = true }, note = "from a friend", skipRecent = true }
+      for k, v in pairs(extra or {}) do s[k] = v end
+      return s
+    end
+
+    before_each(function()
+      ctx = context:New("Test")
+      sent = {}
+      savedSend = events.SendMessage
+      events.SendMessage = function(_, _, message, ...) table.insert(sent, { message, ... }) end
+    end)
+
+    after_each(function()
+      events.SendMessage = savedSend
+    end)
+
+    it("adds it as a new category of yours, on top, its items moved to it from where they were, the bags recalculated", function()
+      categories:CreateCategory(ctx, { name = "Mats", itemList = { [765] = true, [5] = true }, save = true })
+      sent = {}
+      local before = categories:GetGeneration()
+      assert.is_true(categories:ImportCategory(ctx, shared(), "Herbs"))
+      local made = dbCategories.Herbs
+      assert.is_true(made.save)
+      assert.are.same({ [765] = true, [2447] = true }, made.itemList)
+      assert.is_nil(dbCategories.Mats.itemList[765], "an item has one home")
+      assert.is_true(dbCategories.Mats.itemList[5])
+      assert.are.same({ query = "type = herb" }, made.searchCategory)
+      assert.are.equal(2, made.groupBy)
+      assert.are.same({ 0.1, 0.8, 0.2 }, made.color)
+      assert.are.same({ [0] = true, [1] = false, [2] = true }, made.enabled)
+      assert.are.same({ [2] = true }, made.hidden)
+      assert.are.same({ [99] = true }, made.ignoredItems)
+      assert.are.equal("from a friend", made.note)
+      assert.is_true(made.skipRecent)
+      assert.is_nil(made.automation)
+      assert.are.equal("Herbs", categories:GetOrder()[1])
+      assert.is_true(categories:GetGeneration() > before)
+      assert.are.same({ { "categories/Changed" }, { "bags/Rederive", { resetLayout = true, buttons = true } } }, sent)
+    end)
+
+    it("adds it under another name, beside the category that has its name", function()
+      categories:CreateCategory(ctx, { name = "Herbs", itemList = { [765] = true }, save = true })
+      assert.is_true(categories:ImportCategory(ctx, shared(), "Herbs (2)"))
+      assert.are.equal("Herbs (2)", dbCategories["Herbs (2)"].name)
+      assert.is_true(dbCategories["Herbs (2)"].itemList[765])
+      assert.is_nil(dbCategories.Herbs.itemList[765])
+    end)
+
+    -- A string from another client holds that client's item IDs.
+    it("files items this client does not know", function()
+      local known = C_Item.GetItemInfoInstant
+      C_Item.GetItemInfoInstant = function() return nil end
+      finally(function() C_Item.GetItemInfoInstant = known end)
+      assert.is_true(categories:ImportCategory(ctx, shared({ itemList = { [999999] = true } }), "Herbs"))
+      assert.is_true(dbCategories.Herbs.itemList[999999])
+    end)
+
+    it("replaces a category of yours: what it is becomes the shared one's; its place and what it does on its own stay", function()
+      categories:CreateCategory(ctx, { name = "Herbs", save = true, automation = "sell", confirmSale = false,
+        deposit = "bank", itemList = { [1] = true, [765] = true }, searchCategory = { query = "old" }, groupBy = 1,
+        color = { 1, 0, 0 }, enabled = { [0] = false, [1] = true, [2] = true }, hidden = { [0] = true }, note = "mine",
+        ignoredItems = { [3] = true } })
+      dbCategories.Herbs.priority = 4
+      categories:CreateCategory(ctx, { name = "Mats", itemList = { [2447] = true }, save = true })
+      sent = {}
+      local before = categories:GetGeneration()
+      local plain = shared()
+      plain.note, plain.skipRecent = nil, nil
+      assert.is_true(categories:ImportCategory(ctx, plain, "Herbs", true))
+      local f = dbCategories.Herbs
+      assert.are.same({ [765] = true, [2447] = true }, f.itemList)
+      assert.is_nil(dbCategories.Mats.itemList[2447])
+      assert.are.same({ query = "type = herb" }, f.searchCategory)
+      assert.are.equal(2, f.groupBy)
+      assert.are.same({ 0.1, 0.8, 0.2 }, f.color)
+      assert.are.same({ [0] = true, [1] = false, [2] = true }, f.enabled)
+      assert.are.same({ [2] = true }, f.hidden)
+      assert.are.same({ [99] = true }, f.ignoredItems)
+      assert.is_nil(f.note, "the shared one has none")
+      assert.is_nil(f.skipRecent)
+      assert.are.equal(4, f.priority)
+      assert.are.equal("sell", f.automation)
+      assert.is_false(f.confirmSale)
+      assert.are.equal("bank", f.deposit)
+      assert.is_true(categories:GetGeneration() > before)
+      assert.are.same({ { "categories/Changed" }, { "bags/Rederive", { resetLayout = true, buttons = true } } }, sent)
+    end)
+
+    it("replaces one made from a Blizzard category without its group by: it never groups", function()
+      categories:Convert(ctx, "Junk")
+      assert.is_true(categories:ImportCategory(ctx, shared({ name = "Junk" }), "Junk", true))
+      assert.is_true(dbCategories.Junk.blizzard)
+      assert.is_nil(dbCategories.Junk.groupBy)
+      assert.are.same({ query = "type = herb" }, dbCategories.Junk.searchCategory)
+    end)
+
+    it("refuses a name a category has, or to replace one that is not yours, changing nothing", function()
+      categories:CreateCategory(ctx, { name = "Herbs", itemList = {}, save = true })
+      categories:CreateCategory(ctx, { name = "Openable", itemList = {} })
+      sent = {}
+      assert.is_false(categories:ImportCategory(ctx, shared(), "Herbs"))
+      assert.is_false(categories:ImportCategory(ctx, shared(), "Openable"))
+      assert.is_false(categories:ImportCategory(ctx, shared(), "Openable", true))
+      assert.is_false(categories:ImportCategory(ctx, shared(), "Nothing", true))
+      assert.are.same({}, dbCategories.Herbs.itemList)
+      assert.is_nil(dbCategories.Openable)
+      assert.is_nil(dbCategories.Nothing)
+      assert.are.same({}, sent)
+    end)
+
+    it("counts the items an import moves from your other categories", function()
+      categories:CreateCategory(ctx, { name = "Mats", itemList = { [765] = true }, save = true })
+      categories:CreateCategory(ctx, { name = "Herbs", itemList = { [2447] = true }, save = true })
+      assert.are.equal(2, categories:MovesOnImport(shared(), nil), "to a new one, both move")
+      assert.are.equal(1, categories:MovesOnImport(shared(), "Herbs"), "replacing Herbs, its own stays")
+      assert.are.equal(0, categories:MovesOnImport(shared({ itemList = { [5] = true } }), nil))
+    end)
+  end)
+
   describe("AddPermanentItemToCategory", function()
     it("files the item in the saved category, which still reports its bags", function()
       local ctx = context:New("Test")
