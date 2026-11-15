@@ -169,6 +169,17 @@ describe("Constants Module Offsets", function()
     end
   end)
 
+  -- Asked (#471): "we keep current behavior as the default". Every interaction opens the backpack and closes it
+  -- again until the player picks otherwise (interaction-bags.md).
+  it("opens and closes the backpack at every interaction by default", function()
+    loadfile("core/constants.lua")("BetterBags")
+    local const = addon:GetModule("Constants")
+    assert.are.same({ TradePartner = "openClose", Banker = "openClose", AccountBanker = "openClose",
+      Merchant = "openClose", MailInfo = "openClose", Auctioneer = "openClose", GuildBanker = "openClose",
+      VoidStorageBanker = "openClose", ScrappingMachine = "openClose", ItemUpgrade = "openClose" },
+      const.DATABASE_DEFAULTS.profile.interactionBags)
+  end)
+
   -- Items, sections and rows only glide to their new places when the player turns it on
   -- (render-pipeline.md §4c).
   -- BetterBags Next's bags start on opposite edges of the screen, not chained (next.md §12).

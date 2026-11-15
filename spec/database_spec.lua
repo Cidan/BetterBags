@@ -96,6 +96,9 @@ const.DATABASE_DEFAULTS = {
     enableBagFading = false,
     animateItemMovement = false,
     clampBagsToScreen = false,
+    interactionBags = { TradePartner = "openClose", Banker = "openClose", AccountBanker = "openClose",
+      Merchant = "openClose", MailInfo = "openClose", Auctioneer = "openClose", GuildBanker = "openClose",
+      VoidStorageBanker = "openClose", ScrappingMachine = "openClose", ItemUpgrade = "openClose" },
     nextEnabled = false,
     nextVendorEnabled = true,
     nextGuildBankEnabled = true,
@@ -667,6 +670,25 @@ describe("Database", function()
         assert.are.equal(120, x, "put away, it remembers where it was")
         assert.are.equal(340, y)
       end)
+    end)
+
+    -- What the backpack does at each interaction (interaction-bags.md), by the interaction's name in
+    -- Enum.PlayerInteractionType: opened and closed at every one until the player picks otherwise.
+    it("GetInteractionBags / SetInteractionBags, opened and closed at every interaction until told", function()
+      for _, name in ipairs({ "TradePartner", "Banker", "AccountBanker", "Merchant", "MailInfo", "Auctioneer",
+        "GuildBanker", "VoidStorageBanker", "ScrappingMachine", "ItemUpgrade" }) do
+        assert.are.equal("openClose", DB:GetInteractionBags(name), name)
+      end
+      DB:SetInteractionBags("Merchant", "open")
+      assert.are.equal("open", DB:GetInteractionBags("Merchant"))
+      assert.are.equal("openClose", DB:GetInteractionBags("Banker"), "each its own")
+      DB:SetInteractionBags("Merchant", "none")
+      assert.are.equal("none", DB:GetInteractionBags("Merchant"))
+      DB:SetInteractionBags("Merchant", "openClose")
+      assert.are.equal("openClose", DB:GetInteractionBags("Merchant"))
+      assert.has_error(function() DB:GetInteractionBags("Innkeeper") end)
+      assert.has_error(function() DB:SetInteractionBags("Innkeeper", "open") end)
+      assert.has_error(function() DB:SetInteractionBags("Merchant", "close") end)
     end)
 
     it("GetClampBagsToScreen / SetClampBagsToScreen, off until turned on", function()

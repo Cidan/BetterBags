@@ -332,6 +332,8 @@ describe("NextGuildBank", function()
       assert.are.equal("LEFT", g.side)
       assert.are.equal(GUILD, g.kind)
       assert.are.equal("companion", g.chainRole)
+      -- Whether the backpack opens with it is the guild banker interaction's (interaction-bags.md).
+      assert.are.same({ "GuildBanker" }, g.interactions)
       assert.is_false(g:IsShown())
       assert.are.equal("HIGH", g.frame:GetFrameStrata())
     end)

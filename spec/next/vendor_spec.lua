@@ -336,6 +336,8 @@ describe("NextVendor", function()
     it("is the backpack's companion, and its name goes to the chain", function()
       local v = nextVendor:Create(ctx())
       assert.are.equal("companion", v.chainRole)
+      -- Whether the backpack opens with it is the vendor interaction's (interaction-bags.md).
+      assert.are.same({ "Merchant" }, v.interactions)
       local clicked
       override(chain, "Click", function(_, _, panel) clicked = panel return "alone" end)
       v.titleButton:GetScript("OnClick")(v.titleButton, "LeftButton")

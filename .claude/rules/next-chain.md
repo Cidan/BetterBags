@@ -58,7 +58,11 @@ The anchor is the bag at the screen edge; the chained bag faces it, so their rib
   (`chain:Update`). If the backpack has not opened within `style.Chain.AnchorWait` (0.25 s) it opens
   alone from its own edge. The backpack opens after its companion, so it never waits. A bank waiting
   still loads only once it has come in (refresh-scheduler.md §11): wait, stagger and entrance stay
-  under the bank's 1 s show timeout.
+  under the bank's 1 s show timeout. A companion whose interactions all leave the backpack alone
+  (General > Interactions, interaction-bags.md §3) does not wait: the backpack is not coming, so it
+  opens at once from its own edge. Each companion names its interactions (`NextPanelOptions.interactions`:
+  the vendor `Merchant`, the guild bank `GuildBanker`, the bank `Banker` and, with a Warband bank,
+  `AccountBanker`); the bank waits while either of its two opens the backpack.
 - **Out of sight beyond the far edge** (waiting, or held through its stagger: `BeyondFarEdge`), a bag
   that flies home (its anchor closed) or closes leaves through its own edge, never crossing the
   screen.
@@ -181,7 +185,8 @@ room, a tab renamed, the screen's size or the UI scale changing (placed at once)
 narrow; opening alone at its edge, flying to a companion that opens, coming in from behind its
 anchor, staggered after an anchor coming in, falling into place, its sections cascading in only then,
 a companion waiting for the backpack and coming in after it, saying it has shown only once in place,
-coming in alone when the backpack does not open, closing while waiting, flying home from its own
+coming in alone when the backpack does not open, coming in at once when its interaction leaves the
+backpack alone and waiting while either bank interaction opens it, closing while waiting, flying home from its own
 edge when its anchor closes before it came in, not waiting for an open backpack, the bank beside the
 backpack, flying home when the anchor closes or is hidden, `onShown` across a flight; closing through
 the anchor's edge beneath it, held while the anchor leaves then leaving after it, going home once the

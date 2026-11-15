@@ -9,7 +9,7 @@ local addon = LibStub("AceAddon-3.0"):GetAddon("BetterBags")
 
 describe("interaction window refreshes", function()
   local aceAddon = LibStub("AceAddon-3.0")
-  local moduleNames = { "Debug", "Events", "Context", "Items", "Constants" }
+  local moduleNames = { "Debug", "Events", "Context", "Items", "Constants", "Database" }
   local oldModules, oldAddons = {}, {}
   local savedEnum, savedBags, savedGameMenu, savedState
   local sent, bankNeedsRecalculation
@@ -36,6 +36,8 @@ describe("interaction window refreshes", function()
       assert.equal(1, kind, "asked about the bank")
       return bankNeedsRecalculation
     end
+    -- Every interaction opens and closes the backpack, as by default (interaction_bags_spec.lua).
+    StubBetterBagsModule("Database").GetInteractionBags = function() return "openClose" end
 
     savedEnum = _G.Enum
     _G.Enum = _G.Enum or {}

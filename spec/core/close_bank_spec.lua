@@ -14,7 +14,7 @@ local addon = LibStub("AceAddon-3.0"):GetAddon("BetterBags")
 
 describe("addon.CloseBank BankPanel/MoneyDisplay suppression", function()
   local aceAddon = LibStub("AceAddon-3.0")
-  local moduleNames = { "Debug", "Events", "Context", "Constants" }
+  local moduleNames = { "Debug", "Events", "Context", "Constants", "Database" }
   local oldModules, oldAddons = {}, {}
   local savedBankPanel, savedBags, savedEnum, savedCloseBank
 
@@ -31,6 +31,7 @@ describe("addon.CloseBank BankPanel/MoneyDisplay suppression", function()
     events.SendMessage = function() end
     StubBetterBagsModule("Context")
     StubBetterBagsModule("Constants").BAG_KIND = { BACKPACK = 0, BANK = 1 }
+    StubBetterBagsModule("Database")
 
     savedEnum = _G.Enum
     _G.Enum = _G.Enum or {}

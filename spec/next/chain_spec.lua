@@ -81,7 +81,7 @@ local SECTION_GRID = 2
 local SCREEN = 1920
 
 describe("NextChain", function()
-  local buttons, sent, db, backpackGroups, bankGroups, slots, layout, backpack, bank
+  local buttons, sent, db, backpackGroups, bankGroups, slots, layout, backpack, bank, interactionBags
   local eventHandlers = {}
 
   local function fakeButton(slotkey)
@@ -233,6 +233,13 @@ describe("NextChain", function()
     override(stubs.database, "GetNextSectionCompact", function() return false end)
     override(stubs.database, "GetNextSectionWideRows", function() return 2 end)
     override(stubs.database, "SetNextChain", function(_, value) layout = value end)
+    -- What the backpack does at each interaction (interaction-bags.md): opened and closed, until a spec says.
+    interactionBags = { Banker = "openClose", AccountBanker = "openClose", Merchant = "openClose",
+      GuildBanker = "openClose" }
+    override(stubs.database, "GetInteractionBags", function(_, name)
+      assert.is_not_nil(interactionBags[name], "asked about " .. tostring(name))
+      return interactionBags[name]
+    end)
     override(stubs.groups, "GetAllGroups", function(_, kind) return kind == BANK and bankGroups or backpackGroups end)
     override(stubs.groups, "GetGroup", function(_, kind, id) return (kind == BANK and bankGroups or backpackGroups)[id] end)
     override(stubs.groups, "IsDefaultGroup", function() return true end)
@@ -621,6 +628,45 @@ describe("NextChain", function()
       assert.are.equal(0, offset(bank))
       assert.is_true(bank.docked)
       assert.are.equal(1, shown)
+    end)
+
+    -- Asked (#471): an interaction can leave the backpack alone (interaction-bags.md). Then the backpack does not
+    -- open with it, so its companion has nothing to wait for and comes in at once from its own edge.
+    it("brings a companion in at once from its own edge when its interaction leaves the backpack alone", function()
+      layout = "right"
+      interactionBags.Banker, interactionBags.AccountBanker = "none", "none"
+      local shown = 0
+      open(bank, function() shown = shown + 1 end)
+      step(2 / 60)
+      assert.is_true(offset(bank) <= 0 and onScreen(bank), "coming in from its own edge: " .. offset(bank))
+      assert.is_falsy(bank.waiting)
+      settle()
+      assert.are.equal(0, offset(bank))
+      assert.is_true(bank.docked)
+      assert.are.equal(1, shown)
+    end)
+
+    -- The bank opens at a banker and at a Warband banker, and either may open the backpack.
+    it("waits for the backpack while either bank interaction opens it", function()
+      layout = "right"
+      interactionBags.Banker = "none"
+      open(bank)
+      step(style.Chain.AnchorWait * 0.9)
+      assert.is_false(onScreen(bank), "the Warband banker opens the backpack")
+      settle()
+      interactionBags.AccountBanker = "open"
+      close(bank)
+      settle()
+      open(bank)
+      step(style.Chain.AnchorWait * 0.9)
+      assert.is_false(onScreen(bank), "Open Only opens it too")
+      settle()
+      interactionBags.Banker, interactionBags.AccountBanker = "openClose", "none"
+      close(bank)
+      settle()
+      open(bank)
+      step(style.Chain.AnchorWait * 0.9)
+      assert.is_false(onScreen(bank), "the banker opens the backpack")
     end)
 
     it("closes a waiting companion without crossing the screen", function()

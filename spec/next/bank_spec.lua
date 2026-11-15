@@ -347,6 +347,14 @@ describe("NextBank", function()
       assert.are.equal("BankFrame", nextBank:Create(ctx()).standIn)
     end)
 
+    -- Whether the backpack opens with it is these interactions' (interaction-bags.md, chain:WaitsForAnchor).
+    it("opens at a banker, and at a Warband banker on a client with one", function()
+      override(addon, "hasWarbank", true)
+      assert.are.same({ "Banker", "AccountBanker" }, nextBank:Create(ctx()).interactions)
+      addon.hasWarbank = false
+      assert.are.same({ "Banker" }, nextBank:Create(ctx()).interactions)
+    end)
+
     it("feathers its right edge out to nothing and takes no clicks there", function()
       local bank = nextBank:Create(ctx())
       local g = bank.feather._gradient

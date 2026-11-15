@@ -223,6 +223,39 @@ function DB:SetClampBagsToScreen(enabled)
   DB.data.profile.clampBagsToScreen = enabled
 end
 
+---@alias InteractionBags "openClose"|"open"|"none"
+
+-- The values an interaction's choice is checked against (interaction-bags.md).
+local INTERACTION_BAGS = { openClose = true, open = true, none = true }
+
+-- interactionName checks an interaction's name: one of the defaults' (const.DATABASE_DEFAULTS), nothing else.
+---@param name string
+local function interactionName(name)
+  if const.DATABASE_DEFAULTS.profile.interactionBags[name] == nil then
+    error("unknown interaction: " .. tostring(name))
+  end
+end
+
+-- GetInteractionBags returns what the backpack does at an interaction, by its name in Enum.PlayerInteractionType
+-- (interaction-bags.md): "openClose" (it opens with the interaction's window and closes with it), "open" (it opens,
+-- and stays open after) or "none" (it is left as it is). Opened and closed at every interaction until told otherwise.
+---@param name string
+---@return InteractionBags
+function DB:GetInteractionBags(name)
+  interactionName(name)
+  return DB.data.profile.interactionBags[name]
+end
+
+---@param name string
+---@param value InteractionBags
+function DB:SetInteractionBags(name, value)
+  interactionName(name)
+  if not INTERACTION_BAGS[value] then
+    error("not what the backpack does at an interaction: " .. tostring(value))
+  end
+  DB.data.profile.interactionBags[name] = value
+end
+
 -- GetNextEnabled returns whether the backpack is BetterBags Next's panel (next.md); it takes
 -- effect after a reload. Off unless turned on.
 ---@return boolean

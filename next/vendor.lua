@@ -133,6 +133,7 @@ function nextVendor:Create(ctx)
     noDrag = true,
     chainRole = "companion",
     standIn = "MerchantFrame",
+    interactions = { "Merchant" },
   })
   v.tab = TAB_BUY
   v.atMerchant = false

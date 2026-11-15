@@ -73,6 +73,9 @@ Manages all persistent data storage and settings using AceDB-3.0.
 - **Category Management**: Custom category creation, deletion, and item assignment
 - **Filter Settings**: Category filters, stacking options, sorting preferences
 - **Item Settings**: Item level display, new item marking, item locking, and per-character max item level tracking (emits `itemLevel/MaxChanged` for color refresh)
+- **Interactions**: what the backpack does at each interaction, by its name in `Enum.PlayerInteractionType`
+  (`GetInteractionBags`, `SetInteractionBags`: `"openClose"` by default, `"open"`, `"none"`;
+  `.claude/rules/interaction-bags.md`)
 - **Design and Integration Switches**: `GetNextEnabled`; BetterBags Next's vendor and guild bank windows
   (`GetNextVendorEnabled`, `GetNextGuildBankEnabled`, `.claude/rules/next-bagsystem.md` §11g); the QuickFind
   integration (`GetQuickFindEnabled`, `.claude/rules/quickfind.md`); each on by default but BetterBags Next
@@ -114,7 +117,10 @@ Manages UI hooks and interaction with the default Blizzard interface.
 #### Key Features
 
 - Intercepts bag toggle commands
-- Handles NPC interaction windows (vendor, bank, mail, etc.)
+- Handles NPC interaction windows (vendor, bank, mail, etc.): each opens the backpack and closes it again, only
+  opens it, or leaves it alone, as the player picks per interaction (`DB:GetInteractionBags`, General >
+  Interactions, `.claude/rules/interaction-bags.md`); every one recalculates the bags for the window as it opens
+  and closes
 - Forces hiding of Blizzard bag frames
 - Manages button highlight states
 - Coordinates bag opening/closing with game events

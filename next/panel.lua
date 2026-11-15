@@ -245,6 +245,7 @@ end
 ---@field noDrag? boolean Its sections are not dragged, and nothing is dropped on it (the vendor).
 ---@field chainRole "backpack"|"companion" What it is in the chain (next.md §12).
 ---@field standIn? string The global name of the frame of Blizzard's it stands in for, shown and never seen (next-uipanels.md).
+---@field interactions? string[] A companion's: the interactions it opens at, by their names in Enum.PlayerInteractionType (interaction-bags.md).
 
 ---@class (exact) NextHeaderButton
 ---@field key string The field the button is kept in on the panel, and its icon's key in the theme (Header.Buttons.Icons).
@@ -261,6 +262,7 @@ end
 ---@field kind BagKind
 ---@field side NextSide
 ---@field standIn? string The global name of the frame of Blizzard's it stands in for (NextPanelOptions).
+---@field interactions? string[] A companion's: the interactions it opens at (NextPanelOptions).
 ---@field openSound number
 ---@field closeSound number
 ---@field frame Frame The panel.
@@ -421,6 +423,7 @@ function nextPanel:Create(proto, opts)
   p.label = opts.title
   p.side = opts.side
   p.standIn = opts.standIn
+  p.interactions = opts.interactions
   p.openSound = opts.openSound
   p.closeSound = opts.closeSound
   p.offset = 0
