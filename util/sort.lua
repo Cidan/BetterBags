@@ -64,6 +64,33 @@ local function byWorth(aData, bData, worth)
   return aData.itemInfo.itemGUID < bData.itemInfo.itemGUID
 end
 
+-- trackTop is the item level an item's upgrade track takes it to (items:ReadItemTraits), which ranks the tracks
+-- whatever language their names are in; 0 for an item on no track, or read cold.
+---@param data ItemData
+---@return number
+local function trackTop(data)
+  local traits = data.itemInfo.traits
+  return traits and traits.upgradeTrack and traits.upgradeMaxItemLevel or 0
+end
+
+-- byTrack orders two items by upgrade track, the highest first, then as the Item Level order does.
+---@param aData ItemData
+---@param bData ItemData
+---@return boolean
+local function byTrack(aData, bData)
+  local aTop, bTop = trackTop(aData), trackTop(bData)
+  if aTop ~= bTop then
+    return aTop > bTop
+  elseif aData.itemInfo.currentItemLevel ~= bData.itemInfo.currentItemLevel then
+    return aData.itemInfo.currentItemLevel > bData.itemInfo.currentItemLevel
+  elseif aData.itemInfo.itemName ~= bData.itemInfo.itemName then
+    return aData.itemInfo.itemName < bData.itemInfo.itemName
+  elseif aData.itemInfo.currentItemCount ~= bData.itemInfo.currentItemCount then
+    return aData.itemInfo.currentItemCount > bData.itemInfo.currentItemCount
+  end
+  return aData.itemInfo.itemGUID < bData.itemInfo.itemGUID
+end
+
 ---@param kind BagKind
 ---@param view BagView
 ---@return function
@@ -109,6 +136,8 @@ function sort:GetItemSortFunction(kind, view)
     return self.SortItemsBySellPriceStack
   elseif sortType == const.ITEM_SORT_TYPE.SELL_PRICE_EACH then
     return self.SortItemsBySellPriceEach
+  elseif sortType == const.ITEM_SORT_TYPE.UPGRADE_TRACK then
+    return self.SortItemsByUpgradeTrack
   end
   assert(false, "Unknown sort type: " .. sortType)
   return function() end
@@ -302,6 +331,17 @@ end
 ---@param a Item
 ---@param b Item
 ---@return boolean
+function sort.SortItemsByUpgradeTrack(a, b)
+  if a.isFreeSlot then return false end
+  if b.isFreeSlot then return true end
+  local aData, bData = a:GetItemData(), b:GetItemData()
+  if invalidData(aData, bData) then return false end
+  return byTrack(aData, bData)
+end
+
+---@param a Item
+---@param b Item
+---@return boolean
 function sort.GetItemSortBySlot(a, b)
   local aData, bData = a:GetItemData(), b:GetItemData()
   if not aData then return false end
@@ -401,6 +441,16 @@ function sort.SortItemDataBySellPriceEach(aData, bData)
   return byWorth(aData, bData, eachWorth)
 end
 
+---@param aData ItemData
+---@param bData ItemData
+---@return boolean
+function sort.SortItemDataByUpgradeTrack(aData, bData)
+  if aData.isFreeSlot or aData.isItemGap then return false end
+  if bData.isFreeSlot or bData.isItemGap then return true end
+  if invalidData(aData, bData) then return false end
+  return byTrack(aData, bData)
+end
+
 -- slotOrder is where a bag's slots go in slot order: the backpack's keyring (Classic Era, WoW: Forever), whose bag
 -- ID is below the backpack's, after every bag, as its number says (items:GetBagName).
 ---@param bagid number
@@ -444,6 +494,8 @@ function sort:GetItemDataSortFunction(kind, view)
     return self.SortItemDataBySellPriceStack
   elseif sortType == const.ITEM_SORT_TYPE.SELL_PRICE_EACH then
     return self.SortItemDataBySellPriceEach
+  elseif sortType == const.ITEM_SORT_TYPE.UPGRADE_TRACK then
+    return self.SortItemDataByUpgradeTrack
   end
   assert(false, "Unknown sort type: " .. sortType)
   return function() end

@@ -33,6 +33,7 @@ const.ITEM_SORT_TYPE = {
   EXPANSION = 4,
   SELL_PRICE_STACK = 5,
   SELL_PRICE_EACH = 6,
+  UPGRADE_TRACK = 7,
 }
 
 -- Localization: L:G(key) returns the key as-is (no translations loaded)
@@ -751,6 +752,146 @@ describe("Sort", function()
       assert.are.equal(sort.SortItemDataBySellPriceEach,
         sort:GetItemDataSortFunction(const.BAG_KIND.BACKPACK, const.BAG_VIEW.SECTION_GRID))
       assert.are.equal(sort.SortItemsBySellPriceEach,
+        sort:GetItemSortFunction(const.BAG_KIND.BACKPACK, const.BAG_VIEW.SECTION_GRID))
+    end)
+  end)
+
+  -- ─── Item Sort: Upgrade Track ─────────────────────────────────────────────
+  -- Issue #769: gear by its upgrade track (Myth, Hero, Champion...) rather than its item level, which mixes
+  -- the tracks (a Veteran 6/6 is above a Champion 1/6). A track is ranked by the item level it upgrades to
+  -- (items:ReadItemTraits' upgradeMaxItemLevel): the track's name is in the game's language.
+
+  describe("by upgrade track", function()
+    local MockItemData = MockData.ItemData
+
+    -- Gear on a track of 6 ranks, the item level it is at and the one its track upgrades to.
+    local function gear(name, level, track, rank, top, opts)
+      opts = opts or {}
+      return MockItemData({ name = name, currentItemLevel = level, count = opts.count, guid = opts.guid or name,
+        traits = { isEquipment = true, upgradeTrack = track, upgradeLevel = rank, upgradeMax = 6,
+          upgradeMaxItemLevel = top, stats = {} } })
+    end
+
+    -- An item read with its data that is on no track (old gear, a consumable).
+    local function untracked(name, level, opts)
+      opts = opts or {}
+      return MockItemData({ name = name, currentItemLevel = level, count = opts.count, guid = opts.guid or name,
+        traits = { isEquipment = opts.equipment, stats = {} } })
+    end
+
+    it("puts gear on a higher track first, above gear of a lower track at a higher item level", function()
+      local champion = gear("Champion Boots", 308, "Champion", 6, 308)
+      local hero = gear("Hero Boots", 305, "Hero", 1, 321)
+      assert.is_true(sort.SortItemDataByUpgradeTrack(hero, champion))
+      assert.is_false(sort.SortItemDataByUpgradeTrack(champion, hero))
+    end)
+
+    it("puts the higher item level first within a track", function()
+      local low = gear("A Hero Ring", 305, "Hero", 1, 321)
+      local high = gear("B Hero Ring", 311, "Hero", 3, 321)
+      assert.is_true(sort.SortItemDataByUpgradeTrack(high, low))
+      assert.is_false(sort.SortItemDataByUpgradeTrack(low, high))
+    end)
+
+    it("ranks the tracks by the item level they upgrade to, never by their names", function()
+      local list = {
+        gear("Adventurer Cloak", 282, "Adventurer", 6, 282),
+        { isFreeSlot = true, bagid = 0, slotid = 9 },
+        gear("Veteran Belt", 279, "Veteran", 1, 295),
+        untracked("Potion", 1),
+        gear("Champion Belt", 292, "Champion", 1, 308),
+        gear("Veteran Helm", 295, "Veteran", 6, 295),
+        untracked("Old Helm", 250, { equipment = true }),
+        gear("Hero Helm", 305, "Hero", 1, 321),
+        gear("Champion Helm", 308, "Champion", 6, 308),
+        gear("Myth Ring", 318, "Myth", 1, 334),
+      }
+      table.sort(list, sort.SortItemDataByUpgradeTrack)
+      local names = {}
+      for i = 1, 9 do table.insert(names, list[i].itemInfo.itemName) end
+      assert.are.same({ "Myth Ring", "Hero Helm", "Champion Helm", "Champion Belt", "Veteran Helm", "Veteran Belt",
+        "Adventurer Cloak", "Old Helm", "Potion" }, names)
+      assert.is_true(list[10].isFreeSlot)
+    end)
+
+    it("puts an item on no track after every item on one, whatever its item level", function()
+      local adventurer = gear("Adventurer Cloak", 266, "Adventurer", 1, 282)
+      local old = untracked("Old Helm", 400, { equipment = true })
+      assert.is_true(sort.SortItemDataByUpgradeTrack(adventurer, old))
+      assert.is_false(sort.SortItemDataByUpgradeTrack(old, adventurer))
+      -- Read cold: no traits yet, so no track either.
+      local cold = MockItemData({ name = "Cold Helm", currentItemLevel = 500, guid = "cold" })
+      assert.is_true(sort.SortItemDataByUpgradeTrack(adventurer, cold))
+      assert.is_false(sort.SortItemDataByUpgradeTrack(cold, adventurer))
+    end)
+
+    it("orders the items on no track by item level, as Item Level does", function()
+      local high = untracked("Old Helm", 400, { equipment = true })
+      local low = untracked("Older Helm", 300, { equipment = true })
+      assert.is_true(sort.SortItemDataByUpgradeTrack(high, low))
+      assert.is_false(sort.SortItemDataByUpgradeTrack(low, high))
+    end)
+
+    it("falls back to the name, then the bigger pile, and last the GUID", function()
+      local axe = gear("Axe", 305, "Hero", 1, 321)
+      local sword = gear("Sword", 305, "Hero", 1, 321)
+      assert.is_true(sort.SortItemDataByUpgradeTrack(axe, sword))
+      assert.is_false(sort.SortItemDataByUpgradeTrack(sword, axe))
+      local many = untracked("Potion", 1, { count = 20, guid = "z" })
+      local few = untracked("Potion", 1, { count = 5, guid = "a" })
+      assert.is_true(sort.SortItemDataByUpgradeTrack(many, few))
+      assert.is_false(sort.SortItemDataByUpgradeTrack(few, many))
+      local first = untracked("Potion", 1, { guid = "aaa" })
+      local second = untracked("Potion", 1, { guid = "zzz" })
+      assert.is_true(sort.SortItemDataByUpgradeTrack(first, second))
+      assert.is_false(sort.SortItemDataByUpgradeTrack(second, first))
+    end)
+
+    -- A free slot as the harvest reads one (an empty name sorts first by name), and a gap as CloneAsGap makes it: a
+    -- copy of the item that left, here one that would sort first.
+    it("puts free slots and gaps last", function()
+      local item = untracked("Potion", 1)
+      local freeSlot = MockData.EmptySlot()
+      freeSlot.isFreeSlot = true
+      local gapSlot = gear("Myth Ring", 318, "Myth", 1, 334)
+      gapSlot.isItemGap = true
+      assert.is_true(sort.SortItemDataByUpgradeTrack(item, freeSlot))
+      assert.is_false(sort.SortItemDataByUpgradeTrack(freeSlot, item))
+      assert.is_true(sort.SortItemDataByUpgradeTrack(item, gapSlot))
+      assert.is_false(sort.SortItemDataByUpgradeTrack(gapSlot, item))
+    end)
+
+    it("leaves an item without its data unordered", function()
+      local good = gear("Myth Ring", 318, "Myth", 1, 334)
+      local bad = gear("Hero Ring", 305, "Hero", 1, 321)
+      bad.itemInfo.itemGUID = nil
+      assert.is_false(sort.SortItemDataByUpgradeTrack(good, bad))
+      assert.is_false(sort.SortItemDataByUpgradeTrack(bad, good))
+    end)
+
+    it("orders item buttons the same way (SortItemsByUpgradeTrack)", function()
+      local traits = function(track, top)
+        return { isEquipment = true, upgradeTrack = track, upgradeLevel = 1, upgradeMax = 6,
+          upgradeMaxItemLevel = top, stats = {} }
+      end
+      local champion = MockItem({ name = "Champion Boots", currentItemLevel = 308, guid = "a",
+        traits = traits("Champion", 308) })
+      local hero = MockItem({ name = "Hero Boots", currentItemLevel = 305, guid = "b", traits = traits("Hero", 321) })
+      local freeSlot = MockItem({ isFreeSlot = true })
+      local bad = { isFreeSlot = false, GetItemData = function() return nil end }
+      assert.is_true(sort.SortItemsByUpgradeTrack(hero, champion))
+      assert.is_false(sort.SortItemsByUpgradeTrack(champion, hero))
+      assert.is_true(sort.SortItemsByUpgradeTrack(hero, freeSlot))
+      assert.is_false(sort.SortItemsByUpgradeTrack(freeSlot, hero))
+      assert.is_false(sort.SortItemsByUpgradeTrack(hero, bad))
+      assert.is_false(sort.SortItemsByUpgradeTrack(bad, hero))
+    end)
+
+    it("is what GetItemDataSortFunction and GetItemSortFunction give when chosen", function()
+      database.GetItemSortType = function() return const.ITEM_SORT_TYPE.UPGRADE_TRACK end
+      assert.are.equal(sort.SortItemDataByUpgradeTrack,
+        sort:GetItemDataSortFunction(const.BAG_KIND.BACKPACK, const.BAG_VIEW.SECTION_GRID))
+      assert.are.equal(sort.SortItemsByUpgradeTrack,
         sort:GetItemSortFunction(const.BAG_KIND.BACKPACK, const.BAG_VIEW.SECTION_GRID))
     end)
   end)

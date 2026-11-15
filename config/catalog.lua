@@ -484,16 +484,31 @@ local itemOrders = {
   ["Expansion"] = const.ITEM_SORT_TYPE.EXPANSION,
   ["Sell Price (Stack)"] = const.ITEM_SORT_TYPE.SELL_PRICE_STACK,
   ["Sell Price (Each)"] = const.ITEM_SORT_TYPE.SELL_PRICE_EACH,
+  ["Upgrade Track"] = const.ITEM_SORT_TYPE.UPGRADE_TRACK,
 }
+
+-- Upgrade Track only where the client reads upgrade tracks (items:ReadItemTraits): elsewhere no item has one.
+local itemOrderItems = { 'Alphabetically', 'Quality', 'Item Level', 'Expansion', 'Sell Price (Stack)', 'Sell Price (Each)' }
+local itemOrderKeywords = { 'sort', 'items', 'quality', 'item level', 'expansion', 'alphabetical', 'sell price', 'vendor',
+  'value' }
+local upgradeTrackText = ''
+if C_Item.GetItemUpgradeInfo then
+  table.insert(itemOrderItems, 4, 'Upgrade Track')
+  for _, word in ipairs({ 'upgrade track', 'track', 'myth', 'hero', 'champion' }) do
+    table.insert(itemOrderKeywords, word)
+  end
+  upgradeTrackText = ' Upgrade Track puts gear on the highest upgrade track first (Myth, then Hero, Champion...), the '
+    .. 'highest item level first within each.'
+end
 
 define('itemOrder', {
   kind = "dropdown",
   bag = true,
   title = 'Item Order',
-  description = 'The default order of items within each section. Sell Price puts what a vendor pays most for '
-    .. 'first: the whole stack, or one of it.',
-  keywords = { 'sort', 'items', 'quality', 'item level', 'expansion', 'alphabetical', 'sell price', 'vendor', 'value' },
-  items = {'Alphabetically', 'Quality', 'Item Level', 'Expansion', 'Sell Price (Stack)', 'Sell Price (Each)'},
+  description = 'The default order of items within each section.' .. upgradeTrackText .. ' Sell Price puts what a '
+    .. 'vendor pays most for first: the whole stack, or one of it.',
+  keywords = itemOrderKeywords,
+  items = itemOrderItems,
   get = function(_, bag)
     return choiceOf(itemOrders, db:GetItemSortType(bag.kind, db:GetBagView(bag.kind)))
   end,
