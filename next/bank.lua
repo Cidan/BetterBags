@@ -301,9 +301,18 @@ function bankProto:TabData(bagIndex)
   return nil
 end
 
+-- ListsGroups says whether the rail lists the bank's groups from data split by group: groups on, and the Bank Tabs
+-- setting off. Classic has no Bank Tabs mode, but a setting left on splits its data by bag (data/items.lua).
+---@return boolean
+function bankProto:ListsGroups()
+  return not database:GetShowBankTabs() and database:GetGroupsEnabled(self.kind)
+end
+
 -- RefreshTabs lists Blizzard's bank tabs in tab mode, else the bank's groups (none while groups
--- are off), and selects the one shown.
-function bankProto:RefreshTabs()
+-- are off) but those Hide Empty Groups leaves out (ShownTabs), the gap above the first Warbank group
+-- shown, and selects the one shown; with animate they glide.
+---@param animate? boolean
+function bankProto:RefreshTabs(animate)
   if self:InTabMode() then
     self:ListBankTabs()
     return
@@ -323,21 +332,28 @@ function bankProto:RefreshTabs()
   local byID = function(a, b) return a.id < b.id end
   table.sort(bank, byID)
   table.sort(warbank, byID)
-  local entries = self:OrderedTabs(bank)
-  for i, entry in ipairs(self:OrderedTabs(warbank)) do
-    if i == 1 and #bank > 0 then
-      entry.gap = style.TAB_GROUP_GAP
-    end
-    table.insert(entries, entry)
+  local listed = self:OrderedTabs(bank)
+  for _, entry in ipairs(self:OrderedTabs(warbank)) do
+    table.insert(listed, entry)
   end
-  table.insert(entries, {
+  table.insert(listed, {
     id = 0,
     name = "+",
     fixed = true,
     tooltip = { L:G("Create New Group Tab"), L:G("Click to create a new group tab for organizing your items.") },
   })
-  self.tabs:SetTabs(entries)
-  self.tabs:Select(self:GetCurrentTabID())
+  local entries = self:ShownTabs(listed)
+  local bankShown = false
+  for _, entry in ipairs(entries) do
+    if entry.block == "bank" then
+      bankShown = true
+    elseif entry.block == "warbank" then
+      entry.gap = bankShown and style.TAB_GROUP_GAP or nil
+      break
+    end
+  end
+  self.tabs:SetTabs(entries, animate)
+  self.tabs:Select(self:GetCurrentTabID(), animate)
   self.tabs.frame:Show()
 end
 
@@ -738,6 +754,11 @@ function bankProto:WatchKind()
   events:RegisterMessage("groups/EnabledChanged", function(_, kind)
     if kind == self.kind then
       self:RefreshTabs()
+    end
+  end)
+  events:RegisterMessage("groups/HideEmptyChanged", function(_, kind)
+    if kind == self.kind then
+      self:FollowGroups(true)
     end
   end)
 end

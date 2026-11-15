@@ -134,6 +134,31 @@ describe("The settings catalog", function()
     assert.has_error(function() catalog:Get("enableGroups", bank) end, "the bank has no setting enableGroups")
   end)
 
+  -- Asked (#1321): "There should be an option in the settings to allow for hiding of empty layout groups", for the
+  -- backpack and the bank (groups.md §3). Which tabs show needs no recalculation: the bags list their tabs again.
+  it("hides a bag's empty group tabs, the backpack's and the bank's alone, listing the bag's tabs again", function()
+    local hide = { [0] = false, [1] = true }
+    override(db, "GetHideEmptyGroups", function(_, kind) return hide[kind] end)
+    override(db, "SetHideEmptyGroups", function(_, kind, value) hide[kind] = value end)
+    assert.is_true(catalog:Has("hideEmptyGroups", backpack))
+    assert.is_true(catalog:Has("hideEmptyGroups", bank))
+    assert.is_false(catalog:Has("hideEmptyGroups", guild))
+    assert.is_false(catalog:Has("hideEmptyGroups", vendor))
+    local setting = catalog:Get("hideEmptyGroups", backpack)
+    assert.are.equal("toggle", setting.kind)
+    assert.are.equal("Hide Empty Groups", setting.title)
+    assert.are.equal("Hide the tab of a group with nothing in your backpack. The group shown stays, and every group's "
+      .. "tab shows while you drag a section, to drop it on one.", setting.description)
+    assert.are.equal("Hide the tab of a group with nothing in your bank. The group shown stays, and every group's "
+      .. "tab shows while you drag a section, to drop it on one.", catalog:Get("hideEmptyGroups", bank).description)
+    assert.is_false(setting.get(ctx()))
+    assert.is_true(catalog:Get("hideEmptyGroups", bank).get(ctx()))
+    setting.set(ctx(), true)
+    assert.is_true(hide[0])
+    assert.is_true(hide[1], "the bank keeps its own")
+    assert.are.same({ { message = "groups/HideEmptyChanged", args = { 0, true } } }, sent)
+  end)
+
   -- The vendor shows a merchant's items in cards: it has none of the bags' settings of how items are sorted, stacked
   -- and filed, only those that name it (its Size tab and Enable Vendor Window).
   it("gives the vendor only the settings that name it", function()

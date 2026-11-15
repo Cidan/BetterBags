@@ -348,12 +348,20 @@ A bag's tabs of categories (`.claude/rules/groups.md`): creating, renaming and d
 assigning a category to one, and the group shown. The data is saved by `core/database.lua`; which tab
 each category is on is worked out when a bag is recalculated (`items:Phase10_PartitionIntoTabs`).
 
+`HiddenGroups(kind, tabs, shownID)` says which groups' tabs Hide Empty Groups leaves out (groups.md §3): with
+the bag's setting on, every group but its default ones and the one shown with no item in the bag's data by
+tab (`slotInfo.tabs`, each tab's `totalItems`), unless a category was assigned to it since that data was worked
+out (`AssignCategoryToGroup` records the data it was assigned against, so a group a section was just dropped on
+keeps its tab until the bag is recalculated). `SameGroups(a, b)` compares two such sets.
+
 #### Messages
 - `groups/Created (ctx, group)`, `groups/Changed (ctx, groupID, name, oldName, kind)`
 - `groups/Deleted (ctx, groupID, groupName, kind, wasActive)`: sent once the database has deleted the
   group and, if it was shown, made the default group active; `wasActive` says whether it was the one
   shown, so a bag switches to the default group
 - `groups/CategoryAssigned`, `groups/CategoryRemoved`, `groups/ActiveChanged`
+- `groups/HideEmptyChanged (ctx, kind, value)`: a bag's Hide Empty Groups was set (the settings catalog sends
+  it); the bag lists its tabs again
 
 ## Usage Examples
 

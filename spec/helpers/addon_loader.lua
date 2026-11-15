@@ -160,6 +160,40 @@ _G.UseNextCurrencies = function(database, override)
   addon:GetModule("Currencies"):Init()
 end
 
+-- UseHiddenGroups readies the group tabs of BetterBags Next's backpack and bank for a spec that stubs Groups (Hide Empty
+-- Groups, .claude/rules/groups.md §3): Groups' HiddenGroups leaves out the groups hidden names for a kind ({ [kind] =
+-- { [groupID] = true } }), never the group shown, as Groups does, recording what it was asked in hidden.asked ({ kind,
+-- tabs, shownID }); SameGroups compares two sets of groups as Groups does. Installed with the spec's own override so they
+-- are put back after each test. Call it where the spec sets up each test (before_each); it returns hidden.
+---@param groups table
+---@param override fun(tbl: table, key: string, value: any)
+---@param hidden? table
+---@return table
+_G.UseHiddenGroups = function(groups, override, hidden)
+  hidden = hidden or {}
+  hidden.asked = {}
+  override(groups, "HiddenGroups", function(_, kind, tabs, shownID)
+    table.insert(hidden.asked, { kind, tabs, shownID })
+    local out = {}
+    for id in pairs(hidden[kind] or {}) do
+      if id ~= shownID then
+        out[id] = true
+      end
+    end
+    return out
+  end)
+  override(groups, "SameGroups", function(_, a, b)
+    for id in pairs(a) do
+      if not b[id] then return false end
+    end
+    for id in pairs(b) do
+      if not a[id] then return false end
+    end
+    return true
+  end)
+  return hidden
+end
+
 -- UseNextFoodDrink readies BetterBags Next's Food & Drink bar (.claude/rules/food-drink.md) for a spec that builds the
 -- backpack, which makes the bar, or the settings window, which shows its options: the spec's Database answers them
 -- (every option its default, the bar put away), installed with the spec's own override so they are put back after each

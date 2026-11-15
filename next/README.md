@@ -167,6 +167,12 @@ assigns its category to a tab's group, or moves its items to the other bag with
 `SectionFrame:MoveItems`. Targets are found by position every frame. Panels register with
 `NextDrag:Register` and answer `ShownBankType`, `InTabMode` and, for the bank, `BankTypeOfTab`.
 
+With Hide Empty Groups on (`.claude/rules/groups.md` §3), the backpack's and the bank's rails leave out the tabs of groups
+with nothing in them (`panelProto:ShownTabs`, following each draw, `FollowGroups`), and every registered panel shows them
+all while a section is dragged (`RevealGroups`, from `NextDrag:Begin` to its `finish`): the rail lists its tabs again
+gliding (`NextTabs:SetTabs(entries, true)`: a group keeps its own tab, the others slide, a tab coming in fades in and one
+going out fades out).
+
 ## Putting an item in a category from the title
 
 An item dropped on the backpack's or the bank's title (or, in a theme that says so, its bag button: Plain's;

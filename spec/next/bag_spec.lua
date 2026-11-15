@@ -75,7 +75,7 @@ local nextContent = addon:GetModule("NextContent")
 describe("NextBag", function()
   local buttons, sent, messages, buckets, groupsEnabled, activeGroup, allGroups, expired, inBagSearch
   local views, previousView, bagTextures, bagNames, bagCalls, events, tabOrder
-  local box, helper, placed, slotInfo
+  local box, helper, placed, slotInfo, hidden
 
   -- fakeButton stands in for an item button, recording what is done to it.
   local function fakeButton(slotkey)
@@ -148,6 +148,7 @@ describe("NextBag", function()
     override(stubs.database, "SetNextTabOrder", function(_, key, ids) tabOrder[key] = ids end)
     override(stubs.groups, "GetAllGroups", function() return allGroups end)
     override(stubs.groups, "GetGroup", function(_, _, id) return allGroups[id] end)
+    hidden = UseHiddenGroups(stubs.groups, override)
     override(stubs.events, "SendMessage", function(_, _, name, opts) table.insert(sent, { name, opts }) end)
     override(stubs.events, "RegisterMessage", function(_, name, fn) messages[name] = fn end)
     override(stubs.events, "BucketEvent", function(_, name, fn, filter) buckets[name] = { fn, filter } end)
@@ -1384,6 +1385,208 @@ describe("NextBag", function()
       assert.are.equal(3, bag.tabs.selected)
       assert.are.equal("Ore", bag.content.order[1].name)
       assert.are.equal(3, #bag.tabs.tabs)
+    end)
+
+    -- Hide Empty Groups (#1321, groups.md §3): Groups says which groups are empty; the backpack leaves their tabs out,
+    -- shows them all while a section is dragged (asked: "agree with showing all sections when dragging a section, animate
+    -- it"), and keeps their places in the order saved.
+    describe("leaving out empty groups", function()
+      local function ids(bag)
+        local out = {}
+        for _, tab in ipairs(bag.tabs.tabs) do table.insert(out, tab.id) end
+        return out
+      end
+
+      before_each(function()
+        allGroups[3] = { id = 3, name = "Ore" }
+        slotInfo.tabs[3] = { categories = { { name = "Ore" } }, items = { item("0_9", "Ore") } }
+      end)
+
+      it("leaves out the tabs Groups says are empty, asking with the data it drew and the group it shows", function()
+        hidden[BACKPACK] = { [2] = true }
+        local bag = opened()
+        assert.are.same({ 1, 3, 0 }, ids(bag))
+        assert.are.same({ BACKPACK, slotInfo.tabs, 1 }, hidden.asked[#hidden.asked])
+        assert.are.equal(1, bag.tabs.selected)
+      end)
+
+      it("lists its tabs again, gliding, when a draw empties a group or fills one", function()
+        local bag = opened()
+        assert.are.same({ 1, 2, 3, 0 }, ids(bag))
+        local ore = bag.tabs:Tab(3)
+        hidden[BACKPACK] = { [2] = true }
+        bag:Draw(ctx(), slotInfo, function() end)
+        assert.are.same({ 1, 3, 0 }, ids(bag))
+        assert.is_true(tween:IsPlaying(ore.yKey), "Ore slides up into its place")
+        finishTweens()
+        hidden[BACKPACK] = {}
+        bag:Draw(ctx(), slotInfo, function() end)
+        assert.are.same({ 1, 2, 3, 0 }, ids(bag))
+        assert.are.equal(0, bag.tabs:Tab(2).button:GetAlpha(), "Herbs fades in")
+      end)
+
+      it("lists nothing again for a draw that leaves the same groups empty", function()
+        hidden[BACKPACK] = { [2] = true }
+        local bag = opened()
+        local listed = 0
+        local setTabs = bag.tabs.SetTabs
+        bag.tabs.SetTabs = function(rail, ...)
+          listed = listed + 1
+          return setTabs(rail, ...)
+        end
+        bag:Draw(ctx(), slotInfo, function() end)
+        assert.are.equal(0, listed)
+      end)
+
+      it("lists its tabs as it opens without gliding", function()
+        local bag = nextBag:Create(ctx())
+        hidden[BACKPACK] = { [2] = true }
+        bag:Draw(ctx(), slotInfo, function() end)
+        bag:Show(ctx())
+        assert.are.same({ 1, 3, 0 }, ids(bag))
+        assert.is_false(tween:IsPlaying(bag.tabs:Tab(3).yKey))
+      end)
+
+      it("leaves out the group it showed once it shows another", function()
+        hidden[BACKPACK] = { [2] = true }
+        activeGroup = 2
+        local bag = opened()
+        assert.are.same({ 1, 2, 3, 0 }, ids(bag), "the group shown stays")
+        bag:SwitchToGroup(ctx(), 1)
+        assert.are.same({ 1, 3, 0 }, ids(bag))
+        assert.are.equal(1, bag.tabs.selected)
+      end)
+
+      it("shows every group's tab while a section is dragged, and leaves the empty ones out once it ends", function()
+        hidden[BACKPACK] = { [2] = true }
+        local bag = opened()
+        bag:RevealGroups(true)
+        assert.are.same({ 1, 2, 3, 0 }, ids(bag))
+        assert.are.equal(0, bag.tabs:Tab(2).button:GetAlpha(), "Herbs fades in")
+        bag:Draw(ctx(), slotInfo, function() end)
+        assert.are.same({ 1, 2, 3, 0 }, ids(bag), "a draw meanwhile keeps them")
+        finishTweens()
+        bag:RevealGroups(false)
+        assert.are.same({ 1, 3, 0 }, ids(bag))
+        assert.is_true(tween:IsPlaying(bag.tabs:Tab(3).yKey), "Ore slides back up")
+      end)
+
+      it("keeps the place of a group it leaves out when the tabs it shows are moved", function()
+        hidden[BACKPACK] = { [2] = true }
+        local bag = opened()
+        bag.tabs.onReorder(ctx(), { 3, 1, 0 })
+        assert.are.same({ 3, 2, 1, 0 }, tabOrder.backpack)
+        assert.are.same({ 3, 1, 0 }, ids(bag))
+        bag:RevealGroups(true)
+        assert.are.same({ 3, 2, 1, 0 }, ids(bag))
+      end)
+
+      it("lists its tabs again when its Hide Empty Groups is turned on or off, and not another bag's", function()
+        local bag = opened()
+        hidden[BACKPACK] = { [2] = true }
+        messages["groups/HideEmptyChanged"](ctx(), 1, true)
+        assert.are.same({ 1, 2, 3, 0 }, ids(bag), "the bank's")
+        messages["groups/HideEmptyChanged"](ctx(), BACKPACK, true)
+        assert.are.same({ 1, 3, 0 }, ids(bag))
+      end)
+
+      -- Data never read has no tabs: Groups is asked with the last data that had them.
+      it("asks with the last data that had tabs while the data it draws has none", function()
+        local bag = opened()
+        local drawn = slotInfo.tabs
+        bag:Draw(ctx(), { sortedItems = {} }, function() end)
+        assert.are.equal(drawn, hidden.asked[#hidden.asked][2])
+      end)
+
+      it("asks Groups nothing with groups off, nor for its bag slots' tabs, which a draw lists no more", function()
+        groupsEnabled = false
+        opened()
+        assert.are.same({}, hidden.asked)
+        groupsEnabled = true
+        views[BACKPACK] = 4
+        local bag = opened()
+        assert.are.same({}, hidden.asked)
+        assert.are.equal(5, #bag.tabs.tabs)
+        local listed = 0
+        local setTabs = bag.tabs.SetTabs
+        bag.tabs.SetTabs = function(rail, ...)
+          listed = listed + 1
+          return setTabs(rail, ...)
+        end
+        bag:Draw(ctx(), slotInfo, function() end)
+        assert.are.equal(0, listed)
+      end)
+
+      -- Found by the bug review: the Show Bags view's data counts every item in every tab (data/items.lua,
+      -- ItemBelongsToTab), and leaving it listed the tabs from that data, then again from the recalculation after.
+      it("goes by the last data split by group as it leaves its bags", function()
+        local bag = opened()
+        local grouped = slotInfo.tabs
+        bag:ToggleBlizzardBags(ctx())
+        bag:Draw(ctx(), data(), function() end)
+        bag:ToggleBlizzardBags(ctx())
+        assert.are.equal(grouped, hidden.asked[#hidden.asked][2])
+      end)
+
+      -- pressTab presses a tab and moves it (NextTabs:BeginMove), the rail and its tabs where the client would put them.
+      local function pressTab(bag, id)
+        local tab = bag.tabs:Tab(id)
+        UIParent:_SetRect(0, 0, 1920, 1200)
+        bag.tabs.frame:_SetRect(900, 200, 120, 600)
+        for _, t in ipairs(bag.tabs.tabs) do
+          t.button:_SetRect(1020 - t.width, 800 - t.y - style.TAB_HEIGHT, t.width, style.TAB_HEIGHT)
+        end
+        _G._cursorX, _G._cursorY = tab.button:GetLeft() + 10, tab.button:GetTop() - style.TAB_HEIGHT / 2
+        _G._mouseButtonsDown = { LeftButton = true }
+        finally(function()
+          bag.tabs:CancelMove()
+          _G._mouseButtonsDown = nil
+        end)
+        tab.button:GetScript("OnDragStart")(tab.button)
+        assert.is_not_nil(bag.tabs.moving)
+        return tab
+      end
+
+      -- Found by the bug review: a draw listing the tabs again put a tab being moved back (NextTabs:SetTabs cancels a
+      -- move).
+      it("lists nothing again while a tab is moved, and goes by the groups left out after", function()
+        local bag = opened()
+        pressTab(bag, 3)
+        hidden[BACKPACK] = { [2] = true }
+        bag:Draw(ctx(), slotInfo, function() end)
+        assert.is_not_nil(bag.tabs.moving, "still moving")
+        assert.are.same({ 1, 2, 3, 0 }, ids(bag))
+        bag.tabs:CancelMove()
+        bag:Draw(ctx(), slotInfo, function() end)
+        assert.are.same({ 1, 3, 0 }, ids(bag))
+      end)
+
+      -- Found by the second bug review: a tab let go where it began tells its reorder handler nothing, so nothing listed
+      -- the tabs again for the draw it held off.
+      it("goes by the groups left out once a tab moved lands back where it was", function()
+        local bag = opened()
+        local ore = pressTab(bag, 3)
+        hidden[BACKPACK] = { [2] = true }
+        bag:Draw(ctx(), slotInfo, function() end)
+        _G._mouseButtonsDown = nil
+        ore.button:GetScript("OnDragStop")(ore.button)
+        finishTweens()
+        assert.is_nil(bag.tabs.moving)
+        assert.are.same({}, tabOrder, "nothing moved")
+        assert.are.same({ 1, 3, 0 }, ids(bag))
+      end)
+
+      -- Found by the third bug review: a move put back as the rail hides (its bag closed by its keybinding) never landed,
+      -- and the tabs went by the groups left out before it until the next draw.
+      it("goes by the groups left out once a tab moved is put back as its rail hides", function()
+        local bag = opened()
+        pressTab(bag, 3)
+        hidden[BACKPACK] = { [2] = true }
+        bag:Draw(ctx(), slotInfo, function() end)
+        bag.tabs.frame:GetScript("OnHide")(bag.tabs.frame)
+        assert.is_nil(bag.tabs.moving)
+        assert.are.same({ 1, 3, 0 }, ids(bag))
+      end)
     end)
   end)
 

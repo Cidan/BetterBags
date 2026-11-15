@@ -273,10 +273,17 @@ function bagProto:BagSlotTooltip(invID, hasBag, empty)
   GameTooltip:AddLine(L:G("Drop a bag here to put it in this slot."), nil, nil, nil, true)
 end
 
--- RefreshTabs lists the backpack's groups as tabs, in their order, with a last one to make a
--- group, and selects the active one. With groups off there are no tabs. Showing Blizzard's bags, it
--- lists the bag slots (ListBags).
-function bagProto:RefreshTabs()
+-- ListsGroups says whether the rail lists the backpack's groups: groups on, its bags not shown.
+---@return boolean
+function bagProto:ListsGroups()
+  return not self:ShowsBlizzardBags() and database:GetGroupsEnabled(self.kind)
+end
+
+-- RefreshTabs lists the backpack's groups as tabs, in their order, but those Hide Empty Groups leaves out (ShownTabs),
+-- with a last one to make a group, and selects the active one; with animate they glide. With groups off there are no
+-- tabs. Showing Blizzard's bags, it lists the bag slots (ListBags).
+---@param animate? boolean
+function bagProto:RefreshTabs(animate)
   if self:ShowsBlizzardBags() then
     self:ListBags()
     return
@@ -297,8 +304,8 @@ function bagProto:RefreshTabs()
     fixed = true,
     tooltip = { L:G("New Group..."), L:G("Click to create a new group for organizing categories.") },
   })
-  self.tabs:SetTabs(entries)
-  self.tabs:Select(self:GetCurrentTabID())
+  self.tabs:SetTabs(self:ShownTabs(entries), animate)
+  self.tabs:Select(self:GetCurrentTabID(), animate)
   self.tabs.frame:Show()
 end
 
@@ -394,6 +401,11 @@ function bagProto:WatchKind()
   events:RegisterMessage("groups/EnabledChanged", function(_, kind)
     if kind == self.kind then
       self:RefreshTabs()
+    end
+  end)
+  events:RegisterMessage("groups/HideEmptyChanged", function(_, kind)
+    if kind == self.kind then
+      self:FollowGroups(true)
     end
   end)
 end

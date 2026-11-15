@@ -132,6 +132,8 @@ The `sectionFrame` module tracks three module-level fields during a drag:
 - `draggingKind` — `BagKind` of the source section (backpack or bank)
 - `draggingBankType` — `bankType` of the active bank group at drag start (nil for backpack drags)
 
+While a section is dragged, every group's tab of both bags shows, so a category can be dropped on a group Hide Empty Groups hides (`RevealGroupTabs(true)` at the drag's start, `RevealGroupTabs(false)` once it is dropped and assigned: each bag's `behavior:RevealGroups`, `.claude/rules/groups.md` §3).
+
 **Main Class:**
 ```lua
 ---@class Section

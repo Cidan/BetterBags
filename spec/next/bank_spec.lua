@@ -75,7 +75,7 @@ local EMPTY_BAG_SLOT = [[Interface\PaperDoll\UI-PaperDoll-Slot-Bag]]
 
 describe("NextBank", function()
   local buttons, sent, messages, eventsRegistered, buckets, calls
-  local db, allGroups, slotInfo, purchased, nextPurchasable, moneyMade
+  local db, allGroups, slotInfo, purchased, nextPurchasable, moneyMade, hidden
 
   local function fakeButton(slotkey)
     local b = { slotkey = slotkey, frame = CreateFrame("Frame"), released = 0 }
@@ -199,6 +199,7 @@ describe("NextBank", function()
     override(stubs.groups, "GetGroup", function(_, _, id) return allGroups[id] end)
     override(stubs.groups, "IsDefaultGroup", function(_, _, id) return allGroups[id] and allGroups[id].isDefault == true end)
     override(stubs.groups, "GetDefaultBankGroup", function() return allGroups[2] end)
+    hidden = UseHiddenGroups(stubs.groups, override)
     override(stubs.events, "SendMessage", function(_, _, name, opts) table.insert(sent, { name, opts }) end)
     override(stubs.events, "RegisterMessage", function(_, name, fn) messages[name] = fn end)
     override(stubs.events, "RegisterEvent", function(_, name, fn) eventsRegistered[name] = fn end)
@@ -807,6 +808,66 @@ describe("NextBank", function()
       bank.behavior:SwitchToGroup(ctx(), 4)
       assert.are.equal(4, db.active)
     end)
+
+    -- Hide Empty Groups (#1321, groups.md §3): Groups says which groups are empty; the bank leaves their tabs out.
+    it("leaves out the groups Groups says are empty, the Warbank's gap above the first of its groups shown", function()
+      db.tabOrder.bank = { 5, 3 }
+      hidden[BANK] = { [4] = true, [5] = true }
+      local bank = opened()
+      assert.are.same({ 2, 3, 0 }, tabIDs(bank))
+      assert.are.same({ BANK, slotInfo.tabs, 2 }, hidden.asked[#hidden.asked])
+      local step = style.TAB_HEIGHT + style.TAB_SPACING
+      assert.are.equal(step + style.TAB_GROUP_GAP, tabOf(bank, 3).y)
+    end)
+
+    it("keeps the places of the groups it leaves out when the tabs it shows are moved", function()
+      hidden[BANK] = { [4] = true }
+      local bank = opened()
+      assert.are.same({ 2, 3, 5, 0 }, tabIDs(bank))
+      bank.tabs.onReorder(ctx(), { 2, 5, 3, 0 })
+      assert.are.same({ 2, 4, 5, 3, 0 }, db.tabOrder.bank)
+      assert.are.same({ 2, 5, 3, 0 }, tabIDs(bank))
+    end)
+
+    it("shows every group's tab while a section is dragged", function()
+      hidden[BANK] = { [4] = true }
+      local bank = opened()
+      bank:RevealGroups(true)
+      assert.are.same({ 2, 4, 3, 5, 0 }, tabIDs(bank))
+      bank:RevealGroups(false)
+      assert.are.same({ 2, 3, 5, 0 }, tabIDs(bank))
+    end)
+
+    -- The bank's data is cleared when it closes, and has no tabs until the bank is read again as it opens
+    -- (items:ClearBankCache): Groups is asked with the last read's.
+    it("asks with the last read's data while the bank is read again", function()
+      local bank = opened()
+      local read = slotInfo.tabs
+      bank:Draw(ctx(), { sortedItems = {} }, function() end)
+      assert.are.equal(read, hidden.asked[#hidden.asked][2])
+    end)
+
+    -- Found by the bug review: Bank Tabs mode's data is split by Blizzard's bank tabs (data/items.lua,
+    -- GetPossibleTabIDs), and leaving it listed the groups from that data, then again from the recalculation after.
+    it("goes by the last data split by group as it leaves Bank Tabs mode", function()
+      local bank = opened()
+      local grouped = slotInfo.tabs
+      bank:ToggleBankTabs(ctx())
+      bank:Draw(ctx(), data(), function() end)
+      bank:ToggleBankTabs(ctx())
+      assert.are.equal(grouped, hidden.asked[#hidden.asked][2])
+    end)
+
+    -- Classic has no Bank Tabs mode, but the data is split by bag while the setting is left on (data/items.lua).
+    it("leaves out no group on Classic with the Bank Tabs setting left on", function()
+      client("classic")
+      override(Enum, "BankType", nil)
+      db.showBankTabs = true
+      hidden[BANK] = { [4] = true }
+      local bank = opened()
+      assert.are.same({ 2, 3, 4, 5, 0 }, tabIDs(bank))
+      assert.are.same({}, hidden.asked)
+    end)
   end)
 
   describe("bank tabs (retail)", function()
@@ -815,6 +876,22 @@ describe("NextBank", function()
       db.view = SECTION_ALL_BAGS
       return opened()
     end
+
+    -- Hide Empty Groups is the groups' (#1321, groups.md §3): Blizzard's tabs are listed whatever is in them.
+    it("asks Groups nothing for Blizzard's tabs, lists every one, and lists them no more on a draw", function()
+      hidden[BANK] = { [6] = true, [7] = true }
+      local bank = inTabMode()
+      assert.are.same({}, hidden.asked)
+      assert.are.same({ 6, 7, -1, 12, -2 }, tabIDs(bank))
+      local listed = 0
+      local setTabs = bank.tabs.SetTabs
+      bank.tabs.SetTabs = function(rail, ...)
+        listed = listed + 1
+        return setTabs(rail, ...)
+      end
+      bank:Draw(ctx(), slotInfo, function() end)
+      assert.are.equal(0, listed)
+    end)
 
     it("lists the purchased character tabs, then the Warbank's in teal, then a + for each that can be bought", function()
       local bank = inTabMode()

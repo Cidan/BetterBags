@@ -93,7 +93,7 @@ local CANVAS_TOP = 1090
 
 describe("NextDrag", function()
   local buttons, sent, pins, db, backpackGroups, bankGroups, slots, calls, backpack, bank, guild
-  local fileResult, itemIDs
+  local fileResult, itemIDs, hidden
 
   -- An item button: a holder frame and, inside it, the button the player clicks. Like Blizzard's
   -- (ContainerFrameItemButtonMixin:OnReceiveDrag calls OnDragStart, which is a left click), a drag
@@ -322,6 +322,7 @@ describe("NextDrag", function()
       assert.is_not_nil(c)
       table.insert(calls.assigned, { kind, name, id, bankType })
     end)
+    hidden = UseHiddenGroups(stubs.groups, override)
     override(stubs.events, "SendMessage", function(_, _, name, opts) table.insert(sent, { name, opts }) end)
     override(stubs.events, "RegisterMessage", function() end)
     override(stubs.events, "RegisterEvent", function() end)
@@ -988,6 +989,74 @@ describe("NextDrag", function()
       moveTo(cx, cy)
       assert.are.equal("tab", nextDrag:FindTarget().type)
       drop(s)
+    end)
+  end)
+
+  -- Hide Empty Groups (#1321, groups.md §3): asked "agree with showing all sections when dragging a section, animate it".
+  describe("the tabs of empty groups", function()
+    local function ids(panel)
+      local out = {}
+      for _, t in ipairs(panel.tabs.tabs) do table.insert(out, t.id) end
+      return out
+    end
+
+    before_each(function()
+      hidden[BACKPACK] = { [2] = true }
+      hidden[BANK] = { [12] = true }
+      for _, panel in ipairs({ backpack, bank }) do
+        panel:Draw(ctx(), slots[panel.kind], function() end)
+      end
+      finishTweens()
+      flush()
+    end)
+
+    it("shows every group's tab of both bags while a section is dragged, fading in", function()
+      assert.are.same({ 1, 0 }, ids(backpack))
+      assert.are.same({ 10, 11, 0 }, ids(bank))
+      pickUp(backpack, "Herbs")
+      assert.are.same({ 1, 2, 0 }, ids(backpack))
+      assert.are.same({ 10, 12, 11, 0 }, ids(bank))
+      assert.are.equal(0, backpack.tabs:Tab(2).button:GetAlpha())
+      assert.are.equal(0, bank.tabs:Tab(12).button:GetAlpha())
+    end)
+
+    it("leaves the empty ones out again, gliding, once the section lands back", function()
+      local herbs = pickUp(backpack, "Herbs")
+      finishTweens()
+      drop(herbs)
+      finishTweens()
+      assert.are.same({ 1, 0 }, ids(backpack))
+      assert.are.same({ 10, 11, 0 }, ids(bank))
+    end)
+
+    it("leaves them out at once when the drag is cancelled", function()
+      pickUp(backpack, "Herbs")
+      nextDrag:Cancel()
+      assert.are.same({ 1, 0 }, ids(backpack))
+      assert.are.same({ 10, 11, 0 }, ids(bank))
+    end)
+
+    -- Groups keeps a group a category was just assigned to until its bag is worked out again (groups.md §3).
+    it("keeps the empty group's tab a section was dropped on, which pulses", function()
+      override(stubs.groups, "AssignCategoryToGroup", function(_, _, kind, name, id)
+        table.insert(calls.assigned, { kind, name, id })
+        hidden[kind][id] = nil
+      end)
+      local herbs = pickUp(backpack, "Herbs")
+      finishTweens()
+      flush()
+      local gems = backpack.tabs:Tab(2)
+      moveTo(centerOf(gems.button))
+      assert.are.equal(2, backpack.tabs.dropTarget)
+      drop(herbs)
+      tween:Step(style.Time.FlyAway + 0.001)
+      assert.are.same({ { BACKPACK, "Herbs", 2 } }, calls.assigned)
+      assert.are.same({ 1, 2, 0 }, ids(backpack))
+      assert.are.equal(gems, backpack.tabs:Tab(2), "the same tab")
+      assert.is_true(gems.glow:IsShown(), "it pulses")
+      finishTweens()
+      assert.are.same({ 1, 2, 0 }, ids(backpack))
+      assert.are.same({ 10, 11, 0 }, ids(bank))
     end)
   end)
 

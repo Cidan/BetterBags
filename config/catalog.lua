@@ -518,6 +518,24 @@ define('enableGroups', {
   end,
 })
 
+-- Which tabs show changes nothing the data phase works out: the bags list their tabs again (groups.md §3).
+define('hideEmptyGroups', {
+  kind = "toggle",
+  bag = true,
+  only = { const.BAG_KIND.BACKPACK, const.BAG_KIND.BANK },
+  title = 'Hide Empty Groups',
+  description = function(bag)
+    return 'Hide the tab of a group with nothing in your ' .. lower(bag) .. '. The group shown stays, and every '
+      .. "group's tab shows while you drag a section, to drop it on one."
+  end,
+  keywords = { 'tabs', 'groups', 'empty', 'hide' },
+  get = function(_, bag) return db:GetHideEmptyGroups(bag.kind) end,
+  set = function(ctx, value, bag)
+    db:SetHideEmptyGroups(bag.kind, value)
+    events:SendMessage(ctx, 'groups/HideEmptyChanged', bag.kind, value)
+  end,
+})
+
 -- Blizzard's item categories, each a category filter of the bag.
 local filters = {
   { 'filterEquipmentLocation', 'EquipmentLocation', 'Equipment Location',

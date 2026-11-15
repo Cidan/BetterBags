@@ -490,6 +490,35 @@ describe("Section Frame", function()
       sectionFrame:ResetTabHighlights()
       assert.are.same({ bankTabs }, reset)
     end)
+
+    -- Hide Empty Groups (#1321, groups.md §3): every group's tab of both bags shows while a section is dragged, so it
+    -- can be dropped on one, and the empty ones go once it is dropped.
+    it("shows every group's tab of both bags while a section is dragged by its title, until it is dropped", function()
+      local tabsModule, created = StubBetterBagsModule("Tabs")
+      local saved = { reset = rawget(tabsModule, "ResetDropHighlights"), bags = addon.Bags }
+      tabsModule.ResetDropHighlights = function() end
+      local revealed = {}
+      local function behavior(name)
+        return { RevealGroups = function(_, ctx, on)
+          assert.is_not_nil(ctx)
+          table.insert(revealed, { name, on, sectionFrame.draggingCategory })
+        end }
+      end
+      addon.Bags = { Backpack = { tabs = {}, behavior = behavior("backpack") }, Bank = { tabs = {}, behavior = behavior("bank") } }
+      finally(function()
+        tabsModule.ResetDropHighlights = saved.reset
+        addon.Bags = saved.bags
+        if created then ResetModuleStub("Tabs") end
+      end)
+      local s = sectionFrame:Create(context:New("TestRevealGroups"))
+      s:SetTitle("Herbalism")
+      s.kind = const.BAG_KIND.BACKPACK
+      s.title:GetScript("OnDragStart")(s.title)
+      assert.are.same({ { "backpack", true, "Herbalism" }, { "bank", true, "Herbalism" } }, revealed)
+      revealed = {}
+      s.title:GetScript("OnDragStop")(s.title)
+      assert.are.same({ { "backpack", false }, { "bank", false } }, revealed, "once the drag is over")
+    end)
   end)
 
   teardown(function()

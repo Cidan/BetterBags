@@ -79,6 +79,11 @@ end
 database.GetActiveGroup = function(_, kind) return dbActiveGroups[kind] or 1 end
 database.SetActiveGroup = function(_, kind, groupID) dbActiveGroups[kind] = groupID end
 database.GetCustomSectionSort = function() return {} end
+local dbHideEmpty = {}      -- [kind] = Hide Empty Groups
+database.GetHideEmptyGroups = function(_, kind) return dbHideEmpty[kind] == true end
+
+-- The bags' data as Items holds it (items:GetAllSlotInfo), read when a category is assigned to a group.
+local itemsModule, itemsCreated = StubBetterBagsModule("Items")
 
 -- Stub Enum for GetDefaultBankGroup
 _G.Enum = _G.Enum or {}
@@ -88,12 +93,24 @@ LoadBetterBagsModule("data/groups.lua")
 local groups = addon:GetModule("Groups")
 
 describe("Groups", function()
+  local savedSlotInfo, slotInfo
 
   before_each(function()
     for k in pairs(dbGroups) do dbGroups[k] = nil end
     for k in pairs(dbCategoryGroups) do dbCategoryGroups[k] = nil end
     for k in pairs(dbActiveGroups) do dbActiveGroups[k] = nil end
     nextGroupID = 100
+    savedSlotInfo = rawget(itemsModule, "GetAllSlotInfo")
+    slotInfo = {}
+    itemsModule.GetAllSlotInfo = function() return slotInfo end
+  end)
+
+  after_each(function()
+    itemsModule.GetAllSlotInfo = savedSlotInfo
+  end)
+
+  teardown(function()
+    if itemsCreated then ResetModuleStub("Items") end
   end)
 
   -- ─── CRUD ───────────────────────────────────────────────────────────────────
@@ -415,6 +432,104 @@ describe("Groups", function()
     it("is a no-op for categories that were never assigned", function()
       local ctx = context:New("Test")
       groups:OnCategoryDeleted(ctx, "NeverExisted") -- should not error
+    end)
+  end)
+
+  -- ─── HiddenGroups (Hide Empty Groups, groups.md §3) ─────────────────────────
+
+  -- Asked (#1321): "There should be an option in the settings to allow for hiding of empty layout groups."
+  describe("HiddenGroups", function()
+    local BACKPACK, BANK = const.BAG_KIND.BACKPACK, const.BAG_KIND.BANK
+
+    before_each(function()
+      dbHideEmpty[BACKPACK], dbHideEmpty[BANK] = true, true
+    end)
+
+    after_each(function()
+      dbHideEmpty[BACKPACK], dbHideEmpty[BANK] = nil, nil
+    end)
+
+    -- tabsOf is a bag's data by tab, as items:Phase10_PartitionIntoTabs works it out: each tab's items counted.
+    local function tabsOf(counts)
+      local out = {}
+      for id, n in pairs(counts) do out[id] = { items = {}, categories = {}, totalItems = n, hiddenItems = 0 } end
+      return out
+    end
+
+    it("leaves out no group while it is off", function()
+      dbHideEmpty[BACKPACK] = false
+      local herbs = groups:CreateGroup(context:New("Test"), BACKPACK, "Herbs")
+      assert.are.same({}, groups:HiddenGroups(BACKPACK, tabsOf({ [1] = 0, [herbs.id] = 0 }), 1))
+    end)
+
+    it("leaves out each group with nothing in it, never the default group nor the one shown", function()
+      local ctx = context:New("Test")
+      local herbs = groups:CreateGroup(ctx, BACKPACK, "Herbs")
+      local ore = groups:CreateGroup(ctx, BACKPACK, "Ore")
+      local made = groups:CreateGroup(ctx, BACKPACK, "Made Since")
+      dbGroups[BACKPACK][1] = { id = 1, name = "Backpack" }
+      -- Made since the data was worked out: no tab of its own in it yet, so nothing in it.
+      local tabs = tabsOf({ [1] = 0, [herbs.id] = 0, [ore.id] = 3 })
+      assert.are.same({ [herbs.id] = true, [made.id] = true }, groups:HiddenGroups(BACKPACK, tabs, 1))
+      assert.are.same({ [made.id] = true }, groups:HiddenGroups(BACKPACK, tabs, herbs.id), "the group shown stays")
+    end)
+
+    -- A tab's count leaves out what a category hides in the bag (items:Phase10_PartitionIntoTabs): such a group shows
+    -- nothing, and counts as empty (asked: "count hidden groups as empty").
+    it("counts a group whose only items a category hides as empty", function()
+      local herbs = groups:CreateGroup(context:New("Test"), BACKPACK, "Herbs")
+      local tabs = tabsOf({ [1] = 2, [herbs.id] = 0 })
+      tabs[herbs.id].hiddenItems = 4
+      assert.are.same({ [herbs.id] = true }, groups:HiddenGroups(BACKPACK, tabs, 1))
+    end)
+
+    it("never leaves out the bank's default groups", function()
+      local ctx = context:New("Test")
+      local bank = groups:CreateGroup(ctx, BANK, "Bank", Enum.BankType.Character)
+      dbGroups[BANK][bank.id].isDefault = true
+      local warbank = groups:CreateGroup(ctx, BANK, "Warbank", Enum.BankType.Account)
+      dbGroups[BANK][warbank.id].isDefault = true
+      local vault = groups:CreateGroup(ctx, BANK, "Vault", Enum.BankType.Character)
+      local tabs = tabsOf({ [bank.id] = 0, [warbank.id] = 0, [vault.id] = 0 })
+      assert.are.same({ [vault.id] = true }, groups:HiddenGroups(BANK, tabs, bank.id))
+    end)
+
+    -- The bank's data before its first read after it opens has no tabs (items:ClearBankCache).
+    it("leaves out none before the bag's data was first worked out", function()
+      groups:CreateGroup(context:New("Test"), BACKPACK, "Herbs")
+      assert.are.same({}, groups:HiddenGroups(BACKPACK, nil, 1))
+    end)
+
+    -- A section dropped on an empty group's tab: the next recalculation puts its items there, and its tab stays until
+    -- then rather than going and coming back.
+    it("keeps a group a category was assigned to until the bag's data is worked out again", function()
+      local ctx = context:New("Test")
+      local herbs = groups:CreateGroup(ctx, BACKPACK, "Herbs")
+      local tabs = tabsOf({ [1] = 5, [herbs.id] = 0 })
+      slotInfo = { [BACKPACK] = { tabs = tabs } }
+      groups:AssignCategoryToGroup(ctx, BACKPACK, "Herbalism", herbs.id)
+      assert.are.same({}, groups:HiddenGroups(BACKPACK, tabs, 1))
+      local again = tabsOf({ [1] = 5, [herbs.id] = 0 })
+      slotInfo = { [BACKPACK] = { tabs = again } }
+      assert.are.same({ [herbs.id] = true }, groups:HiddenGroups(BACKPACK, again, 1), "nothing came")
+    end)
+
+    it("keeps no group for a category assigned to another bag's group", function()
+      local ctx = context:New("Test")
+      local herbs = groups:CreateGroup(ctx, BACKPACK, "Herbs")
+      local vault = groups:CreateGroup(ctx, BANK, "Vault")
+      local tabs = tabsOf({ [1] = 5, [herbs.id] = 0 })
+      slotInfo = { [BACKPACK] = { tabs = tabs }, [BANK] = { tabs = tabsOf({ [vault.id] = 0 }) } }
+      groups:AssignCategoryToGroup(ctx, BANK, "Herbalism", vault.id)
+      assert.are.same({ [herbs.id] = true }, groups:HiddenGroups(BACKPACK, tabs, 1))
+    end)
+
+    it("says whether two sets of groups name the same groups", function()
+      assert.is_true(groups:SameGroups({}, {}))
+      assert.is_true(groups:SameGroups({ [2] = true, [3] = true }, { [3] = true, [2] = true }))
+      assert.is_false(groups:SameGroups({ [2] = true }, { [3] = true }))
+      assert.is_false(groups:SameGroups({ [2] = true }, { [2] = true, [3] = true }))
+      assert.is_false(groups:SameGroups({ [2] = true, [3] = true }, { [2] = true }))
     end)
   end)
 end)

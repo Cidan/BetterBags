@@ -15,6 +15,9 @@ local database = addon:GetModule('Database')
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 
+---@class Groups: AceModule
+local groups = addon:GetModule('Groups')
+
 ---@class Context: AceModule
 local context = addon:GetModule('Context')
 
@@ -315,6 +318,10 @@ end
 ---@field drawOnClose boolean
 ---@field drawPendingOnShow boolean
 ---@field lastSlotInfo? SlotInfo
+---@field groupTabs? table<number, table> The last data drawn that had tabs (SlotInfo.tabs): what Hide Empty Groups reads.
+---@field revealGroups? boolean A section is being dragged: every group's tab shows (RevealGroups).
+---@field tabsHidden? table<number, boolean> The groups whose tabs the rail left out when it last listed them (ShownTabs).
+---@field tabsListed? number[] Every tab the rail last listed, those left out included, in order (ShownTabs).
 ---@field drawnButtons table<Item, boolean>
 ---@field claims? table<Item, boolean>
 ---@field loaded boolean
@@ -6100,6 +6107,10 @@ function panelProto:BuildTabs()
   self.tabs:SetReorderHandler(function(ctx, ids)
     self:OnTabsReordered(ctx, ids)
   end)
+  -- The groups it leaves out may have changed while a tab was moved (FollowGroups holds off then).
+  self.tabs:SetLandHandler(function()
+    self:FollowGroups(true)
+  end)
   -- Chained, the gap between the bags follows their tabs' widths (next.md §12); autosized, its height follows the rail's
   -- (FollowHeight, a frame on: the rail is shown after its tabs are set); clamped, its clamp rect takes in the rail's tabs at once
   -- (ApplyClamp) and it goes where its place puts it with them (FollowTabs, a frame on too).
@@ -6121,8 +6132,69 @@ function panelProto:BuildTabs()
   self:RefreshTabs()
 end
 
--- RefreshTabs lists the kind's tabs.
-function panelProto:RefreshTabs()
+-- RefreshTabs lists the kind's tabs; with animate they glide to their new places (NextTabs:SetTabs).
+---@param animate? boolean
+function panelProto:RefreshTabs(animate)
+  local _ = animate
+end
+
+-- ListsGroups says whether the rail lists the bag's groups (not its bag slots nor Blizzard's bank tabs, and not with
+-- groups off): the tabs Hide Empty Groups leaves out are groups' (groups.md §3).
+---@return boolean
+function panelProto:ListsGroups()
+  return false
+end
+
+-- HiddenGroups returns the groups whose tabs the rail leaves out (Groups:HiddenGroups): none while a section is dragged
+-- (RevealGroups) or while the rail lists no groups; else the empty ones of the last data drawn that had tabs, never the
+-- group shown.
+---@return table<number, boolean>
+function panelProto:HiddenGroups()
+  if self.revealGroups or not self:ListsGroups() then
+    return {}
+  end
+  return groups:HiddenGroups(self.kind, self.groupTabs, self:GetCurrentTabID())
+end
+
+-- ShownTabs returns the entries of the tabs the rail shows: every tab given (each in the order shown) but the groups it
+-- leaves out (HiddenGroups). It records which those were (tabsHidden), to list the tabs again only when that changes
+-- (FollowGroups), and every tab given (tabsListed), so a move among those shown keeps the others' places (OnTabsReordered).
+---@param entries NextTabEntry[]
+---@return NextTabEntry[]
+function panelProto:ShownTabs(entries)
+  local hidden = self:HiddenGroups()
+  self.tabsHidden = hidden
+  self.tabsListed = {}
+  local shown = {}
+  for _, entry in ipairs(entries) do
+    table.insert(self.tabsListed, entry.id)
+    if not hidden[entry.id] then
+      table.insert(shown, entry)
+    end
+  end
+  return shown
+end
+
+-- FollowGroups lists the tabs again when the groups the rail leaves out changed (a draw emptied a group or filled one, the
+-- group shown changed, a drag began or ended), gliding with animate. Never while a tab is moved, which listing them puts
+-- back: it follows once the tab has landed (the rail's land handler).
+---@param animate boolean
+function panelProto:FollowGroups(animate)
+  if not self:ListsGroups() or self.tabs.moving ~= nil then
+    return
+  end
+  if self.tabsHidden == nil or not groups:SameGroups(self:HiddenGroups(), self.tabsHidden) then
+    self:RefreshTabs(animate)
+  end
+end
+
+-- RevealGroups shows every group's tab while a section is dragged (on), so it can be dropped on an empty one, and leaves
+-- the empty ones out again once the drag ends (asked: "agree with showing all sections when dragging a section, animate
+-- it"), the tabs gliding either way.
+---@param on boolean
+function panelProto:RevealGroups(on)
+  self.revealGroups = on
+  self:FollowGroups(true)
 end
 
 -- TabOrderKey names the rail the order of the tabs shown is saved under (database:GetNextTabOrder), nil
@@ -6142,7 +6214,7 @@ function panelProto:OrderedTabs(entries)
 end
 
 -- OnTabsReordered saves the order a tab was moved to (asked: "make sure it saves"; docs/next-batch-2.md
--- §5) and lists the tabs again in it.
+-- §5) and lists the tabs again in it. The groups the rail leaves out keep their places among the others (withLeftOut).
 ---@param ctx Context
 ---@param ids number[]
 function panelProto:OnTabsReordered(ctx, ids)
@@ -6151,8 +6223,33 @@ function panelProto:OnTabsReordered(ctx, ids)
   if key == nil then
     return
   end
+  if self:ListsGroups() and self.tabsListed ~= nil then
+    ids = self:withLeftOut(ids)
+  end
   database:SetNextTabOrder(key, ids)
   self:RefreshTabs()
+end
+
+-- withLeftOut puts the tabs the rail left out back among the ids of the tabs it shows (a move's new order), where they
+-- were listed (tabsListed): each place a tab shown held takes the next of ids.
+---@private
+---@param ids number[]
+---@return number[]
+function panelProto:withLeftOut(ids)
+  local shown = {}
+  for _, id in ipairs(ids) do
+    shown[id] = true
+  end
+  local out, at = {}, 1
+  for _, id in ipairs(self.tabsListed) do
+    if shown[id] then
+      table.insert(out, ids[at])
+      at = at + 1
+    else
+      table.insert(out, id)
+    end
+  end
+  return out
 end
 
 -- OnTabClicked runs a click on a tab.
@@ -6633,6 +6730,11 @@ end
 ---@param slotInfo SlotInfo
 ---@param callback? fun()
 function panelProto:Draw(ctx, slotInfo, callback)
+  -- The rail goes by the last data split by group that had tabs: data never read (the bank's until it is read as it
+  -- opens) has none, and the Show Bags view's and Bank Tabs mode's tabs are bags (data/items.lua, ItemBelongsToTab).
+  if slotInfo.tabs ~= nil and self:ListsGroups() then
+    self.groupTabs = slotInfo.tabs
+  end
   if not self.frame:IsShown() then
     self.lastSlotInfo = slotInfo
     self.drawPendingOnShow = true
@@ -6657,6 +6759,8 @@ function panelProto:Draw(ctx, slotInfo, callback)
   self.drawnButtons = claims
   self.claims = nil
   self.lastSlotInfo = slotInfo
+  -- The groups it leaves out follow what it holds and the group it shows (Hide Empty Groups), gliding unless it is opening.
+  self:FollowGroups(not self.opening)
   -- Before it is laid out: how narrow a small panel goes keeps room for its footer's text (MinWidth), and it follows what it
   -- shows first (FollowNames).
   local free = format(L:G("%d free slots"), self.content.freeTotal)

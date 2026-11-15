@@ -350,7 +350,7 @@ local function bagPage(id, bag, general, shown, design)
         { setting = 'sectionColumns' }, { setting = 'sectionCompact' }, { setting = 'sectionGap' }, { setting = 'sectionFill' },
         { setting = 'sectionSpan' }, { setting = 'sectionWideRows' },
       } },
-      { title = L:G("Tabs"), rows = { { setting = 'enableGroups' } } },
+      { title = L:G("Tabs"), rows = { { setting = 'enableGroups' }, { setting = 'hideEmptyGroups' } } },
       { title = L:G("Slots"), rows = { { setting = 'showAllFreeSpace' }, { setting = 'preserveGaps' } } },
       -- Only the classic bags read these (frames/bag.lua, frames/bagcanvas.lua, frames/section.lua).
       { title = L:G("Window"), design = "classic", rows = {
