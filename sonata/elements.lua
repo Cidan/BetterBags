@@ -32,6 +32,9 @@ local ITEM_PUSHED = { Texture = "", BlendMode = "BLEND" }
 local ITEM_UPGRADE = { Atlas = "bags-greenarrow", Scale = 1 }
 local ITEM_COUNT = { Font = { Object = "NumberFontNormal" }, Points = { { Point = "BOTTOMRIGHT", X = -5, Y = 2 } } }
 local ITEM_LEVEL = { Font = { Object = "NumberFontNormal" } }
+-- A specialized bag's glyph in its empty slots (BetterBags' BetterBagsFamilyIcon, frames/item.lua) is white art: drawn
+-- white at 0.4, a hint of the bag's type on Blizzard's dark slot.
+local ITEM_FAMILY_ICON = { Color = { 1, 1, 1, 0.4 } }
 local QUEST_BORDER = "Interface\\Common\\WhiteIconFrame"
 
 -- PanelTabButtonTemplate's and BetterBags' Classic tab template's art, fonts and height, and
@@ -456,6 +459,19 @@ local function itemText(text, spec)
   apply:Font(text, { Object = fontObjectFor(spec) })
 end
 
+-- drawFamilyIcon tints a decoration's bag-type glyph, if it has one, in a style's FamilyIcon color, its alpha the
+-- color's (a texture's alpha is its vertex color's, apply:Texture).
+---@param decoration ItemButton
+---@param style? table
+local function drawFamilyIcon(decoration, style)
+  local glyph = decoration.BetterBagsFamilyIcon
+  if glyph == nil then
+    return
+  end
+  local spec = withDefaults(style ~= nil and style.FamilyIcon or nil, ITEM_FAMILY_ICON)
+  glyph:SetVertexColor(apply:Color(spec.Color))
+end
+
 ---@param decoration ItemButton
 ---@param style table
 function elements:StyleItemButton(decoration, style)
@@ -517,6 +533,7 @@ function elements:StyleItemButton(decoration, style)
 
   -- An empty slot's own art (retail's: Classic's is drawn as its icon, EmptySlotArt); Blizzard's when the style has none.
   styleRegion(decoration, "EmptySlot", decoration.ItemSlotBackground, style.EmptySlot, decoration)
+  drawFamilyIcon(decoration, style)
 
   local upgrade = decoration.UpgradeIcon
   if upgrade ~= nil then
@@ -575,6 +592,14 @@ end
 function elements:EmptySlotArt(decoration)
   local style = decoration.sonataItemStyle
   return style ~= nil and style.EmptySlot ~= nil and style.EmptySlot.Texture or nil
+end
+
+-- DrawFamilyIcon tints a decoration's bag-type glyph in the color of the style it was given, or white at 0.4 for a
+-- decoration no style drew: for a glyph made after its decoration was styled (BetterBags makes it the first time it draws
+-- an empty slot of a specialized bag). A restyle tints it again (StyleItemButton).
+---@param decoration ItemButton
+function elements:DrawFamilyIcon(decoration)
+  drawFamilyIcon(decoration, decoration.sonataItemStyle)
 end
 
 -- artBorder draws the icon's border in a style's border art (QualityBorder given as art), in a color at the

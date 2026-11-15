@@ -144,6 +144,28 @@ describe("the Papercraft theme on the whole addon", function()
     assert.same({}, handle.errors)
   end)
 
+  -- Issue #1327: a specialized bag's glyph is white art drawn at 0.4, and vanished on this theme's light empty slots. It is
+  -- drawn in the theme's ink (ItemButton.FamilyIcon), and a theme switch recolors one already showing, with no draw.
+  it("draws a specialized bag's glyph on its empty slots in ink, and in white again under another theme", function()
+    local INK, WHITE = { 0.18, 0.16, 0.14, 0.4 }, { 1, 1, 1, 0.4 }
+    start()
+    local c = ctx()
+    local button = module("ItemFrame"):GetButton(c, "5_1")
+    button:SetFreeSlots(c, { slotkey = "5_1", bagid = 5, slotid = 1, itemInfo = { emptySlotName = "Reagent Bag",
+      emptySlotFamilyIcon = module("Constants").EMPTY_SLOT_FAMILY_ICON_DEFAULT } }, 1, true)
+    local glyph = button:GetDecoration(c).BetterBagsFamilyIcon
+    assert.is_true(glyph:IsShown())
+    assert.are.same(INK, { glyph:GetVertexColor() })
+    local engine = module("SonataNext")
+    engine:ApplyTheme(c, "Default", false)
+    assert.are.same(WHITE, { glyph:GetVertexColor() }, "another Next theme")
+    engine:ApplyTheme(c, "Papercraft", false)
+    assert.are.same(INK, { glyph:GetVertexColor() }, "back to Papercraft")
+    module("BagSystem"):Switch(c, "classic")
+    assert.are.same(WHITE, { glyph:GetVertexColor() }, "the classic design")
+    assert.same({}, handle.errors)
+  end)
+
   it("writes the money in the footer's font under a Next theme that names no other", function()
     local addon = start("Default")
     for _, button in ipairs(buttons(addon.Bags.Backpack)) do

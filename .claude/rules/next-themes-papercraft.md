@@ -77,7 +77,10 @@ What the Papercraft theme (next-themes-shipped.md §8) needed of the engine, all
     set on the text: set on the text, it stayed on every button under every other theme and the classic bags (issue #1263,
     after a preview of this theme; sonata.md §3a).
 - **Item buttons' empty slots:** `ItemButton.EmptySlot` draws an empty slot's art (retail's `ItemSlotBackground`; on Classic
-  its icon, `SonataElements:EmptySlotArt`), Blizzard's when the style has none.
+  its icon, `SonataElements:EmptySlotArt`), Blizzard's when the style has none. The slot is light paper, so a specialized
+  bag's glyph on it is drawn in ink (`ItemButton.FamilyIcon`, Papercraft's `Ink` at 0.4, sonata.md §3a): the white every
+  other theme draws vanished on it (issue #1327). The ink at 0.4 was picked from composites of the real glyph on
+  `item_empty.png` against InkSoft and InkMuted and other alphas: it reads as the same faint hint the white does on a dark slot.
 - **Check** (`SonataNext:Check`): a stop motion's parts, an `FPS` above nothing, a `Spacing` from 0 to under a half; a sheet's
   parts (`NextPaper.KEYS` and its neighbours), `Front`, `Back` and `Rate`, `From`, every number's range, angles in `Half` and
   `Full`, `Poses` ending in 1, `Drift` the least first.

@@ -68,6 +68,12 @@ replace(sonata, "RegisterElement", function(self, kind, element) table.insert(se
 -- By default the theme draws neither quality nor quest art.
 replace(elements, "DrawItemQuality", function() return false end)
 replace(elements, "DrawItemQuest", function() end)
+-- The bag-type glyphs the theme was asked to tint, in order: each decoration's glyph when it was asked ("no glyph" if it
+-- had none yet, so there was nothing to tint).
+local tintedGlyphs = {}
+replace(elements, "DrawFamilyIcon", function(_, decoration)
+  table.insert(tintedGlyphs, decoration.BetterBagsFamilyIcon or "no glyph")
+end)
 
 -- newDecoration builds what ContainerFrameItemButtonTemplate gives an item's decoration.
 local function newDecoration(item)
@@ -1910,10 +1916,13 @@ describe("Empty slot family icon overlay", function()
 
   -- The bag types' glyphs are BetterBags' own 64 x 64 files (tools/textures/next_icons.py), drawn smaller than they
   -- are: smooth, as the header glyphs (next-themes.md §11).
-  it("draws the bag type's glyph file, smooth, centered and semi-transparent on a specialized empty slot", function()
+  -- Its color and alpha are the theme's (ItemButton.FamilyIcon, issue #1327): the glyph is tinted when it is made, and
+  -- again by every restyle (spec/sonata/elements_spec.lua).
+  it("draws the bag type's glyph file, smooth and centered on a specialized empty slot, tinted by the theme", function()
     local btnCtx = ctx:New("famicon")
     local item = itemFrame:GetButton(btnCtx, "0_9")
     local quiver = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\quiver.png"
+    for i = #tintedGlyphs, 1, -1 do tintedGlyphs[i] = nil end
     item:SetFreeSlots(btnCtx, {
       slotkey = "0_9", bagid = 0, slotid = 9,
       itemInfo = { emptySlotName = "Quiver", emptySlotFamilyIcon = quiver },
@@ -1925,7 +1934,8 @@ describe("Empty slot family icon overlay", function()
     assert.is_nil(overlay:GetAtlas())
     assert.are.equal("TRILINEAR", overlay._filterMode)
     assert.are.same({ 24, 24 }, { overlay:GetSize() })
-    assert.are.equal(0.4, overlay._alpha)
+    assert.are.equal(1, #tintedGlyphs)
+    assert.are.equal(overlay, tintedGlyphs[1], "tinted once it was made")
   end)
 
   it("hides the family icon on a generic (family 0) empty slot", function()

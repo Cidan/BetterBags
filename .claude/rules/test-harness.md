@@ -134,7 +134,11 @@ passed (next-bagsystem.md §11f). The whole-addon helper loads and starts all of
   draw an item button: a spec that runs a read and its draw keeps every bag empty
   (`globals = { C_Container = ... }` with `GetContainerNumSlots` 0; the mock gives every bag 16
   slots and every slot an item). Drawing items on the whole addon needs a template mock from
-  Blizzard's source first.
+  Blizzard's source first. A free slot does draw (`SetFreeSlots` on a button from
+  `ItemFrame:GetButton`): the helper sets Blizzard's `SetItemButtonTexture`, `SetItemButtonQuality`,
+  `SetItemButtonCount` and `SetItemButtonDesaturated` (`ItemButtonTemplate.lua`), and
+  `spec/integration/papercraft_spec.lua` draws a reagent bag's empty slot to follow its glyph's color
+  through theme switches.
 - **Errors in message and event handlers reach `handle.errors`.** AceEvent dispatches through
   CallbackHandler, which calls each handler with `securecallfunction`. The mock used to return
   `pcall`'s results and drop the error, so a handler that threw (a bank draw missing a Blizzard

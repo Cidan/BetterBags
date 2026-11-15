@@ -574,6 +574,39 @@ describe("SonataElements", function()
       end)
     end)
 
+    -- A specialized bag's glyph in its empty slots (frames/item.lua) is white art: on a theme's light empty slot it
+    -- vanished (issue #1327, Papercraft), so the style says what color it is drawn in.
+    describe("a specialized bag's glyph (FamilyIcon)", function()
+      local INK = { 0.18, 0.16, 0.14, 0.4 }
+
+      it("tints the glyph in the style's color, and back to white at 0.4 for a style without one", function()
+        local b = itemDecoration()
+        b.BetterBagsFamilyIcon = b:CreateTexture(nil, "OVERLAY")
+        elements:StyleItemButton(b, { FamilyIcon = { Color = INK } })
+        assert.are.same(INK, { b.BetterBagsFamilyIcon:GetVertexColor() })
+        assert.are.equal(0.4, b.BetterBagsFamilyIcon:GetAlpha())
+        elements:StyleItemButton(b, {})
+        assert.are.same({ 1, 1, 1, 0.4 }, { b.BetterBagsFamilyIcon:GetVertexColor() })
+        assert.are.equal(0.4, b.BetterBagsFamilyIcon:GetAlpha())
+      end)
+
+      it("tints a glyph made after its decoration was styled, in that style's color", function()
+        local b = itemDecoration()
+        elements:StyleItemButton(b, { FamilyIcon = { Color = INK } })
+        b.BetterBagsFamilyIcon = b:CreateTexture(nil, "OVERLAY")
+        elements:DrawFamilyIcon(b)
+        assert.are.same(INK, { b.BetterBagsFamilyIcon:GetVertexColor() })
+      end)
+
+      it("draws the glyph white at 0.4 on a decoration no style drew", function()
+        local b = itemDecoration()
+        b.BetterBagsFamilyIcon = b:CreateTexture(nil, "OVERLAY")
+        b.BetterBagsFamilyIcon:SetVertexColor(0.5, 0, 0, 1)
+        elements:DrawFamilyIcon(b)
+        assert.are.same({ 1, 1, 1, 0.4 }, { b.BetterBagsFamilyIcon:GetVertexColor() })
+      end)
+    end)
+
     describe("in art", function()
       local BACKDROP = "Interface\\AddOns\\GW2_UI\\Textures\\bag\\bagitembackdrop.png"
       local BORDER = "Interface\\AddOns\\GW2_UI\\Textures\\bag\\bagitemborder.png"
