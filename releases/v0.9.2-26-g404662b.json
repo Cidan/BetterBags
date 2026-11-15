@@ -1,0 +1,29 @@
+{
+  "id": 1794722780,
+  "version": "v0.9.2-26-g404662b",
+  "channel": "alpha",
+  "date": "2026-11-15",
+  "from": "1c6fe70a41e7803a3c1368ef1cdfcf464ebb0c83",
+  "to": "404662b2f2262993336d048833304ec855af2f70",
+  "headline": "Bag enable toggles and Size settings now live on each bag's own settings page, including a new Vendor page.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "Vendor page in BetterBags Next settings",
+      "details": "Adds a Vendor page under Bags in BetterBags Next with General and Size tabs. Because the vendor window does not file items in categories, it has no item or category settings.",
+      "clients": []
+    },
+    {
+      "category": "Improved",
+      "title": "Per-bag Size settings replace Appearance \u003e Size",
+      "details": "Moves Icon Scale, Bag Scale, Autosize (was Autosize Bags), and Fit Names While Open from Appearance \u003e Size to each bag's Size tab in BetterBags Next. Bags scale separately, custom values carry over, Vendor Autosize defaults to off, and the Food \u0026 Drink bar uses the backpack's Icon Scale.",
+      "clients": []
+    },
+    {
+      "category": "Improved",
+      "title": "Bag enable toggles moved to each bag's General tab",
+      "details": "Moves Enable Bank Bags, Enable Guild Bank Window, and Enable Vendor Window from General to a new General tab on the Bank, Guild Bank, and Vendor pages in BetterBags Next. General keeps settings shared by every bag.",
+      "clients": []
+    }
+  ]
+}
