@@ -1,0 +1,23 @@
+{
+  "id": 1794781924,
+  "version": "v0.9.3-6-gcba8c25",
+  "channel": "alpha",
+  "date": "2026-11-15",
+  "from": "c05fceaa7ea5be1467edc0552f6d4a5ff73e2d34",
+  "to": "cba8c2592abc3e77f94097ae58f4f53fbf5c207e",
+  "headline": "Item sorting now supports up to three tiers, new keys like Equipment Slot, and per-category orders.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "Per-category Item Order",
+      "details": "Give any category its own sort order from the new Item Order tab on the Categories page. Enable Own Item Order (which defaults to Quality) and pick up to three tiers. Custom orders are also preserved when exporting and importing categories.",
+      "clients": []
+    },
+    {
+      "category": "Improved",
+      "title": "Multi-tier Item Order and new sort keys",
+      "details": "Each bag's Layout tab now offers Item Order, Then By, and And Then By under Order to chain up to three keys: Name, Quality, Item Level, Upgrade Track (where supported), Equipment Slot, Item Type, Expansion, Count, Sell Price (Stack), and Sell Price (Each). Saved orders migrate automatically.",
+      "clients": []
+    }
+  ]
+}
