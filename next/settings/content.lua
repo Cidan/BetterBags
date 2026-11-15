@@ -333,7 +333,9 @@ local function bagPage(id, bag, shown, design)
         { title = L:G("Sections"), design = "classic", rows = { { setting = 'fullSectionNames' } } },
       } },
       { id = "items", title = L:G("Items"), sections = {
-        { title = L:G("Item Level"), rows = { { setting = 'itemLevel' }, { setting = 'itemLevelColor' } } },
+        -- Keystones are retail's (Mythic+).
+        { title = L:G("Item Level"), rows = { { setting = 'itemLevel' }, { setting = 'itemLevelColor' },
+          { setting = 'keystoneLevel', hidden = function() return not addon.isRetail end } } },
         { title = L:G("Quality"), rows = { { setting = 'glowIntensity' } } },
         { title = L:G("Stacking"), rows = {
           { setting = 'markRecentItems' }, { setting = 'newItemFlash' }, { setting = 'mergeStacks' },

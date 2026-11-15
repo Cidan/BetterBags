@@ -910,15 +910,18 @@ const.DATABASE_DEFAULTS = {
     itemLevel = {
       [const.BAG_KIND.BACKPACK] = {
         enabled = true,
-        color = true
+        color = true,
+        keystone = true
       },
       [const.BAG_KIND.BANK] = {
         enabled = true,
-        color = true
+        color = true,
+        keystone = true
       },
       [const.BAG_KIND.GUILD] = {
         enabled = true,
-        color = true
+        color = true,
+        keystone = true
       },
     },
     itemLevelColor = {

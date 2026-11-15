@@ -129,6 +129,7 @@ describe("What each setting asks the bags for", function()
     { "Quality Glow Intensity", 80, true },
     { "Show Item Level", false, true },
     { "Show Item Level Color", false, true },
+    { "Show Keystone Level", false, true },
   }
   -- Laying the sections out again reads nothing, and only that bag's panel does it.
   it("lays only that bag out again for its section columns and fill order", function()

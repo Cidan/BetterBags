@@ -129,6 +129,23 @@ describe("The settings catalog", function()
     assert.has_error(function() catalog:Get("enableGroups", bank) end, "the bank has no setting enableGroups")
   end)
 
+  -- Issue #202: a keystone's level on its button, by a setting of its own beside the item level's. The guild bank
+  -- takes no bound item, so never a keystone.
+  it("shows a keystone's level by its own setting, in the backpack and the bank", function()
+    ilvl[0].keystone, ilvl[1].keystone = true, false
+    local mine, theirs = catalog:Get("keystoneLevel", backpack), catalog:Get("keystoneLevel", bank)
+    assert.are.equal("toggle", mine.kind)
+    assert.are.equal("Show Keystone Level", mine.title)
+    assert.are.equal("Show a keystone's level on its button in the backpack.", mine.description)
+    assert.is_true(mine.get(ctx()))
+    assert.is_false(theirs.get(ctx()))
+    mine.set(ctx(), false)
+    assert.is_false(ilvl[0].keystone)
+    assert.is_false(ilvl[1].keystone)
+    assert.are.same({ { message = "bags/Redraw", args = { { buttons = true } } } }, sent)
+    assert.is_false(catalog:Has("keystoneLevel", { name = "Guild Bank", kind = 2 }))
+  end)
+
   -- Asked (#1239): the tooltip said the tabs are at the bottom of the backpack, where only the classic bags draw them;
   -- BetterBags Next's run down the panel's side, and both designs read this one description.
   it("describes Enable Groups without naming where the tabs are drawn", function()

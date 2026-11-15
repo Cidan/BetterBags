@@ -280,6 +280,20 @@ describe("Items (New Data Farming Engine)", function()
       assert.is_not_nil(itemsMap["0_2"])
       assert.is_true(itemsMap["0_2"].isItemEmpty)
     end)
+
+    -- Issue #202: a keystone read from its bag slot carries its level, from the slot's own link.
+    it("reads a keystone's level from its bag slot's link", function()
+      _G.C_Container.GetContainerItemID = function(bagid, slotid)
+        if bagid == 0 and slotid <= 2 then return slotid == 1 and 180653 or 12345 end
+      end
+      _G.C_Container.GetContainerItemLink = function(bagid, slotid)
+        if bagid == 0 and slotid == 1 then return "|cnIQ4:|Hkeystone:180653:503:12:10:0:0:0|h[Keystone: Ara-Kara (12)]|h|r" end
+        if bagid == 0 and slotid == 2 then return "|cff0070dd|Hitem:12345|h[Test Sword]|h|r" end
+      end
+      local itemsMap = items:Harvest(const.BAG_KIND.BACKPACK, { [0] = 0 })
+      assert.are.equal(12, itemsMap["0_1"].itemInfo.keystoneLevel)
+      assert.is_nil(itemsMap["0_2"].itemInfo.keystoneLevel)
+    end)
   end)
 
   -- Regression for issue #1090: on login with very full bags the item cache is cold,
@@ -737,6 +751,32 @@ describe("Items (New Data Farming Engine)", function()
       local props = items:ReadItemProperties(42, "|cffffffff|Hitem:42::::::::|h[Adder]|h|r")
       assert.is_true(props.traits.isPet)
       assert.are.equal(635, props.traits.petSpeciesID)
+    end)
+  end)
+
+  -- Issue #202: a keystone's level, from its link: keystone:itemID:challengeModeID:level:affixes
+  -- (warcraft.wiki.gg Hyperlinks), the same for every keystone item.
+  describe("keystone level (issue #202)", function()
+    it("reads a keystone's level from its link", function()
+      assert.are.equal(12, items:KeystoneLevel("|cnIQ4:|Hkeystone:180653:503:12:10:0:0:0|h[Keystone: Ara-Kara (12)]|h|r"))
+      -- The wiki's example.
+      assert.are.equal(15, items:KeystoneLevel(
+        "|cffa335ee|Hkeystone:180653:375:15:10:8:12:121|h[Keystone: Mists of Tirna Scithe (15)]|h|r"))
+      -- The Timeworn Keystone's item ID in the same format.
+      assert.are.equal(8, items:KeystoneLevel("|cffa335ee|Hkeystone:187786:200:8:0:0:0:0|h[Keystone: Halls of Valor (8)]|h|r"))
+    end)
+
+    it("reads no level from any other link", function()
+      assert.is_nil(items:KeystoneLevel("|cff0070dd|Hitem:12345::::::::|h[Test Sword]|h|r"))
+      assert.is_nil(items:KeystoneLevel("|cff0070dd|Hbattlepet:635:1:3:152:13:12:0000000000000000|h[Adder]|h|r"))
+      assert.is_nil(items:KeystoneLevel(nil))
+    end)
+
+    it("gives every slot's item info its keystone's level", function()
+      local link = "|cnIQ4:|Hkeystone:180653:503:12:10:0:0:0|h[Keystone: Ara-Kara (12)]|h|r"
+      assert.are.equal(12, items:ItemInfoOf({ itemID = 180653, itemLink = link }, {}).keystoneLevel)
+      assert.is_nil(items:ItemInfoOf({ itemID = 12345, itemLink = "|cff0070dd|Hitem:12345|h[Test Sword]|h|r" }, {})
+        .keystoneLevel)
     end)
   end)
 

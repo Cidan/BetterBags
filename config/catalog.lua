@@ -632,6 +632,21 @@ define('itemLevelColor', {
   end,
 })
 
+-- The guild bank takes no bound item, so never a keystone.
+define('keystoneLevel', {
+  kind = "toggle",
+  bag = true,
+  only = { const.BAG_KIND.BACKPACK, const.BAG_KIND.BANK },
+  title = 'Show Keystone Level',
+  description = function(bag) return "Show a keystone's level on its button in the " .. lower(bag) .. '.' end,
+  keywords = { 'keystone', 'key level', 'mythic', 'mythic+', 'm+' },
+  get = function(_, bag) return db:GetItemLevelOptions(bag.kind).keystone end,
+  set = function(ctx, value, bag)
+    db:GetItemLevelOptions(bag.kind).keystone = value
+    events:SendMessage(ctx, 'bags/Redraw', { buttons = true })
+  end,
+})
+
 define('fullSectionNames', {
   kind = "toggle",
   bag = true,

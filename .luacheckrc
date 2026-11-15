@@ -177,6 +177,7 @@ globals = {
 	"C_AddOnProfiler",
 	"C_AuctionHouse",
 	"C_Bank",
+	"C_ChallengeMode",
 	"C_Container",
 	"C_Cursor",
 	"C_CVar",

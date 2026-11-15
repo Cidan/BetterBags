@@ -428,7 +428,7 @@ describe("NextSettingsContent", function()
         { "Layout", "Window [classic]", { "resizableWindow", "snapToContent", "itemsPerRow", "columns", "opacity",
           "scale" } },
         { "Layout", "Sections [classic]", { "fullSectionNames" } },
-        { "Items", "Item Level", { "itemLevel", "itemLevelColor" } },
+        { "Items", "Item Level", { "itemLevel", "itemLevelColor", "keystoneLevel" } },
         { "Items", "Quality", { "glowIntensity" } },
         { "Items", "Stacking", { "markRecentItems", "newItemFlash", "mergeStacks", "mergeUnstackable",
           "dontMergePartial", "dontMergeTransmog", "unmergeAtShop" } },
@@ -436,6 +436,22 @@ describe("NextSettingsContent", function()
           "filterRecentItems", "filterTradeSkill", "filterType", "filterSubtype" } },
         { "Order", "Category Order", { "Category Order" } },
       }, idsOf(page))
+    end)
+
+    -- Issue #202: keystones are retail's (Mythic+), so Show Keystone Level shows on retail only.
+    it("shows Show Keystone Level on retail only", function()
+      local row
+      for _, tab in ipairs(pages:Get("backpack").tabs) do
+        for _, section in ipairs(pages:Sections(tab)) do
+          for _, r in ipairs(section.rows) do
+            if r.setting == "keystoneLevel" then row = r end
+          end
+        end
+      end
+      override(addon, "isRetail", true)
+      assert.is_false(row.hidden())
+      addon.isRetail = false
+      assert.is_true(row.hidden())
     end)
 
     it("turns a bag's fill order and wide sections on and off as its columns change", function()
@@ -534,6 +550,9 @@ describe("NextSettingsContent", function()
                 end
                 if catalog:Has(row.setting, page.bag) then
                   assert.has_no.errors(function() catalog:Get(row.setting, page.bag) end, row.setting)
+                elseif row.setting == "keystoneLevel" then
+                  -- The guild bank takes no bound item, so never a keystone (issue #202).
+                  assert.are.equal(const.BAG_KIND.GUILD, page.bag.kind, "only the guild bank has no Show Keystone Level")
                 else
                   assert.are.equal("enableGroups", row.setting, "only Enable Groups is a backpack's alone")
                 end
@@ -544,8 +563,8 @@ describe("NextSettingsContent", function()
       end
       -- The general pages' 48 (the ten Interactions the latest, interaction-bags.md; before them Enable Vendor Window,
       -- Enable Guild Bank Window and Enable QuickFind Integration, #1262), the Currencies page's 10 (currency.md §6), the
-      -- Food & Drink page's 7 (food-drink.md §5), and each bag's 34.
-      assert.are.equal(48 + 10 + 7 + 3 * 34, named)
+      -- Food & Drink page's 7 (food-drink.md §5), and each bag's 35 (Show Keystone Level the latest, #202).
+      assert.are.equal(48 + 10 + 7 + 3 * 35, named)
     end)
 
     -- The Food & Drink bar's options (food-drink.md §5): a page of their own after Currencies, BetterBags Next only.
