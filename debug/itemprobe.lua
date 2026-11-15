@@ -77,6 +77,23 @@ local function field(tbl, name)
   return tbl and tbl[name]
 end
 
+-- bankAllowed records whether each bank takes the item, by its Enum.BankType name: Blizzard's own code asks
+-- C_Bank.IsItemAllowedInBankType only of the bank and the Warbank, and BetterBags asks it of the guild bank too
+-- (item-drawing.md §8). Nothing on a client without the check.
+---@param location ItemLocationMixin
+---@return table<string, table>?
+local function bankAllowed(location)
+  local check, types = field(_G.C_Bank, "IsItemAllowedInBankType"), _G.Enum and _G.Enum.BankType
+  if type(check) ~= "function" or types == nil then
+    return nil
+  end
+  local out = {}
+  for name, bankType in pairs(types) do
+    out[name] = ask(check, bankType, location)
+  end
+  return out
+end
+
 -- probeItem records what the client says about an item, wherever it is (location).
 ---@param itemID number
 ---@param link? string
@@ -103,6 +120,7 @@ local function probeItem(itemID, link, location)
     scrappable = ask(item.CanScrapItem, location),
     auctionable = ask(field(_G.C_AuctionHouse, "IsSellItemValid"), location, false),
     legacyAuctionHouse = ask(_G.IsUsingLegacyAuctionClient),
+    bankAllowed = bankAllowed(location),
     stats = ask(item.GetItemStats or _G.GetItemStats, link),
     reagentQuality = ask(field(trade, "GetItemReagentQualityByItemInfo"), link),
     craftedQuality = ask(field(trade, "GetItemCraftedQualityByItemInfo"), link),

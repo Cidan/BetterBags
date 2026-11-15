@@ -109,6 +109,27 @@ describe("ItemProbe", function()
     assert.is_false(probe.legacyAuctionHouse[1])
   end)
 
+  -- Blizzard's own code asks C_Bank.IsItemAllowedInBankType only of the bank and the Warbank; BetterBags asks it of the
+  -- guild bank too (#768), so a dump records what it answers for every bank type the client has.
+  it("records whether each bank takes the item", function()
+    override(_G.Enum, "BankType", { Character = 0, Guild = 1, Account = 2 })
+    local asked = {}
+    override(_G, "C_Bank", { IsItemAllowedInBankType = function(bankType, location)
+      local bag, slot = location:GetBagAndSlot()
+      table.insert(asked, bankType .. "@" .. bag .. ":" .. slot)
+      return bankType ~= 1
+    end })
+    local p = itemProbe:Probe(0, 1)
+    assert.are.same({ Character = { n = 1, true }, Guild = { n = 1, false }, Account = { n = 1, true } }, p.bankAllowed)
+    table.sort(asked)
+    assert.are.same({ "0@0:1", "1@0:1", "2@0:1" }, asked)
+  end)
+
+  it("records nothing about the banks on a client without the check", function()
+    override(_G, "C_Bank", {})
+    assert.is_nil(itemProbe:Probe(0, 1).bankAllowed)
+  end)
+
   it("records each tooltip line with its type", function()
     local p = itemProbe:Probe(0, 1)
     assert.are.same({

@@ -15,10 +15,10 @@
 -- the addon they expect: the AceAddon registry, LibStub's libraries, the Enum tables, the globals it
 -- set, and the events and hooks the loaded addon registered.
 --
--- The client set up here is live retail or WoW: Forever: Enum.BagIndex, Enum.PlayerInteractionType
--- and Enum.ItemQuality are Blizzard's (Blizzard_APIDocumentationGenerated on the live and forever
--- branches: BagIndexConstants, PlayerInteractionType, ItemQuality; the last two are the same on
--- both), the other values are the ones spec/core/constants_spec.lua uses. The mocks have no layout engine, so every frame the loaded addon makes is resolved at the
+-- The client set up here is live retail or WoW: Forever: Enum.BagIndex, Enum.PlayerInteractionType,
+-- Enum.BankType and Enum.ItemQuality are Blizzard's (Blizzard_APIDocumentationGenerated on the live and
+-- forever branches: BagIndexConstants, PlayerInteractionType, ItemConstants, ItemQuality; the last three
+-- are the same on both), the other values are the ones spec/core/constants_spec.lua uses. The mocks have no layout engine, so every frame the loaded addon makes is resolved at the
 -- screen's origin, as if laid out, and the cursor is far off screen, so no frame is under it.
 
 local WholeAddon = {}
@@ -47,6 +47,8 @@ local PLAYER_INTERACTION_TYPE = {
   Auctioneer = 21, VoidStorageBanker = 26, ScrappingMachine = 40, ItemUpgrade = 53,
   CharacterBanker = 67, AccountBanker = 68,
 }
+
+local BANK_TYPE = { Character = 0, Guild = 1, Account = 2 }
 
 local ITEM_QUALITY = {
   Poor = 0, Common = 1, Uncommon = 2, Rare = 3, Epic = 4, Legendary = 5, Artifact = 6, Heirloom = 7,
@@ -246,6 +248,7 @@ function WholeAddon.Load(opts)
     table.insert(restorers, function() _G.__mockContainerItemButtons("live") end)
   end
   setField(Enum, "PlayerInteractionType", PLAYER_INTERACTION_TYPE)
+  setField(Enum, "BankType", BANK_TYPE)
   setField(Enum, "ItemQuality", ITEM_QUALITY)
   setField(Enum, "InventoryType", INVENTORY_TYPE)
   for i, slot in ipairs(INVENTORY_SLOTS) do setGlobal("INVSLOT_" .. slot, i) end

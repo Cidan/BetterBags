@@ -218,7 +218,8 @@ whatever an input every item shares (a setting, the gear, the open window) chang
     exactly what `GetCategory` returns (its Recent Items check comes first). An item becoming recent
     or no longer recent asks for no category.
   - `context` (Phase 6: grey-out, `itemContextMatchResult`), with the signature it was worked out
-    under (`items:contextSignature()`: whether the bank is open and shows a Warbank tab). While an
+    under (`items:contextSignature()`: whether the bank is open and shows a Warbank tab, whether the
+    Auction House is open, and whether the guild bank is open, item-drawing.md §8). While an
     item context is active (`ItemButtonUtil.GetItemContext()` not nil) there is no signature and
     grey-out is worked out every sweep: Blizzard's answer then can depend on the spell being cast
     (Enchanting, CheckItemCondition, ReplaceBonusTree, JumpUpgradeTrack) or the recipe being

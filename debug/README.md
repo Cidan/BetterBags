@@ -147,6 +147,20 @@ The debug tooltip displays:
   - Category assignment
   - Stack information
 
+### Item Probe (`itemprobe.lua`, `ItemProbe`)
+
+Records what each Blizzard API answered about an item, raw, for the Dump tab of `/bbdb` (stored beside each
+dumped backpack item as `apiProbe`), so one dump from the game settles what an API does
+(`.claude/rules/data-driven.md`). Nothing here is read by the bags.
+
+- `ItemProbe:Probe(bagid, slotid)`, `ItemProbe:ProbeEquipped(slot)`, `ItemProbe:ProbeEquipment()`: every value each
+  item API returned (`n` is how many), an error recorded instead of raised, a value the addon may not access recorded
+  as `<secret type>`, an API the client lacks left out. Among them whether each bank takes the item
+  (`bankAllowed`: `C_Bank.IsItemAllowedInBankType` for every `Enum.BankType`, by name), which BetterBags asks of the
+  guild bank to dim what it refuses (`.claude/rules/guild-bank.md` §3a).
+- `ItemProbe:Player()`, `ItemProbe:BagNames()`, `ItemProbe:Sample()`, `ItemProbe:Client()`: the player's values, every
+  container's name and size, what follows the character for the backpack's items, and the client the dump came from.
+
 ### Analytics Integration (`analytics.lua`)
 
 Integrates with WagoAnalytics for usage tracking and telemetry.
