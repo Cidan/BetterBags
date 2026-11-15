@@ -190,6 +190,20 @@ function backpack.proto:RegisterEvents()
 			behavior:GenerateGroupTabs(ctx)
 		end
 	end)
+
+	-- Hide Empty Groups (groups.md §3): the tabs follow what the bag drew, and the setting.
+	events:RegisterMessage("bag/Rendered", function(ctx, rendered, slotInfo)
+		if rendered ~= bag then return end
+		if slotInfo.tabs ~= nil and behavior:ListsGroups() then
+			behavior.groupTabs = slotInfo.tabs
+		end
+		behavior:FollowGroups(ctx)
+	end)
+	events:RegisterMessage("groups/HideEmptyChanged", function(ctx, kind)
+		if kind == const.BAG_KIND.BACKPACK then
+			behavior:FollowGroups(ctx)
+		end
+	end)
 end
 
 -- Resync catches up on what RegisterEvents' handlers would have done while the classic design was
@@ -216,35 +230,78 @@ end
 local NEW_GROUP_TAB_ID = 0
 local NEW_GROUP_TAB_ICON = "communities-icon-addchannelplus"
 
--- GenerateGroupTabs creates tabs for all groups.
+-- ListsGroups says whether the backpack's data is split by group (items:Phase10_PartitionIntoTabs): groups on, and not
+-- the Show Bags view, every tab of which holds every item.
+---@return boolean
+function backpack.proto:ListsGroups()
+	return database:GetGroupsEnabled(const.BAG_KIND.BACKPACK)
+		and database:GetBagView(const.BAG_KIND.BACKPACK) ~= const.BAG_VIEW.SECTION_ALL_BAGS
+end
+
+-- HiddenGroups returns the groups whose tabs the backpack leaves out (Groups:HiddenGroups, Hide Empty Groups): none while
+-- a section is dragged (RevealGroups) or its data is not split by group; else the empty ones of the last data split by
+-- group that had tabs, never the group shown.
+---@return table<number, boolean>
+function backpack.proto:HiddenGroups()
+	if self.revealGroups or not self:ListsGroups() then
+		return {}
+	end
+	return groups:HiddenGroups(const.BAG_KIND.BACKPACK, self.groupTabs, database:GetActiveGroup(const.BAG_KIND.BACKPACK))
+end
+
+-- FollowGroups lists the tabs again when the groups the backpack leaves out changed (a draw emptied a group or filled one,
+-- the group shown changed, a drag began or ended), while its data is split by group.
+---@param ctx Context
+function backpack.proto:FollowGroups(ctx)
+	if not self:ListsGroups() then
+		return
+	end
+	if self.tabsHidden == nil or not groups:SameGroups(self:HiddenGroups(), self.tabsHidden) then
+		self:GenerateGroupTabs(ctx)
+	end
+end
+
+-- RevealGroups shows every group's tab while a section is dragged (on), so it can be dropped on an empty one, and hides
+-- the empty ones again once it is dropped.
+---@param ctx Context
+---@param on boolean
+function backpack.proto:RevealGroups(ctx, on)
+	self.revealGroups = on
+	self:FollowGroups(ctx)
+end
+
+-- GenerateGroupTabs creates tabs for all groups, hiding those Hide Empty Groups leaves out (HiddenGroups). Skipped with
+-- groups off, it records none (tabsHidden nil): the next draw split by group generates them (FollowGroups).
 ---@param ctx Context
 function backpack.proto:GenerateGroupTabs(ctx)
 	-- Skip tab generation if groups are disabled
 	if not database:GetGroupsEnabled(const.BAG_KIND.BACKPACK) then
+		self.tabsHidden = nil
 		self.bag.tabs.frame:Hide()
 		return
 	end
 
-	-- If slots panel is active, hide tabs instead of showing them
-	if self.bag.slots and self.bag.slots:IsShown() then
-		self.bag.tabs.frame:Hide()
-		return
-	end
-
-	-- Show tabs frame in case it was hidden
-	self.bag.tabs.frame:Show()
+	-- If slots panel is active, hide the tab bar instead of showing it. Its tabs are listed all the same: the panel shows
+	-- the bar again once it has faded out (BagSlots:OnClose), and the draw that turning it off asks for comes during the
+	-- fade, while it is still shown.
+	self.bag.tabs.frame:SetShown(not (self.bag.slots and self.bag.slots:IsShown()))
 
 	local allGroups = groups:GetAllGroups(const.BAG_KIND.BACKPACK)
+	local hidden = self:HiddenGroups()
+	self.tabsHidden = hidden
 
 	-- Create tabs for each group that doesn't exist yet
 	for groupID, group in pairs(allGroups) do
-		if not self.bag.tabs:TabExistsByID(groupID) then
+		local exists = self.bag.tabs:TabExistsByID(groupID)
+		if not exists then
 			self.bag.tabs:AddTab(ctx, group.name, groupID)
-		else
+		elseif self.bag.tabs:GetTabNameByID(groupID) ~= group.name then
 			-- Update name if it changed
-			if self.bag.tabs:GetTabNameByID(groupID) ~= group.name then
-				self.bag.tabs:RenameTabByID(ctx, groupID, group.name)
-			end
+			self.bag.tabs:RenameTabByID(ctx, groupID, group.name)
+		end
+		if hidden[groupID] then
+			self.bag.tabs:HideTabByID(groupID)
+		elseif exists then
 			self.bag.tabs:ShowTabByID(groupID)
 		end
 	end

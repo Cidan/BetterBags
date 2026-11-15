@@ -453,7 +453,7 @@ describe("NextSettingsContent", function()
         { "Layout", "Order", { "sectionOrder", "itemOrder" } },
         { "Layout", "Sections [next]", { "sectionColumns", "sectionCompact", "sectionGap", "sectionFill", "sectionSpan",
           "sectionWideRows" } },
-        { "Layout", "Tabs", { "enableGroups" } },
+        { "Layout", "Tabs", { "enableGroups", "hideEmptyGroups" } },
         { "Layout", "Slots", { "showAllFreeSpace", "preserveGaps" } },
         { "Layout", "Window [classic]", { "resizableWindow", "snapToContent", "itemsPerRow", "columns", "opacity",
           "scale" } },
@@ -508,7 +508,7 @@ describe("NextSettingsContent", function()
       override(db, "GetNextSectionFill", function() return "across" end)
       override(db, "GetNextSectionSpan", function() return true end)
       for _, name in ipairs({ "GetSectionSortType", "GetBagView", "GetItemSortType", "GetGroupsEnabled",
-        "GetShowAllFreeSpace", "GetPreserveItemGaps" }) do
+        "GetHideEmptyGroups", "GetShowAllFreeSpace", "GetPreserveItemGaps" }) do
         override(db, name, function() return 1 end)
       end
       design = "next"
@@ -601,6 +601,9 @@ describe("NextSettingsContent", function()
                 elseif row.setting == "keystoneLevel" then
                   -- The guild bank takes no bound item, so never a keystone (issue #202).
                   assert.are.equal(const.BAG_KIND.GUILD, page.bag.kind, "only the guild bank has no Show Keystone Level")
+                elseif row.setting == "hideEmptyGroups" then
+                  -- The guild bank's tabs are its own, never groups (#1321).
+                  assert.are.equal(const.BAG_KIND.GUILD, page.bag.kind, "only the guild bank has no Hide Empty Groups")
                 else
                   assert.are.equal("enableGroups", row.setting, "only Enable Groups is a backpack's alone")
                 end
@@ -611,10 +614,11 @@ describe("NextSettingsContent", function()
       end
       -- The general pages' 41 (the ten Interactions the latest, interaction-bags.md; Enable QuickFind Integration, #1262;
       -- Enable Bank Bags, Enable Vendor Window and Enable Guild Bank Window moved to their bags, and the Size tab's four to
-      -- every bag), the Currencies page's 10 (currency.md §6), the Food & Drink page's 7 (food-drink.md §5), each bag's 40
-      -- (Gap Between Sections the latest, next-columns.md §7c; its Size tab's four before it, Show Keystone Level before them,
-      -- #202), the bank's and the guild bank's switch on their General tabs, and the vendor's 5 (its switch and its Size tab).
-      assert.are.equal(41 + 10 + 7 + 3 * 40 + 2 + 5, named)
+      -- every bag), the Currencies page's 10 (currency.md §6), the Food & Drink page's 7 (food-drink.md §5), each bag's 41
+      -- (Hide Empty Groups the latest, #1321; Gap Between Sections before it, next-columns.md §7c; its Size tab's four before
+      -- that, Show Keystone Level before them, #202), the bank's and the guild bank's switch on their General tabs, and the
+      -- vendor's 5 (its switch and its Size tab).
+      assert.are.equal(41 + 10 + 7 + 3 * 41 + 2 + 5, named)
     end)
 
     -- The Food & Drink bar's options (food-drink.md §5): a page of their own after Currencies, BetterBags Next only.
@@ -644,23 +648,27 @@ describe("NextSettingsContent", function()
         "nextFoodDrinkScale", "nextFoodDrinkBackground", "nextFoodDrinkHideInCombat" }, settingsShown)
     end)
 
-    it("shows the bank's Layout without the backpack's Enable Groups", function()
+    -- The bank's Tabs hold its own Hide Empty Groups (#1321), never the backpack's Enable Groups.
+    it("shows the bank's Layout without the backpack's Enable Groups, with its own Hide Empty Groups", function()
       for _, name in ipairs({ "GetSectionSortType", "GetBagView", "GetItemSortType", "GetGroupsEnabled",
-        "GetShowAllFreeSpace", "GetPreserveItemGaps" }) do
+        "GetHideEmptyGroups", "GetShowAllFreeSpace", "GetPreserveItemGaps" }) do
         override(db, name, function() return 1 end)
       end
       settings:Open("bank", "layout")
       local sections = {}
       for _, section in ipairs(settings.page.sections) do table.insert(sections, section.title) end
-      assert.are.same({ "Order", "Sections", "Slots" }, sections)
+      assert.are.same({ "Order", "Sections", "Tabs", "Slots" }, sections)
+      assert.is_nil(rowTitled("Enable Groups"))
+      assert.is_not_nil(rowTitled("Hide Empty Groups"))
       settings:Open("backpack", "layout")
       assert.is_not_nil(rowTitled("Enable Groups"))
+      assert.is_not_nil(rowTitled("Hide Empty Groups"))
     end)
 
     -- Asked: rows and columns in the classic bags' Layout, and not in BetterBags Next's.
     it("shows a bag's window, rows and columns in the classic bags' Layout only", function()
       for _, name in ipairs({ "GetSectionSortType", "GetBagView", "GetItemSortType", "GetGroupsEnabled",
-        "GetShowAllFreeSpace", "GetPreserveItemGaps", "GetBagSnapToContent", "GetShowFullSectionNames" }) do
+        "GetHideEmptyGroups", "GetShowAllFreeSpace", "GetPreserveItemGaps", "GetBagSnapToContent", "GetShowFullSectionNames" }) do
         override(db, name, function() return 1 end)
       end
       override(db, "GetBagSizeMode", function() return "content" end)
@@ -674,7 +682,7 @@ describe("NextSettingsContent", function()
       settings:Open("bank", "layout")
       local sections = {}
       for _, section in ipairs(settings.page.sections) do table.insert(sections, section.title) end
-      assert.are.same({ "Order", "Slots", "Window", "Sections" }, sections)
+      assert.are.same({ "Order", "Tabs", "Slots", "Window", "Sections" }, sections)
       assert.are.equal(7, rowTitled("Items Per Row").control:GetValue())
       assert.are.equal(2, rowTitled("Columns").control:GetValue())
     end)
@@ -1455,6 +1463,7 @@ describe("NextSettingsContent", function()
         GetCategorySell = per(false), GetChangelogAutoOpen = per(true), GetCustomSectionSort = per({}),
         GetData = per({ profile = profile }), GetEnableBagFading = per(false), GetEnableBankBag = per(true),
         GetEnterToMakeCategory = per(true), GetGlowIntensity = per(60), GetGroupsEnabled = per(false),
+        GetHideEmptyGroups = per(false),
         GetInBagSearch = per(true), GetItemLevelColors = per(colors), GetItemLevelOptions = per({ enabled = true, color = true }),
         GetItemSortType = per(1), GetMarkRecentItems = per(false), GetMaxItemLevel = per(1), GetNextBagScale = per(100),
         GetNextEnabled = per(design == "next"), GetNextIconScale = per(100), GetNextFitNamesWhileOpen = per(false),

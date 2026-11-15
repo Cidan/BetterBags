@@ -1174,6 +1174,13 @@ const.DATABASE_DEFAULTS = {
       [const.BAG_KIND.BANK] = true,
       [const.BAG_KIND.GUILD] = false,
     },
+    -- Hide Empty Groups: a bag leaves out the tab of a group with nothing in it (groups.md §3).
+    ---@type table<BagKind, boolean>
+    hideEmptyGroups = {
+      [const.BAG_KIND.BACKPACK] = false,
+      [const.BAG_KIND.BANK] = false,
+      [const.BAG_KIND.GUILD] = false,
+    },
     -- Profile system migration flag
     __profileSystemMigrated = false,
     -- Bank categories scoped by bankType migration flag

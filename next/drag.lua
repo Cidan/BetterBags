@@ -171,7 +171,18 @@ function nextDrag:Begin(panel, section)
     self:Update(elapsed)
   end)
   canvas:Invalidate()
+  self:revealGroups(true)
   return true
+end
+
+-- revealGroups shows every group's tab of every panel while a section is dragged, so it can be dropped on an empty one,
+-- and leaves the empty ones out again once the drag ends (Hide Empty Groups, groups.md §3).
+---@private
+---@param on boolean
+function nextDrag:revealGroups(on)
+  for _, panel in ipairs(self.panels) do
+    panel:RevealGroups(on)
+  end
 end
 
 -- groupBankType returns a bank group's bank type on a client with bank types.
@@ -484,7 +495,8 @@ function nextDrag:reattach(hidden)
   self.hint:Hide()
 end
 
--- finish ends the drag: the target unlit, the driver stopped.
+-- finish ends the drag: the target unlit, the driver stopped, the empty groups' tabs left out again. A category it
+-- assigned to a group keeps that group's tab until the bag is worked out again (Groups:HiddenGroups).
 ---@private
 function nextDrag:finish()
   local state = self.current
@@ -494,6 +506,7 @@ function nextDrag:finish()
   self.current = nil
   if state then
     tween:Stop(state)
+    self:revealGroups(false)
   end
 end
 

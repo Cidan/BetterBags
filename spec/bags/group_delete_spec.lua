@@ -55,8 +55,10 @@ override(L, "G", function(_, key) return key end)
 override(debug, "Log", function() end)
 override(const, "BAG_KIND", { BACKPACK = BACKPACK, BANK = BANK, UNDEFINED = -1 })
 override(const, "OFFSETS", { BAG_LEFT_INSET = 6, BAG_RIGHT_INSET = -6 })
+override(const, "BAG_VIEW", { SECTION_GRID = 2, SECTION_ALL_BAGS = 4 })
 override(const, "DATABASE_DEFAULTS", {
   profile = {
+    views = { [BACKPACK] = 2, [BANK] = 2 },
     groups = { [BACKPACK] = { [1] = { id = 1, name = "Backpack", order = 1, kind = BACKPACK, isDefault = true } }, [BANK] = {} },
     groupCounter = { [BACKPACK] = 1, [BANK] = 0 },
     categoryToGroup = { [BACKPACK] = {}, [BANK] = { [Enum.BankType.Character] = {}, [Enum.BankType.Account] = {} } },

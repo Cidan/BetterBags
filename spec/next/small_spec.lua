@@ -255,6 +255,7 @@ describe("BetterBags Next's small mode", function()
     override(stubs.database, "GetBagView", function(_, kind) return db.view[kind] end)
     override(stubs.database, "SetBagView", function(_, kind, view) db.view[kind] = view end)
     override(stubs.groups, "GetAllGroups", function() return {} end)
+    UseHiddenGroups(stubs.groups, override)
     override(stubs.groups, "GetGroup", function(_, kind, id)
       if kind == BANK and id == 10 then return { id = 10, name = "Bank", bankType = 1, isDefault = true } end
     end)

@@ -687,6 +687,154 @@ describe("NextTabs", function()
     assert.are.equal(0, #rail.pool, "the hidden tabs are used again")
   end)
 
+  -- Hide Empty Groups (#1321, groups.md §3): a group's tab comes and goes as the group fills and empties, and every
+  -- group's tab shows while a section is dragged (asked: "agree with showing all sections when dragging a section,
+  -- animate it").
+  describe("listing tabs again", function()
+    local step
+    local function list(ids)
+      local names = { [0] = "+", [1] = "Backpack", [2] = "Herbs", [3] = "Ore", [4] = "Gems" }
+      local out = {}
+      for _, id in ipairs(ids) do table.insert(out, { id = id, name = names[id], fixed = id == 0 or nil }) end
+      return out
+    end
+    local function placed(tab) return { tab.button:GetPoint(1) } end
+    local function pooled(tab)
+      for _, t in ipairs(rail.pool) do
+        if t == tab then return true end
+      end
+      return false
+    end
+
+    before_each(function()
+      step = style.TAB_HEIGHT + style.TAB_SPACING
+    end)
+
+    it("keeps each group's own tab while it is listed, whatever comes and goes around it", function()
+      rail:SetTabs(list({ 1, 3, 0 }))
+      local ore = rail:Tab(3)
+      rail:SetTabs(list({ 1, 2, 3, 0 }))
+      assert.are.equal(ore, rail:Tab(3))
+      assert.are.equal("Ore", ore.text:GetText())
+      assert.are.same({ "TOPRIGHT", rail.frame, "TOPRIGHT", 0, -2 * step }, placed(ore))
+    end)
+
+    it("slides the tabs that stay to their new places, a tab coming in fading in at its own", function()
+      rail:SetTabs(list({ 1, 3, 0 }))
+      local ore = rail:Tab(3)
+      rail:SetTabs(list({ 1, 2, 3, 0 }), true)
+      local herbs = rail:Tab(2)
+      assert.are.same({ "TOPRIGHT", rail.frame, "TOPRIGHT", 0, -step }, placed(herbs), "in its place at once")
+      assert.are.equal(0, herbs.button:GetAlpha())
+      assert.is_true(tween:IsPlaying(ore.yKey), "Ore slides down out of its way")
+      assert.are.same({ "TOPRIGHT", rail.frame, "TOPRIGHT", 0, -step }, placed(ore), "from where it was")
+      tween:Step(style.Time.Interaction / 2)
+      local half = herbs.button:GetAlpha()
+      assert.is_true(half > 0 and half < 1)
+      finishTweens()
+      assert.are.equal(1, herbs.button:GetAlpha())
+      assert.are.same({ "TOPRIGHT", rail.frame, "TOPRIGHT", 0, -2 * step }, placed(ore))
+    end)
+
+    it("fades a tab going out, taking no click meanwhile, then puts it away to be used again", function()
+      rail:SetTabs(list({ 1, 2, 3, 0 }))
+      local herbs, ore = rail:Tab(2), rail:Tab(3)
+      rail:SetTabs(list({ 1, 3, 0 }), true)
+      assert.is_nil(rail:Tab(2), "no longer one of its tabs")
+      assert.is_true(herbs.button:IsShown())
+      assert.is_false(herbs.button:IsMouseEnabled())
+      assert.is_true(tween:IsPlaying(ore.yKey), "Ore slides up into its place")
+      assert.are.equal(3, #rail.tabs)
+      finishTweens()
+      assert.is_false(herbs.button:IsShown())
+      assert.is_true(pooled(herbs))
+      assert.are.same({ "TOPRIGHT", rail.frame, "TOPRIGHT", 0, -step }, placed(ore))
+      rail:SetTabs(list({ 1, 2, 3, 0 }))
+      assert.are.equal(herbs, rail:Tab(2), "used again")
+      assert.is_true(herbs.button:IsMouseEnabled())
+      assert.are.equal(1, herbs.button:GetAlpha())
+    end)
+
+    it("brings back a tab going out when its group is listed again before it has gone", function()
+      rail:SetTabs(list({ 1, 2, 3, 0 }))
+      local herbs = rail:Tab(2)
+      rail:SetTabs(list({ 1, 3, 0 }), true)
+      tween:Step(style.Time.Interaction / 2)
+      rail:SetTabs(list({ 1, 2, 3, 0 }), true)
+      assert.are.equal(herbs, rail:Tab(2))
+      assert.is_true(herbs.button:IsMouseEnabled())
+      finishTweens()
+      assert.is_true(herbs.button:IsShown())
+      assert.are.equal(1, herbs.button:GetAlpha())
+      assert.is_false(pooled(herbs))
+    end)
+
+    it("shows a tab going out at once, whole and clickable, when its group is listed again without gliding", function()
+      rail:SetTabs(list({ 1, 2, 3, 0 }))
+      local herbs = rail:Tab(2)
+      rail:SetTabs(list({ 1, 3, 0 }), true)
+      tween:Step(style.Time.Interaction / 2)
+      rail:SetTabs(list({ 1, 2, 3, 0 }))
+      assert.are.equal(herbs, rail:Tab(2))
+      assert.are.equal(1, herbs.button:GetAlpha())
+      assert.is_true(herbs.button:IsMouseEnabled())
+      assert.is_false(tween:IsPlaying(herbs.fadeKey))
+    end)
+
+    it("stops a tab going out where it is, sliding no further", function()
+      rail:SetTabs(list({ 1, 3, 0 }))
+      local ore = rail:Tab(3)
+      rail:SetTabs(list({ 1, 2, 3, 0 }), true)
+      assert.is_true(tween:IsPlaying(ore.yKey))
+      tween:Step(style.Time.Interaction / 2)
+      local at = placed(ore)
+      rail:SetTabs(list({ 1, 2, 0 }), true)
+      assert.is_false(tween:IsPlaying(ore.yKey))
+      finishTweens()
+      assert.are.same(at, placed(ore), "where it was when it began to go")
+    end)
+
+    it("restyles a tab going out with the others for a theme applied meanwhile", function()
+      finally(function() UseNextTheme(nil) end)
+      rail:SetTabs(list({ 1, 2, 3, 0 }))
+      local herbs = rail:Tab(2)
+      rail:SetTabs(list({ 1, 3, 0 }), true)
+      UseNextTheme({ Layout = { TabHeight = 20 } })
+      rail:ApplyStyle(nil)
+      assert.are.equal(20, herbs.button:GetHeight())
+    end)
+
+    it("puts a tab going out away at once when the tabs are listed again without gliding", function()
+      rail:SetTabs(list({ 1, 2, 3, 0 }))
+      local herbs = rail:Tab(2)
+      rail:SetTabs(list({ 1, 3, 0 }), true)
+      rail:SetTabs(list({ 1, 3, 0 }))
+      assert.is_false(herbs.button:IsShown())
+      assert.is_true(pooled(herbs))
+      finishTweens()
+      assert.is_false(herbs.button:IsShown(), "its fade does not show it again")
+      assert.are.equal(1, herbs.button:GetAlpha(), "nor fades it out in the pool, to be used again unseen")
+    end)
+
+    it("glides the bar along with the selected tab to where it is going", function()
+      rail:SetTabs(list({ 1, 2, 3, 0 }))
+      rail:Select(3)
+      rail:SetTabs(list({ 1, 3, 0 }), true)
+      assert.is_true(tween:IsPlaying(rail.indicator))
+      finishTweens()
+      assert.are.equal(-step, rail.indicatorY)
+    end)
+
+    it("lists them at once while the rail is not shown", function()
+      rail:SetTabs(list({ 1, 3, 0 }))
+      body:Hide()
+      rail:SetTabs(list({ 1, 2, 3, 0 }), true)
+      assert.is_false(tween:IsPlaying(rail:Tab(3).yKey))
+      assert.are.equal(1, rail:Tab(2).button:GetAlpha())
+      assert.are.same({ "TOPRIGHT", rail.frame, "TOPRIGHT", 0, -2 * step }, placed(rail:Tab(3)))
+    end)
+  end)
+
   -- Asked: "all tabs in all Next windows should be reorderable by clicking and holding to slide. animate
   -- the slide, but pin the X axis so you can't move it left and right, just drag it up and down. animate
   -- this transition and make sure it saves." (docs/next-batch-2.md §5)

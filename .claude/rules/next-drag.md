@@ -67,6 +67,8 @@ section is being dragged or landing.
   else may draw the bag (reported: a section the merchant did not take all of stayed hidden, "limbo").
 - The canvas keeps a gap the section's height where it was (`NextContent:BeginDrag`), so the other
   sections do not move until the cursor does.
+- Every registered panel shows every group's tab from the pickup until the drag ends (`finish`), so a section can be
+  dropped on a group Hide Empty Groups leaves out; the tabs glide in and out (groups.md §3).
 
 **Making room.** While the cursor is over its own panel's body, the gap goes to the insertion point
 under the cursor (`NextContent:DragIndexAt`, by the midpoints of the other sections), and the other

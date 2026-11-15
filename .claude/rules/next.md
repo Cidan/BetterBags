@@ -308,7 +308,9 @@ section dragged out of a panel returns to the panel's strata (next-drag.md §7).
   for that tab), right click opens the group menu (rename, delete) and "+" creates a group, both
   through the classic backpack behavior's dialogs. Hidden when groups are off. Deleting the group shown
   switches to Backpack, drawn; the delete's confirmation recalculates the bag so its categories are on
-  Backpack's tab (groups.md §1; the bank does the same with its default group).
+  Backpack's tab (groups.md §1; the bank does the same with its default group). With Hide Empty Groups on, the
+  tabs of groups with nothing in them are left out, all shown while a section is dragged, gliding in and out
+  (groups.md §3).
   - **A tab's icon** (`NextTabEntry.icon` or `atlas`: the bag slots in Show Blizzard Bags, the bank's tabs, the
     Warbank's) is against the body, the padding in from the tab's body side, and its name past it and the icon gap
     (`placeContent`): on the backpack's rail the icon is right of the name, on the bank's and the guild bank's
@@ -336,7 +338,8 @@ section dragged out of a panel returns to the panel's strata (next-drag.md §7).
     tells its handler every tab's id
     in it; nothing when it is back where it was. The bar follows the selected tab. A move ends with the
     tab back in its place when the rail hides or its tabs are listed again, and none starts while
-    another frame is lifted. One at a time.
+    another frame is lifted. One at a time. Once it lands, or is put back as the rail hides, the rail's land
+    handler runs (`SetLandHandler`): the panel lists its tabs for what a draw held off meanwhile (groups.md §3).
   - **What moves where:** a tab moves among the movable tabs of its block (`NextTabEntry.block`, tabs
     next to each other: the bank's own groups and its Warbank groups; its character tabs and its Warbank
     tabs; the guild's tabs, apart from All Tabs); a block's gap stays above whichever of its tabs is
@@ -348,7 +351,8 @@ section dragged out of a panel returns to the panel's strata (next-drag.md §7).
     (`backpack`, `bank` for the bank's groups, `bankTabs` for its Blizzard tabs, `guild`, `vendor`; none
     for the bag slots), and the tabs are listed again. Every `RefreshTabs` lists each block in the saved
     order (`panelProto:OrderedTabs`, `NextTabs:Ordered`: saved tabs in their order, new ones after them
-    in their own, fixed and purchase tabs where they are), then gives each block's first tab its gap.
+    in their own, fixed and purchase tabs where they are), then gives each block's first tab its gap. The groups
+    Hide Empty Groups leaves out keep their places in the order saved (`withLeftOut`, groups.md §3).
   - The settings window's tabs run across its top: pinning X there leaves nothing to drag, so they are
     not moved.
   - Coverage: `spec/next/tabs_spec.lua` ("moving a tab", "a saved order"), and each panel's spec

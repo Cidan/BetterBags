@@ -757,6 +757,24 @@ function DB:SetGroupsEnabled(kind, value)
   DB.data.profile.groupsEnabled[kind] = value
 end
 
+-- GetHideEmptyGroups is whether a bag leaves out the tab of a group with nothing in it (Hide Empty Groups, groups.md §3).
+-- Off once the logout's strip took the table, every value of which was its default (initialization.md §7).
+---@param kind BagKind
+---@return boolean
+function DB:GetHideEmptyGroups(kind)
+  local t = DB.data.profile.hideEmptyGroups
+  return t ~= nil and t[kind] == true
+end
+
+---@param kind BagKind
+---@param value boolean
+function DB:SetHideEmptyGroups(kind, value)
+  if DB.data.profile.hideEmptyGroups == nil then
+    DB.data.profile.hideEmptyGroups = {}
+  end
+  DB.data.profile.hideEmptyGroups[kind] = value
+end
+
 ---@param kind BagKind
 ---@param view BagView
 ---@return SizeInfo

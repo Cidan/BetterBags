@@ -1145,6 +1145,24 @@ describe("Database", function()
       assert.is_false(DB:GetNextSectionGap(const.BAG_KIND.BACKPACK))
     end)
 
+    -- Hide Empty Groups (#1321, groups.md §3).
+    it("keeps whether each bag hides its empty groups' tabs, off until turned on", function()
+      assert.is_false(DB:GetHideEmptyGroups(const.BAG_KIND.BACKPACK))
+      DB:SetHideEmptyGroups(const.BAG_KIND.BACKPACK, true)
+      assert.is_true(DB:GetHideEmptyGroups(const.BAG_KIND.BACKPACK))
+      assert.is_false(DB:GetHideEmptyGroups(const.BAG_KIND.BANK))
+      DB:SetHideEmptyGroups(const.BAG_KIND.BACKPACK, false)
+      assert.is_false(DB:GetHideEmptyGroups(const.BAG_KIND.BACKPACK))
+    end)
+
+    -- The logout's strip takes a table every value of which is its default (initialization.md §7).
+    it("reads Hide Empty Groups as off once the logout's strip took its table, and keeps it when set then", function()
+      DB.data.profile.hideEmptyGroups = nil
+      assert.is_false(DB:GetHideEmptyGroups(const.BAG_KIND.BANK))
+      DB:SetHideEmptyGroups(const.BAG_KIND.BANK, true)
+      assert.is_true(DB:GetHideEmptyGroups(const.BAG_KIND.BANK))
+    end)
+
     it("keeps each bag's limit of rows before a section is wide, two until set and never below", function()
       assert.are.equal(2, DB:GetNextSectionWideRows(const.BAG_KIND.BACKPACK))
       DB:SetNextSectionWideRows(const.BAG_KIND.BACKPACK, 4)

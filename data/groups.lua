@@ -16,7 +16,11 @@ local const = addon:GetModule('Constants')
 local debug = addon:GetModule('Debug')
 
 ---@class (exact) Groups: AceModule
+---@field private assignedSince table<BagKind, table<number, table|false>> For each group a category was assigned to, the
+--- bag's data by tab (SlotInfo.tabs) when it was, false before the bag's data was first worked out (HiddenGroups).
 local groups = addon:NewModule('Groups')
+
+groups.assignedSince = {}
 
 function groups:Init()
 end
@@ -152,6 +156,9 @@ function groups:AssignCategoryToGroup(ctx, kind, categoryName, groupID, bankType
   end
 
   database:SetCategoryGroup(kind, categoryName, groupID, bankType)
+  local data = addon:GetModule('Items'):GetAllSlotInfo()[kind]
+  self.assignedSince[kind] = self.assignedSince[kind] or {}
+  self.assignedSince[kind][groupID] = data and data.tabs or false
   debug:Log("groups", "Assigned category '%s' to group '%s' (ID: %d)", categoryName, group.name, groupID)
   events:SendMessage(ctx, 'groups/CategoryAssigned', categoryName, groupID, kind)
 end
@@ -210,6 +217,53 @@ function groups:CategoryBelongsToGroup(kind, categoryName, groupID, bankType)
     -- Other groups only include explicitly assigned categories
     return assignedGroup == groupID
   end
+end
+
+-------
+--- Empty Groups
+-------
+
+-- HiddenGroups returns the groups of a bag whose tabs Hide Empty Groups leaves out (groups.md §3): with it on, every group
+-- but the bag's default ones and the one shown (shownID) with nothing in tabs, the bag's data by tab
+-- (items:Phase10_PartitionIntoTabs: a tab's items counted, those a category hides in the bag left out), unless a category
+-- was assigned to it since tabs was worked out (its items go there at the next recalculation). None before the bag's data
+-- was first worked out (tabs nil).
+---@param kind BagKind
+---@param tabs? table<number, {totalItems: number}>
+---@param shownID number
+---@return table<number, boolean>
+function groups:HiddenGroups(kind, tabs, shownID)
+  local hidden = {}
+  if tabs == nil or not database:GetHideEmptyGroups(kind) then
+    return hidden
+  end
+  local assigned = self.assignedSince[kind] or {}
+  for id in pairs(database:GetAllGroups(kind)) do
+    local tab = tabs[id]
+    if id ~= shownID and not self:IsDefaultGroup(kind, id) and (tab == nil or tab.totalItems == 0)
+      and assigned[id] ~= tabs then
+      hidden[id] = true
+    end
+  end
+  return hidden
+end
+
+-- SameGroups says whether two sets of groups (HiddenGroups) name the same groups.
+---@param a table<number, boolean>
+---@param b table<number, boolean>
+---@return boolean
+function groups:SameGroups(a, b)
+  for id in pairs(a) do
+    if not b[id] then
+      return false
+    end
+  end
+  for id in pairs(b) do
+    if not a[id] then
+      return false
+    end
+  end
+  return true
 end
 
 -------
