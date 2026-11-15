@@ -1,0 +1,17 @@
+{
+  "id": 1794779160,
+  "version": "v0.9.3-5-gc05fcea",
+  "channel": "alpha",
+  "date": "2026-11-15",
+  "from": "53b5dbe7a54c3803e12bc52da8bc00e819075074",
+  "to": "c05fceaa7ea5be1467edc0552f6d4a5ff73e2d34",
+  "headline": "Fixed empty specialized bag slot glyphs blending into the Papercraft theme.",
+  "entries": [
+    {
+      "category": "Fixed",
+      "title": "Specialized bag slot glyphs missing on Papercraft theme",
+      "details": "Empty slots in specialized bags, such as reagent bags, quivers, and profession bags, drew a white glyph that blended into the light Papercraft theme background and looked missing. In Papercraft, these glyphs now use the theme's ink color so they are visible.",
+      "clients": []
+    }
+  ]
+}
