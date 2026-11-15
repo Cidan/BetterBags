@@ -164,6 +164,13 @@ string gives a category nothing an export could not:
 | `hidden` | `true` for a bag kind BetterBags has |
 | `note` | a string not empty |
 | `skipRecent` | `true` |
+| `itemOrder` | its own item order (item-sort.md §5): the keys BetterBags has (`const.ITEM_ORDER_KEY`), each once, at most `ITEM_ORDER_DEPTH` (`itemOrderOf`); none when no key is left |
+
+A whole set of categories pasted in (`ApplyImport`) is brought to shape by `NormalizeCategories`, which reads each
+category's `itemOrder` the same way (`itemOrderOf`), a plugin's saved state's too: an order with a key BetterBags does
+not have would stop the sort (`sort:ItemDataComparator` refuses one). A key this client does not offer (Upgrade Track,
+from a retail string, on a Classic client) is one BetterBags has: kept, it orders nothing there (every item is on no
+track), and its dropdown shows its name with no choice checked.
 
 Never shared: `automation`, `confirmSale`, `deposit` (the user's decision), `priority` (the importer's order),
 `blizzard` (worked out again from the name, category-lifecycle.md §11), `save`, `dynamic`, `isGroupBySubcategory`,

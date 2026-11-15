@@ -200,8 +200,6 @@ local function stubModules()
   override(items, "GetAllSlotInfo", function() return {} end)
 
   local sort = stubModule("Sort")
-  override(sort, "GetItemSortBySlot", function() end)
-  override(sort, "GetItemSortFunction", function() end)
   override(sort, "GetSectionSortFunction", function() return function() return true end end)
 
   local categories = stubModule("Categories")

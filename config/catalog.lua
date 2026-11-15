@@ -18,6 +18,9 @@ local bucket = addon:GetModule('Bucket')
 ---@class Sonata: AceModule
 local sonata = addon:GetModule('Sonata')
 
+---@class Sort: AceModule
+local sort = addon:GetModule('Sort')
+
 -- SettingsCatalog defines every setting once (docs/next-settings.md): its kind, name, description,
 -- choices or range, how it is read and written, and what it sends so the bags show it. The settings
 -- window (next/settings/) builds its rows from it, for the classic bags and BetterBags Next alike. A
@@ -45,10 +48,11 @@ local catalog = addon:NewModule('SettingsCatalog')
 ---@field description string|fun(bag: SettingBag): string
 ---@field keywords? string[] Words a search finds it by, beside its name and description.
 ---@field items? string[] A dropdown's choices.
----@field itemsFunction? fun(ctx: Context): string[] A dropdown's choices, read each time the menu opens.
+---@field itemsFunction? fun(ctx: Context, bag?: SettingBag): string[] A dropdown's choices, read each time the menu opens.
 ---@field min? number
 ---@field max? number
 ---@field step? number
+---@field disabled? fun(bag?: SettingBag): boolean Drawn disabled while it says so.
 ---@field reload? boolean It takes effect after a reload.
 ---@field get fun(ctx: Context, bag?: SettingBag): any A toggle's boolean, a choice's item, a number.
 ---@field set fun(ctx: Context, value: any, bag?: SettingBag): boolean? False when the change was refused.
@@ -194,7 +198,7 @@ function catalog:Get(id, bag)
     keywords = def.keywords or {},
     disabled = def.disabled and function() return def.disabled(bag) end or nil,
     items = def.items,
-    itemsFunction = def.itemsFunction,
+    itemsFunction = def.itemsFunction and function(ctx) return def.itemsFunction(ctx, bag) end or nil,
     min = def.min,
     max = def.max,
     step = def.step,
@@ -492,45 +496,67 @@ define('sectionOrder', {
   end,
 })
 
-local itemOrders = {
-  ["Alphabetically"] = const.ITEM_SORT_TYPE.ALPHABETICALLY_THEN_QUALITY,
-  ["Quality"] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
-  ["Item Level"] = const.ITEM_SORT_TYPE.ITEM_LEVEL,
-  ["Expansion"] = const.ITEM_SORT_TYPE.EXPANSION,
-  ["Sell Price (Stack)"] = const.ITEM_SORT_TYPE.SELL_PRICE_STACK,
-  ["Sell Price (Each)"] = const.ITEM_SORT_TYPE.SELL_PRICE_EACH,
-  ["Upgrade Track"] = const.ITEM_SORT_TYPE.UPGRADE_TRACK,
-}
-
--- Upgrade Track only where the client reads upgrade tracks (items:ReadItemTraits): elsewhere no item has one.
-local itemOrderItems = { 'Alphabetically', 'Quality', 'Item Level', 'Expansion', 'Sell Price (Stack)', 'Sell Price (Each)' }
-local itemOrderKeywords = { 'sort', 'items', 'quality', 'item level', 'expansion', 'alphabetical', 'sell price', 'vendor',
-  'value' }
+-- The order of items within each section of a bag (item-sort.md §1): the keys it sorts by, each tier of it one dropdown,
+-- Item Order, then Then By and And Then By breaking its ties; the choices and what each saves are the Sort module's,
+-- which a category's Item Order tab shares (next/settings/categories.lua).
+local itemOrderKeywords = { 'sort', 'items', 'order', 'quality', 'item level', 'expansion', 'alphabetical', 'name',
+  'sell price', 'vendor', 'value', 'slot', 'equipment slot', 'type', 'item type', 'count', 'stack' }
 local upgradeTrackText = ''
-if C_Item.GetItemUpgradeInfo then
-  table.insert(itemOrderItems, 4, 'Upgrade Track')
+if sort:OffersItemOrderKey(const.ITEM_ORDER_KEY.UPGRADE_TRACK) then
   for _, word in ipairs({ 'upgrade track', 'track', 'myth', 'hero', 'champion' }) do
     table.insert(itemOrderKeywords, word)
   end
-  upgradeTrackText = ' Upgrade Track puts gear on the highest upgrade track first (Myth, then Hero, Champion...), the '
-    .. 'highest item level first within each.'
+  upgradeTrackText = ' Upgrade Track puts gear on the highest upgrade track first (Myth, then Hero, Champion...).'
 end
 
-define('itemOrder', {
-  kind = "dropdown",
-  bag = true,
+-- The tie-break every order ends with.
+local itemOrderRest = ' Items still equal go by name, then the bigger pile.'
+
+---@param id string
+---@param tier number
+---@param def {title: string, description: string, keywords: string[], disabled?: fun(bag: SettingBag): boolean}
+local function itemOrderTier(id, tier, def)
+  define(id, {
+    kind = "dropdown",
+    bag = true,
+    title = def.title,
+    description = def.description,
+    keywords = def.keywords,
+    disabled = def.disabled,
+    itemsFunction = function(_, bag)
+      return sort:ItemOrderChoices(db:GetItemOrder(bag.kind, db:GetBagView(bag.kind)), tier)
+    end,
+    get = function(_, bag)
+      return sort:ItemOrderChoice(db:GetItemOrder(bag.kind, db:GetBagView(bag.kind)), tier)
+    end,
+    set = function(ctx, value, bag)
+      local view = db:GetBagView(bag.kind)
+      db:SetItemOrder(bag.kind, view, sort:WithItemOrderChoice(db:GetItemOrder(bag.kind, view), tier, value))
+      rederive(ctx)
+    end,
+  })
+end
+
+itemOrderTier('itemOrder', 1, {
   title = 'Item Order',
-  description = 'The default order of items within each section.' .. upgradeTrackText .. ' Sell Price puts what a '
-    .. 'vendor pays most for first: the whole stack, or one of it.',
+  description = 'What items within each section are ordered by first; Then By and And Then By break its ties. '
+    .. 'Equipment Slot follows the character sheet, Item Type the item\'s type, then its subtype.' .. upgradeTrackText
+    .. ' Sell Price puts what a vendor pays most for first: the whole stack, or one of it. A category can have its own '
+    .. '(Categories, its Item Order tab).' .. itemOrderRest,
   keywords = itemOrderKeywords,
-  items = itemOrderItems,
-  get = function(_, bag)
-    return choiceOf(itemOrders, db:GetItemSortType(bag.kind, db:GetBagView(bag.kind)))
-  end,
-  set = function(ctx, value, bag)
-    db:SetItemSortType(bag.kind, db:GetBagView(bag.kind), itemOrders[value])
-    rederive(ctx)
-  end,
+})
+
+itemOrderTier('itemOrderThen', 2, {
+  title = 'Then By',
+  description = 'What items Item Order holds equal are ordered by; None for nothing more.' .. itemOrderRest,
+  keywords = { 'sort', 'items', 'order', 'then', 'tie', 'second' },
+})
+
+itemOrderTier('itemOrderLast', 3, {
+  title = 'And Then By',
+  description = 'What items still equal after Then By are ordered by; None for nothing more.' .. itemOrderRest,
+  keywords = { 'sort', 'items', 'order', 'then', 'tie', 'third' },
+  disabled = function(bag) return #db:GetItemOrder(bag.kind, db:GetBagView(bag.kind)) < 2 end,
 })
 
 define('enableGroups', {

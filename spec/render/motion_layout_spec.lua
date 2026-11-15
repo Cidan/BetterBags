@@ -24,9 +24,7 @@ const.BAG_KIND = const.BAG_KIND or { BACKPACK = 1, BANK = 2 }
 const.MOVEMENT_FLOW = const.MOVEMENT_FLOW or { UNDEFINED = 0 }
 trackStub("Debug").Log = function() end
 trackStub("Categories").GetGroupForCategory = function() return nil end
-local sort = trackStub("Sort")
-sort.GetItemSortBySlot = function() end
-sort.GetItemSortFunction = function() end
+trackStub("Sort")
 local database = trackStub("Database")
 local originalFullNames = database.GetShowFullSectionNames
 database.GetShowFullSectionNames = function() return false end

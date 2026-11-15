@@ -11,8 +11,12 @@ const.BAG_KIND.GUILD = const.BAG_KIND.GUILD or 2
 const.BAG_VIEW = const.BAG_VIEW or { UNDEFINED = 0, SECTION_GRID = 2, SECTION_ALL_BAGS = 4 }
 const.SEARCH_CATEGORY_GROUP_BY = const.SEARCH_CATEGORY_GROUP_BY or { NONE = 0, TYPE = 1, SUBTYPE = 2, EXPANSION = 3 }
 const.SECTION_SORT_TYPE = const.SECTION_SORT_TYPE or { ALPHABETICALLY = 1, SIZE_DESCENDING = 2, SIZE_ASCENDING = 3 }
-const.ITEM_SORT_TYPE = const.ITEM_SORT_TYPE
-  or { ALPHABETICALLY_THEN_QUALITY = 1, QUALITY_THEN_ALPHABETICALLY = 2, ITEM_LEVEL = 3, EXPANSION = 4 }
+const.ITEM_ORDER_KEY = const.ITEM_ORDER_KEY or {
+  QUALITY = "quality", NAME = "name", ITEM_LEVEL = "itemLevel", UPGRADE_TRACK = "upgradeTrack",
+  EQUIPMENT_SLOT = "equipmentSlot", ITEM_TYPE = "itemType", EXPANSION = "expansion", COUNT = "count",
+  SELL_PRICE_STACK = "sellPriceStack", SELL_PRICE_EACH = "sellPriceEach",
+}
+const.DEFAULT_ITEM_ORDER = const.DEFAULT_ITEM_ORDER or { "quality" }
 
 LoadBetterBagsModule("core/context.lua")
 LoadBetterBagsModule("render/render.lua")
@@ -43,7 +47,7 @@ StubBetterBagsModule("ItemRowFrame")
 local sonata = StubBetterBagsModule("Sonata")
 local debugModule = StubBetterBagsModule("Debug")
 debugModule.Log = debugModule.Log or function() end
-for _, m in ipairs({ { "SettingsCatalog", "config/catalog.lua" }, { "NextStyle", "next/style.lua" },
+for _, m in ipairs({ { "Sort", "util/sort.lua" }, { "SettingsCatalog", "config/catalog.lua" }, { "NextStyle", "next/style.lua" },
   { "NextTween", "next/tween.lua" }, { "NextFrameArt", "next/frameart.lua" }, { "NextFill", "next/fill.lua" }, { "NextControls", "next/controls/base.lua" },
   { "NextScrollBar", "next/controls/scrollbar.lua" }, { "NextButton", "next/controls/button.lua" },
   { "NextToggle", "next/controls/toggle.lua" }, { "NextInput", "next/controls/input.lua" },
@@ -243,6 +247,7 @@ describe("NextSettingsContent", function()
       override(editor, "RuleTabShown", function() return rule end)
       override(editor, "ItemsTabShown", function() return chosen end)
       override(editor, "AutomationTabShown", function() return chosen end)
+      override(editor, "ItemOrderTabShown", function() return chosen end)
       for _, name in ipairs({ "CreateSettingsTab", "CreateRuleTab", "CreateItemsTab", "CreateBlizzardTab" }) do
         override(editor, name, function(_, parent, owner, bags, mode)
           made[mode and (name .. ":" .. mode) or name] = { owner = owner, bags = bags }
@@ -261,7 +266,7 @@ describe("NextSettingsContent", function()
         return list
       end
       -- Asked: "a new tab next to 'Added Items' called 'Ignored Items'".
-      assert.are.same({ "Settings", "Search Rule", "Added Items", "Ignored Items", "Automation" }, tabs())
+      assert.are.same({ "Settings", "Search Rule", "Added Items", "Ignored Items", "Automation", "Item Order" }, tabs())
       assert.are.equal(settings.frame, made.CreateSettingsTab.owner)
       local function kinds(name)
         local list = {}
@@ -303,6 +308,18 @@ describe("NextSettingsContent", function()
       assert.are.equal("Recent Items", sections[3].title)
       assert.are.same({ "Skip Recent Items" }, { sections[3].rows[1].option.title })
       assert.are.equal(1, #sections[3].rows)
+      -- Asked (issue #108): "each category can have it's own sort order": its own switch, and the three dropdowns a
+      -- bag's Layout tab chooses its order with, as settings rows.
+      local itemOrder
+      for _, t in ipairs(pages:Get("categories").tabs) do
+        if t.id == "order" then itemOrder = t end
+      end
+      local orderSections = pages:Sections(itemOrder)
+      assert.are.equal(1, #orderSections)
+      assert.are.equal("Order", orderSections[1].title)
+      local orderTitles = {}
+      for i, row in ipairs(orderSections[1].rows) do orderTitles[i] = row.option.title end
+      assert.are.same({ "Own Item Order", "Item Order", "Then By", "And Then By" }, orderTitles)
       settings:Select("categories", "ignored")
       assert.are.equal(settings.frame, made["CreateItemsTab:ignored"].owner)
       assert.are.same({ const.BAG_KIND.BACKPACK, const.BAG_KIND.BANK, const.BAG_KIND.GUILD },
@@ -452,7 +469,7 @@ describe("NextSettingsContent", function()
       assert.are.same({
         { "General", "Bank Window", { "enableBankBags" } },
         { "General", "Warbank", { "bankAutoDepositReagents" } },
-        { "Layout", "Order", { "sectionOrder", "itemOrder" } },
+        { "Layout", "Order", { "sectionOrder", "itemOrder", "itemOrderThen", "itemOrderLast" } },
         { "Layout", "Sections [next]", { "sectionColumns", "sectionCompact", "sectionGap", "sectionFill", "sectionSpan",
           "sectionWideRows" } },
         { "Layout", "Tabs", { "enableGroups", "hideEmptyGroups" } },
@@ -509,10 +526,11 @@ describe("NextSettingsContent", function()
       override(db, "GetNextSectionColumns", function() return columns end)
       override(db, "GetNextSectionFill", function() return "across" end)
       override(db, "GetNextSectionSpan", function() return true end)
-      for _, name in ipairs({ "GetSectionSortType", "GetBagView", "GetItemSortType", "GetGroupsEnabled",
+      for _, name in ipairs({ "GetSectionSortType", "GetBagView", "GetGroupsEnabled",
         "GetHideEmptyGroups", "GetShowAllFreeSpace", "GetPreserveItemGaps" }) do
         override(db, name, function() return 1 end)
       end
+      override(db, "GetItemOrder", function() return { "quality" } end)
       design = "next"
       settings:Open("backpack", "layout")
       content:OnEnable()
@@ -616,12 +634,12 @@ describe("NextSettingsContent", function()
       end
       -- The general pages' 41 (the ten Interactions the latest, interaction-bags.md; Enable QuickFind Integration, #1262;
       -- Enable Bank Bags, Enable Vendor Window and Enable Guild Bank Window moved to their bags, and the Size tab's four to
-      -- every bag), the Currencies page's 10 (currency.md §6), the Food & Drink page's 7 (food-drink.md §5), each bag's 41
-      -- (Hide Empty Groups the latest, #1321; Gap Between Sections before it, next-columns.md §7c; its Size tab's four before
-      -- that, Show Keystone Level before them, #202), the bank's and the guild bank's switch on their General tabs, the
-      -- bank's Include Tradeable Reagents beside its switch (#750, warbank-deposit.md), and the vendor's 5 (its switch and
-      -- its Size tab).
-      assert.are.equal(41 + 10 + 7 + 3 * 41 + 2 + 1 + 5, named)
+      -- every bag), the Currencies page's 10 (currency.md §6), the Food & Drink page's 7 (food-drink.md §5), each bag's 43
+      -- (Then By and And Then By the latest, #108; Hide Empty Groups before them, #1321; Gap Between Sections before it,
+      -- next-columns.md §7c; its Size tab's four before that, Show Keystone Level before them, #202), the bank's and the
+      -- guild bank's switch on their General tabs, the bank's Include Tradeable Reagents beside its switch (#750,
+      -- warbank-deposit.md), and the vendor's 5 (its switch and its Size tab).
+      assert.are.equal(41 + 10 + 7 + 3 * 43 + 2 + 1 + 5, named)
     end)
 
     -- The Food & Drink bar's options (food-drink.md §5): a page of their own after Currencies, BetterBags Next only.
@@ -653,10 +671,11 @@ describe("NextSettingsContent", function()
 
     -- The bank's Tabs hold its own Hide Empty Groups (#1321), never the backpack's Enable Groups.
     it("shows the bank's Layout without the backpack's Enable Groups, with its own Hide Empty Groups", function()
-      for _, name in ipairs({ "GetSectionSortType", "GetBagView", "GetItemSortType", "GetGroupsEnabled",
+      for _, name in ipairs({ "GetSectionSortType", "GetBagView", "GetGroupsEnabled",
         "GetHideEmptyGroups", "GetShowAllFreeSpace", "GetPreserveItemGaps" }) do
         override(db, name, function() return 1 end)
       end
+      override(db, "GetItemOrder", function() return { "quality" } end)
       settings:Open("bank", "layout")
       local sections = {}
       for _, section in ipairs(settings.page.sections) do table.insert(sections, section.title) end
@@ -670,10 +689,11 @@ describe("NextSettingsContent", function()
 
     -- Asked: rows and columns in the classic bags' Layout, and not in BetterBags Next's.
     it("shows a bag's window, rows and columns in the classic bags' Layout only", function()
-      for _, name in ipairs({ "GetSectionSortType", "GetBagView", "GetItemSortType", "GetGroupsEnabled",
+      for _, name in ipairs({ "GetSectionSortType", "GetBagView", "GetGroupsEnabled",
         "GetHideEmptyGroups", "GetShowAllFreeSpace", "GetPreserveItemGaps", "GetBagSnapToContent", "GetShowFullSectionNames" }) do
         override(db, name, function() return 1 end)
       end
+      override(db, "GetItemOrder", function() return { "quality" } end)
       override(db, "GetBagSizeMode", function() return "content" end)
       override(db, "GetBagSizeInfo", function() return { itemsPerRow = 7, columnCount = 2, opacity = 100, scale = 100 } end)
       settings:Open("bank", "layout")
@@ -1538,7 +1558,7 @@ describe("NextSettingsContent", function()
         GetEnterToMakeCategory = per(true), GetGlowIntensity = per(60), GetGroupsEnabled = per(false),
         GetHideEmptyGroups = per(false),
         GetInBagSearch = per(true), GetItemLevelColors = per(colors), GetItemLevelOptions = per({ enabled = true, color = true }),
-        GetItemSortType = per(1), GetMarkRecentItems = per(false), GetMaxItemLevel = per(1), GetNextBagScale = per(100),
+        GetItemOrder = per({ "quality" }), GetMarkRecentItems = per(false), GetMaxItemLevel = per(1), GetNextBagScale = per(100),
         GetNextEnabled = per(design == "next"), GetNextIconScale = per(100), GetNextFitNamesWhileOpen = per(false),
         GetNextAutosize = per(true), GetNextVendorEnabled = per(true), GetNextGuildBankEnabled = per(true),
         GetQuickFindEnabled = per(true),

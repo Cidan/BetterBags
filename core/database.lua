@@ -976,18 +976,46 @@ function DB:SetGlowIntensity(kind, value)
   DB.data.profile.glowIntensity[kind] = value
 end
 
----@param kind BagKind
----@param view BagView
----@return ItemSortType
-function DB:GetItemSortType(kind, view)
-  return DB.data.profile.itemSort[kind][view]
+-- itemOrderOf returns an item order as one is kept (item-sort.md §1): the keys BetterBags has (const.ITEM_ORDER_KEY), each
+-- once, at most ITEM_ORDER_DEPTH of them, read from a value that may be anything (a pasted string's); nil for none.
+---@param value any
+---@return ItemOrderKey[]?
+local function itemOrderOf(value)
+  if type(value) ~= "table" then
+    return nil
+  end
+  local known = {}
+  for _, key in pairs(const.ITEM_ORDER_KEY) do
+    known[key] = true
+  end
+  local order, taken = {}, {}
+  for _, key in ipairs(value) do
+    if known[key] and not taken[key] and #order < const.ITEM_ORDER_DEPTH then
+      taken[key] = true
+      table.insert(order, key)
+    end
+  end
+  return #order > 0 and order or nil
 end
 
+-- GetItemOrder returns the order of the items within each section of a bag in a view (item-sort.md §1): the keys it sorts
+-- by, first to last, as a new list; DEFAULT_ITEM_ORDER until one is chosen.
 ---@param kind BagKind
 ---@param view BagView
----@param sort ItemSortType
-function DB:SetItemSortType(kind, view, sort)
-  DB.data.profile.itemSort[kind][view] = sort
+---@return ItemOrderKey[]
+function DB:GetItemOrder(kind, view)
+  local byView = DB.data.profile.itemOrder[kind]
+  return { unpack(byView and byView[view] or const.DEFAULT_ITEM_ORDER) }
+end
+
+-- SetItemOrder saves a copy of a bag's item order in a view.
+---@param kind BagKind
+---@param view BagView
+---@param order ItemOrderKey[]
+function DB:SetItemOrder(kind, view, order)
+  local orders = DB.data.profile.itemOrder
+  orders[kind] = orders[kind] or {}
+  orders[kind][view] = { unpack(order) }
 end
 
 ---@param itemID number
@@ -1202,8 +1230,8 @@ end
 -- empty rule;
 -- the item index rebuilt from the item lists (an item listed in several keeps the category its index
 -- names, else the lowest priority number, then the first name; entries naming no list are dropped);
--- hidden sections dropped (hiding was retired). Run on every load and every import; it changes nothing
--- a second time.
+-- hidden sections dropped (hiding was retired); an item order of keys BetterBags has (itemOrderOf). Run on every load
+-- and every import; it changes nothing a second time.
 function DB:NormalizeCategories()
   local profile = DB.data.profile
   profile.categoryOptions = nil
@@ -1214,11 +1242,13 @@ function DB:NormalizeCategories()
     filter.save = true
     filter.itemList = type(filter.itemList) == "table" and filter.itemList or {}
     filter.enabled = normalizeEnabled(filter.enabled)
+    filter.itemOrder = itemOrderOf(filter.itemOrder)
     normalizeRule(filter)
   end
   for name, filter in pairs(profile.ephemeralCategoryFilters) do
     filter.name = name
     filter.enabled = normalizeEnabled(filter.enabled)
+    filter.itemOrder = itemOrderOf(filter.itemOrder)
   end
 
   local old = profile.customCategoryIndex or {}
@@ -1333,7 +1363,7 @@ function DB:CreateOrUpdateCategory(category)
     end
   else
     -- A plugin's category saves only what is the player's (its bags, and the color, priority,
-    -- automation, confirming and deposit they set): the plugin gives the rest again when it makes it.
+    -- automation, confirming, deposit and item order they set): the plugin gives the rest again when it makes it.
     local saved = DB.data.profile.ephemeralCategoryFilters[category.name]
     DB.data.profile.ephemeralCategoryFilters[category.name] = {
       name = category.name,
@@ -1350,15 +1380,16 @@ function DB:CreateOrUpdateCategory(category)
       skipRecent = saved and saved.skipRecent,
       ignoredItems = saved and saved.ignoredItems,
       hidden = saved and saved.hidden,
+      itemOrder = saved and saved.itemOrder,
     }
   end
 end
 
 -- UpdateEphemeralItemCategory saves what a player set for a plugin's category (its bags, color,
 -- priority, automation, confirming, where it deposits, skipping Recent Items, its Ignored Items, the bags it
--- is hidden in).
+-- is hidden in, its own item order).
 ---@param name string
----@param fields {enabled?: table<BagKind, boolean>, color?: number[], priority?: number, automation?: string, confirmSale?: boolean, deposit?: string, skipRecent?: boolean, ignoredItems?: table<number, boolean>}
+---@param fields {enabled?: table<BagKind, boolean>, color?: number[], priority?: number, automation?: string, confirmSale?: boolean, deposit?: string, skipRecent?: boolean, ignoredItems?: table<number, boolean>, hidden?: table<BagKind, boolean>, itemOrder?: ItemOrderKey[]}
 function DB:UpdateEphemeralItemCategory(name, fields)
   local saved = DB.data.profile.ephemeralCategoryFilters[name]
   if saved == nil then
@@ -1374,6 +1405,7 @@ function DB:UpdateEphemeralItemCategory(name, fields)
   saved.skipRecent = fields.skipRecent
   saved.ignoredItems = fields.ignoredItems
   saved.hidden = fields.hidden
+  saved.itemOrder = fields.itemOrder
 end
 
 ---@param category string
@@ -2025,8 +2057,8 @@ local function colorOf(color)
 end
 
 -- sharedCategory returns what a category shares (#1250, .claude/rules/import-export.md §7): its name, rule, items,
--- Ignored Items, group by, color, bags, the bags it is hidden in, its note and Skip Recent Items, each of the shape it
--- has. What it does on its own (Auto Sell, Auto Deposit), its place in the order and what each bag set for it (pins,
+-- Ignored Items, group by, color, bags, the bags it is hidden in, its note, Skip Recent Items and its own item order, each
+-- of the shape it has. What it does on its own (Auto Sell, Auto Deposit), its place in the order and what each bag set for it (pins,
 -- tabs) stay with the player. Made alike for a category of yours to export and for one read from a pasted string,
 -- whose fields may be anything; nil for one with no name.
 ---@param filter any
@@ -2064,6 +2096,7 @@ local function sharedCategory(filter)
   if filter.skipRecent == true then
     shared.skipRecent = true
   end
+  shared.itemOrder = itemOrderOf(filter.itemOrder)
   return shared
 end
 
@@ -2175,6 +2208,35 @@ function DB:ApplyImport(importData)
   DB:NormalizeCategories()
   -- Exports before version 3 hold rules of search rule version 1.
   DB:MigrateSearchRules(importData.version >= 3 and 2 or 1)
+end
+
+-- MigrateItemOrders gives every bag in every view, once, the keys the Item Order it saved as one of seven orders
+-- (profile.itemSort, const.ITEM_SORT_TYPE) sorted by, then drops the old orders. An order at the old default (Quality)
+-- was never saved (AceDB strips it at logout) and stays the default; an order already made of keys is kept.
+function DB:MigrateItemOrders()
+  local profile = DB.data.profile
+  if profile.itemSort == nil then
+    return
+  end
+  local KEY, TYPE = const.ITEM_ORDER_KEY, const.ITEM_SORT_TYPE
+  local orderOf = {
+    [TYPE.ALPHABETICALLY_THEN_QUALITY] = { KEY.NAME, KEY.QUALITY },
+    [TYPE.QUALITY_THEN_ALPHABETICALLY] = { KEY.QUALITY },
+    [TYPE.ITEM_LEVEL] = { KEY.ITEM_LEVEL },
+    [TYPE.EXPANSION] = { KEY.EXPANSION },
+    [TYPE.SELL_PRICE_STACK] = { KEY.SELL_PRICE_STACK },
+    [TYPE.SELL_PRICE_EACH] = { KEY.SELL_PRICE_EACH },
+    [TYPE.UPGRADE_TRACK] = { KEY.UPGRADE_TRACK, KEY.ITEM_LEVEL },
+  }
+  for kind, views in pairs(profile.itemSort) do
+    for view, sortType in pairs(views) do
+      local chosen = profile.itemOrder[kind] and profile.itemOrder[kind][view]
+      if chosen == nil and orderOf[sortType] ~= nil then
+        DB:SetItemOrder(kind, view, orderOf[sortType])
+      end
+    end
+  end
+  profile.itemSort = nil
 end
 
 -- SplitSectionOrder gives BetterBags Next, once, a Section Order a player chose when both designs shared one.
@@ -2605,6 +2667,13 @@ function DB:Migrate()
     Do not remove before Q3'27.
   ]]--
   DB:SplitSizeOptions()
+
+  --[[
+    An Item Order was one of seven orders until an order was the keys it sorts by (issue #108, 2026-11-15). Last, as
+    above: the profile system's migration may switch to another profile.
+    Do not remove before Q3'27.
+  ]]--
+  DB:MigrateItemOrders()
 end
 
 -- ============================================================
@@ -2710,11 +2779,12 @@ function DB:CopyFromProfile(sourceName)
 
   -- Copy from source to current profile
   DB.data:CopyProfile(sourceName)
-  -- The copy has the source's rules, in the version the source has, its order, split or not, and its Size tab, one for
-  -- every bag or one per bag.
+  -- The copy has the source's rules, in the version the source has, its order, split or not, its Size tab, one for
+  -- every bag or one per bag, and its item orders, of keys or not.
   DB:MigrateSearchRules()
   DB:SplitSectionOrder()
   DB:SplitSizeOptions()
+  DB:MigrateItemOrders()
   return true, "Profile copied successfully"
 end
 

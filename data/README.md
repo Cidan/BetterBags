@@ -85,7 +85,7 @@ Manages both custom user-defined categories and dynamic search categories.
 - **Custom Categories**: User-defined item groups
 - **Search Categories**: Dynamic categories based on search queries
 - **Priority System**: Categories can have priorities for ordering
-- **Per-Bag Enable/Disable**: Categories can be toggled per bag type. Whether a bag uses a category decides everything it does there: its color, Hide In, automation and Ignored Items are looked up through `CategoryIn(name, kind)`, which finds nothing in a bag that does not use it
+- **Per-Bag Enable/Disable**: Categories can be toggled per bag type. Whether a bag uses a category decides everything it does there: its color, Hide In, automation, Ignored Items and own item order are looked up through `CategoryIn(name, kind)`, which finds nothing in a bag that does not use it
 - **Blizzard Categories Made Yours**: `Convert(ctx, name)` makes a Blizzard category (one BetterBags names from item data) a category of the player's with the same name, marked `blizzard`, so Blizzard's items keep landing in it; it never groups, and renaming it makes an ordinary category (`.claude/rules/category-lifecycle.md` §11)
 - **Ephemeral Categories**: Temporary runtime categories
 - **Category Functions**: Plugin system for dynamic categorization
@@ -120,6 +120,12 @@ categories:AutomationOf(name, kind)
 categories:ConfirmsSaleOf(name, kind)
 categories:DepositOf(name, kind)
 categories:UpdateCategory(ctx, name, { automation = "sell", confirmSale = false, deposit = "warbank" })
+
+-- A category's items' own order in a bag (a group by's sections as their category), or nil for the bag's
+-- (.claude/rules/item-sort.md §5); whether any category a bag uses has one
+categories:ItemOrderOf(name, kind)
+categories:HasItemOrders(kind)
+categories:UpdateCategory(ctx, name, { itemOrder = { "equipmentSlot", "itemLevel" } }) -- false: the bag's
 
 -- Make a Blizzard category the player's (false for a name a category has); the caller recalculates the bags
 categories:Convert(ctx, name)

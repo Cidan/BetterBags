@@ -66,6 +66,7 @@ restyles it, and switching themes restyles it at once. Default's sizes:
 |   General        |  ORDER                                                        |
 |   Appearance     |  +-------------------------------+-----------------------------+
 |   Item Colors    |  | Section Order  [Alphabet  v] | Item Order    [Quality  v]  |
+|                  |  | Then By        [None      v] | And Then By   [None     v]  |
 | BAGS             |  +-------------------------------+-----------------------------+
 | | Backpack       |  SLOTS                                                        |
 |   Bank           |  +-------------------------------+-----------------------------+
@@ -131,7 +132,8 @@ bags'), and Currency (Blizzard's backpack currency list, which Next's footer doe
 
 **Bags** (Backpack, Bank, and Guild Bank where the client has one; each the same, per bag)
 
-4. **Layout:** *Order:* Section Order, Item Order. *Tabs* (backpack): Enable Groups. *Slots:* Show
+4. **Layout:** *Order:* Section Order, Item Order, Then By, And Then By (each a tier of the bag's item order,
+   `.claude/rules/item-sort.md`). *Tabs* (backpack): Enable Groups. *Slots:* Show
    All Free Space Slots, Preserve Empty Slots as Gaps.
 5. **Items:** *Item Level:* Show Item Level, Show Item Level Color, Show Keystone Level (retail; the
    backpack and the bank). *Quality:* Quality Glow

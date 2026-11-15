@@ -49,7 +49,7 @@ database.CreateOrUpdateCategory = function(_, category)
       isGroupBySubcategory = category.isGroupBySubcategory, groupByParent = category.groupByParent, itemList = {},
       color = saved and saved.color, priority = saved and saved.priority, automation = saved and saved.automation,
       confirmSale = saved and saved.confirmSale, deposit = saved and saved.deposit, skipRecent = saved and saved.skipRecent,
-      ignoredItems = saved and saved.ignoredItems, hidden = saved and saved.hidden,
+      ignoredItems = saved and saved.ignoredItems, hidden = saved and saved.hidden, itemOrder = saved and saved.itemOrder,
     }
   end
 end
@@ -653,6 +653,41 @@ describe("Categories", function()
       assert.is_true(categories:GetCategoryByName("Openable").skipRecent)
     end)
 
+    -- Asked (issue #108): "each category can have it's own sort order". It changes the order of its items, so
+    -- the bags are recalculated, with a fresh layout.
+    it("gives a category its own item order, a copy, and takes it away, recalculating the bags", function()
+      dbCategories["Gear"] = { name = "Gear", itemList = {}, save = true }
+      local order = { "equipmentSlot", "itemLevel" }
+      categories:UpdateCategory(context:New("Test"), "Gear", { itemOrder = order })
+      assert.are.same({ "equipmentSlot", "itemLevel" }, dbCategories["Gear"].itemOrder)
+      order[1] = "name"
+      assert.are.same({ "equipmentSlot", "itemLevel" }, dbCategories["Gear"].itemOrder, "a copy")
+      assert.are.same({ "bags/Rederive", { resetLayout = true, buttons = true } }, sent[2])
+      sent = {}
+      categories:UpdateCategory(context:New("Test"), "Gear", { itemOrder = false })
+      assert.is_nil(dbCategories["Gear"].itemOrder, "the bag's order is the default")
+      assert.are.same({ "bags/Rederive", { resetLayout = true, buttons = true } }, sent[2])
+    end)
+
+    it("keeps a plugin's own item order across its next creation and a move in the order", function()
+      local ctx = context:New("Test")
+      categories:CreateCategory(ctx, { name = "Openable", itemList = {}, priority = 1 })
+      categories:UpdateCategory(ctx, "Openable", { itemOrder = { "count" } })
+      assert.are.same({ "count" }, dbEphemeralCategories["Openable"].itemOrder)
+      dbCategories["Mats"] = { name = "Mats", itemList = {}, save = true, priority = 5 }
+      local real, given = database.UpdateEphemeralItemCategory, nil
+      database.UpdateEphemeralItemCategory = function(self, name, fields)
+        given = fields
+        return real(self, name, fields)
+      end
+      finally(function() database.UpdateEphemeralItemCategory = real end)
+      categories:MoveCategory(ctx, "Openable", "Mats")
+      assert.are.same({ "count" }, given.itemOrder, "a move keeps it")
+      categories:Init()
+      categories:CreateCategory(ctx, { name = "Openable", itemList = {}, priority = 1 })
+      assert.are.same({ "count" }, categories:GetCategoryByName("Openable").itemOrder)
+    end)
+
     it("says when there is no such category", function()
       assert.is_false(categories:UpdateCategory(context:New("Test"), "Nope", { priority = 1 }))
       assert.are.same({}, sent)
@@ -690,6 +725,31 @@ describe("Categories", function()
       assert.is_false(categories:SkipsRecentOf("Recent Items", BACKPACK))
     end)
 
+    it("gives a category's own item order, a group by's sections their category's, none for the others", function()
+      local ctx = context:New("Test")
+      dbCategories["Gear"] = { name = "Gear", itemList = {}, save = true, itemOrder = { "itemLevel" }, enabled = everywhere() }
+      dbCategories["Mats"] = { name = "Mats", itemList = {}, save = true, enabled = everywhere() }
+      categories:CreateCategory(ctx, { name = "Gear - Plate", itemList = {}, dynamic = true,
+        isGroupBySubcategory = true, groupByParent = "Gear" })
+      assert.are.same({ "itemLevel" }, categories:ItemOrderOf("Gear", BACKPACK))
+      assert.are.same({ "itemLevel" }, categories:ItemOrderOf("Gear - Plate", BACKPACK))
+      assert.is_nil(categories:ItemOrderOf("Mats", BACKPACK))
+      assert.is_nil(categories:ItemOrderOf("Armor", BACKPACK), "a built-in category has none")
+      assert.is_nil(categories:ItemOrderOf("Recent Items", BACKPACK))
+    end)
+
+    it("says whether a category a bag uses has its own item order", function()
+      dbCategories["Mats"] = { name = "Mats", itemList = {}, save = true, enabled = everywhere() }
+      assert.is_false(categories:HasItemOrders(BACKPACK))
+      dbCategories["Gear"] = { name = "Gear", itemList = {}, save = true, itemOrder = { "itemLevel" },
+        enabled = { [0] = false, [1] = true, [2] = true } }
+      assert.is_false(categories:HasItemOrders(BACKPACK), "not one the backpack uses")
+      assert.is_true(categories:HasItemOrders(1))
+      categories:CreateCategory(context:New("Test"), { name = "Openable", itemList = {}, priority = 1 })
+      categories:UpdateCategory(context:New("Test"), "Openable", { itemOrder = { "count" } })
+      assert.is_true(categories:HasItemOrders(BACKPACK), "a plugin's too")
+    end)
+
     it("confirms a sale unless turned off, a group by's sections as their category does", function()
       local ctx = context:New("Test")
       dbCategories["Mats"] = { name = "Mats", itemList = {}, save = true, automation = "sell", enabled = everywhere() }
@@ -720,17 +780,19 @@ describe("Categories", function()
     it("does nothing in a bag that does not use the category", function()
       dbCategories["Junk"] = { name = "Junk", itemList = {}, save = true, blizzard = true, automation = "sell",
         confirmSale = false, deposit = "bank", skipRecent = true, hidden = { [0] = true, [1] = true },
-        enabled = { [0] = false, [1] = true, [2] = true } }
+        itemOrder = { "sellPriceStack" }, enabled = { [0] = false, [1] = true, [2] = true } }
       assert.is_nil(categories:AutomationOf("Junk", 0))
       assert.is_true(categories:ConfirmsSaleOf("Junk", 0))
       assert.is_nil(categories:DepositOf("Junk", 0))
       assert.is_false(categories:SkipsRecentOf("Junk", 0))
       assert.is_false(categories:HiddenIn("Junk", 0))
+      assert.is_nil(categories:ItemOrderOf("Junk", 0))
       assert.are.equal("sell", categories:AutomationOf("Junk", 1))
       assert.is_false(categories:ConfirmsSaleOf("Junk", 1))
       assert.are.equal("bank", categories:DepositOf("Junk", 1))
       assert.is_true(categories:SkipsRecentOf("Junk", 1))
       assert.is_true(categories:HiddenIn("Junk", 1))
+      assert.are.same({ "sellPriceStack" }, categories:ItemOrderOf("Junk", 1))
     end)
   end)
 
@@ -876,7 +938,7 @@ describe("Categories", function()
     local function shared(extra)
       local s = { name = "Herbs", itemList = { [765] = true, [2447] = true }, searchCategory = { query = "type = herb" },
         groupBy = 2, color = { 0.1, 0.8, 0.2 }, enabled = { [0] = true, [1] = false, [2] = true }, hidden = { [2] = true },
-        ignoredItems = { [99] = true }, note = "from a friend", skipRecent = true }
+        ignoredItems = { [99] = true }, note = "from a friend", skipRecent = true, itemOrder = { "count", "name" } }
       for k, v in pairs(extra or {}) do s[k] = v end
       return s
     end
@@ -910,6 +972,7 @@ describe("Categories", function()
       assert.are.same({ [99] = true }, made.ignoredItems)
       assert.are.equal("from a friend", made.note)
       assert.is_true(made.skipRecent)
+      assert.are.same({ "count", "name" }, made.itemOrder)
       assert.is_nil(made.automation)
       assert.are.equal("Herbs", categories:GetOrder()[1])
       assert.is_true(categories:GetGeneration() > before)
@@ -937,13 +1000,13 @@ describe("Categories", function()
       categories:CreateCategory(ctx, { name = "Herbs", save = true, automation = "sell", confirmSale = false,
         deposit = "bank", itemList = { [1] = true, [765] = true }, searchCategory = { query = "old" }, groupBy = 1,
         color = { 1, 0, 0 }, enabled = { [0] = false, [1] = true, [2] = true }, hidden = { [0] = true }, note = "mine",
-        ignoredItems = { [3] = true } })
+        ignoredItems = { [3] = true }, itemOrder = { "quality" } })
       dbCategories.Herbs.priority = 4
       categories:CreateCategory(ctx, { name = "Mats", itemList = { [2447] = true }, save = true })
       sent = {}
       local before = categories:GetGeneration()
       local plain = shared()
-      plain.note, plain.skipRecent = nil, nil
+      plain.note, plain.skipRecent, plain.itemOrder = nil, nil, nil
       assert.is_true(categories:ImportCategory(ctx, plain, "Herbs", true))
       local f = dbCategories.Herbs
       assert.are.same({ [765] = true, [2447] = true }, f.itemList)
@@ -956,6 +1019,7 @@ describe("Categories", function()
       assert.are.same({ [99] = true }, f.ignoredItems)
       assert.is_nil(f.note, "the shared one has none")
       assert.is_nil(f.skipRecent)
+      assert.is_nil(f.itemOrder, "the shared one has none: the bag's order")
       assert.are.equal(4, f.priority)
       assert.are.equal("sell", f.automation)
       assert.is_false(f.confirmSale)

@@ -62,7 +62,6 @@ const.BRIEF_EXPANSION_MAP = const.BRIEF_EXPANSION_MAP or { [0] = "classic" }
 local sort = StubBetterBagsModule("Sort")
 sort.SortSectionsAlphabetically = function() return true end
 sort.GetSectionSortFunction = function() return function() return true end end
-sort.GetItemSortFunction = function() return function() return true end end
 
 
 local categories

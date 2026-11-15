@@ -387,6 +387,8 @@ const.SEARCH_CATEGORY_GROUP_BY = {
   EXPANSION = 3,
 }
 
+-- The Item Order a profile saved before an order was a list of keys (profile.itemSort), which DB:MigrateItemOrders
+-- turns into the keys it sorted by.
 ---@enum ItemSortType
 const.ITEM_SORT_TYPE = {
   ALPHABETICALLY_THEN_QUALITY = 1,
@@ -397,6 +399,29 @@ const.ITEM_SORT_TYPE = {
   SELL_PRICE_EACH = 6,
   UPGRADE_TRACK = 7,
 }
+
+-- The keys an item order is made of (util/sort.lua, item-sort.md §1), as saved: an order is a list of them, the first
+-- deciding, each next one breaking the ties of those before it.
+---@enum ItemOrderKey
+const.ITEM_ORDER_KEY = {
+  QUALITY = "quality",
+  NAME = "name",
+  ITEM_LEVEL = "itemLevel",
+  UPGRADE_TRACK = "upgradeTrack",
+  EQUIPMENT_SLOT = "equipmentSlot",
+  ITEM_TYPE = "itemType",
+  EXPANSION = "expansion",
+  COUNT = "count",
+  SELL_PRICE_STACK = "sellPriceStack",
+  SELL_PRICE_EACH = "sellPriceEach",
+}
+
+-- The most keys an item order has: Item Order, Then By and And Then By.
+const.ITEM_ORDER_DEPTH = 3
+
+-- A bag's item order until one is chosen: Quality.
+---@type ItemOrderKey[]
+const.DEFAULT_ITEM_ORDER = { const.ITEM_ORDER_KEY.QUALITY }
 
 ---@enum ExpansionType
 const.EXPANSION_TYPE = {
@@ -995,20 +1020,10 @@ const.DATABASE_DEFAULTS = {
         [const.BAG_VIEW.SECTION_ALL_BAGS] = const.SECTION_SORT_TYPE.SIZE_DESCENDING,
       },
     },
-    itemSort = {
-      [const.BAG_KIND.BACKPACK] = {
-        [const.BAG_VIEW.SECTION_GRID] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
-        [const.BAG_VIEW.SECTION_ALL_BAGS] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
-      },
-      [const.BAG_KIND.BANK] = {
-        [const.BAG_VIEW.SECTION_GRID] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
-        [const.BAG_VIEW.SECTION_ALL_BAGS] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
-      },
-      [const.BAG_KIND.GUILD] = {
-        [const.BAG_VIEW.SECTION_GRID] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
-        [const.BAG_VIEW.SECTION_ALL_BAGS] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
-      },
-    },
+    -- Each bag's item order in each view, chosen (DB:GetItemOrder): a list of ITEM_ORDER_KEY, by kind, then view. An
+    -- order not chosen is DEFAULT_ITEM_ORDER, never a default here: AceDB strips a default's entries one by one.
+    ---@type table<BagKind, table<BagView, ItemOrderKey[]>>
+    itemOrder = {},
     customSectionSort = {
       ---@type table<string, number>
       [const.BAG_KIND.BACKPACK] = {},

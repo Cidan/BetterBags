@@ -42,7 +42,7 @@ Contains all constant values, enumerations, and configuration defaults used thro
 - **Bag Lists**: `BACKPACK_BAGS`, `BANK_BAGS`, `ACCOUNT_BANK_BAGS` and their variants: which container IDs each bag window reads. On WoW: Forever the keyring (`Enum.BagIndex.Keyring`, -1) is a backpack bag while `C_ActionBar.ShouldShowKeyring()` is true, with no bag slot button (`.claude/rules/camelot-forever.md` §7)
 - **Bank Tabs**: Definitions for different bank tab types
 - **View Modes**: `BAG_VIEW` (ONE_BAG, SECTION_GRID, LIST, SECTION_ALL_BAGS)
-- **Sort Types**: `SECTION_SORT_TYPE`, `ITEM_SORT_TYPE`
+- **Sort Types**: `SECTION_SORT_TYPE`; `ITEM_ORDER_KEY`, the keys an item order is a list of (`DEFAULT_ITEM_ORDER`, at most `ITEM_ORDER_DEPTH`; `.claude/rules/item-sort.md`); `ITEM_SORT_TYPE`, the seven orders a profile saved before, which `DB:MigrateItemOrders` turns into keys
 - **Item Quality**: Quality levels and color mappings
 - **Expansions**: Expansion type mappings
 - **Bag Families**: Specialty bag type definitions, and `EMPTY_SLOT_FAMILY_ICON`: each bag family's glyph file for its empty slots (`EMPTY_SLOT_FAMILY_ICON_DEFAULT`, the reagent bag's, for a family with none; `.claude/rules/item-drawing.md` §11)
