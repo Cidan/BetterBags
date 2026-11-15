@@ -80,6 +80,22 @@ A string that is exactly `"$Name"` becomes a copy of the variable. Functions run
 theme is applied, so a theme can follow another addon's settings (the ElvUI theme reads ElvUI's
 colors and textures this way). A child theme can override a parent's variables.
 
+A variable can also **name** another addon's value instead of computing it: a reference,
+`{ Global, Path, Fallback, Alpha, Map }`. It is read every time the theme resolves, raw (nothing of
+the other addon runs), and the `Fallback` is used while the value is not there or is another kind (a
+color comes back as `{ r, g, b, a }`). BetterBags Next's themes, which cannot hold functions, follow
+another addon this way, and may `Watch` that addon's methods to be drawn again when it changes them
+(the ElvUI Next theme, `themes/next/elvui.lua`):
+
+```lua
+Variables = {
+  Border = { Global = "ElvUI", Path = { 1, "media", "bordercolor" }, Fallback = { 0, 0, 0, 1 }, Alpha = 1 },
+},
+Watch = { { Global = "ElvUI", Path = { 1 }, Method = "UpdateMedia" } }, -- BetterBags Next themes only
+```
+
+The rules are in `.claude/rules/next-themes-references.md`.
+
 ### Per-client overrides
 
 `Clients` holds partial themes merged on top on some clients, general before specific:

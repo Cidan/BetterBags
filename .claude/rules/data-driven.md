@@ -97,3 +97,9 @@ reasoning about it can suggest a cause; it does not establish one.
   item ID, toys, bags as equipment, cold reads) from one capture. Coverage:
   `spec/debug/itemprobe_spec.lua`, `spec/frames/debug_window_spec.lua` ("dumps each backpack item
   with what the client's APIs answered about it"); 11 mutations, all caught.
+- **What another addon's change did** (next-themes-references.md §2b): `SonataNext:OnWatchedCall` returns what a watched
+  call did (`"scheduled"`, `"queued"`, `"not watched"`, `"not started"`), `RefreshWatched` what the read after it did
+  (`"unchanged"`, `"restyled"` with the font objects kept, `"applied"`, `"no theme"`), and `HookWatches` how many methods it
+  hooked; module methods are wrapped in every capture, so their returns are in the trace. Added with the ElvUI theme's hook
+  on `E:UpdateMedia` (next-themes-elvui.md §27), so a capture of a color dragged in ElvUI's options shows how many calls
+  came, how many reads they made and whether any made new font objects. Not captured yet: no game client here.

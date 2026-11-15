@@ -429,8 +429,8 @@ describe("BetterBags Next, pixel perfect", function()
   -- nothing sent to the error handler: SonataNext restyles each widget in a protected call (RestyleWidgets).
   it("puts every part on whole pixels in every shipped theme, on every client, at both sizes", function()
     useScreen(3396, 1362, 0.65)
-    -- Guild Wars 2 is offered while GW2_UI is loaded.
-    _G._loadedAddOns = { GW2_UI = true }
+    -- Guild Wars 2 is offered while GW2_UI is loaded, ElvUI while ElvUI is.
+    _G._loadedAddOns = { GW2_UI = true, ElvUI = true }
     local errors = {}
     local savedHandler = _G.geterrorhandler
     _G.geterrorhandler = function() return function(err) table.insert(errors, tostring(err)) end end
@@ -621,7 +621,7 @@ describe("BetterBags Next, pixel perfect", function()
 
     it("puts every part on whole pixels in every shipped theme, in both fill orders", function()
       useScreen(3396, 1362, 0.65)
-      _G._loadedAddOns = { GW2_UI = true }
+      _G._loadedAddOns = { GW2_UI = true, ElvUI = true }
       local errors = {}
       local savedHandler = _G.geterrorhandler
       _G.geterrorhandler = function() return function(err) table.insert(errors, tostring(err)) end end
@@ -887,7 +887,7 @@ describe("BetterBags Next, pixel perfect", function()
       end)
 
       it("stands every icon on one grid in every shipped theme", function()
-        _G._loadedAddOns = { GW2_UI = true }
+        _G._loadedAddOns = { GW2_UI = true, ElvUI = true }
         useScreen(3396, 1362, 0.65)
         db.size = "small"
         local errors = {}

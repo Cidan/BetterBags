@@ -65,13 +65,15 @@ end
 -- Every edge made, for the render recorder (render-recorder.md §2), held weakly.
 controls.edges = setmetatable({}, { __mode = "k" }) ---@type table<NextEdge, boolean>
 
--- CreateEdge makes the four lines of an edge round frame, in layer (BORDER when unset).
+-- CreateEdge makes the four lines of an edge round frame, in layer (BORDER when unset); round around instead when
+-- given, its lines still frame's (drawn among frame's own textures by their layers: a slider's thumb over its edge).
 ---@param frame Frame
 ---@param layer? DrawLayer
 ---@param subLevel? number
+---@param around? Frame
 ---@return NextEdge
-function controls:CreateEdge(frame, layer, subLevel)
-  local edge = { frame = frame }
+function controls:CreateEdge(frame, layer, subLevel, around)
+  local edge = { frame = around or frame }
   for _, side in ipairs(SIDES) do
     edge[side] = frame:CreateTexture(nil, layer or "BORDER", nil, subLevel)
   end

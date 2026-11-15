@@ -659,21 +659,31 @@ function elements:DrawItemQuality(decoration, color, quality)
 end
 
 -- DrawItemQuest swaps the art of the quest icon Blizzard just drew for a quest item for the
--- style's, and colors the border. It goes by the item's quest data: on Classic the quest
--- texture is shown on every button (ContainerFrame.xml gives it no hidden attribute).
+-- style's, and colors the border. It goes by the item's quest data (none: an empty slot). Blizzard
+-- draws the quest texture only on a button with UpdateQuestItem (Retail's): there a style with quest
+-- art owns it, shown with its art over a quest item and off over anything else, and one without leaves
+-- it to Blizzard. On the Classic clients' buttons nothing of Blizzard's draws or hides it
+-- (ContainerFrame.xml shows it on every button; Masque paints its own quest art on it as it skins, and
+-- shows or hides nothing), so it shows a style's art over a quest item and nothing else, or the art of
+-- the last quest item, of the theme before, or Masque's, stays on every slot.
 ---@param decoration ItemButton
 ---@param questInfo? {isQuestItem?: boolean, questID?: number, isActive?: boolean}
 function elements:DrawItemQuest(decoration, questInfo)
   local style = decoration.sonataItemStyle
-  if style == nil or questInfo == nil then
+  if style == nil then
     return
   end
-  local isQuest = questInfo.questID ~= nil or questInfo.isQuestItem == true
+  local quest = decoration.IconQuestTexture
+  local blizzard = decoration.UpdateQuestItem ~= nil
+  local owned = not blizzard or type(style.QuestIcon) == "table" or type(style.QuestStarterIcon) == "table"
+  local isQuest = questInfo ~= nil and (questInfo.questID ~= nil or questInfo.isQuestItem == true)
   if not isQuest then
+    if quest ~= nil and owned then
+      quest:Hide()
+    end
     return
   end
   local starter = questInfo.questID ~= nil and not questInfo.isActive
-  local quest = decoration.IconQuestTexture
   local art = (starter and style.QuestStarterIcon) or style.QuestIcon
   if quest ~= nil and type(art) == "table" then
     if art.Atlas ~= nil then
@@ -681,6 +691,9 @@ function elements:DrawItemQuest(decoration, questInfo)
     else
       quest:SetTexture(art.Texture)
     end
+    quest:Show()
+  elseif quest ~= nil and not blizzard then
+    quest:Hide()
   end
   if style.QuestBorderColor ~= nil then
     if type(style.QualityBorder) == "table" and decoration.IconBorder ~= nil then

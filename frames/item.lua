@@ -1020,6 +1020,8 @@ function itemFrame.itemProto:SetFreeSlots(ctx, data, count, nocount)
 		if decoration.ExtendedSlot then decoration.ExtendedSlot:Hide() end
 	end
 	if decoration.UpdateQuestItem then decoration:UpdateQuestItem(false, nil, nil) end
+	-- A theme's quest art comes off too (the Classic clients' buttons have no UpdateQuestItem).
+	elements:DrawItemQuest(decoration, nil)
 	if decoration.UpdateNewItem then decoration:UpdateNewItem(false) end
 	if decoration.UpdateJunkItem then decoration:UpdateJunkItem(false, false) end
 	if decoration.UpdateItemContextMatching then decoration:UpdateItemContextMatching() end
@@ -1159,6 +1161,8 @@ function itemFrame.itemProto:ResetVisuals(ctx)
 		if decoration.ExtendedSlot then decoration.ExtendedSlot:Hide() end
 	end
 	if decoration.UpdateQuestItem then decoration:UpdateQuestItem(false, nil, nil) end
+	-- A theme's quest art comes off too (the Classic clients' buttons have no UpdateQuestItem).
+	elements:DrawItemQuest(decoration, nil)
 	if decoration.UpdateNewItem then decoration:UpdateNewItem(false) end
 	if decoration.UpdateJunkItem then decoration:UpdateJunkItem(false, false) end
 	if decoration.UpdateItemContextMatching then decoration:UpdateItemContextMatching() end

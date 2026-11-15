@@ -45,7 +45,8 @@ prototype with `NextPanel:Extend(proto, name)` and overrides what differs: `GetH
 its title does with `OnTitleRightClick`, `TitleRightClickHint` and `TitleRightClickLabel` (the backpack and the bank sort;
 the others do nothing). In a theme with a bag button (Plain), a right click on the button does the same, and its menu lists,
 after the header's buttons, what only it offers (`MenuEntries`: that right click's action, and the switch to small bags,
-`SizeEntry`, on a panel with no size button).
+`SizeEntry`, on a panel with no size button). A theme may put every header button on a backdrop (`Header.Buttons.Backdrop`:
+ElvUI's square bag buttons), an icon's own winning.
 
 Docked at full height, a panel stands from the screen's top to its bottom, unless its theme keeps it clear of both
 (`Panel.DockMargin`, the Plain theme): it stands in by what its art reaches past its body there (`NextFrameArt:Reach`,

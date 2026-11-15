@@ -220,3 +220,23 @@ Convert to Category button sat 40 units off center after a theme with wider butt
 laying out (`blizzardTabProto:Style`, next/settings/categories.lua: `self.convert:Style()`). Anchoring by the
 control's left edge does not need it: a width change does not move it. Test it by restyling the page first and the
 controls after, then checking the position.
+
+## Following Another Addon's Settings From a Data-Only Theme
+**Problem**: A BetterBags Next theme cannot hold a function, so it cannot read another addon's settings the way a classic
+theme's `Variables` functions do; drawing the other addon's files alone loses the player's colors (the ElvUI theme, issue
+#1326). The other addon may also change them at any time and announce nothing: ElvUI's options call `E:UpdateMedia()`
+once per step while a color is dragged.
+
+**Pattern**: Name the value instead of computing it, and watch the method that writes it
+(next-themes-references.md §2a, §2b):
+- A reference `{ Global, Path, Fallback }` read raw on every resolve, the addon's own default as the fallback, so a
+  moved key costs a default look, never an error.
+- `Watch` the writer with one `hooksecurefunc` for good; inside the other addon's call do nothing but schedule one read
+  for the next frame, however many calls come.
+- Draw again only what changed: nothing when the values are as they were, a restyle keeping the font objects when no
+  text role's look changed (font objects can never be freed), a full apply otherwise.
+- Check each path against the addon's source in a spec (the file that writes it), not only against a stand-in.
+
+Files: `sonata/resolve.lua` (`ReadReference`), `sonata/next.lua` (`HookWatches`, `OnWatchedCall`, `RefreshWatched`),
+`sonata/themes/next/elvui.lua`.
+

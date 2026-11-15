@@ -1113,6 +1113,51 @@ describe("BetterBags Next's panels and themes", function()
       assert.are.equal("close", NextIconName(bank.closeButton), "its art kept")
     end)
 
+    -- ElvUI's bag buttons are squares on its default template, their edge in its value color under the pointer
+    -- (Modules/Bags/Bags.lua, Modules/Skins/Skins.lua; docs/next-elvui-theme.md): a theme puts every header button on a
+    -- backdrop (Header.Buttons.Backdrop), Default on none.
+    it("draws every button on the theme's backdrop, its edge lit under the pointer while enabled, and none in Default", function()
+      local bag = nextBag:Create(ctx())
+      every(bag, function(button)
+        assert.is_false(button.fill:IsShown(), button.key)
+        assert.is_false(button.edge.Top:IsShown(), button.key)
+      end)
+      apply({ Palette = { Slate = { 0.1, 0.1, 0.1, 1 }, Ink = { 0, 0, 0, 1 }, Lit = { 0.1, 0.5, 0.8, 1 } },
+        Header = { Buttons = { Backdrop = { Fill = { Color = "Slate" }, Edge = { Color = "Ink", Size = 1 },
+          HoverEdge = { Color = "Lit", Size = 1 } } } } })
+      every(bag, function(button)
+        assert.is_true(button.fill:IsShown(), button.key)
+        assert.are.same({ 0.1, 0.1, 0.1, 1 }, rgba(button.fill._colorTexture), button.key)
+        assert.are.same({ "TOPLEFT", button, "TOPLEFT", 0, 0 }, { button.fill:GetPoint(1) }, button.key)
+        for _, side in ipairs({ "Top", "Bottom", "Left", "Right" }) do
+          assert.is_true(button.edge[side]:IsShown(), button.key .. " " .. side)
+          assert.are.same({ 0, 0, 0, 1 }, rgba(button.edge[side]._colorTexture), button.key .. " " .. side)
+        end
+      end)
+      local settings = bag.settingsButton
+      settings:GetScript("OnEnter")(settings)
+      assert.are.same({ 0.1, 0.5, 0.8, 1 }, rgba(settings.edge.Top._colorTexture), "lit under the pointer")
+      settings:GetScript("OnLeave")(settings)
+      assert.are.same({ 0, 0, 0, 1 }, rgba(settings.edge.Top._colorTexture))
+      bag:SetHeaderButtonEnabled(settings, false)
+      settings:GetScript("OnEnter")(settings)
+      assert.are.same({ 0, 0, 0, 1 }, rgba(settings.edge.Top._colorTexture), "not while disabled")
+      settings:GetScript("OnLeave")(settings)
+      bag:SetHeaderButtonEnabled(settings, true)
+      -- ElvUI's close button is bare (Modules/Skins/Skins.lua, HandleCloseButton): an icon's own Backdrop wins, false none.
+      apply({ Palette = { Slate = { 0.1, 0.1, 0.1, 1 } },
+        Header = { Buttons = { Backdrop = { Fill = { Color = "Slate" }, Edge = { Color = "Black", Size = 1 } },
+          Icons = { closeButton = { Backdrop = false } } } } })
+      assert.is_false(bag.closeButton.fill:IsShown())
+      assert.is_false(bag.closeButton.edge.Top:IsShown())
+      assert.is_true(bag.settingsButton.fill:IsShown(), "the others on the buttons' backdrop")
+      backToDefault()
+      every(bag, function(button)
+        assert.is_false(button.fill:IsShown(), button.key)
+        assert.is_false(button.edge.Left:IsShown(), button.key)
+      end)
+    end)
+
     -- A white glyph looks the same desaturated, so a disabled button fades (DisabledAlpha) instead,
     -- art desaturated too; under the pointer it stays disabled.
     it("fades a disabled button, glyph or art, hovered or not, and brings it back", function()
@@ -3618,8 +3663,8 @@ describe("BetterBags Next's panels and themes", function()
     it("applies to open, drawn bags at both sizes, in turn, and back to Default", function()
       local errors = {}
       override(_G, "geterrorhandler", function() return function(e) table.insert(errors, tostring(e)) end end)
-      -- Guild Wars 2 is offered while GW2_UI is loaded.
-      override(_G, "_loadedAddOns", { GW2_UI = true })
+      -- Guild Wars 2 is offered while GW2_UI is loaded, ElvUI while ElvUI is.
+      override(_G, "_loadedAddOns", { GW2_UI = true, ElvUI = true })
       for _, size in ipairs({ "full", "small" }) do
         db.size = size
         sonataNext:Init()

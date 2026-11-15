@@ -157,8 +157,8 @@ describe("every shipped Next theme", function()
     C_Timer.After = function(_, fn) fn() end
     events.SendMessage = function() end
     _G.geterrorhandler = function() return function(err) table.insert(errors, tostring(err)) end end
-    -- Guild Wars 2 is offered while GW2_UI is loaded.
-    _G._loadedAddOns = { GW2_UI = true }
+    -- Guild Wars 2 is offered while GW2_UI is loaded, ElvUI while ElvUI is.
+    _G._loadedAddOns = { GW2_UI = true, ElvUI = true }
     controls.escape = {}
     render:Init()
     tween:Init()

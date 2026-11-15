@@ -45,6 +45,9 @@ local scrollbox = addon:GetModule('Scrollbox')
 ---@class NextScrollBar: AceModule
 local nextScrollBar = addon:GetModule('NextScrollBar')
 
+---@class NextControls: AceModule
+local controls = addon:GetModule('NextControls')
+
 ---@class NextStyle: AceModule
 local style = addon:GetModule('NextStyle')
 
@@ -4426,6 +4429,11 @@ function panelProto:headerButton(spec)
   local button = CreateFrame("Button", nil, self.frame)
   -- Above a small panel's mover, which lies over the title row, and the overlay, whose frame art they sit on.
   button:SetFrameLevel(self.overlay:GetFrameLevel() + 3)
+  -- Its backdrop, for a theme that draws one (Header.Buttons.Backdrop: ElvUI's square buttons), under its icon.
+  button.fill = button:CreateTexture(nil, "BACKGROUND")
+  button.fill:SetAllPoints(button)
+  button.fill:Hide()
+  button.edge = controls:CreateEdge(button)
   local icon = button:CreateTexture(nil, "ARTWORK")
   button.icon = icon
   -- Drawn over the icon while hovered (an icon's Highlight).
@@ -4561,6 +4569,14 @@ function panelProto:PaintHeaderIcon(button)
   if H ~= nil then
     button.highlight:SetVertexColor(1, 1, 1, H.Alpha or 1)
   end
+  -- Its backdrop (Backdrop, false in Default; its icon's own Backdrop wins, false for none), the edge lit under the
+  -- pointer while enabled, as ElvUI lights its buttons.
+  local F = own.Backdrop
+  if F == nil then
+    F = B.Backdrop
+  end
+  controls:Paint(button.fill, F and F.Fill or false)
+  controls:PaintEdge(button.edge, F and ((button.hover and enabled and F.HoverEdge) or F.Edge) or false)
 end
 
 -- SetHeaderButtonEnabled enables or disables a header button, its icon drawn for it (PaintHeaderIcon).

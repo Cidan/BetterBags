@@ -424,6 +424,8 @@ describe("SonataElements", function()
 
     it("swaps a quest item's icon art after Blizzard draws it, and leaves Blizzard's otherwise", function()
       local b = itemDecoration()
+      -- Retail's: Blizzard draws its quest art (ContainerFrameItemButtonMixin:UpdateQuestItem).
+      b.UpdateQuestItem = function() end
       elements:StyleItemButton(b, { QuestIcon = { Texture = "elv-quest.tga" }, QuestBorderColor = { 1, 0.8, 0, 1 } })
       b.IconQuestTexture:SetTexture("Interface\\ContainerFrame\\UI-Icon-QuestBorder")
       b.IconBorder:SetTexture("Interface\\Buttons\\UI-ActionButton-Border")
@@ -438,8 +440,10 @@ describe("SonataElements", function()
       assert.is_true(b.IconBorder:IsShown())
       elements:StyleItemButton(b, {})
       b.IconQuestTexture:SetTexture("Interface\\ContainerFrame\\UI-Icon-QuestBorder")
+      b.IconQuestTexture:Show()
       elements:DrawItemQuest(b, { isQuestItem = true, isActive = false })
       assert.are.equal("Interface\\ContainerFrame\\UI-Icon-QuestBorder", b.IconQuestTexture:GetTexture())
+      assert.is_true(b.IconQuestTexture:IsShown())
     end)
 
     it("uses the quest starter art for an item that starts a quest", function()
@@ -459,6 +463,57 @@ describe("SonataElements", function()
       elements:DrawItemQuest(b, { isQuestItem = false, isActive = false })
       assert.is_nil(b.IconQuestTexture:GetTexture())
       assert.is_false(b.IconBorder:IsShown())
+    end)
+
+    -- The Classic clients' buttons have no UpdateQuestItem and their quest texture is shown on every one
+    -- (Classic/ContainerFrame.xml): a style's quest art stayed on a button after its quest item went, over the next
+    -- item or an empty slot (found in review of the ElvUI Next theme, docs/next-elvui-theme.md). A style with quest
+    -- art owns the texture: off for a button with no quest item (no quest data: an empty slot), shown with its art.
+    it("takes its quest art off a button that no longer holds a quest item, and leaves Blizzard's art to Blizzard", function()
+      local b = itemDecoration()
+      b.UpdateQuestItem = function() end
+      elements:StyleItemButton(b, { QuestIcon = { Texture = "quest.tga" }, QuestStarterIcon = { Texture = "bang.tga" } })
+      b.IconQuestTexture:Hide()
+      elements:DrawItemQuest(b, { isQuestItem = false, questID = 123, isActive = false })
+      assert.are.equal("bang.tga", b.IconQuestTexture:GetTexture())
+      assert.is_true(b.IconQuestTexture:IsShown(), "shown with its art")
+      elements:DrawItemQuest(b, { isQuestItem = false, isActive = false })
+      assert.is_false(b.IconQuestTexture:IsShown(), "off over an item that is not a quest item")
+      elements:DrawItemQuest(b, { isQuestItem = true, isActive = false })
+      assert.is_true(b.IconQuestTexture:IsShown())
+      elements:DrawItemQuest(b, nil)
+      assert.is_false(b.IconQuestTexture:IsShown(), "off over an empty slot")
+      elements:StyleItemButton(b, { QuestStarterIcon = { Texture = "bang.tga" } })
+      b.IconQuestTexture:Show()
+      elements:DrawItemQuest(b, nil)
+      assert.is_false(b.IconQuestTexture:IsShown(), "starter art alone owns it too")
+      elements:StyleItemButton(b, {})
+      b.IconQuestTexture:Show()
+      elements:DrawItemQuest(b, nil)
+      elements:DrawItemQuest(b, { isQuestItem = false, isActive = false })
+      assert.is_true(b.IconQuestTexture:IsShown(), "a style without quest art leaves the texture to Blizzard")
+    end)
+
+    -- The Classic clients' buttons have no UpdateQuestItem, so Blizzard draws no quest art on them (its
+    -- ContainerFrame_UpdateQuestItem is for its own bags' buttons): their quest texture only ever shows a style's art.
+    -- Found in a third review: switching from a theme with quest art to one without left the last quest item's art.
+    it("shows only a style's quest art on a Classic button, taking it off under a style without", function()
+      local b = itemDecoration()
+      assert.is_nil(b.UpdateQuestItem)
+      elements:StyleItemButton(b, { QuestStarterIcon = { Texture = "bang.tga" } })
+      elements:DrawItemQuest(b, { questID = 5, isActive = false })
+      assert.are.equal("bang.tga", b.IconQuestTexture:GetTexture())
+      assert.is_true(b.IconQuestTexture:IsShown())
+      elements:DrawItemQuest(b, { isQuestItem = true, isActive = false })
+      assert.is_false(b.IconQuestTexture:IsShown(), "no art for a quest item that starts nothing: the starter's not left")
+      elements:DrawItemQuest(b, { questID = 5, isActive = false })
+      assert.is_true(b.IconQuestTexture:IsShown())
+      elements:StyleItemButton(b, {})
+      elements:DrawItemQuest(b, { questID = 5, isActive = false })
+      assert.is_false(b.IconQuestTexture:IsShown(), "a style without quest art")
+      b.IconQuestTexture:Show()
+      elements:DrawItemQuest(b, nil)
+      assert.is_false(b.IconQuestTexture:IsShown(), "an empty slot under a style without quest art")
     end)
 
     it("leaves the upgrade arrow's art when a style only scales it", function()

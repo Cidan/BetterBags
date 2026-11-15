@@ -60,8 +60,8 @@ describe("BetterBags Next's shipped themes", function()
   end
 
   it("ships Default and at least three others", function()
-    assert.are.same({ "Default", "Ember", "Frost", "GW2", "Glitch", "Halloween", "MakeItSo", "Papercraft", "Parchment",
-      "Plain", "Quiet", "RainyWindow" },
+    assert.are.same({ "Default", "ElvUI", "Ember", "Frost", "GW2", "Glitch", "Halloween", "MakeItSo", "Papercraft",
+      "Parchment", "Plain", "Quiet", "RainyWindow" },
       shipped())
   end)
 
@@ -278,15 +278,17 @@ describe("BetterBags Next's shipped themes", function()
     end
   end)
 
-  it("needs no other addon, but Guild Wars 2, which needs GW2_UI", function()
+  it("needs no other addon, but Guild Wars 2, which needs GW2_UI, and ElvUI, which needs ElvUI", function()
     for _, key in ipairs(shipped()) do
-      if key ~= "GW2" then
+      if key ~= "GW2" and key ~= "ElvUI" then
         assert.is_true(sonataNext:IsSelectable(key), key)
       end
     end
     assert.is_false(sonataNext:IsSelectable("GW2"))
-    _G._loadedAddOns = { GW2_UI = true }
+    assert.is_false(sonataNext:IsSelectable("ElvUI"))
+    _G._loadedAddOns = { GW2_UI = true, ElvUI = true }
     assert.is_true(sonataNext:IsSelectable("GW2"))
+    assert.is_true(sonataNext:IsSelectable("ElvUI"))
     _G._loadedAddOns = nil
   end)
 
@@ -530,6 +532,311 @@ describe("BetterBags Next's shipped themes", function()
       assert.are.equal(art(t, t.Header.Buttons.Icons.closeButton), t.Textures[S.Header.Close.Icon])
       assert.are.equal(GW .. "uistuff\\window-close-button-hover.png", t.Textures[S.Header.Close.HoverIcon])
       assert.are.equal(GW .. "character\\menu-hover.png", art(t, S.Nav.SelectedFill))
+    end)
+  end)
+
+  -- Asked (issue #1326): "Re-add the ElvUI theme ... in the same manner as the GW2 theme: Direct loading of
+  -- assets/textures without relying on external helper functions", for BetterBags Next, "everything, top to bottom",
+  -- keeping the player's ElvUI colors ("i do think we should hook UpdateMedia"; docs/next-elvui-theme.md).
+  describe("ElvUI", function()
+    local MEDIA = "Interface\\AddOns\\ElvUI\\Game\\Shared\\Media\\"
+    local TEX = MEDIA .. "Textures\\"
+    local ROOT = ".libraries/ElvUI/"
+    local savedElvUI
+
+    -- elvui stands in for ElvUI's engine (unpack(ElvUI) is E) as E:UpdateMedia leaves it (General/Core.lua): the
+    -- player's colors (r, g, b, a and [1] to [4]), bar textures and font, the font's style, the icon crop.
+    local function elvui(style)
+      local function color(r, g, b, a) return { r = r, g = g, b = b, a = a, r, g, b, a } end
+      local E = {
+        media = {
+          bordercolor = color(0.3, 0.2, 0.1, 1),
+          backdropcolor = color(0.15, 0.15, 0.2, 1),
+          backdropfadecolor = color(0.05, 0.05, 0.1, 0.7),
+          rgbvaluecolor = color(1, 0.5, 0, 1),
+          normTex = "Interface\\AddOns\\SharedMedia\\bar.tga",
+          glossTex = "Interface\\AddOns\\SharedMedia\\gloss.tga",
+          normFont = "Interface\\AddOns\\SharedMedia\\font.ttf",
+        },
+        db = { general = { fontStyle = style or "SHADOWOUTLINE" } },
+        TexCoords = { 0.1, 0.9, 0.1, 0.9 },
+        UpdateMedia = function() end,
+        UpdateTexCoords = function() end,
+      }
+      _G.ElvUI = { E }
+      return E
+    end
+
+    before_each(function()
+      savedElvUI = rawget(_G, "ElvUI")
+      _G.ElvUI = nil
+    end)
+
+    after_each(function()
+      _G.ElvUI = savedElvUI
+    end)
+
+    local function t() return sonataNext:Resolve("ElvUI") end
+
+    local function art(theme, spec)
+      return theme.Textures[spec.Texture] or spec.Texture
+    end
+
+    -- every ElvUI file a table names, at any depth.
+    local function elvFiles(node, out)
+      for _, v in pairs(node) do
+        if type(v) == "string" and v:sub(1, #"Interface\\AddOns\\ElvUI\\") == "Interface\\AddOns\\ElvUI\\" then
+          out[v] = true
+        elseif type(v) == "table" then
+          elvFiles(v, out)
+        end
+      end
+      return out
+    end
+
+    local function source(path)
+      local f = assert(io.open(ROOT .. path, "rb"), ROOT .. path .. " (install-deps.sh clones ElvUI)")
+      local text = f:read("*a")
+      f:close()
+      return text
+    end
+
+    it("draws from ElvUI's own files, every one there in ElvUI, offered while ElvUI is loaded", function()
+      assert.are.same({ "ElvUI" }, sonataNext.themes.ElvUI.Requires)
+      assert.are.equal("ElvUI", sonataNext.themes.ElvUI.DisplayName)
+      local files = elvFiles(t(), {})
+      local count = 0
+      for path in pairs(files) do
+        count = count + 1
+        local file = ROOT .. "ElvUI/" .. path:sub(#"Interface\\AddOns\\ElvUI\\" + 1):gsub("\\", "/")
+        local f = io.open(file, "rb")
+        assert.is_not_nil(f, file .. " (install-deps.sh clones ElvUI)")
+        f:close()
+      end
+      assert.is_true(count >= 8, "its art is ElvUI's: " .. count)
+    end)
+
+    -- Nothing of ElvUI's is called: each value is read where E:UpdateMedia and ElvUI's start leave it, and the methods
+    -- watched are ElvUI's (asked: "hook UpdateMedia").
+    it("reads only what ElvUI's source keeps where it reads, and watches methods ElvUI has", function()
+      local core = source("ElvUI/Game/Shared/General/Core.lua")
+      local toolkit = source("ElvUI/Game/Shared/General/Toolkit.lua")
+      local profile = source("ElvUI/Game/Shared/Defaults/Profile.lua")
+      for name, ref in pairs(sonataNext.themes.ElvUI.Variables) do
+        assert.are.equal("ElvUI", ref.Global, name)
+        assert.are.equal(1, ref.Path[1], name .. ": E, unpack(ElvUI)'s first")
+        local key = ref.Path[2]
+        if key == "media" then
+          assert.is_truthy(core:find("E.media." .. ref.Path[3] .. " = ", 1, true), name .. ": E.media." .. ref.Path[3])
+        elseif key == "db" then
+          assert.are.same({ 1, "db", "general", "fontStyle" }, ref.Path, name)
+          assert.is_truthy(profile:find("fontStyle = 'OUTLINE'", 1, true), name)
+        else
+          assert.are.same({ 1, "TexCoords" }, ref.Path, name)
+          assert.is_truthy(core:find("E.TexCoords = {0, 1, 0, 1}", 1, true), name)
+        end
+      end
+      local methods = {}
+      for _, watch in ipairs(sonataNext.themes.ElvUI.Watch) do
+        assert.are.same({ "ElvUI", { 1 } }, { watch.Global, watch.Path })
+        table.insert(methods, watch.Method)
+      end
+      table.sort(methods)
+      assert.are.same({ "UpdateMedia", "UpdateTexCoords" }, methods)
+      assert.is_truthy(core:find("function E:UpdateMedia()", 1, true))
+      assert.is_truthy(toolkit:find("function E:UpdateTexCoords()", 1, true))
+    end)
+
+    it("follows the player's ElvUI: its colors, bar and gloss textures, font and style, and icon crop", function()
+      elvui()
+      local theme = t()
+      local P = theme.Palette
+      assert.are.same({ 0.3, 0.2, 0.1, 1 }, P.Border)
+      assert.are.same({ 0.15, 0.15, 0.2, 1 }, P.Card, "the default template's fill")
+      assert.are.same({ 0.05, 0.05, 0.1, 0.7 }, P.Body, "the transparent template's: the fade color, its alpha the player's")
+      assert.are.same({ 1, 0.5, 0, 1 }, P.Accent, "the value color")
+      assert.are.equal("Interface\\AddOns\\SharedMedia\\gloss.tga", art(theme, theme.Controls.Button.Plain.Fill))
+      assert.are.equal("Interface\\AddOns\\SharedMedia\\gloss.tga", theme.ItemButton.Backdrop.Texture)
+      assert.are.equal("Interface\\AddOns\\SharedMedia\\bar.tga", art(theme, theme.Controls.Menu.Check))
+      for role, spec in pairs(theme.Fonts) do
+        if role ~= "Stack" then
+          assert.are.equal("Interface\\AddOns\\SharedMedia\\font.ttf", spec.File, role)
+          assert.are.equal("OUTLINE", spec.Flags, role)
+          assert.is_true(spec.Shadow, role)
+        end
+      end
+      assert.are.same({ 0.1, 0.9, 0.1, 0.9 }, theme.ItemButton.Icon.TexCoords)
+      assert.are.same({}, sonataNext:Check("ElvUI"), "every value read where ElvUI keeps it")
+    end)
+
+    -- ElvUI's options call E:UpdateMedia on every step of a dragged color (ElvUI_Options/Game/Shared/General.lua:80), and a
+    -- read whose fonts look otherwise makes a new set of font objects, which can never be freed (next-themes-references.md
+    -- §2b). Found in review: six roles drawn in the value color made 56 font objects a frame while it was dragged.
+    it("draws no text in a color read from ElvUI, so a color dragged in its options makes no font objects", function()
+      local E = elvui()
+      local before = t()
+      for _, key in ipairs({ "bordercolor", "backdropcolor", "backdropfadecolor", "rgbvaluecolor" }) do
+        local c = E.media[key]
+        E.media[key] = { r = 1 - c.r, g = 1 - c.g, b = 0.5, a = 0.9, 1 - c.r, 1 - c.g, 0.5, 0.9 }
+      end
+      local after = t()
+      assert.are_not.same(before.Palette.Accent, after.Palette.Accent, "the stand-in's colors changed")
+      assert.are.same(before.Fonts, after.Fonts)
+      assert.are.same(before.FontShadow, after.FontShadow)
+      for role, spec in pairs(after.Fonts) do
+        if type(spec.Color) == "string" then
+          assert.are.same(before.Palette[spec.Color], after.Palette[spec.Color], role .. " in " .. spec.Color)
+        end
+      end
+      assert.are.same(before.Palette[after.FontShadow.Color], after.Palette[after.FontShadow.Color], "the shadow")
+    end)
+
+    it("draws ElvUI's defaults while a value is not where ElvUI keeps it", function()
+      local theme = t()
+      local P = theme.Palette
+      assert.are.same({ 0, 0, 0, 1 }, P.Border)
+      assert.are.same({ 0.1, 0.1, 0.1, 1 }, P.Card)
+      assert.are.same({ 0.06, 0.06, 0.06, 0.8 }, P.Body)
+      assert.are.same({ 0.09, 0.52, 0.82, 1 }, P.Accent)
+      assert.are.equal(TEX .. "NormTex2.tga", art(theme, theme.Controls.Button.Plain.Fill), "ElvUI Norm")
+      assert.is_false(theme.Fonts.Title.File, "the client's font")
+      assert.are.equal("OUTLINE", theme.Fonts.Title.Flags)
+      assert.is_false(theme.Fonts.Title.Shadow)
+      assert.are.same({ 0.08, 0.92, 0.08, 0.92 }, theme.ItemButton.Icon.TexCoords, "cropIcon 2")
+    end)
+
+    -- FontTemplate: NONE is no flags; a SHADOW style is the rest and a shadow (General/Toolkit.lua, Initialize.lua).
+    it("draws ElvUI's font styles: none for NONE, a SHADOW style's outline and a shadow", function()
+      local cases = {
+        NONE = { "", false }, OUTLINE = { "OUTLINE", false }, THICKOUTLINE = { "THICKOUTLINE", false },
+        SHADOW = { "", true }, SHADOWOUTLINE = { "OUTLINE", true }, SHADOWTHICKOUTLINE = { "THICKOUTLINE", true },
+        MONOCHROME = { "MONOCHROME", false }, MONOCHROMEOUTLINE = { "MONOCHROMEOUTLINE", false },
+        MONOCHROMETHICKOUTLINE = { "MONOCHROMETHICKOUTLINE", false },
+      }
+      for fontStyle, want in pairs(cases) do
+        elvui(fontStyle)
+        local spec = t().Fonts.Section
+        assert.are.same(want, { spec.Flags, spec.Shadow }, fontStyle)
+      end
+      assert.are.same({ X = 1, Y = -1 }, { X = t().FontShadow.X, Y = t().FontShadow.Y }, "a pixel down and right")
+      -- E:SetFontShadow: black at 1 for SHADOW alone, at 0.6 with an outline (General/Initialize.lua:460-463).
+      local function shadow(fontStyle)
+        elvui(fontStyle)
+        local theme = t()
+        return theme.Palette[theme.FontShadow.Color]
+      end
+      assert.are.same({ 0, 0, 0, 1 }, shadow("SHADOW"))
+      assert.are.same({ 0, 0, 0, 0.6 }, shadow("SHADOWOUTLINE"))
+      assert.are.same({ 0, 0, 0, 0.6 }, shadow("SHADOWTHICKOUTLINE"))
+    end)
+
+    it("is flat, on ElvUI's templates: every panel edged, nothing feathered, washed or starry", function()
+      local theme = t()
+      assert.is_nil(theme.Panel.Feather)
+      assert.is_nil(theme.Panel.Wash)
+      assert.are.same({ "Body", "Border", true }, { theme.Panel.Fill.Color, theme.Panel.Edge.Color, theme.Panel.Edge.Full })
+      assert.is_nil(theme.Header.Ribbon)
+      assert.is_nil(theme.Header.Spark)
+      assert.is_nil(theme.Header.Cloud)
+      assert.is_nil(theme.Header.TitleGlow)
+      assert.is_nil(theme.Sparkles)
+      assert.is_false(theme.Chain.Braid)
+      assert.is_nil(theme.Dock.Halo)
+      assert.are.equal("Accent", theme.Dock.Glow.Color)
+    end)
+
+    it("draws the bags' buttons as ElvUI's: squares on its default template, the value color on the edge under the pointer", function()
+      local theme = t()
+      local B = theme.Header.Buttons
+      assert.are.same({ "Card", "Border", "Accent" }, { B.Backdrop.Fill.Color, B.Backdrop.Edge.Color, B.Backdrop.HoverEdge.Color })
+      -- Its close button: bare, its art, the value color under the pointer (HandleCloseButton).
+      assert.is_false(B.Icons.closeButton.Backdrop)
+      assert.are.equal(TEX .. "Close.tga", art(theme, B.Icons.closeButton))
+      assert.are.equal("Accent", B.HoverColor)
+      assert.are.equal(TEX .. "Close.tga", theme.Textures[theme.Settings.Header.Close.Icon])
+      assert.are.equal("Accent", theme.Settings.Header.Close.HoverColor)
+    end)
+
+    it("draws its tabs, search box and sections on ElvUI's templates", function()
+      local theme = t()
+      assert.are.same({ "Tab", "TabSelected" }, { theme.Tabs.Fill, theme.Tabs.SelectedFill })
+      assert.are.same(theme.Palette.Card, theme.Palette.Tab)
+      assert.are.same({ "Border", "Accent" }, { theme.Tabs.Edge.Color, theme.Tabs.SelectedEdge.Color })
+      assert.are.same({ "Border", 1, 1, 1 }, { theme.Search.Edge.Color, theme.Search.Edge.Idle, theme.Search.Edge.Hover,
+        theme.Search.Edge.Focus })
+      assert.are.same(theme.Palette.Card, theme.Palette.SearchFill)
+      assert.are.equal("Accent", theme.Sections.Line.Color)
+    end)
+
+    it("draws every control as ElvUI's skins do", function()
+      local theme = t()
+      local C = theme.Controls
+      for _, kind in ipairs({ "Plain", "Primary", "Danger" }) do
+        local K = C.Button[kind]
+        assert.are.equal(TEX .. "NormTex2.tga", art(theme, K.Fill), kind .. ": the gloss template")
+        assert.are.same({ "Border", "Accent" }, { K.Edge.Color, K.HoverEdge.Color }, kind)
+        assert.is_not_nil(K.DisabledFill, kind .. ": not dimmed, its text grayed")
+      end
+      -- HandleCheckBox: a box with ElvUI's gold square inside; HandleSliderFrame: a box, a gold square thumb.
+      assert.are.equal("Square", C.Toggle.Style)
+      assert.are.equal(C.Toggle.Width, C.Toggle.Height)
+      assert.is_nil(C.Toggle.Knob)
+      assert.are.same({ TEX .. "Melli.tga", "Gold", 0.8 }, { art(theme, C.Toggle.KnobOn), C.Toggle.KnobOn.Color,
+        C.Toggle.KnobOn.Alpha })
+      assert.are.same({ 1, 0.82, 0, 1 }, theme.Palette.Gold)
+      assert.are.equal("Border", C.Toggle.Edge.Color)
+      assert.are.equal("Border", C.Slider.Edge.Color)
+      assert.is_nil(C.Slider.Fill)
+      assert.are.equal(TEX .. "Melli.tga", art(theme, C.Slider.Thumb))
+      assert.are.equal(C.Slider.TrackSize, C.Slider.Height)
+      -- HandleTrimScrollBar: the value color at 0.25, 0.75 under the pointer and held.
+      assert.are.same({ "Accent", 0.25 }, { C.ScrollBar.Thumb.Color, C.ScrollBar.Thumb.Alpha })
+      assert.are.same({ "Accent", 0.75 }, { C.ScrollBar.ThumbHover.Color, C.ScrollBar.ThumbHover.Alpha })
+      assert.are.same({ "Accent", 0.75 }, { C.ScrollBar.ThumbDrag.Color, C.ScrollBar.ThumbDrag.Alpha })
+      -- HandleDropDownBox: ElvUI's up arrow turned down.
+      assert.are.equal(TEX .. "ArrowUp.tga", art(theme, C.Dropdown.Chevron))
+      assert.are.same({ 0, 1, 1, 0 }, C.Dropdown.Chevron.TexCoords)
+      -- Menus and dialogs on the transparent template.
+      assert.are.same({ "Body", "Border" }, { C.Menu.Fill.Color, C.Menu.Edge.Color })
+      assert.are.same({ "Body", "Border" }, { C.Dialog.Card.Color, C.Dialog.Edge.Color })
+      assert.are.same({ "ControlFill", "Border" }, { C.Input.Fill.Color, C.Input.Edge.Color })
+    end)
+
+    it("skins item buttons as ElvUI's bags do: the gloss template, its crop, its quest and upgrade icons", function()
+      elvui()
+      for _, flag in ipairs(FLAGS) do addon[flag] = CLIENTS.Retail[flag] == true end
+      local b = t().ItemButton
+      assert.are.equal(1, b.Icon.Inset, "inset by its border")
+      assert.are.same({ 0.15, 0.15, 0.2, 1 }, b.Backdrop.VertexColor)
+      assert.are.same({ 0.3, 0.2, 0.1, 1 }, b.Backdrop.BorderColor)
+      assert.are.equal("table", type(b.QualityBorder), "quality on the icon's border, as every Next theme")
+      assert.are.same({ 0.3, 0.2, 0.1, 1 }, b.QualityColors[0], "Poor in the border color")
+      assert.are.same({ 0.3, 0.2, 0.1, 1 }, b.QualityColors[1], "Common in the border color")
+      assert.are.same({ 1, 0.96, 0.41, 1 }, b.QuestBorderColor, "its quest starter color")
+      -- Its "!" only on an item that starts a quest not yet taken, nothing over other quest items, on every client
+      -- (Modules/Bags/Bags.lua:793; on Era, E.Classic, its tooltip scan marks quest items active, :663-683). Found in
+      -- review: it was on every quest item, and then, by a misreading, on every one on the Classic clients.
+      for name, flags in pairs(CLIENTS) do
+        for _, flag in ipairs(FLAGS) do addon[flag] = flags[flag] == true end
+        local q = t().ItemButton
+        assert.are.equal(TEX .. "BagQuestIcon.tga", q.QuestStarterIcon.Texture, name)
+        assert.are.equal(TEX .. "Invisible.tga", q.QuestIcon.Texture, name)
+      end
+      assert.are.same({ TEX .. "BagUpgradeIcon.tga", 1.2 }, { b.UpgradeIcon.Texture, b.UpgradeIcon.Scale })
+      assert.are.same({ { 1, 1, 1, 0.3 }, "ADD" }, { b.Highlight.Color, b.Highlight.BlendMode }, "StyleButton")
+      assert.are.same({ { 0.9, 0.8, 0.1, 0.3 }, "ADD" }, { b.Pushed.Color, b.Pushed.BlendMode }, "StyleButton")
+      assert.are.same({ MEDIA .. "Fonts\\Homespun.ttf", 10, "MONOCHROMEOUTLINE" },
+        { b.Count.Font.Path, b.Count.Font.Size, b.Count.Font.Flags })
+    end)
+
+    it("draws the settings window on ElvUI's templates, its lists lit as ElvUI lights them", function()
+      local theme = t()
+      local S = theme.Settings
+      assert.are.same({ "Body", "Border" }, { S.Fill.Color, S.Edge.Color })
+      assert.is_nil(S.Wash)
+      assert.are.equal(TEX .. "Highlight.tga", art(theme, S.Nav.HoverFill))
+      assert.are.same({ TEX .. "Highlight.tga", "Accent" }, { art(theme, S.Nav.SelectedFill), S.Nav.SelectedFill.Color })
+      assert.are.same({ "Card", "Border", "Accent" }, { S.Cards.Fill.Color, S.Cards.Edge.Color, S.Cards.SelectedEdge.Color })
     end)
   end)
 

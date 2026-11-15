@@ -264,6 +264,29 @@ describe("ItemFrame Static Buttons and Parent Removal Tests", function()
       assert.are.equal(data.questInfo, got[2])
     end)
 
+    -- A theme's quest art comes off a free or reset slot (SonataElements:DrawItemQuest with no quest data): the Classic
+    -- clients' buttons have no UpdateQuestItem to hide it.
+    it("hands the theme no quest data for a free slot, and for a slot reset", function()
+      local item = itemFrame:GetButton(btnCtx, "0_9")
+      local calls = {}
+      elements.DrawItemQuest = function(_, decoration, questInfo)
+        table.insert(calls, { decoration, questInfo == nil })
+      end
+      local free = { bagid = 0, slotid = 9, slotkey = "0_9", itemInfo = { emptySlotName = "Bag" } }
+      item:SetFreeSlots(btnCtx, free, 1)
+      assert.is_true(#calls >= 1, "a free slot")
+      -- Drawn free again: no reset first, so the free slot's own call is the only one.
+      local before = #calls
+      item:SetFreeSlots(btnCtx, free, 2)
+      assert.are.equal(before + 1, #calls, "a free slot drawn again")
+      item:ResetVisuals(btnCtx)
+      assert.are.equal(before + 2, #calls, "a slot reset")
+      for i, call in ipairs(calls) do
+        assert.is_true(rawequal(item._decoration, call[1]), "call " .. i)
+        assert.is_true(call[2], "call " .. i .. ": no quest data")
+      end
+    end)
+
     it("draws again in full after a theme is applied", function()
       local item = itemFrame:GetButton(btnCtx, "0_9")
       item:SetItemFromData(btnCtx, potion())

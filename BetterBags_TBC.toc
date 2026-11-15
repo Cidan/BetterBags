@@ -96,6 +96,7 @@ sonata\themes\next\halloween.lua
 sonata\themes\next\makeitso.lua
 sonata\themes\next\papercraft.lua
 sonata\themes\next\gw2.lua
+sonata\themes\next\elvui.lua
 sonata\themes\next\parchment.lua
 sonata\themes\next\plain.lua
 sonata\themes\next\quiet.lua

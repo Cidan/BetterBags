@@ -406,9 +406,10 @@ sonataNext:RegisterTheme({
     -- on the right, from Start below the body's top; false: no art). Pinned puts a button by its key at a corner
     -- of the body ({ Point, X, Y }:
     -- TOPRIGHT and the rest, or TOPOUTER and the rest by side, mirrored as ornaments are), apart from the row
-    -- or the rail (none here).
+    -- or the rail (none here). Backdrop (none here) draws every button on a backdrop: its Fill, its Edge, and HoverEdge
+    -- in place of the edge under the pointer while enabled; an icon's own Backdrop (false: none) wins.
     Buttons = { Color = "ButtonIcon", HoverColor = "White", ArtColor = "ButtonIcon", ArtHoverColor = "White",
-      DisabledAlpha = 0.3, Scale = 1, Rail = false,
+      DisabledAlpha = 0.3, Scale = 1, Rail = false, Backdrop = false,
       Icons = {
         settingsButton = { Texture = "IconSettings" },
         closeButton = { Texture = "IconClose" },

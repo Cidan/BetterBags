@@ -30,7 +30,7 @@ register as they load, before `Init`, which never clears `sonata.themes`.
 | `Hidden` | never listed or applied (`Base`) |
 | `Available` | boolean, or a function (an addon the theme depends on is loaded) |
 | `Masque` | `false`: item buttons are not handed to Masque |
-| `Variables` | values or functions, used as `"$Name"` |
+| `Variables` | values, functions, or references to another addon's values (next-themes-references.md §2a), used as `"$Name"` |
 | `Windows` | window styles by window kind: `Bag`, `Panel`, `Flat`, `Dialog`, `Slots`, `Search` (§3, §3b) |
 | `Elements` | element styles by element kind (item buttons, tabs, ...) |
 | `Clients` | partial themes applied on a client (below) |
@@ -46,13 +46,16 @@ registers one there (the "other registration path"):
    `Retail`, `Forever` on WoW: Forever; `Classic` plus `Era`, `TBC`, `Mists`, `Cata`, or
    `TBC`, `Anniversary` on Anniversary (which also sets `isBCC`). An unknown client key is an
    error at registration.
-3. Merge rules: tables merge key by key; **lists replace** (a table with `[1]`); **`false`
+3. Merge rules: tables merge key by key; **lists replace** (a table with `[1]`), and so do references
+   (next-themes-references.md §2a); **`false`
    replacing a table removes it** (a theme turns off something it inherited; a `false` with no
    table under it stays `false`, e.g. `Masque = false`); objects (a table with a metatable, or
    a frame) are kept by reference, never copied or merged.
 4. `Variables` merge like everything else; then every value is evaluated (a function is called
-   and must return something) and variables referring to other variables are filled in (a
-   cycle is an error). Every whole-string `"$Name"` (spaces around the name allowed) becomes a
+   and must return something; a reference, `{ Global, Path, Fallback }`, is read raw from another
+   addon's tables, its Fallback when the value is not there, next-themes-references.md §2a, which only
+   BetterBags Next's engine validates at registration) and variables referring to other variables are
+   filled in (a cycle is an error). Every whole-string `"$Name"` (spaces around the name allowed) becomes a
    copy of the variable. An unknown variable is an error; a string that only contains `$` stays.
 5. `Name`, `DisplayName`, `Description`, `Hidden` describe the result; `Parent`, `Available`,
    `Clients` are not part of it. `Windows` and `Elements` always exist.
@@ -264,6 +267,19 @@ Details:
   texture is shown: Classic's `IconQuestTexture` has no hidden attribute and is shown on every
   button. A quest border without a backdrop edge sets the icon border's texture
   (`WhiteIconFrame`), blend, coordinates and color itself, so no quality halo stays on it.
+  **Who draws the quest texture.** Blizzard draws it only on a button with `UpdateQuestItem`
+  (Retail's and Forever's): there a style with quest art (`QuestIcon` or `QuestStarterIcon`) owns it,
+  shown with its art over a quest item and hidden over anything else, and a style without leaves it to
+  Blizzard. On the Classic clients' buttons nothing of Blizzard's draws or hides it (no `UpdateQuestItem`;
+  `ContainerFrame_UpdateQuestItem` is for Blizzard's own bags), so it shows a style's art over a quest
+  item and is hidden otherwise, whatever the style. Masque paints its own quest art on it as it skins
+  (by name on Classic, never showing or hiding it), which showed its quest mark on every slot until
+  this (read from Masque's source in a review, not seen in game). A free or reset slot calls it with no quest data
+  (`frames/item.lua`). Before, the last quest item's art stayed over the next item or an empty slot,
+  and a theme without quest art after one with it left it (found in reviews of the ElvUI Next theme,
+  next-themes-elvui.md §27; the classic ElvUI theme's quest art had it on Classic clients too).
+  Coverage `spec/sonata/elements_spec.lua` ("takes its quest art off a button", "shows only a style's
+  quest art on a Classic button"), `spec/frames/item_spec.lua` ("no quest data for a free slot").
 - `SetTabState(tab, "normal"|"selected"|"drop")` replaces toggling the template's art by hand
   (`frames/tabs.lua` `SelectTab`/`DeselectTab`, the drag highlight): `drop` (a section dragged
   over the tab) shows the active art without moving the text, and keeps the selected tab's
