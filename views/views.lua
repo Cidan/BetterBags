@@ -46,6 +46,8 @@ local views = addon:NewModule('Views')
 ---@field tabID number
 ---@field sortRequired boolean
 ---@field emptyGroupFrame? Frame The hint shown in an empty group tab.
+---@field emptyGroupHint? FontString The hint's text.
+---@field EmptyGroupSizeHandler? fun(view: View): number, number The room the hint takes while it shows (views/gridview.lua).
 views.viewProto = {}
 addon:GetModule('Perf'):RegisterPrototype(views.viewProto, 'View')
 
@@ -112,8 +114,9 @@ function views.viewProto:Bind(ctx, bag, slotInfo)
     end
   end
 
+  -- Data with no tabs has never been read: the bag shows Loading... there (frames/bag.lua Draw).
   if self.emptyGroupFrame then
-    self.emptyGroupFrame:SetShown(self.tabID ~= nil and self.tabID > 1 and #tabData.categories == 0)
+    self.emptyGroupFrame:SetShown(slotInfo.tabs ~= nil and self.tabID ~= nil and self.tabID > 1 and #tabData.categories == 0)
   end
 
   self.sortRequired = false
@@ -124,7 +127,8 @@ end
 -- Measure works out the layout of the bound sections, moving nothing (render-pipeline.md, the
 -- layout engine): each section measured with itemsPerRow items in a row (by measureSection when
 -- given: the canvas caches measures across the layouts it tries), and the sections packed in rows
--- of 41 * itemsPerRow + 16 within columns at their measured sizes.
+-- of 41 * itemsPerRow + 16 within columns at their measured sizes. While an empty group's hint
+-- shows, the view is at least the room the hint takes, so the canvas gives it that room.
 ---@param itemsPerRow number
 ---@param columns number
 ---@param measureSection? SectionMeasurer
@@ -149,13 +153,18 @@ function views.viewProto:Measure(itemsPerRow, columns, measureSection)
       end
     end,
   })
+  local width, height = content.width, content.height
+  if self.emptyGroupFrame ~= nil and self.emptyGroupFrame:IsShown() then
+    local hintWidth, hintHeight = self.EmptyGroupSizeHandler(self)
+    width, height = math.max(width, hintWidth), math.max(height, hintHeight)
+  end
   return {
     itemsPerRow = itemsPerRow,
     columns = columns,
     sections = sections,
     content = content,
-    width = content.width,
-    height = content.height,
+    width = width,
+    height = height,
   }
 end
 

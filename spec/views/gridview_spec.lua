@@ -413,6 +413,61 @@ describe("Phase 6 View Placement and Rendering Tests", function()
     assert.are.same({ 123, 45 }, { w, h })
   end)
 
+  -- An empty group's hint is what its view shows (#1216): it takes 260 across, as wide as a bag's content at its
+  -- narrowest, and its text's height with 20 above and below, read each time it is measured.
+  describe("an empty group's hint", function()
+    local HINT = "Drag a section header to this tab at the bottom of the window to add a section to this group!"
+
+    local function hintOf(view)
+      for _, region in ipairs({ view.emptyGroupFrame:GetRegions() }) do
+        if region.GetText and region:GetText() == HINT then
+          return region
+        end
+      end
+    end
+
+    local function bound(tabID, tabCategories)
+      local view = views:NewGrid(CreateFrame("Frame"), const.BAG_KIND.BACKPACK, tabID)
+      view:Bind(context:New("test"), { kind = const.BAG_KIND.BACKPACK },
+        { tabs = { [tabID] = { items = {}, categories = tabCategories } } })
+      return view
+    end
+
+    it("measures the hint as the view's size while it shows", function()
+      local view = bound(2, {})
+      assert.is_true(view.emptyGroupFrame:IsShown())
+      local hint = hintOf(view)
+      assert.are.equal(220, hint:GetWidth())
+      local measured = view:Measure(5, 1)
+      assert.are.same({ 260, hint:GetStringHeight() + 40 }, { measured.width, measured.height })
+      assert.are.same({ 100, 50 }, { measured.content.width, measured.content.height })
+    end)
+
+    it("reads the hint's height each time, as a theme's font may have changed it", function()
+      local view = bound(2, {})
+      hintOf(view).GetStringHeight = function() return 99 end
+      assert.are.equal(139, view:Measure(5, 1).height)
+    end)
+
+    -- Data with no tabs has never been read, and the bag shows Loading... where the hint would be (frames/bag.lua).
+    it("does not show before the bag's data was ever read", function()
+      local view = views:NewGrid(CreateFrame("Frame"), const.BAG_KIND.BACKPACK, 2)
+      view:Bind(context:New("test"), { kind = const.BAG_KIND.BACKPACK }, {})
+      assert.is_false(view.emptyGroupFrame:IsShown())
+      view:Bind(context:New("test"), { kind = const.BAG_KIND.BACKPACK }, { tabs = {} })
+      assert.is_true(view.emptyGroupFrame:IsShown())
+    end)
+
+    it("keeps the content's size where the hint does not show", function()
+      for _, case in ipairs({ { 1, {} }, { 2, { { name = "Things" } } } }) do
+        local view = bound(case[1], case[2])
+        assert.is_false(view.emptyGroupFrame:IsShown())
+        local measured = view:Measure(5, 1)
+        assert.are.same({ 100, 50 }, { measured.width, measured.height })
+      end
+    end)
+  end)
+
   it("should support polymorphic NewBagView views and place items correctly", function()
     local parent = CreateFrame("Frame")
     local view = views:NewBagView(parent, const.BAG_KIND.BACKPACK)

@@ -109,6 +109,7 @@ Implements the category-based grid view with sections.
 - **Free Space Display**: Shows available bag slots
 - **Smart Sorting**: Sorts sections and items within sections
 - **Dynamic Sections**: Creates/removes sections as needed
+- **Empty Group Hint**: A backpack group (tab 2 and up) with no category shows "Drag a section header to this tab..." instead of sections, once the bag's data was read (never under Loading...). The view measures the hint's room as its size (`EmptyGroupSizeHandler`: 260 across, the bag's narrowest content, and the text's height with a 20 margin), so the canvas gives it that room, centers it and hangs Free Space below it (`.claude/rules/layout-rendering.md` §5).
 - **Sort After Wipe**: Tracks a `sortRequired` flag so that a section sort always runs after the view is wiped, even when the wipe and the subsequent rebuild happen under different context objects (e.g. `SwitchToGroup` wipes with one context, but the refresh pipeline creates a fresh context without `wipe=true`).
 
 #### Key Functions

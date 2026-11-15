@@ -159,8 +159,9 @@ Now one engine computes layouts as data, and everything else asks it.
   cells fit one row (more changes nothing). `Draw`/`Grid` arrange a measure at its items per row.
 - **View** (`views/views.lua`): `Measure(itemsPerRow, columns, measureSection?)` measures every
   section (through `measureSection` when given) and packs them at their measured sizes in rows of
-  41 × itemsPerRow + 16 within columns; `Arrange(measured)` arranges every section, then the
-  sections. `Layout(ctx, layout)` is the two.
+  41 × itemsPerRow + 16 within columns; while an empty group's hint shows, the view is at least
+  the room the hint takes (layout-rendering.md §5). `Arrange(measured)` arranges every section,
+  then the sections. `Layout(ctx, layout)` is the two.
 - **Bag global sections** (`frames/bag.lua`): `GetGlobalLayoutSections()` lists Recent Items
   (spanning the columns) and Free Space (spanning them when it shows every slot);
   `MeasureGlobalSections(itemsPerRow, columns, measureSection?)` and `ArrangeGlobalSections`.

@@ -486,7 +486,9 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
       freeSlotKeys = {},
       emptySlotsSorted = {},
       stacks = { GetStackInfo = function() end },
-      totalItems = 0
+      totalItems = 0,
+      -- Read, with nothing in either tab (data with no tabs has never been read, and shows no hint).
+      tabs = {},
     }
     render(view, ctx, bag, mockSlotInfo, function() end)
     assert.is_false(view.emptyGroupFrame:IsShown())
