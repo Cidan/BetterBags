@@ -1,0 +1,20 @@
+{
+  "id": 1794774760,
+  "version": "v0.9.3-3-gb3d9e8c",
+  "channel": "alpha",
+  "date": "2026-11-15",
+  "from": "e9ccc8f304e4b39417881fe3dc9d1fc4840500bb",
+  "to": "b3d9e8c237e74321960b09656f03f7b7d8bd4743",
+  "headline": "Adds an Upgrade Track item order option to keep gear grouped by upgrade track.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "Upgrade Track item order option",
+      "details": "A new Upgrade Track option in the Item Order dropdown arranges gear by its upgrade track (such as Myth, Hero, or Champion) from highest to lowest, then by item level. Items without an upgrade track appear afterward in Item Level order.",
+      "clients": [
+        "Retail",
+        "Forever"
+      ]
+    }
+  ]
+}
