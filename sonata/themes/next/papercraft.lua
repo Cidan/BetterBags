@@ -614,6 +614,8 @@ sonataNext:RegisterTheme({
     Highlight = { Texture = TEXTURES .. "item_light.png", VertexColor = { 0.3, 0.48, 0.71, 0.26 }, BlendMode = "BLEND" },
     Pushed = { Texture = TEXTURES .. "item_light.png", VertexColor = { 0.18, 0.16, 0.14, 0.26 }, BlendMode = "BLEND" },
     EmptySlot = { Texture = TEXTURES .. "item_empty.png" },
+    -- A specialized bag's glyph in ink: Default's white vanished on the light empty slot (issue #1327).
+    FamilyIcon = { Color = { 0.18, 0.16, 0.14, 0.4 } },
     Count = { Font = { Object = "NumberFontNormal", Path = PATRICK, Size = 15, Flags = "OUTLINE" },
       Points = { { Point = "BOTTOMRIGHT", X = -4, Y = 4 } } },
     ItemLevel = { Font = { Object = "NumberFontNormal", Path = PATRICK, Size = 15, Flags = "OUTLINE" } },

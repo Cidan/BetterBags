@@ -223,7 +223,7 @@ registered window that has `UpdateOpacity` to apply its opacity again (the Opaci
 
 | Kind | Element | Style keys (defaults are Blizzard's) |
 |---|---|---|
-| `ItemButton` | an item button's visual decoration | `Icon` (`Inset`, `TexCoords`), `Highlight`, `Pushed` (button states), `Backdrop` (a `Color` fill, or art: `Texture` or `Atlas`, tinted by `VertexColor`, with `TexCoords`, `Alpha`, `BlendMode`; `Inset`; `BorderColor`/`EdgeSize` draw a 4-texture edge, `BorderInset` a number or per side), `QualityBorder = "Backdrop"` or art (`{ Texture or Atlas, Alpha, BlendMode }`: the icon's border drawn in it, tinted the quality's color at `Alpha`), `QualityColors` (per quality index), `UpgradeIcon` (`Atlas`/`Texture`, `Scale`), `Count` (`Font`, `Points`), `ItemLevel` (`Font`: the item level text, its color the draw's; both fonts through a font object, below), `Countdown` (`Font`, `Locales`: a cooldown's numbers; none, the client's own font, recorded by value and put back), `EmptySlot` (a texture spec: an empty slot's art; Classic draws it as its icon), `QuestIcon`, `QuestStarterIcon`, `QuestBorderColor` |
+| `ItemButton` | an item button's visual decoration | `Icon` (`Inset`, `TexCoords`), `Highlight`, `Pushed` (button states), `Backdrop` (a `Color` fill, or art: `Texture` or `Atlas`, tinted by `VertexColor`, with `TexCoords`, `Alpha`, `BlendMode`; `Inset`; `BorderColor`/`EdgeSize` draw a 4-texture edge, `BorderInset` a number or per side), `QualityBorder = "Backdrop"` or art (`{ Texture or Atlas, Alpha, BlendMode }`: the icon's border drawn in it, tinted the quality's color at `Alpha`), `QualityColors` (per quality index), `UpgradeIcon` (`Atlas`/`Texture`, `Scale`), `Count` (`Font`, `Points`), `ItemLevel` (`Font`: the item level text, its color the draw's; both fonts through a font object, below), `Countdown` (`Font`, `Locales`: a cooldown's numbers; none, the client's own font, recorded by value and put back), `EmptySlot` (a texture spec: an empty slot's art; Classic draws it as its icon), `FamilyIcon` (`Color`: a specialized bag's glyph in its empty slots, below), `QuestIcon`, `QuestStarterIcon`, `QuestBorderColor` |
 | `Tab` | a bottom tab | `Art = "Flat"` (template art hidden; `Background`, `Border`, `Hover` (HIGHLIGHT layer), `Selected = { Background, Bar, Border }`: `Bar` is a texture spec with `Height` and `Points` (default along the top), `Border = { Color }` recolors the tab's border while it is selected or a drop target), `Height` (default 32), `Font`, `HighlightFont`, `SelectedFont`, `TextOffset`, `SelectedTextOffset` |
 | `SectionHeader` | a section title font string | `Font` (default `GameFontNormal`) |
 | `SearchBox` | the in-bag `BagSearchBoxTemplate` box | `Strip`, `HideCaps`, `Middle` (texture spec + `Points`, `Height`), `SearchIcon` (`false` hides; a texture spec restyles), `ClearButton = { Icon }`, `Background`, `Border`, `Font` (default `GameFontHighlightSmall`), `Instructions` (default `GameFontDisableSmall`, 0.35 gray), `InstructionsPoints`, `TextInsets` (default 16, 20, 0, 0) |
@@ -240,6 +240,22 @@ Details:
   its own art, blend, coordinates and color on every draw, so a theme switch away from an art border
   needs no reset. `DrawItemQuest` frames a quest item in the same art, in `QuestBorderColor`. Added for
   GW2_UI's item buttons (docs/next-gw2-theme.md); coverage `spec/sonata/elements_spec.lua` ("in art").
+- `FamilyIcon` colors a specialized bag's glyph in its empty slots (`decoration.BetterBagsFamilyIcon`, item-drawing.md
+  §11: BetterBags makes it on the decoration, as it does the item level text this styler also styles). The glyph files
+  are white art, drawn in `Color` with its alpha as the texture's (`SetVertexColor`); a style without one draws them white
+  at 0.4 (`ITEM_FAMILY_ICON`), the look before themes could color them. Every restyle tints a glyph the decoration has,
+  so a theme switch recolors one already showing with no draw; `DrawFamilyIcon(decoration)` tints one made after the
+  decoration was styled, in its style's color (white at 0.4 for a decoration no style drew), and BetterBags calls it when
+  it makes the glyph. Added for issue #1327: the white glyph vanished on Papercraft's light empty slot, which sets its ink
+  at the same 0.4 (next-themes-papercraft.md §25). Coverage `spec/sonata/elements_spec.lua` ("a specialized bag's glyph
+  (FamilyIcon)"), `spec/frames/item_spec.lua` ("Empty slot family icon overlay": tinted when made),
+  `spec/integration/papercraft_spec.lua` ("draws a specialized bag's glyph on its empty slots in ink": through Next theme
+  switches and the switch to the classic design, with no draw).
+  - **Left as is (found in review):** `Color` is a color value (a list or keyed table, a classic theme's `$Variable`
+    included), never a palette name: `SonataNext:Check` skips `ItemButton` and nothing resolves a Next palette name in it,
+    so `Color = "Ink"` draws opaque white, and so does `Color = false` (a false color is the style's own, and
+    `apply:Color(false)` is white at 1), where `FamilyIcon = false` gives the default. Every other item button color
+    behaves the same; a theme author sees it at once, so nothing guards it.
 - `DrawItemIcon(decoration)` puts back the icon crop the decoration's style gave it (`Icon.TexCoords`): WoW: Forever's
   launch build resets the icon's texture coordinates in every `SetItemButtonTexture`, so its icon draws call this right
   after (camelot-forever.md §11c). Coverage `spec/sonata/elements_spec.lua` ("an icon's crop after a draw").

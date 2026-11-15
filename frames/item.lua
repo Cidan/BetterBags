@@ -126,8 +126,6 @@ end
 -- glyph files are 64 x 64 (tools/textures/next_icons.py); this sizes them well under the
 -- 37x37 slot so they read as an icon and not a slot background.
 local FAMILY_ICON_SIZE = 24
--- The glyph is drawn at reduced opacity so it hints at the bag type without dominating the slot.
-local FAMILY_ICON_ALPHA = 0.4
 
 -- An empty container slot's art on WoW: Forever 1.60.1.70790, which removed ItemSlotBackgroundCombinedBagsTemplate
 -- (Mainline/ContainerFrame.xml) and draws its own empty slots in this atlas
@@ -148,7 +146,9 @@ end
 
 -- getFamilyIconTexture lazily creates (and returns) the centered family-bag glyph on a themed
 -- item-button decoration. It lives in the OVERLAY layer so it sits above the empty-slot art,
--- and is stored on the decoration itself so it survives across draws and theme swaps.
+-- and is stored on the decoration itself so it survives across draws and theme swaps. Its color
+-- and alpha are the theme's (ItemButton.FamilyIcon): the glyph files are white, and a theme with
+-- light empty slots draws them darker (issue #1327).
 ---@param decoration ItemButton
 ---@return Texture
 local function getFamilyIconTexture(decoration)
@@ -156,9 +156,9 @@ local function getFamilyIconTexture(decoration)
 		local tex = decoration:CreateTexture(nil, "OVERLAY")
 		tex:SetSize(FAMILY_ICON_SIZE, FAMILY_ICON_SIZE)
 		tex:SetPoint("CENTER", decoration, "CENTER", 0, 0)
-		tex:SetAlpha(FAMILY_ICON_ALPHA)
 		tex:Hide()
 		decoration.BetterBagsFamilyIcon = tex
+		elements:DrawFamilyIcon(decoration)
 	end
 	return decoration.BetterBagsFamilyIcon
 end
@@ -1043,7 +1043,7 @@ function itemFrame.itemProto:SetFreeSlots(ctx, data, count, nocount)
 	self.freeSlotName = data.itemInfo and data.itemInfo.emptySlotName or ""
 
 	-- Specialized bags (reagent, quiver, soul, herb, ...) carry a pre-resolved glyph file,
-	-- drawn centered and semi-transparent, smooth at a third of its size (TRILINEAR, as the
+	-- drawn centered in the theme's color, smooth at a third of its size (TRILINEAR, as the
 	-- header glyphs). Generic bags leave it nil, so the overlay stays hidden.
 	local familyIcon = data.itemInfo and data.itemInfo.emptySlotFamilyIcon
 	local familyTexture = getFamilyIconTexture(decoration)

@@ -297,6 +297,16 @@ function WholeAddon.Load(opts)
   setGlobal("SetItemButtonQuality", function(button, ...)
     if button and button.SetItemButtonQuality then button:SetItemButtonQuality(...) end
   end)
+  -- Blizzard_ItemButton/Mainline/ItemButtonTemplate.lua: the icon's desaturation (GetItemButtonIconTexture,
+  -- Shared/ItemButtonTemplate.lua: Icon, icon, or the button's named IconTexture).
+  setGlobal("SetItemButtonDesaturated", function(button, desaturated)
+    if button then
+      local icon = button.Icon or button.icon or _G[button:GetName() .. "IconTexture"]
+      if icon then
+        icon:SetDesaturated(desaturated)
+      end
+    end
+  end)
   setGlobal("SetItemButtonCount", function(button, count)
     if not button then return end
     count = count or 0

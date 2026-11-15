@@ -143,6 +143,7 @@ local function stubModules()
   override(elements, "DrawItemQuality", function() return false end)
   override(elements, "DrawItemQuest", function() end)
   override(elements, "EmptySlotArt", function() return nil end)
+  override(elements, "DrawFamilyIcon", function() end)
 end
 
 -- decorate makes an item's decoration; useItemModule loads a fresh ItemFrame whose

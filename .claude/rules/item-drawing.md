@@ -239,13 +239,22 @@ glance. Generic bags (family `0`) draw nothing.
 - **Draw (`frames/item.lua`).** `SetFreeSlots` reads `data.itemInfo.emptySlotFamilyIcon` and, when
   set, shows a lazily-created `OVERLAY` texture on the **themed decoration** (`decoration.BetterBagsFamilyIcon`
   via `getFamilyIconTexture`) via `SetTexture(file, nil, nil, "TRILINEAR")` — 24×24 (`SetSize`
-  after the texture), centered, `0.4` alpha — else hides it. `TRILINEAR`
+  after the texture), centered — else hides it. `TRILINEAR`
   (`SimpleTextureBaseAPIDocumentation`'s `filterMode`, on every client's branch) keeps the 64-pixel
   glyph smooth drawn at a third of its size, as the header glyphs. The render recorder names it
   `glyph=<file name>` (render-recorder.md). The overlay lives on the **decoration** (the visual layer), not `self.button` (the interaction
   layer), and in the `OVERLAY` layer so it sits above the empty-slot art. It is hidden in
   `SetItemFromData` (any real item drawn into the slot) and `ClearItem`. No `items:`/database call
   happens at draw time.
+- **Its color is the theme's (issue #1327).** The glyph files are white art. They were drawn white
+  at a fixed `0.4` alpha, and vanished on Papercraft's light empty slot (reported with a
+  screenshot: "white on white"). The item button theme now says the color, alpha included
+  (`ItemButton.FamilyIcon = { Color }`, sonata.md §3a; white at 0.4 when a theme leaves it out,
+  Papercraft's ink at 0.4). `getFamilyIconTexture` has Sonata tint the glyph when it makes it
+  (`SonataElements:DrawFamilyIcon`), and every restyle of the decoration tints it again, so a
+  theme switch recolors a glyph already showing without a draw; a draw never sets its color.
+  Coverage: `spec/frames/item_spec.lua` ("Empty slot family icon overlay": tinted when made),
+  `spec/sonata/elements_spec.lua`, `spec/integration/papercraft_spec.lua`.
 - **Left as they are (found in review).** The `SetSize(24, 24)` after the texture undoes nothing
   `SetTexture` does (it was there because `SetAtlas` could take the atlas's size); it is kept so the
   glyph is 24×24 on every draw, as before. On Next it also resets the whole-pixel size `NextItemFit`
