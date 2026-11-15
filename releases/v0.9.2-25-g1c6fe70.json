@@ -1,0 +1,19 @@
+{
+  "id": 1794711105,
+  "version": "v0.9.2-25-g1c6fe70",
+  "channel": "alpha",
+  "date": "2026-11-15",
+  "from": "4c0adf8c1292b8f3f4c2064b17da14862e483af7",
+  "to": "1c6fe70a41e7803a3c1368ef1cdfcf464ebb0c83",
+  "headline": "Mythic Keystones now show their level on item buttons with a new setting to toggle it.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "Show Mythic Keystone level on item buttons",
+      "details": "Mythic Keystones now show their level on their item button, colored by level when Show Item Level Color is on or white when it is off. Enabled by default, you can toggle Show Keystone Level in the Item Level section of your Backpack and Bank settings.",
+      "clients": [
+        "Retail"
+      ]
+    }
+  ]
+}
