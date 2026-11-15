@@ -73,7 +73,8 @@ spec/
   world_spec.lua         # Every spec file gets a fresh world, and the last one is collected (fixtures/world/)
   basic_spec.lua         # Ace3 library loading verification
   query_spec.lua         # QueryParser (Lexer/Parser/Query) unit tests
-  serialization_spec.lua # Serialization (Serialize/Deserialize/Base64/DeepCopy) tests
+  serialization_spec.lua # Serialization (Encode/Decode, DecodeLegacy never running a string, DeepCopy) tests
+  helpers_encoding_util_spec.lua # The C_EncodingUtil mock against the CBOR, Base64 and Deflate RFCs
   intervaltree_spec.lua  # IntervalTree (Insert/Query/Remove) tests
   sort_spec.lua          # Sort comparators (items, sections, priorities) with stub modules
   color_spec.lua         # Item level color tier calculations
@@ -90,6 +91,8 @@ spec/
   helpers/
     world.lua            # Builds the world a spec file runs in: mocks, Ace3, the addon, shared modules, mock data
     wow_mocks.lua        # WoW global API mocks (CreateFrame, C_Timer, string/table funcs, etc.)
+    encoding_util.lua    # C_EncodingUtil: CBOR, Deflate (stored blocks) and Base64, and their enums
+    legacy_export.lua    # The "!BB" writer from before #1317, so specs can make the strings players still hold
     addon_loader.lua     # BetterBags addon creation + module loading helpers
 ```
 
@@ -131,6 +134,7 @@ LoadBetterBagsModule("path/to/module_that_needs_database.lua")
 `spec/setup.lua` is the busted helper (configured in `.busted`). It builds the world a spec file runs in with `helpers/world.lua`, a new one when every spec file starts, on the globals Lua and busted start with, and lets the last file's go: every file runs as it would alone, and the suite holds one file's memory at a time (`.claude/rules/test-harness.md` §6). The world is made of:
 
 - **`helpers/wow_mocks.lua`**: Sets WoW global functions and aliases (`_G.CreateFrame`, `_G.C_Timer`, `_G.strmatch`, `_G.wipe`, etc.)
+- **`helpers/encoding_util.lua`**: `C_EncodingUtil` and its enums, real CBOR and Base64 and Deflate's stored blocks (`.claude/rules/import-export.md` §4)
 - **the Ace3 libraries** (`libs/`)
 - **`helpers/addon_loader.lua`**: Creates the BetterBags addon via AceAddon and provides `LoadBetterBagsModule()` and `StubBetterBagsModule()` helpers
 - **the modules every spec needs** (the profiler engine, Motion, BetterBags Next's pixel grid and themes, and the rest `helpers/world.lua` lists) and **`helpers/mock_data.lua`** (`MockData`)

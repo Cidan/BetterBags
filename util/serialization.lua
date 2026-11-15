@@ -6,106 +6,137 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class Serialization: AceModule
 local serialization = addon:NewModule('Serialization')
 
--- Base64 encoding/decoding characters
-local b64chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+-- parseLegacy reads the Lua table constructor the "!BB" exporter wrote (serializeTable, before #1317), and nothing else:
+-- tables of `[key] = value,` fields, keys and values that are strings as string.format("%q") writes them, numbers as
+-- tostring writes them, true, false, and nil. It is read as data and never run. Raises an error for anything else.
+---@param text string
+---@return table
+local function parseLegacy(text)
+  local pos = 1
 
--- Serialize a Lua table to a string
----@param tbl table
----@param indent? number
----@return string
-local function serializeTable(tbl, indent)
-  indent = indent or 0
-  local result = {}
-  local indentStr = string.rep("  ", indent)
+  local function fail(what)
+    error(string.format("%s at byte %d", what, pos), 0)
+  end
 
-  table.insert(result, "{\n")
+  local function skipSpace()
+    pos = text:find("[^%s]", pos) or #text + 1
+  end
 
-  for k, v in pairs(tbl) do
-    local key
-    if type(k) == "number" then
-      key = string.format("[%d]", k)
-    elseif type(k) == "string" then
-      key = string.format("[%q]", k)
-    else
-      key = "[" .. tostring(k) .. "]"
+  local function readString()
+    local parts = {}
+    pos = pos + 1
+    while true do
+      local at = text:find('["\\]', pos)
+      if not at then
+        fail("unfinished string")
+      end
+      table.insert(parts, text:sub(pos, at - 1))
+      if text:sub(at, at) == '"' then
+        pos = at + 1
+        return table.concat(parts)
+      end
+      local escaped = text:sub(at + 1, at + 1)
+      if escaped == '"' or escaped == "\\" or escaped == "\n" then
+        table.insert(parts, escaped)
+        pos = at + 2
+      elseif escaped == "r" then
+        table.insert(parts, "\r")
+        pos = at + 2
+      else
+        local digits = text:match("^%d%d?%d?", at + 1)
+        if not digits then
+          pos = at
+          fail("unknown escape")
+        end
+        table.insert(parts, string.char(tonumber(digits)))
+        pos = at + 1 + #digits
+      end
     end
+  end
 
-    table.insert(result, indentStr .. "  " .. key .. " = ")
-
-    if type(v) == "table" then
-      table.insert(result, serializeTable(v, indent + 1))
-    elseif type(v) == "string" then
-      table.insert(result, string.format("%q", v))
-    elseif type(v) == "number" or type(v) == "boolean" then
-      table.insert(result, tostring(v))
-    else
-      table.insert(result, "nil")
+  local function readNumber()
+    local token = text:match("^%-?%d+%.?%d*[eE][%+%-]?%d+", pos) or text:match("^%-?%d+%.?%d*", pos)
+    if not token then
+      fail("unexpected text")
     end
-
-    table.insert(result, ",\n")
+    pos = pos + #token
+    return tonumber(token)
   end
 
-  table.insert(result, indentStr .. "}")
-  return table.concat(result)
-end
-
--- Deserialize a string back to a Lua table
----@param str string
----@return table|nil, string?
-local function deserializeTable(str)
-  local func, err = loadstring("return " .. str)
-  if not func then
-    return nil, err
+  -- A literal: a string, a number, true, false or nil.
+  local function readLiteral()
+    local c = text:sub(pos, pos)
+    if c == '"' then
+      return readString()
+    elseif text:find("^true", pos) then
+      pos = pos + 4
+      return true
+    elseif text:find("^false", pos) then
+      pos = pos + 5
+      return false
+    elseif text:find("^nil", pos) then
+      pos = pos + 3
+      return nil
+    end
+    return readNumber()
   end
 
-  local success, result = pcall(func)
-  if not success then
-    return nil, result
+  local readTable
+
+  local function readValue()
+    if text:sub(pos, pos) == "{" then
+      return readTable()
+    end
+    return readLiteral()
   end
 
+  readTable = function()
+    local result = {}
+    pos = pos + 1
+    while true do
+      skipSpace()
+      if text:sub(pos, pos) == "}" then
+        pos = pos + 1
+        return result
+      end
+      if text:sub(pos, pos) ~= "[" then
+        fail("expected a [key]")
+      end
+      pos = pos + 1
+      skipSpace()
+      local key = readLiteral()
+      skipSpace()
+      if text:sub(pos, pos) ~= "]" then
+        fail("expected ]")
+      end
+      pos = pos + 1
+      skipSpace()
+      if text:sub(pos, pos) ~= "=" then
+        fail("expected =")
+      end
+      pos = pos + 1
+      skipSpace()
+      result[key] = readValue()
+      skipSpace()
+      local c = text:sub(pos, pos)
+      if c == "," then
+        pos = pos + 1
+      elseif c ~= "}" then
+        fail("expected , or }")
+      end
+    end
+  end
+
+  skipSpace()
+  if text:sub(pos, pos) ~= "{" then
+    fail("expected a table")
+  end
+  local result = readTable()
+  skipSpace()
+  if pos <= #text then
+    fail("text after the table")
+  end
   return result
-end
-
--- Encode a string to Base64
----@param data string
----@return string
-local function encodeBase64(data)
-  return ((data:gsub('.', function(x)
-    local r, b = '', x:byte()
-    for i = 8, 1, -1 do
-      r = r .. (b % 2 ^ i - b % 2 ^ (i - 1) > 0 and '1' or '0')
-    end
-    return r
-  end) .. '0000'):gsub('%d%d%d?%d?%d?%d?', function(x)
-    if (#x < 6) then return '' end
-    local c = 0
-    for i = 1, 6 do
-      c = c + (x:sub(i, i) == '1' and 2 ^ (6 - i) or 0)
-    end
-    return b64chars:sub(c + 1, c + 1)
-  end) .. ({ '', '==', '=' })[#data % 3 + 1])
-end
-
--- Decode a Base64 string
----@param data string
----@return string|nil
-local function decodeBase64(data)
-  data = string.gsub(data, '[^'..b64chars..'=]', '')
-  return (data:gsub('.', function(x)
-    if (x == '=') then return '' end
-    local r, f = '', (b64chars:find(x) - 1)
-    for i = 6, 1, -1 do
-      r = r .. (f % 2 ^ i - f % 2 ^ (i - 1) > 0 and '1' or '0')
-    end
-    return r
-  end):gsub('%d%d%d?%d?%d?%d?%d?%d?', function(x)
-    if (#x ~= 8) then return '' end
-    local c = 0
-    for i = 1, 8 do
-      c = c + (x:sub(i, i) == '1' and 2 ^ (8 - i) or 0)
-    end
-    return string.char(c)
-  end))
 end
 
 -- Deep copy a table
@@ -126,29 +157,61 @@ local function deepCopy(orig)
   return copy
 end
 
--- Export public functions
----@param tbl table
+-- base64Only keeps the characters Base64 is written with. The "!BB" reader skipped every other one, so a string saved
+-- with a period after it, or pasted with a no-break or zero-width space, read; both formats still do.
+---@param text string
 ---@return string
-function serialization:Serialize(tbl)
-  return serializeTable(tbl)
+local function base64Only(text)
+  return (text:gsub("[^A-Za-z0-9%+/=]", ""))
 end
 
----@param str string
+-- Encode writes a table as text a player can share: CBOR, compressed with Deflate, in Base64 (C_EncodingUtil, on every
+-- client BetterBags ships for).
+---@param value table
+---@return string
+function serialization:Encode(value)
+  local cbor = C_EncodingUtil.SerializeCBOR(value)
+  local compressed = C_EncodingUtil.CompressString(cbor, Enum.CompressionMethod.Deflate,
+    Enum.CompressionLevel.OptimizeForSize)
+  return C_EncodingUtil.EncodeBase64(compressed)
+end
+
+-- Decode reads what Encode wrote. The text is pasted by a player, so anything may be in it: CBOR only ever reads as
+-- data, and text that is not Base64, not compressed, not CBOR or not a table is refused (C_EncodingUtil raises an error
+-- on some bad data and returns nothing on other).
+---@param text string
 ---@return table|nil, string?
-function serialization:Deserialize(str)
-  return deserializeTable(str)
+function serialization:Decode(text)
+  local decodedOK, decoded = pcall(C_EncodingUtil.DecodeBase64, base64Only(text))
+  if not decodedOK or not decoded then
+    return nil, "it is not Base64"
+  end
+  local inflatedOK, inflated = pcall(C_EncodingUtil.DecompressString, decoded, Enum.CompressionMethod.Deflate)
+  if not inflatedOK or not inflated then
+    return nil, "it is not compressed data"
+  end
+  local valueOK, value = pcall(C_EncodingUtil.DeserializeCBOR, inflated)
+  if not valueOK or type(value) ~= "table" then
+    return nil, "it does not hold a table"
+  end
+  return value
 end
 
----@param data string
----@return string
-function serialization:EncodeBase64(data)
-  return encodeBase64(data)
-end
-
----@param data string
----@return string|nil
-function serialization:DecodeBase64(data)
-  return decodeBase64(data)
+-- DecodeLegacy reads a string exported before #1317: the Base64 after "!BB", of a Lua table constructor. It is parsed,
+-- never run (it used to be handed to loadstring, so a pasted string could run any code). What the parser cannot read
+-- comes back as the reason, tables nested too deep for Lua's stack included.
+---@param text string
+---@return table|nil, string?
+function serialization:DecodeLegacy(text)
+  local decodedOK, decoded = pcall(C_EncodingUtil.DecodeBase64, base64Only(text))
+  if not decodedOK or not decoded then
+    return nil, "it is not Base64"
+  end
+  local parsedOK, value = pcall(parseLegacy, decoded)
+  if not parsedOK then
+    return nil, value
+  end
+  return value
 end
 
 ---@param orig table

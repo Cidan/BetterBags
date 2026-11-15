@@ -1969,7 +1969,8 @@ function DB:GetGroupOrder(kind, groupID)
   return group and group.order or groupID  -- Default to ID if order not set
 end
 
--- Export category configuration to a base64-encoded string
+-- Export category configuration: "!BB2!", then Serialization:Encode's Base64 (#1317). Before, "!BB" and a Lua table
+-- constructor in Base64, which ImportSettings still reads.
 ---@return string
 function DB:ExportSettings()
   ---@class Serialization: AceModule
@@ -1987,17 +1988,11 @@ function DB:ExportSettings()
     customSectionSort = serialization:DeepCopy(DB.data.profile.customSectionSort),
   }
 
-  -- Serialize the table
-  local serialized = serialization:Serialize(exportData)
-
-  -- Encode to base64
-  local encoded = serialization:EncodeBase64(serialized)
-
-  -- Add BetterBags prefix for identification
-  return "!BB" .. encoded
+  return "!BB2!" .. serialization:Encode(exportData)
 end
 
--- Import category configuration from a base64-encoded string
+-- Import category configuration from a string ExportSettings wrote, of either format. The string is read as data,
+-- never run.
 ---@param dataString string
 ---@return boolean, string
 function DB:ImportSettings(dataString)
@@ -2011,22 +2006,17 @@ function DB:ImportSettings(dataString)
   -- Remove whitespace
   dataString = dataString:gsub("%s+", "")
 
-  -- Validate and strip BetterBags prefix
-  if not dataString:match("^!BB") then
+  -- "!BB2!" first: "!BB" is a prefix of it, and an old string never holds "!" after "!BB" (Base64 has none).
+  local importData, err
+  if dataString:match("^!BB2!") then
+    importData, err = serialization:Decode(dataString:sub(6))
+  elseif dataString:match("^!BB") then
+    importData, err = serialization:DecodeLegacy(dataString:sub(4))
+  else
     return false, "Invalid import string: Missing !BB prefix. Please make sure you copied the full export string."
   end
-  dataString = dataString:sub(4) -- Remove "!BB" prefix
-
-  -- Decode from base64
-  local decoded = serialization:DecodeBase64(dataString)
-  if not decoded then
-    return false, "Failed to decode import data"
-  end
-
-  -- Deserialize the table
-  local importData, err = serialization:Deserialize(decoded)
   if not importData then
-    return false, "Failed to parse import data: " .. (err or "unknown error")
+    return false, "Failed to read import data: " .. err
   end
 
   -- Validate version

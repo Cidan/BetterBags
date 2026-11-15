@@ -11,6 +11,7 @@ The utilities module provides essential helper functions, data structures, and a
   - [Cursor Placement](#cursor-placement-cursorplacementlua)
   - [Movement Flow Detection](#movement-flow-detection-movementflowlua)
   - [Query Parser](#query-parser-querylua)
+  - [Serialization](#serialization-serializationlua)
   - [Sorting System](#sorting-system-sortlua)
 - [Data Structures](#data-structures)
   - [Interval Tree](#interval-tree-treesintervaltreelua)
@@ -181,6 +182,18 @@ A complete lexer and parser for search query syntax, supporting complex boolean 
 -- With NOT operator
 "NOT soulbound AND tradeable"
 ```
+
+### Serialization (`serialization.lua`)
+
+The text a player shares their categories as (`DB:ExportSettings`, `DB:ImportSettings`; `.claude/rules/import-export.md`).
+Pasted text is untrusted, so it is read as data and never run.
+
+| Function | Description | Returns |
+|----------|-------------|---------|
+| `Encode(value)` | CBOR, compressed with Deflate, in Base64 (`C_EncodingUtil`, every client) | `string` |
+| `Decode(text)` | Reads what `Encode` wrote; refuses text that is not Base64, not compressed, not CBOR or not a table | `table` or `nil, reason` |
+| `DecodeLegacy(text)` | Reads a `!BB` string exported before #1317 (Base64 of a Lua table constructor) with a parser for exactly what the old writer wrote | `table` or `nil, reason` |
+| `DeepCopy(value)` | A copy of a table and everything in it, metatables included | `any` |
 
 ### Sorting System (`sort.lua`)
 
@@ -395,6 +408,14 @@ movementFlow:AtNPCShopWindow(): boolean
 ### QueryParser Module
 ```lua
 QueryParser:Query(input: string): QueryNode?
+```
+
+### Serialization Module
+```lua
+serialization:Encode(value: table): string
+serialization:Decode(text: string): table?, string?
+serialization:DecodeLegacy(text: string): table?, string?
+serialization:DeepCopy(value: any): any
 ```
 
 ### Sort Module

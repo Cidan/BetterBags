@@ -6,6 +6,7 @@ paths:
   - "frames/{bag,item,tabs}.lua"
   - "core/{events,async,database,bagsystem}.lua"
   - "integrations/quickfind.lua"
+  - "util/serialization.lua"
 ---
 # State Management and Architecture Patterns
 
@@ -96,6 +97,15 @@ function gridProto:Sort(fn)
   table.sort(self.cells, fn)
 end
 ```
+
+## Never Run Text a Player Pastes: Read It as Data
+**Problem**: an import string arrives from other players. The category importer once read one with
+`loadstring("return " .. text)()`, so a shared string could run any code with every addon API (#1317).
+**Rule**: read pasted text with a reader that can only produce data: `C_EncodingUtil.DeserializeCBOR` (on every client),
+or a parser for the exact grammar a writer used. Never `loadstring`, `RunScript` or a `setfenv` sandbox: an empty
+environment still reaches string methods through the string metatable and can loop forever. Wrap each decoding step in
+`pcall` and check what comes back, since `C_EncodingUtil` raises on some bad data and returns nothing on other
+(`.claude/rules/import-export.md`).
 
 ## WipeSlotInfo / SendMessageLater Race: Stale SlotInfo in Deferred Draws
 **Problem**: `items:GetItemDataFromSlotKey(slotkey)` returns nil for slotkeys that were valid at time of refresh but are gone by the time the deferred draw fires. Error: `"data must be provided"` in `SetItemFromData`.

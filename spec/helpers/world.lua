@@ -5,6 +5,7 @@
 return function()
   -- Step 1: Mock WoW globals (must come before any library loading)
   dofile("spec/helpers/wow_mocks.lua")
+  dofile("spec/helpers/encoding_util.lua")
 
   -- Step 2: Load Ace3 libraries (order matters -- dependencies first)
   dofile("libs/LibStub/LibStub.lua")

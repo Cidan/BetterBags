@@ -1,141 +1,185 @@
--- serialization_spec.lua -- Unit tests for util/serialization.lua
+-- serialization_spec.lua -- Unit tests for util/serialization.lua: text that can be shared (C_EncodingUtil's CBOR,
+-- Deflate and Base64), the "!BB" strings exported before it (parsed, never run: #1317), and DeepCopy.
 
 local addon = LibStub("AceAddon-3.0"):GetAddon("BetterBags")
 LoadBetterBagsModule("util/serialization.lua")
 local Serialization = addon:GetModule("Serialization")
+local legacyExport = dofile("spec/helpers/legacy_export.lua")
+local fixture = dofile("spec/fixtures/legacy_export_v3.lua")
+
+local E = C_EncodingUtil
+
+-- Every byte, so a string that holds them all survives.
+local function everyByte()
+  local bytes = {}
+  for i = 0, 255 do
+    bytes[#bytes + 1] = string.char(i)
+  end
+  return table.concat(bytes)
+end
 
 describe("Serialization", function()
 
-  -- ─── Serialize / Deserialize ────────────────────────────────────────────────
+  -- ─── Encode / Decode ───────────────────────────────────────────────────────
 
-  describe("Serialize + Deserialize", function()
+  describe("Encode and Decode", function()
 
-    it("round-trips a simple flat table", function()
-      local tbl = {a = 1, b = "hello", c = true}
-      local str = Serialization:Serialize(tbl)
-      local result = Serialization:Deserialize(str)
-      assert.same(tbl, result)
+    it("round-trip what a category export holds: item IDs, bag kinds from 0, negative numbers, fractions, any bytes", function()
+      local value = Serialization:DeepCopy(fixture.data)
+      value.customCategoryFilters['Mats "&" Herbs'].note = everyByte()
+      assert.are.same(value, Serialization:Decode(Serialization:Encode(value)))
     end)
 
-    it("round-trips a table with numeric keys", function()
-      local tbl = {10, 20, 30}
-      local str = Serialization:Serialize(tbl)
-      local result = Serialization:Deserialize(str)
-      assert.same(tbl, result)
+    it("write Base64 only, so the text survives a chat box", function()
+      assert.is_truthy(Serialization:Encode(fixture.data):match("^[A-Za-z0-9+/]+=*$"))
     end)
 
-    it("round-trips nested tables", function()
-      local tbl = {outer = {inner = {deep = "value"}}}
-      local str = Serialization:Serialize(tbl)
-      local result = Serialization:Deserialize(str)
-      assert.same(tbl, result)
+    it("write CBOR, compressed with Deflate, in Base64", function()
+      local text = Serialization:Encode({ version = 3 })
+      local cbor = E.DecompressString(E.DecodeBase64(text), Enum.CompressionMethod.Deflate)
+      assert.are.same({ version = 3 }, E.DeserializeCBOR(cbor))
     end)
 
-    it("round-trips an empty table", function()
-      local tbl = {}
-      local str = Serialization:Serialize(tbl)
-      local result = Serialization:Deserialize(str)
-      assert.same(tbl, result)
+    -- C_EncodingUtil raises on some bad data and returns nothing on other (MayReturnNothing); each step handles both.
+    it("refuse text when any step raises an error or returns nothing, naming the step", function()
+      local text = Serialization:Encode({ version = 3 })
+      local reasons = {
+        DecodeBase64 = "it is not Base64",
+        DecompressString = "it is not compressed data",
+        DeserializeCBOR = "it does not hold a table",
+      }
+      for name, reason in pairs(reasons) do
+        local real = E[name]
+        for _, broken in ipairs({ function() error("bad data") end, function() end }) do
+          E[name] = broken
+          local ok, value, err = pcall(Serialization.Decode, Serialization, text)
+          E[name] = real
+          assert.is_true(ok, name)
+          assert.is_nil(value, name)
+          assert.are.equal(reason, err, name)
+        end
+      end
+      local realDecode = E.DecodeBase64
+      for _, broken in ipairs({ function() error("bad data") end, function() end }) do
+        E.DecodeBase64 = broken
+        local ok, value, err = pcall(Serialization.DecodeLegacy, Serialization, "e30=")
+        E.DecodeBase64 = realDecode
+        assert.is_true(ok)
+        assert.is_nil(value)
+        assert.are.equal("it is not Base64", err)
+      end
     end)
 
-    it("round-trips strings with special characters", function()
-      local tbl = {msg = 'he said "hello"', path = "a\\b\\c"}
-      local str = Serialization:Serialize(tbl)
-      local result = Serialization:Deserialize(str)
-      assert.same(tbl, result)
-    end)
-
-    it("round-trips mixed key types", function()
-      local tbl = {[1] = "first", ["key"] = "second", [true] = nil}
-      local str = Serialization:Serialize(tbl)
-      local result = Serialization:Deserialize(str)
-      assert.same(tbl, result)
-    end)
-
-    it("round-trips boolean values", function()
-      local tbl = {enabled = true, disabled = false}
-      local str = Serialization:Serialize(tbl)
-      local result = Serialization:Deserialize(str)
-      assert.same(tbl, result)
-    end)
-
-    it("serializes to a string", function()
-      local tbl = {x = 1}
-      local str = Serialization:Serialize(tbl)
-      assert.is_string(str)
-      assert.is_truthy(#str > 0)
-    end)
-  end)
-
-  -- ─── Deserialize errors ─────────────────────────────────────────────────────
-
-  describe("Deserialize", function()
-
-    it("returns nil and an error for invalid Lua syntax", function()
-      local result, err = Serialization:Deserialize("{{{invalid")
-      assert.is_nil(result)
-      assert.is_not_nil(err)
-    end)
-
-    it("returns nil and an error for non-table expressions", function()
-      -- loadstring("return 42") succeeds but returns a number, not a table.
-      -- The function still returns it (no type check), so this tests the boundary.
-      local result = Serialization:Deserialize("42")
-      assert.are.equal(42, result)
+    it("refuse text that is not Base64, not compressed, not CBOR or not a table, saying so", function()
+      local cases = {
+        "!!!not base64!!!",
+        E.EncodeBase64("not compressed"),
+        E.EncodeBase64(E.CompressString("\255")),
+        E.EncodeBase64(E.CompressString(E.SerializeCBOR(42))),
+        E.EncodeBase64(E.CompressString(E.SerializeCBOR("a string"))),
+      }
+      for _, text in ipairs(cases) do
+        local value, err = Serialization:Decode(text)
+        assert.is_nil(value, text)
+        assert.is_string(err, text)
+      end
     end)
   end)
 
-  -- ─── Base64 ─────────────────────────────────────────────────────────────────
+  -- ─── DecodeLegacy ──────────────────────────────────────────────────────────
 
-  describe("Base64", function()
+  describe("DecodeLegacy", function()
 
-    it("round-trips a simple string", function()
-      local input = "Hello, World!"
-      local encoded = Serialization:EncodeBase64(input)
-      local decoded = Serialization:DecodeBase64(encoded)
-      assert.are.equal(input, decoded)
+    it("reads a string the old exporter wrote", function()
+      local value, err = Serialization:DecodeLegacy(fixture.text:sub(4))
+      assert.is_nil(err)
+      assert.are.same(fixture.data, value)
     end)
 
-    it("round-trips an empty string", function()
-      local encoded = Serialization:EncodeBase64("")
-      local decoded = Serialization:DecodeBase64(encoded)
-      assert.are.equal("", decoded)
+    it("reads every value the old writer wrote: strings of any bytes, numbers of any form, booleans, keys of each kind", function()
+      local value = {
+        everything = everyByte(),
+        quoted = 'a "quoted" \\ back\\slash\nnew line\r\0',
+        numbers = { -2, 0, 0.25, -0.5, 1.5e-07, 1e+20, 123456789012 },
+        [0] = true, [-1] = false, [2447] = { [1] = {}, [2] = { deep = { deeper = "yes" } } },
+        [true] = "a boolean key", [false] = 0,
+        empty = {},
+      }
+      assert.are.same(value, Serialization:DecodeLegacy(legacyExport(value):sub(4)))
     end)
 
-    it("round-trips binary-like data", function()
-      local input = "\0\1\2\255\254\253"
-      local encoded = Serialization:EncodeBase64(input)
-      local decoded = Serialization:DecodeBase64(encoded)
-      assert.are.equal(input, decoded)
+    it("reads the nil the old writer wrote for a value it could not write", function()
+      assert.are.same({ kept = 1 }, Serialization:DecodeLegacy(legacyExport({ kept = 1, dropped = print }):sub(4)))
     end)
 
-    it("round-trips strings of various lengths (padding cases)", function()
-      -- Length 1: needs == padding
-      local a = "A"
-      assert.are.equal(a, Serialization:DecodeBase64(Serialization:EncodeBase64(a)))
-      -- Length 2: needs = padding
-      local ab = "AB"
-      assert.are.equal(ab, Serialization:DecodeBase64(Serialization:EncodeBase64(ab)))
-      -- Length 3: no padding
-      local abc = "ABC"
-      assert.are.equal(abc, Serialization:DecodeBase64(Serialization:EncodeBase64(abc)))
+    it("never runs what the string holds: calls, globals, operators and functions are refused", function()
+      _G.BB1317_RAN = nil
+      local payloads = {
+        '(function() _G.BB1317_RAN = true return { ["version"] = 3, } end)()',
+        '{\n  ["version"] = (function() _G.BB1317_RAN = true return 3 end)(),\n}',
+        '{\n  ["version"] = print("x"),\n}',
+        '{\n  ["version"] = ("x"):rep(3),\n}',
+        '{\n  ["version"] = BB1317_GLOBAL,\n}',
+        '{\n  ["version"] = 1 + 2,\n}',
+        '{\n  ["version"] = "a" .. "b",\n}',
+        '{\n  ["version"] = function() end,\n}',
+        '{\n  ["version"] = -x,\n}',
+        'setmetatable({}, {})',
+        '{\n  [f()] = 1,\n}',
+      }
+      for _, payload in ipairs(payloads) do
+        local value, err = Serialization:DecodeLegacy(E.EncodeBase64(payload))
+        assert.is_nil(value, payload)
+        assert.is_string(err, payload)
+      end
+      assert.is_nil(_G.BB1317_RAN)
     end)
 
-    it("produces only valid Base64 characters", function()
-      local encoded = Serialization:EncodeBase64("test data 123")
-      assert.is_truthy(encoded:match("^[A-Za-z0-9+/=]+$"))
+    it("refuses what the old writer never wrote", function()
+      local bad = {
+        '"a string"', '42', 'true', 'nil', '',
+        '{\n  ["a"] = "unfinished,\n}',
+        '{\n  ["a"] = "\\q",\n}',
+        '{\n  ["a"] = "\\256",\n}',
+        '{\n  ["a"] = 1,\n}\n}',
+        '{\n  ["a"] = 1,\n} trailing',
+        '{\n  ["a"] = 1\n  ["b"] = 2,\n}',
+        '{ 1, 2, }',
+        '{ a = 1, }',
+        '{\n  ["a"] = 0x10,\n}',
+        '{\n  ["a"] = [[long string]],\n}',
+        '{\n  ["a"] = 1, -- comment\n}',
+        '{\n  [{}] = 1,\n}',
+        '{\n  [nil] = 1,\n}',
+        '{\n  ["a"] = 1,',
+        '{\n  ("a"] = 1,\n}',
+        '{\n  ["a") = 1,\n}',
+        '{\n  ["a"] : 1,\n}',
+        'x["a"] = 1, }',
+      }
+      for _, text in ipairs(bad) do
+        local value, err = Serialization:DecodeLegacy(E.EncodeBase64(text))
+        assert.is_nil(value, text)
+        assert.is_string(err, text)
+      end
     end)
 
-    it("adds correct padding", function()
-      -- 1 byte input -> 4 chars with == padding
-      local enc1 = Serialization:EncodeBase64("A")
-      assert.is_truthy(enc1:match("==$"))
-      -- 2 byte input -> 4 chars with = padding
-      local enc2 = Serialization:EncodeBase64("AB")
-      assert.is_truthy(enc2:match("=$"))
-      -- 3 byte input -> 4 chars with no padding
-      local enc3 = Serialization:EncodeBase64("ABC")
-      assert.is_falsy(enc3:match("="))
+    it("reads a last field with no comma after it", function()
+      assert.are.same({ a = 1, b = { 2 } },
+        Serialization:DecodeLegacy(E.EncodeBase64('{ ["a"] = 1, ["b"] = { [1] = 2 } }')))
+    end)
+
+    it("refuses text that is not Base64", function()
+      local value, err = Serialization:DecodeLegacy("!!!")
+      assert.is_nil(value)
+      assert.is_string(err)
+    end)
+
+    it("refuses nesting too deep to read, without raising", function()
+      local text = string.rep('{ ["a"] = ', 30000) .. "1" .. string.rep(" }", 30000)
+      local value, err = Serialization:DecodeLegacy(E.EncodeBase64(text))
+      assert.is_nil(value)
+      assert.is_string(err)
     end)
   end)
 
