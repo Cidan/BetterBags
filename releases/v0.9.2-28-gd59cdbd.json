@@ -1,0 +1,23 @@
+{
+  "id": 1794730372,
+  "version": "v0.9.2-28-gd59cdbd",
+  "channel": "alpha",
+  "date": "2026-11-15",
+  "from": "30e676dc93e8433ed55ea01f6841dc1687caa717",
+  "to": "d59cdbd6679c84a15ad8889a14c660702b1f9472",
+  "headline": "Settings import and export now reads pasted strings strictly as data and uses a new compressed format.",
+  "entries": [
+    {
+      "category": "Improved",
+      "title": "Compressed \"!BB2!\" export format",
+      "details": "Exports from Settings -\u003e Profiles -\u003e Import / Export now use a new compressed \"!BB2!\" format. Older \"!BB\" export strings still import.",
+      "clients": []
+    },
+    {
+      "category": "Fixed",
+      "title": "Read imported strings strictly as data",
+      "details": "Settings -\u003e Profiles -\u003e Import / Export now reads pasted strings as data instead of running them as code. Unsafe or invalid strings are rejected without changing your saved categories.",
+      "clients": []
+    }
+  ]
+}
