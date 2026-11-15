@@ -22,6 +22,20 @@ local L =  addon:GetModule('Localization')
 ---@class Debug : AceModule
 local debug = addon:GetModule('Debug')
 
+-- The hint in an empty group's tab wraps at HINT_WIDTH and keeps HINT_MARGIN around it, so it takes 260 across: as wide
+-- as a bag's content at its narrowest (MIN_CONTENT_WIDTH, frames/bag.lua), which puts it in the middle of a bag sized to
+-- its content unless something else, a wide tab bar, makes the window wider.
+local HINT_WIDTH = 220
+local HINT_MARGIN = 20
+
+-- EmptyGroupSize is the room the hint in an empty group's tab takes: its width and its text's height, with the margin
+-- around them. The height is read each time, as a theme's font may have changed it.
+---@param view View
+---@return number width, number height
+local function EmptyGroupSize(view)
+  return HINT_WIDTH + 2 * HINT_MARGIN, view.emptyGroupHint:GetStringHeight() + 2 * HINT_MARGIN
+end
+
 ---@param view View
 ---@param ctx Context
 local function Wipe(view, ctx)
@@ -78,10 +92,12 @@ function views:NewGrid(parent, kind, tabID)
     local helpText = sonata:CreateText(emptyGroupFrame, "Muted")
     helpText:SetPoint("CENTER", emptyGroupFrame, "CENTER", 0, 0)
     helpText:SetText(L:G("Drag a section header to this tab at the bottom of the window to add a section to this group!"))
-    helpText:SetWidth(220)
+    helpText:SetWidth(HINT_WIDTH)
     helpText:SetJustifyH("CENTER")
 
     view.emptyGroupFrame = emptyGroupFrame
+    view.emptyGroupHint = helpText
+    view.EmptyGroupSizeHandler = EmptyGroupSize
   end
 
   return view

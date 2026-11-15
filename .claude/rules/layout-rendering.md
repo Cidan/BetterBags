@@ -8,6 +8,7 @@ paths:
   - "spec/frames/bagcanvas_spec.lua"
   - "spec/frames/grid_spec.lua"
   - "spec/views/*_spec.lua"
+  - "spec/integration/empty_group_hint_spec.lua"
 ---
 # Layout Rendering and the Bag's Scroll Box
 
@@ -68,4 +69,45 @@ To support visual gaps and spacers without polluting the UI with thousands of in
 - **Data Layer Contract:** The data layer specifies spacer locations in `tabData.items` by setting `isItemGap = true`. Such items are omitted from item count metrics (`tabData.totalItems`).
 - **View Layer Contract:** In both `GridView` and `BagView` rendering pipelines, if an item is a gap (`item.isItemGap == true`), we do not request or draw an `ItemButton`. Instead, we add a mathematical gap cell to the corresponding section via `section:AddCell(slotkey, { isGap = true, width = 37, height = 37 })`.
 - **Linter & Test Verification:** All calculations must remain free of warnings under `luacheck` and fully covered by layout-specific and edge-case unit tests.
+
+### 5. The Empty Group's Hint Is the View's Content
+The classic backpack's grid view for a group with no category (`tabID > 1`, no categories in its tab) shows a hint instead
+of sections: "Drag a section header to this tab at the bottom of the window to add a section to this group!"
+(`views/gridview.lua`, `view.emptyGroupFrame` filling the tab container, its text `view.emptyGroupHint` centered on it).
+- **Reported (#1216, v0.8.12):** "clipped on its left, so only the end of each line shows". **Measured** on the whole addon
+  on a resolved screen (`spec/integration/empty_group_hint_spec.lua` before the fix): in a bag sized to its content, 94 of
+  the hint's 220 units were past the scroll box's left edge (46 with a Free Space section 100 wide), and in every size
+  mode its top half was above the scroll box's top. **The cause:** the empty view measured as an empty grid (4 x 0), so
+  the canvas made the tab container 1 unit tall and only as wide as the rest of the content. A bag sized to its content
+  hands its canvas no width (window.md §7), so the canvas is only as wide as its content and hangs 14 units in from the
+  scroll box's left (the bar's room, window.md §3b), while the window is held at its minimum: the hint, centered on that
+  strip, went past the scroll box's left and top, which clip (`WowScrollBox` inherits `ScrollBoxBaseTemplate`,
+  `clipChildren="true"`), and its bottom half lay over Free Space, hung right below the view.
+- **Rule:** while the hint shows, the view measures at least the room the hint takes (`views.viewProto:Measure`, through
+  `view.EmptyGroupSizeHandler`, set by `views/gridview.lua` as `WipeHandler` is): `HINT_WIDTH + 2 * HINT_MARGIN` across
+  (220 + 40 = 260) and the text's height plus `2 * HINT_MARGIN`, read on every measure (`GetStringHeight` on a font string
+  with a set width and no set height, as `frames/groupdialog.lua` and `frames/question.lua` size theirs), so a theme's font
+  is followed. The canvas then gives the view that room like any section: the tab container is as tall as the hint, Free
+  Space hangs below it, Recent Items above it, and the hint is centered in the canvas. `measured.content` stays the
+  grid's own measure. Views with no hint (the bank's, `views/bagview.lua`) have neither field.
+- **Why 260 across:** it is the bag's narrowest content (`MIN_CONTENT_WIDTH`, `frames/bag.lua`), so in a bag sized to its
+  content at its minimum the canvas is exactly the room inside the scroll bar's gutters and the hint is in the middle.
+  A player-sized window is never narrower (its minimum is the same 260 plus the gutters, sizes rounded to 0.01 unit,
+  `withoutFloatError`), so the hint never makes a layout wider than the width it is planned for. The two numbers are kept
+  apart; the integration spec fails if they drift.
+- **Not before the first read:** the hint shows only for data that was read (`slotInfo.tabs ~= nil`), the same test the
+  bag uses for Loading... (`bagProto:Draw`, `self.loading`). Loading... is centered on the scroll box, where the hint now is;
+  found by the change's bug review, which opened the backpack on an empty group before its first read and saw the two
+  drawn over each other.
+- **Left as it is (approved design, reported to the user):** a tab bar wider than 260 (3 groups or more) or the bag slots
+  panel makes a window sized to its content wider than its narrowest. The canvas still has no width there and hangs at
+  the scroll box's left, as all content narrower than such a window does (out of this change's scope), so the hint sits
+  left of the middle (25 units with 3 groups, 70 with 4, measured in the mock): whole, never clipped. Centering narrow
+  content in a window sized to its content would move every nearly empty bag's content, and was not taken.
+- **Not measured in game:** the client's line breaks and font heights differ from the mock's (6 units a character), so the
+  hint's height in game is the client's `GetStringHeight`, not the mock's.
+- Coverage: `spec/integration/empty_group_hint_spec.lua` (whole, in the middle, above Free Space: sized to its content, a
+  400 x 300 window, a window as small as it goes; whole beside a wide tab bar; not under Loading... before the first read;
+  no room taken in the default group), `spec/views/gridview_spec.lua` ("an empty group's hint"),
+  `spec/views/persistent_tabs_spec.lua` (shown on tab 2 only). Seven mutations of the guards, all caught.
 
