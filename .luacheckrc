@@ -182,6 +182,7 @@ globals = {
 	"C_Cursor",
 	"C_CVar",
 	"C_CurrencyInfo",
+	"C_EncodingUtil",
 	"C_EquipmentSet",
 	"C_Item",
 	"C_NewItems",

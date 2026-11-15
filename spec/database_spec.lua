@@ -1845,11 +1845,78 @@ describe("Database", function()
   -- ─── Export / Import ───────────────────────────────────────────────────────────
 
   describe("import/export", function()
+    local legacyExport = dofile("spec/helpers/legacy_export.lua")
 
-    it("ExportSettings returns a base64 string with !BB prefix", function()
+    -- C_EncodingUtil's CBOR, Deflate and Base64 after "!BB2!" (#1317).
+    it("ExportSettings writes '!BB2!' and Base64", function()
       local exported = DB:ExportSettings()
-      assert.is_not_nil(exported)
-      assert.is_not_nil(exported:match("^!BB"))
+      assert.is_truthy(exported:match("^!BB2![A-Za-z0-9+/]+=*$"))
+      local data = addon:GetModule("Serialization"):Decode(exported:sub(6))
+      assert.are.equal(3, data.version)
+    end)
+
+    it("imports a string the '!BB' exporter wrote before", function()
+      local fixture = dofile("spec/fixtures/legacy_export_v3.lua")
+      local ok, msg = DB:ImportSettings(fixture.text)
+      assert.is_true(ok, msg)
+      local p = DB.data.profile
+      local name = 'Mats "&" Herbs'
+      local filter = p.customCategoryFilters[name]
+      assert.are.same({ [2447] = true, [765] = true }, filter.itemList)
+      assert.are.same({ 0.25, 0.5, 1 }, filter.color)
+      assert.are.equal("line1\nline2\\ end\r", filter.note)
+      assert.are.equal('type = "Tradeskill" AND ilvl > 1.5e-07', filter.searchCategory.query)
+      assert.is_false(filter.enabled[1])
+      assert.are.same(fixture.data.customCategoryIndex, p.customCategoryIndex)
+      assert.are.same(fixture.data.categoryFilters, p.categoryFilters)
+      assert.are.same(fixture.data.customSectionSort, p.customSectionSort)
+      assert.are.equal(-2, p.ephemeralCategoryFilters["Plugin Cat"].priority)
+    end)
+
+    -- #1317: the text after "!BB" was handed to loadstring and run.
+    it("never runs code a pasted '!BB' string holds, and leaves the categories as they were", function()
+      _G.BB1317_RAN = nil
+      DB.data.profile.customCategoryFilters = { Kept = { name = "Kept", itemList = {} } }
+      local payload = "(function() _G.BB1317_RAN = true return { version = 3, customCategoryFilters = {} } end)()"
+      local ok, msg = DB:ImportSettings("!BB" .. C_EncodingUtil.EncodeBase64(payload))
+      assert.is_false(ok)
+      assert.is_string(msg)
+      assert.is_nil(_G.BB1317_RAN)
+      assert.is_not_nil(DB.data.profile.customCategoryFilters.Kept)
+    end)
+
+    it("refuses a '!BB2!' string that is not what ExportSettings writes", function()
+      local ok, msg = DB:ImportSettings("!BB2!" .. C_EncodingUtil.EncodeBase64("not compressed"))
+      assert.is_false(ok)
+      assert.is_string(msg)
+    end)
+
+    -- The "!BB" reader skipped every character outside Base64, so a string saved with a period after it, or pasted
+    -- with a no-break or zero-width space, imported; either format still does.
+    it("skips characters outside Base64 in either format, as the '!BB' reader did", function()
+      local fixture = dofile("spec/fixtures/legacy_export_v3.lua")
+      local stray = { ".", "`", '"', "\226\128\139", "\194\160" }
+      for _, s in ipairs(stray) do
+        local ok, msg = DB:ImportSettings(fixture.text:sub(1, 40) .. s .. fixture.text:sub(41) .. s)
+        assert.is_true(ok, msg)
+        assert.is_not_nil(DB.data.profile.customCategoryFilters['Mats "&" Herbs'])
+      end
+      DB.data.profile.customCategoryFilters = { Stray = { name = "Stray", itemList = { [7] = true } } }
+      local exported = DB:ExportSettings()
+      DB.data.profile.customCategoryFilters = {}
+      local ok, msg = DB:ImportSettings(exported:sub(1, 30) .. "\194\160" .. exported:sub(31) .. ".")
+      assert.is_true(ok, msg)
+      assert.is_true(DB.data.profile.customCategoryFilters.Stray.itemList[7])
+    end)
+
+    it("imports an export broken over lines by a chat box", function()
+      DB.data.profile.customCategoryFilters = { Wrapped = { name = "Wrapped", itemList = { [42] = true } } }
+      local exported = DB:ExportSettings()
+      DB.data.profile.customCategoryFilters = {}
+      local wrapped = exported:sub(1, 20) .. "\n  " .. exported:sub(21, 40) .. "\r\n" .. exported:sub(41)
+      local ok, msg = DB:ImportSettings(wrapped)
+      assert.is_true(ok, msg)
+      assert.is_true(DB.data.profile.customCategoryFilters.Wrapped.itemList[42])
     end)
 
     it("ImportSettings returns false for nil data", function()
@@ -1877,8 +1944,7 @@ describe("Database", function()
     -- Version 3: rules written with AND binding tighter than OR.
     it("exports version 3, without the hidden sections", function()
       DB.data.profile.categoryOptions = { Junk = { shown = false } }
-      local serialization = addon:GetModule("Serialization")
-      local data = serialization:Deserialize(serialization:DecodeBase64(DB:ExportSettings():sub(4)))
+      local data = addon:GetModule("Serialization"):Decode(DB:ExportSettings():sub(6))
       assert.are.equal(3, data.version)
       assert.is_nil(data.categoryOptions)
       DB.data.profile.categoryOptions = nil
@@ -1886,8 +1952,7 @@ describe("Database", function()
 
     -- An old export carries the old shapes; importing it brings them to the current one, as a load does.
     it("imports a version 1 export into the current shape", function()
-      local serialization = addon:GetModule("Serialization")
-      local old = "!BB" .. serialization:EncodeBase64(serialization:Serialize({
+      local old = legacyExport({
         version = 1,
         customCategoryFilters = {
           Mats = { name = "Mats", itemList = { [42] = true }, enabled = { [0] = true, [1] = false } },
@@ -1895,7 +1960,7 @@ describe("Database", function()
         },
         customCategoryIndex = {},
         categoryOptions = { Mats = { shown = false } },
-      }))
+      })
       local ok, msg = DB:ImportSettings(old)
       assert.is_true(ok, msg)
       local f = DB.data.profile.customCategoryFilters
@@ -1909,15 +1974,14 @@ describe("Database", function()
 
     -- An export from before AND bound tighter than OR has rules grouped left to right.
     it("keeps the meaning of an older export's rules, and leaves a version 3 export's as they are", function()
-      local serialization = addon:GetModule("Serialization")
       local function export(version)
-        return "!BB" .. serialization:EncodeBase64(serialization:Serialize({
+        return legacyExport({
           version = version,
           customCategoryFilters = {
             Gear = { name = "Gear", itemList = {}, searchCategory = { query = "type = armor OR type = weapon AND ilvl > 200" } },
           },
           customCategoryIndex = {},
-        }))
+        })
       end
       assert.is_true((DB:ImportSettings(export(2))))
       assert.are.equal("(type = armor OR type = weapon) AND ilvl > 200",
