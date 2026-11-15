@@ -1,0 +1,20 @@
+{
+  "id": 1794771775,
+  "version": "v0.9.3-2-ge9ccc8f",
+  "channel": "alpha",
+  "date": "2026-11-15",
+  "from": "07d8c0b1a832bd6c4c9522bd5335bf8b73581786",
+  "to": "e9ccc8f304e4b39417881fe3dc9d1fc4840500bb",
+  "headline": "Backpack items that the guild bank refuses now dim while the guild bank is open.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "Dim backpack items refused by the guild bank",
+      "details": "While the guild bank is open, backpack items that cannot be placed into it are dimmed, and they return to normal when it closes. Only whether an item itself is allowed counts, not full tabs or tab permissions.",
+      "clients": [
+        "Retail",
+        "Forever"
+      ]
+    }
+  ]
+}
