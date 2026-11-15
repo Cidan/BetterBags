@@ -156,6 +156,7 @@ describe("NextSettingsContent", function()
     override(_G, "ReloadUI", function() reloads = reloads + 1 end)
     override(events, "SendMessage", function(_, _, message, ...) table.insert(sent, { message, ... }) end)
     override(events, "RegisterMessage", function(_, message, fn) handlers[message] = fn end)
+    override(events, "RegisterEvent", function(_, event, fn) handlers[event] = fn end)
     override(addon, "hasGuildBank", false)
     design = "next"
     override(bagSystem, "ActiveDesign", function() return design end)
@@ -450,6 +451,7 @@ describe("NextSettingsContent", function()
       assert.are.equal(const.BAG_KIND.BANK, page.bag.kind)
       assert.are.same({
         { "General", "Bank Window", { "enableBankBags" } },
+        { "General", "Warbank", { "bankAutoDepositReagents" } },
         { "Layout", "Order", { "sectionOrder", "itemOrder" } },
         { "Layout", "Sections [next]", { "sectionColumns", "sectionCompact", "sectionGap", "sectionFill", "sectionSpan",
           "sectionWideRows" } },
@@ -616,9 +618,10 @@ describe("NextSettingsContent", function()
       -- Enable Bank Bags, Enable Vendor Window and Enable Guild Bank Window moved to their bags, and the Size tab's four to
       -- every bag), the Currencies page's 10 (currency.md §6), the Food & Drink page's 7 (food-drink.md §5), each bag's 41
       -- (Hide Empty Groups the latest, #1321; Gap Between Sections before it, next-columns.md §7c; its Size tab's four before
-      -- that, Show Keystone Level before them, #202), the bank's and the guild bank's switch on their General tabs, and the
-      -- vendor's 5 (its switch and its Size tab).
-      assert.are.equal(41 + 10 + 7 + 3 * 41 + 2 + 5, named)
+      -- that, Show Keystone Level before them, #202), the bank's and the guild bank's switch on their General tabs, the
+      -- bank's Include Tradeable Reagents beside its switch (#750, warbank-deposit.md), and the vendor's 5 (its switch and
+      -- its Size tab).
+      assert.are.equal(41 + 10 + 7 + 3 * 41 + 2 + 1 + 5, named)
     end)
 
     -- The Food & Drink bar's options (food-drink.md §5): a page of their own after Currencies, BetterBags Next only.
@@ -1147,6 +1150,76 @@ describe("NextSettingsContent", function()
       for _, page in ipairs(pages:List()) do listed[page.id] = true end
       assert.is_nil(listed.vendor)
       assert.is_nil(listed.guild)
+    end)
+  end)
+
+  -- Blizzard's Include tradeable reagents checkbox under its Warbank (issue #750, warbank-deposit.md), on the bank's General
+  -- tab beside its switch (asked, of BetterBags Next: "in the settings page"), for both designs: one settings window.
+  describe("the Warbank's deposit", function()
+    before_each(function()
+      override(db, "GetEnableBankBag", function() return true end)
+      override(_G, "_cvars", { bankAutoDepositReagents = "1" })
+      override(addon, "hasWarbank", true)
+    end)
+
+    local function shown(title)
+      local row = rowTitled(title)
+      return row ~= nil and row.frame:IsShown()
+    end
+
+    local function shownTitles()
+      local list = {}
+      for _, title in ipairs(settings.page.titles) do
+        if title:IsShown() then table.insert(list, title:GetText()) end
+      end
+      return list
+    end
+
+    it("switches the client's Include tradeable reagents from the bank's General tab, under Warbank", function()
+      settings:Open("bank", "general")
+      render:Flush()
+      local row = rowTitled("Include Tradeable Reagents")
+      assert.is_true(shown("Include Tradeable Reagents"))
+      assert.is_true(row.control:GetChecked())
+      assert.are.same({ "BANK WINDOW", "WARBANK" }, shownTitles())
+      row.control.frame:GetScript("OnClick")(row.control.frame, "LeftButton")
+      assert.are.equal("0", _G._cvars.bankAutoDepositReagents)
+      settings:Close()
+      design = "classic"
+      settings:Open("bank", "general")
+      render:Flush()
+      assert.is_true(shown("Include Tradeable Reagents"), "the classic bags' too")
+      assert.is_false(rowTitled("Include Tradeable Reagents").control:GetChecked())
+    end)
+
+    -- The classic bank's menu, Blizzard's own bank or the console may change the client's setting while the page shows.
+    it("shows the client's setting again when it changes elsewhere while the window shows", function()
+      settings:Open("bank", "general")
+      render:Flush()
+      content:OnEnable()
+      local row = rowTitled("Include Tradeable Reagents")
+      assert.is_true(row.control:GetChecked())
+      -- As Events dispatches an event (core/events.lua): the context, the event's name, then what the client sent.
+      _G._cvars.bankAutoDepositReagents = "0"
+      handlers["CVAR_UPDATE"](nil, "CVAR_UPDATE", "bankAutoDepositReagents", "0")
+      assert.is_false(row.control:GetChecked())
+      _G._cvars.bankAutoDepositReagents = "1"
+      handlers["CVAR_UPDATE"](nil, "CVAR_UPDATE", "someOtherCVar", "1")
+      assert.is_false(row.control:GetChecked(), "another CVar shows nothing again")
+    end)
+
+    -- Without a Warbank the client keeps no such setting: GetCVarBool answers nil.
+    it("leaves it out where there is no Warbank, its section's title too", function()
+      addon.hasWarbank = false
+      _G._cvars = {}
+      settings:Open("bank", "general")
+      render:Flush()
+      assert.is_true(shown("Enable Bank Bags"))
+      local row = rowTitled("Include Tradeable Reagents")
+      assert.is_not_nil(row, "made, then left out")
+      assert.is_false(row.frame:IsShown())
+      assert.is_false(row.control:GetChecked())
+      assert.are.same({ "BANK WINDOW" }, shownTitles())
     end)
   end)
 

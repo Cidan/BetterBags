@@ -269,6 +269,21 @@ define('enableBankBags', {
   set = function(_, value) db:SetEnableBankBag(value) end,
 })
 
+-- Blizzard's Include tradeable reagents checkbox under its Warbank, which BetterBags hides with the rest of its bank
+-- (.claude/rules/warbank-deposit.md): the client's own setting, kept for each character, which Deposit All Warbound Items
+-- reads. Nothing shows it until a deposit.
+define('bankAutoDepositReagents', {
+  kind = "toggle",
+  bag = true,
+  only = { const.BAG_KIND.BANK },
+  title = 'Include Tradeable Reagents',
+  description = 'If enabled, Deposit All Warbound Items also puts your tradeable reagents into the Warbank. '
+    .. "This is the game's own setting, kept for each character.",
+  keywords = { 'warbank', 'warband', 'deposit', 'reagents', 'tradeable', 'account bank' },
+  get = function() return GetCVarBool("bankAutoDepositReagents") end,
+  set = function(_, value) SetCVar("bankAutoDepositReagents", value) end,
+})
+
 define('bagFading', {
   kind = "toggle",
   title = 'Enable Bag Fading',

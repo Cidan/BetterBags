@@ -35,6 +35,16 @@ windows:
 - **Re-entrancy.** `flush` swaps out the collected list and clears the timer **before**
   calling the callback, so a fire raised from inside the callback opens a fresh window.
 
+## 1a. What a callback gets (`RegisterEvent`, `RegisterMessage`)
+
+An **event's** callback gets `(ctx, eventName, ...payload)`: the dispatcher (`events:dispatcher`) passes on everything
+AceEvent's `Fire` gives it, the event's name first. A **message's** gets `(ctx, ...payload)`: its dispatcher drops the
+name (`select(2, ...)`). So a WoW event's payload starts at the third parameter, `function(ctx, _, currencyType)`
+(`data/currencies.lua`), and a spec fakes one as `fn(ctx, name, ...)` (`spec/next/currency_spec.lua`). Mistake this comes
+from: the settings window's `CVAR_UPDATE` handler (warbank-deposit.md §3) was first written `function(ctx, name)`, so
+`name` was always "CVAR_UPDATE" and it never matched, and its spec called the handler without the event's name and
+passed; a bug review found it by firing the event through the real Events module.
+
 ## 2. Why (the bugs this replaced)
 
 The previous implementation:

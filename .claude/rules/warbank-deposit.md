@@ -8,6 +8,10 @@ paths:
   - "spec/frames/contextmenu_spec.lua"
   - "spec/frames/menubutton_spec.lua"
   - "spec/next/bank_spec.lua"
+  - "config/catalog.lua"
+  - "next/settings/content.lua"
+  - "spec/config/catalog_spec.lua"
+  - "spec/next/settings/content_spec.lua"
 ---
 # The Warbank's Item Deposit (Deposit All Warbound Items)
 
@@ -75,7 +79,22 @@ taint-sensitive. Reported to the user with #750, not built.
 | | Classic bags | BetterBags Next |
 |---|---|---|
 | Deposit All Warbound Items | the bank's left-click menu (after Sort Bank and Clean Up Warbank); Shift + right click on the bank's menu button | the bank's header button (`depositButton`, in Plain's bag-button menu); Shift + right click on its title or bag button |
-| Include tradeable reagents | the bank's left-click menu, checked while `GetCVarBool("bankAutoDepositReagents")` | (to come) |
+| Include tradeable reagents | the bank's left-click menu, checked while `GetCVarBool("bankAutoDepositReagents")`; the settings row | the settings row: the Bank page's General tab, section Warbank, Include Tradeable Reagents |
+
+- **The settings row** (asked, of BetterBags Next: "in the settings page") is the catalog's `bankAutoDepositReagents`
+  (`config/catalog.lua`: `bag = true`, `only = { BANK }`, get `GetCVarBool`, set `SetCVar`, sending nothing: only a
+  deposit reads it), in a section "Warbank" after the bank's switch on its General tab (`next/settings/content.lua`),
+  its row hidden where there is no Warbank. The settings window is one for both designs, so the classic bags have it
+  there too, beside their menu's toggle (as Drag to Resize mirrors Resizable Window, bag-menu-button.md §3). Its title
+  is the catalog's English, Title Case, as every settings row's; the menu's is Blizzard's translated label.
+- **Kept current.** A row reads its value when built and on the window's `Refresh`, so `NextSettingsContent:OnEnable`
+  refreshes the window shown on `CVAR_UPDATE` for `bankAutoDepositReagents` (the event's first value is the CVar's
+  name: `ConsoleDocumentation.lua`, and Blizzard's handlers, `CvarUtil.lua`'s `CVarCallbackRegistry`): the classic
+  bank's menu, Blizzard's own bank (Enable Bank Bags off) or the console may change it while the row shows (found by
+  the bug review). The handler is `function(ctx, _, name)`: an event's callback gets its name before its payload
+  (event-buckets.md §1a). The other way, Blizzard's own checkbox reads the CVar only in its `OnShow`
+  (`BankPanelIncludeReagentsCheckboxMixin`), so with Blizzard's bank open a change from the row shows there the next
+  time it opens: Blizzard's, not built for.
 
 - Both sides name it in Blizzard's words (`ACCOUNT_BANK_DEPOSIT_BUTTON_LABEL`, "Deposit All Warbound Items";
   `BANK_DEPOSIT_INCLUDE_REAGENTS_CHECKBOX_LABEL`, "Include tradeable reagents"), translated by the client: the menu
@@ -94,5 +113,8 @@ taint-sensitive. Reported to the user with #750, not built.
 bank's popup), `spec/frames/contextmenu_spec.lua` ("the Warbank's deposit": the entries, their order, the CVar toggle,
 Sort Bank depositing nothing), `spec/frames/menubutton_spec.lua` (the Shift right click through the bank),
 `spec/next/bank_spec.lua` (the header button, the question over the bank, another window's dialog, Hide closing the
-question); 14 mutations, all caught. The WoW mocks for `ItemUtil`, `C_Bank.IsItemAllowedInBankType`, `C_CVar` and
+question), `spec/config/catalog_spec.lua` (the setting: the bank's alone, the CVar both ways, nothing sent) and
+`spec/next/settings/content_spec.lua` ("the Warbank's deposit": the row on the bank's General tab, both designs, shown
+again on `CVAR_UPDATE` for its CVar alone, the handler called as Events calls it, left out with its section's title
+without a Warbank); 24 mutations, all caught. The WoW mocks for `ItemUtil`, `C_Bank.IsItemAllowedInBankType`, `C_CVar` and
 `ContainerFrame_GetContainerNumSlots` are ported from Blizzard's source (`spec/helpers/wow_mocks.lua`).

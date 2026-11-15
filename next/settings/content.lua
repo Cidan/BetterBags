@@ -612,7 +612,12 @@ function content:Init()
   -- too (Enable Bank Bags); BetterBags Next's guild bank and vendor stand in for Blizzard's frames (next-bagsystem.md
   -- §11g), which the classic bags leave to Blizzard.
   bagPage("backpack", { name = 'Backpack', kind = const.BAG_KIND.BACKPACK })
-  bagPage("bank", { name = 'Bank', kind = const.BAG_KIND.BANK }, generalTab(L:G("Bank Window"), 'enableBankBags'))
+  -- Beside the bank's switch, what its Deposit All Warbound Items takes, where there is a Warbank (warbank-deposit.md).
+  local bankGeneral = generalTab(L:G("Bank Window"), 'enableBankBags')
+  table.insert(bankGeneral.sections, { title = L:G("Warbank"), rows = {
+    { setting = 'bankAutoDepositReagents', hidden = function() return not addon.hasWarbank end },
+  } })
+  bagPage("bank", { name = 'Bank', kind = const.BAG_KIND.BANK }, bankGeneral)
   -- BetterBags Next's guild bank (guild-bank.md §5), on a client with one; the classic bags have none.
   bagPage("guild", { name = 'Guild Bank', kind = const.BAG_KIND.GUILD },
     generalTab(L:G("Guild Bank Window"), 'nextGuildBank'), function() return addon.hasGuildBank == true end, "next")
@@ -702,6 +707,14 @@ function content:OnEnable()
   -- one column, and its Fill Order while it is compact.
   events:RegisterMessage('next/SectionColumnsChanged', function(ctx)
     if settings:IsShown() then
+      settings:Refresh(ctx)
+    end
+  end)
+  -- Include Tradeable Reagents is the client's own setting (warbank-deposit.md): the classic bank's menu, Blizzard's own
+  -- bank or the console may change it while it shows. CVAR_UPDATE names the CVar changed (ConsoleDocumentation.lua), after
+  -- the event's own name (core/events.lua).
+  events:RegisterEvent('CVAR_UPDATE', function(ctx, _, name)
+    if name == "bankAutoDepositReagents" and settings:IsShown() then
       settings:Refresh(ctx)
     end
   end)

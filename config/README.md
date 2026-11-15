@@ -18,7 +18,9 @@ for what a bag read depends on). A bag's settings are bound to a bag when asked 
 (`catalog:Bags()`). A bag's setting is the bags' that hold items unless it names its kinds (`only`): each bag's
 switch is its own (Enable Bank Bags, Enable Vendor Window, Enable Guild Bank Window), and each bag's Size tab is
 every bag's, the vendor's too (`.claude/rules/next-bag-settings.md`). The window builds its rows from it;
-`spec/config/settings_effects_spec.lua` checks what each setting sends.
+`spec/config/settings_effects_spec.lua` checks what each setting sends. Most read and write the profile; Include
+Tradeable Reagents (the bank's) is the client's own `bankAutoDepositReagents` CVar, kept per character, which a
+Warbank deposit reads (`.claude/rules/warbank-deposit.md`).
 
 ### config.lua (`Config`)
 
