@@ -345,7 +345,8 @@ local function bagPage(id, bag, general, shown, design)
   table.insert(BAG_PAGES, { id = id, bag = bag })
   local tabs = {
     { id = "layout", title = L:G("Layout"), sections = {
-      { title = L:G("Order"), rows = { { setting = 'sectionOrder' }, { setting = 'itemOrder' } } },
+      { title = L:G("Order"), rows = { { setting = 'sectionOrder' }, { setting = 'itemOrder' }, { setting = 'itemOrderThen' },
+        { setting = 'itemOrderLast' } } },
       { title = L:G("Sections"), design = "next", rows = {
         { setting = 'sectionColumns' }, { setting = 'sectionCompact' }, { setting = 'sectionGap' }, { setting = 'sectionFill' },
         { setting = 'sectionSpan' }, { setting = 'sectionWideRows' },
@@ -511,6 +512,7 @@ function content:Init()
   local automationOptions = categoryEditor:AutomationOptions()
   local depositOptions = categoryEditor:DepositOptions()
   local recentOptions = categoryEditor:RecentOptions()
+  local itemOrderOptions = categoryEditor:ItemOrderOptions()
   pages:Define({
     id = "categories", group = L:G("BetterBags"), title = L:G("Categories"),
     description = L:G("Your categories: a rule, items you add, or both. Each bag uses those you choose."),
@@ -550,6 +552,14 @@ function content:Init()
             { option = depositOptions[2], hidden = function() return not addon.hasWarbank end },
           } },
           { title = L:G("Recent Items"), rows = { { option = recentOptions[1] } } },
+        } },
+      -- Its items' own order (item-sort.md §5), chosen with the dropdowns a bag's Layout tab has.
+      { id = "order", title = L:G("Item Order"), shown = function() return categoryEditor:ItemOrderTabShown() end,
+        sections = {
+          { title = L:G("Order"), rows = {
+            { option = itemOrderOptions[1] }, { option = itemOrderOptions[2] }, { option = itemOrderOptions[3] },
+            { option = itemOrderOptions[4] },
+          } },
         } },
     },
   })

@@ -44,6 +44,7 @@ local context = addon:GetModule('Context')
 ---@field skipRecent? boolean Its items skip Recent Items (Skip Recent Items, docs/next-batch-2.md §1).
 ---@field hidden? table<BagKind, boolean> The bags its items are not shown in (Hide In, category-lifecycle.md §10).
 ---@field ignoredItems? table<number, boolean> Items that never land in it, by item ID (Ignored Items, docs/next-batch-2.md §2).
+---@field itemOrder? ItemOrderKey[] Its items' own order, in every bag it is used in (Own Item Order, item-sort.md §5); the bag's without one.
 ---@field blizzard? boolean Made from a Blizzard category (Convert): Blizzard's items of its name show in it, and it never groups (category-lifecycle.md §11).
 
 ---@class (exact) Categories: AceModule
@@ -446,6 +447,9 @@ function categories:CreateCategory(ctx, category)
       if savedState.ignoredItems ~= nil then
         category.ignoredItems = savedState.ignoredItems
       end
+      if savedState.itemOrder ~= nil then
+        category.itemOrder = savedState.itemOrder
+      end
     end
     self.ephemeralCategories[category.name] = category
     category.itemList = category.itemList or {}
@@ -498,7 +502,8 @@ end
 local function saveState(filter)
   database:UpdateEphemeralItemCategory(filter.name, { enabled = filter.enabled, color = filter.color,
     priority = filter.priority, automation = filter.automation, confirmSale = filter.confirmSale,
-    deposit = filter.deposit, skipRecent = filter.skipRecent, ignoredItems = filter.ignoredItems, hidden = filter.hidden })
+    deposit = filter.deposit, skipRecent = filter.skipRecent, ignoredItems = filter.ignoredItems, hidden = filter.hidden,
+    itemOrder = filter.itemOrder })
 end
 
 -- setPriority sets a category's place, saving a plugin's in its saved state as UpdateCategory does.
@@ -595,14 +600,14 @@ end
 -- false for none), priority, enabled (the bags named are set, the others kept), rule (its search;
 -- empty for none), groupBy, automation ("sell", "destroy", or false for none), confirmSale (false:
 -- Auto Sell sells at once; true, the default, is not stored), deposit ("bank", "warbank", or false for
--- none), skipRecent (true: its items skip Recent Items; false, the default, is not stored) and hidden (the
--- bags named are set, the others kept; shown, the default, is not stored). A plugin's category keeps its
--- own rule and group by; the bags, color, priority and automation set for it are saved, and win when the
--- plugin makes it again. The bags are recalculated unless only the automation changed, which changes no
--- item's category. It returns false for a name no category has.
+-- none), skipRecent (true: its items skip Recent Items; false, the default, is not stored), hidden (the
+-- bags named are set, the others kept; shown, the default, is not stored) and itemOrder (its own item order, a copy
+-- kept, or false for the bag's). A plugin's category keeps its own rule and group by; the bags, color, priority,
+-- automation and item order set for it are saved, and win when the plugin makes it again. The bags are recalculated
+-- unless only the automation changed, which changes no item's category. It returns false for a name no category has.
 ---@param ctx Context
 ---@param name string
----@param fields {color?: number[]|false, priority?: number, enabled?: table<BagKind, boolean>, rule?: string, groupBy?: number, automation?: string|false, confirmSale?: boolean, deposit?: string|false, skipRecent?: boolean}
+---@param fields {color?: number[]|false, priority?: number, enabled?: table<BagKind, boolean>, rule?: string, groupBy?: number, automation?: string|false, confirmSale?: boolean, deposit?: string|false, skipRecent?: boolean, hidden?: table<BagKind, boolean>, itemOrder?: ItemOrderKey[]|false}
 ---@return boolean
 function categories:UpdateCategory(ctx, name, fields)
   local saved = database:GetItemCategory(name)
@@ -630,6 +635,9 @@ function categories:UpdateCategory(ctx, name, fields)
   end
   if fields.skipRecent ~= nil then
     filter.skipRecent = fields.skipRecent == true or nil
+  end
+  if fields.itemOrder ~= nil then
+    filter.itemOrder = fields.itemOrder and { unpack(fields.itemOrder) } or nil
   end
   if fields.hidden ~= nil then
     local hidden = filter.hidden or {}
@@ -704,6 +712,29 @@ end
 function categories:SkipsRecentOf(name, kind)
   local filter = self:CategoryIn(name, kind)
   return filter ~= nil and filter.skipRecent == true
+end
+
+-- ItemOrderOf returns the order a category's items take in a bag (its Own Item Order; a group by's sections their
+-- category's), or nil for the bag's (util/sort.lua, item-sort.md §5). A built-in category has none.
+---@param name string
+---@param kind BagKind
+---@return ItemOrderKey[]?
+function categories:ItemOrderOf(name, kind)
+  local filter = self:CategoryIn(name, kind)
+  return filter and filter.itemOrder or nil
+end
+
+-- HasItemOrders says whether a category a bag uses has its own item order: without one, the bag's order sorts all its
+-- items (util/sort.lua, item-sort.md §5).
+---@param kind BagKind
+---@return boolean
+function categories:HasItemOrders(kind)
+  for _, filter in pairs(self:GetAllCategories()) do
+    if filter.itemOrder ~= nil and filter.enabled ~= nil and filter.enabled[kind] then
+      return true
+    end
+  end
+  return false
 end
 
 -- HiddenIn says whether a category's items are kept out of a bag (Hide In; a group by's sections as their
@@ -939,7 +970,8 @@ end
 -- ImportCategory adds a category shared as text (#1250; DB:ReadImport's category, only what one shares) as a category
 -- of yours named name: a new one, on top of the order like any new one, or with replace the one of yours of that name,
 -- which takes the shared rule, items, Ignored Items, group by (never for one made from a Blizzard category), color,
--- bags, Hide In, note and Skip Recent Items, and keeps its place, what it does on its own and what each bag set for it.
+-- bags, Hide In, note, Skip Recent Items and item order, and keeps its place, what it does on its own and what each bag
+-- set for it.
 -- Its items move to it from where they were filed (an item has one home), whether this client knows them or not. The
 -- bags are recalculated. It returns false, changing nothing, for a name a category has, or to replace one that is not
 -- yours.
@@ -969,11 +1001,12 @@ function categories:ImportCategory(ctx, shared, name, replace)
     filter.ignoredItems = shared.ignoredItems
     filter.note = shared.note
     filter.skipRecent = shared.skipRecent
+    filter.itemOrder = shared.itemOrder
     events:SendMessage(ctx, 'categories/Changed')
   else
     self:CreateCategory(ctx, { name = name, save = true, itemList = {}, searchCategory = rule, groupBy = shared.groupBy,
       color = shared.color, enabled = shared.enabled, hidden = shared.hidden, ignoredItems = shared.ignoredItems,
-      note = shared.note, skipRecent = shared.skipRecent })
+      note = shared.note, skipRecent = shared.skipRecent, itemOrder = shared.itemOrder })
   end
   for id in pairs(shared.itemList) do
     database:SaveItemToCategory(id, name)

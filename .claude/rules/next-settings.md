@@ -30,7 +30,9 @@ every setter.
 - **A bag's setting** (`bag = true`) is bound to a bag when asked for: `Get(id, bag)` with a
   `SettingBag` (`{ name, kind }`; `Bags()` lists the backpack, the bank, the guild bank where
   `addon.hasGuildBank`, and BetterBags Next's vendor, whose kind is `UNDEFINED`). Its description may be
-  a function of the bag ("... in your backpack."). `only` names the kinds that have it (Enable Groups:
+  a function of the bag ("... in your backpack."), and so may its `itemsFunction` and `disabled` (the item order's
+  tiers, item-sort.md §1a: what each lists and whether And Then By is off depend on the bag's order). `only` names the
+  kinds that have it (Enable Groups:
   the backpack; each bag's Size tab: every bag, the vendor too; Enable Bank Bags: the bank); without it
   a bag's setting is the bags' that hold items (the backpack, the bank, the guild bank), never the
   vendor's (next-bag-settings.md §2). `Has(id, bag)` says whether a bag has it. Asking for a bag's

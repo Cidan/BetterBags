@@ -21,9 +21,11 @@ const.BAG_KIND = const.BAG_KIND or { UNDEFINED = -1, BACKPACK = 0, BANK = 1 }
 const.BAG_KIND.GUILD = const.BAG_KIND.GUILD or 2
 const.NEXT_SECTION_COLUMNS_MAX = const.NEXT_SECTION_COLUMNS_MAX or 4
 const.SECTION_SORT_TYPE = const.SECTION_SORT_TYPE or { ALPHABETICALLY = 1, SIZE_DESCENDING = 2, SIZE_ASCENDING = 3 }
-const.ITEM_SORT_TYPE = const.ITEM_SORT_TYPE
-  or { ALPHABETICALLY_THEN_QUALITY = 1, QUALITY_THEN_ALPHABETICALLY = 2, ITEM_LEVEL = 3, EXPANSION = 4,
-    SELL_PRICE_STACK = 5, SELL_PRICE_EACH = 6, UPGRADE_TRACK = 7 }
+const.ITEM_ORDER_KEY = const.ITEM_ORDER_KEY or {
+  QUALITY = "quality", NAME = "name", ITEM_LEVEL = "itemLevel", UPGRADE_TRACK = "upgradeTrack",
+  EQUIPMENT_SLOT = "equipmentSlot", ITEM_TYPE = "itemType", EXPANSION = "expansion", COUNT = "count",
+  SELL_PRICE_STACK = "sellPriceStack", SELL_PRICE_EACH = "sellPriceEach",
+}
 
 local context = LoadFreshBetterBagsModule("Context", "core/context.lua")
 local events = stubModule("Events")
@@ -32,7 +34,11 @@ local bucket = stubModule("Bucket")
 stubModule("Sonata")
 local bagSystem = stubModule("BagSystem")
 local itemsModule = stubModule("Items")
+stubModule("Localization")
+stubModule("Categories")
 
+-- The item order's choices are the Sort module's (util/sort.lua), which the catalog asks when it loads.
+LoadFreshBetterBagsModule("Sort", "util/sort.lua")
 LoadFreshBetterBagsModule("SettingsCatalog", "config/catalog.lua")
 local catalog = addon:GetModule("SettingsCatalog")
 
@@ -219,56 +225,121 @@ describe("The settings catalog", function()
     assert.are.same({ "BetterBags", "None", "Pawn" }, list)
   end)
 
-  -- Issue #1303: items in a section by what a vendor pays, for the stack or for one.
-  it("offers the item orders, the two sell prices after the others", function()
-    override(db, "GetItemSortType", function() return const.ITEM_SORT_TYPE.SELL_PRICE_EACH end)
-    override(db, "SetItemSortType", function(_, kind, view, value) db._itemSort = { kind, view, value } end)
-    local order = catalog:Get("itemOrder", backpack)
-    assert.are.same({ "Alphabetically", "Quality", "Item Level", "Upgrade Track", "Expansion", "Sell Price (Stack)",
-      "Sell Price (Each)" }, order.items)
-    assert.are.equal("Sell Price (Each)", order.get(ctx()))
-    order.set(ctx(), "Sell Price (Stack)")
-    assert.are.same({ 0, 1, const.ITEM_SORT_TYPE.SELL_PRICE_STACK }, db._itemSort)
-    order.set(ctx(), "Sell Price (Each)")
-    assert.are.same({ 0, 1, const.ITEM_SORT_TYPE.SELL_PRICE_EACH }, db._itemSort)
-    local words = {}
-    for _, word in ipairs(order.keywords) do words[word] = true end
-    assert.is_true(words["sell price"] and words["vendor"] and true or false)
-  end)
+  -- Issue #108: a bag's item order is the keys it sorts by, chosen in three dropdowns, Item Order and two Then Bys that
+  -- break its ties (util/sort.lua's choices, item-sort.md §1), each a tier of the order the bag has in its view.
+  describe("the item order", function()
+    local order
 
-  -- Issue #769: gear by its upgrade track, offered where the client reads tracks (C_Item.GetItemUpgradeInfo,
-  -- which items:ReadItemTraits asks): elsewhere no item has one, and the order would be Item Level's.
-  it("offers Upgrade Track where the client has upgrade tracks, and saves it", function()
-    local chosen = const.ITEM_SORT_TYPE.UPGRADE_TRACK
-    override(db, "GetItemSortType", function() return chosen end)
-    override(db, "SetItemSortType", function(_, kind, view, value) db._itemSort = { kind, view, value } end)
-    local order = catalog:Get("itemOrder", backpack)
-    assert.are.equal("Upgrade Track", order.get(ctx()))
-    chosen = const.ITEM_SORT_TYPE.ITEM_LEVEL
-    order.set(ctx(), "Upgrade Track")
-    assert.are.same({ 0, 1, const.ITEM_SORT_TYPE.UPGRADE_TRACK }, db._itemSort)
-    assert.is_truthy(order.description:find("Upgrade Track puts gear on the highest upgrade track first", 1, true))
-    local words = {}
-    for _, word in ipairs(order.keywords) do words[word] = true end
-    assert.is_true(words["upgrade track"] and words["myth"] and words["hero"] and words["champion"] and true or false)
-  end)
-
-  -- The client's APIs are what they are from the start, so the catalog decides when it loads.
-  it("neither lists nor names Upgrade Track where the client has no upgrade tracks", function()
-    local getUpgradeInfo = _G.C_Item.GetItemUpgradeInfo
-    finally(function()
-      _G.C_Item.GetItemUpgradeInfo = getUpgradeInfo
-      LoadFreshBetterBagsModule("SettingsCatalog", "config/catalog.lua")
-    end)
-    _G.C_Item.GetItemUpgradeInfo = nil
-    local order = LoadFreshBetterBagsModule("SettingsCatalog", "config/catalog.lua"):Get("itemOrder", backpack)
-    assert.are.same({ "Alphabetically", "Quality", "Item Level", "Expansion", "Sell Price (Stack)", "Sell Price (Each)" },
-      order.items)
-    assert.are.equal("The default order of items within each section. Sell Price puts what a vendor pays most for "
-      .. "first: the whole stack, or one of it.", order.description)
-    for _, word in ipairs(order.keywords) do
-      assert.is_nil(({ ["upgrade track"] = true, track = true, myth = true, hero = true, champion = true })[word], word)
+    local function rederived()
+      for _, s in ipairs(sent) do
+        if s.message == "bags/Rederive" then return true end
+      end
+      return false
     end
+
+    before_each(function()
+      order = { "equipmentSlot", "itemLevel" }
+      override(db, "GetItemOrder", function(_, kind, view)
+        db._askedOrder = { kind, view }
+        return { unpack(order) }
+      end)
+      override(db, "SetItemOrder", function(_, kind, view, chosen)
+        db._itemOrder = { kind, view, chosen }
+        order = chosen
+      end)
+    end)
+
+    it("is three dropdowns, each a tier of the bag's order in its view", function()
+      local tiers = { catalog:Get("itemOrder", backpack), catalog:Get("itemOrderThen", backpack),
+        catalog:Get("itemOrderLast", backpack) }
+      for _, tier in ipairs(tiers) do
+        assert.are.equal("dropdown", tier.kind)
+        assert.truthy(#tier.keywords > 0)
+      end
+      assert.are.same({ "Item Order", "Then By", "And Then By" }, { tiers[1].title, tiers[2].title, tiers[3].title })
+      assert.are.same({ "Equipment Slot", "Item Level", "None" }, { tiers[1].get(ctx()), tiers[2].get(ctx()),
+        tiers[3].get(ctx()) })
+      assert.are.same({ 0, 1 }, db._askedOrder, "the backpack's, in its view")
+      catalog:Get("itemOrder", bank).get(ctx())
+      assert.are.same({ 1, 1 }, db._askedOrder, "each bag's own")
+    end)
+
+    it("lists every key for Item Order, and None then the keys not taken above for each Then By", function()
+      local all = { "Name", "Quality", "Item Level", "Upgrade Track", "Equipment Slot", "Item Type", "Expansion", "Count",
+        "Sell Price (Stack)", "Sell Price (Each)" }
+      assert.are.same(all, catalog:Get("itemOrder", backpack).itemsFunction(ctx()))
+      assert.are.same({ "None", "Name", "Quality", "Item Level", "Upgrade Track", "Item Type", "Expansion", "Count",
+        "Sell Price (Stack)", "Sell Price (Each)" }, catalog:Get("itemOrderThen", backpack).itemsFunction(ctx()))
+      assert.are.same({ "None", "Name", "Quality", "Upgrade Track", "Item Type", "Expansion", "Count", "Sell Price (Stack)",
+        "Sell Price (Each)" }, catalog:Get("itemOrderLast", backpack).itemsFunction(ctx()))
+    end)
+
+    it("saves the tier chosen, a key moving from the tier below, None taking a tier out, recalculating the bags", function()
+      catalog:Get("itemOrderLast", backpack).set(ctx(), "Count")
+      assert.are.same({ 0, 1, { "equipmentSlot", "itemLevel", "count" } }, db._itemOrder)
+      assert.is_true(rederived())
+      sent = {}
+      catalog:Get("itemOrder", backpack).set(ctx(), "Count")
+      assert.are.same({ 0, 1, { "count", "itemLevel" } }, db._itemOrder)
+      assert.is_true(rederived())
+      catalog:Get("itemOrderThen", backpack).set(ctx(), "None")
+      assert.are.same({ 0, 1, { "count" } }, db._itemOrder)
+      catalog:Get("itemOrderThen", bank).set(ctx(), "Name")
+      assert.are.same({ 1, 1, { "count", "name" } }, db._itemOrder)
+    end)
+
+    it("leaves And Then By off until Then By has a key", function()
+      local last = catalog:Get("itemOrderLast", backpack)
+      assert.is_false(last.disabled())
+      order = { "quality" }
+      assert.is_true(last.disabled())
+      assert.is_nil(catalog:Get("itemOrder", backpack).disabled)
+      assert.is_nil(catalog:Get("itemOrderThen", backpack).disabled)
+    end)
+
+    -- Issue #1303: items in a section by what a vendor pays, for the stack or for one.
+    it("says what each order does, and is found by its words", function()
+      local first = catalog:Get("itemOrder", backpack)
+      for _, phrase in ipairs({ "Sell Price puts what a vendor pays most for first", "Equipment Slot",
+        "A category can have its own" }) do
+        assert.is_truthy(first.description:find(phrase, 1, true), phrase)
+      end
+      local words = {}
+      for _, word in ipairs(first.keywords) do words[word] = true end
+      for _, word in ipairs({ "sell price", "vendor", "slot", "type", "count" }) do
+        assert.is_true(words[word], word)
+      end
+    end)
+
+    -- Issue #769: gear by its upgrade track, offered where the client reads tracks (C_Item.GetItemUpgradeInfo,
+    -- which items:ReadItemTraits asks): elsewhere no item has one, and the key would order nothing.
+    it("names Upgrade Track, and is found by its words, where the client has upgrade tracks", function()
+      local first = catalog:Get("itemOrder", backpack)
+      assert.is_truthy(first.description:find("Upgrade Track puts gear on the highest upgrade track first", 1, true))
+      local words = {}
+      for _, word in ipairs(first.keywords) do words[word] = true end
+      assert.is_true(words["upgrade track"] and words["myth"] and words["hero"] and words["champion"] and true or false)
+    end)
+
+    -- The client's APIs are what they are from the start, so the Sort module and the catalog decide when they load.
+    it("neither lists nor names Upgrade Track where the client has no upgrade tracks", function()
+      local getUpgradeInfo = _G.C_Item.GetItemUpgradeInfo
+      finally(function()
+        _G.C_Item.GetItemUpgradeInfo = getUpgradeInfo
+        LoadFreshBetterBagsModule("Sort", "util/sort.lua")
+        LoadFreshBetterBagsModule("SettingsCatalog", "config/catalog.lua")
+      end)
+      _G.C_Item.GetItemUpgradeInfo = nil
+      LoadFreshBetterBagsModule("Sort", "util/sort.lua")
+      local fresh = LoadFreshBetterBagsModule("SettingsCatalog", "config/catalog.lua")
+      local first = fresh:Get("itemOrder", backpack)
+      assert.are.same({ "Name", "Quality", "Item Level", "Equipment Slot", "Item Type", "Expansion", "Count",
+        "Sell Price (Stack)", "Sell Price (Each)" }, first.itemsFunction(ctx()))
+      assert.is_nil(first.description:find("Upgrade Track", 1, true))
+      for _, word in ipairs(first.keywords) do
+        assert.is_nil(({ ["upgrade track"] = true, track = true, myth = true, hero = true, champion = true })[word], word)
+      end
+    end)
   end)
 
   it("reads a number within its range, and writes a number", function()
@@ -595,7 +666,7 @@ describe("The settings catalog", function()
     end
     for _, id in ipairs({ "inBagSearch", "enterToMakeCategory", "categorySell", "showBagButton", "enableBankBags",
       "bagFading", "animateItemMovement", "clampBagsToScreen", "nextEnabled", "upgradeProvider", "newItemDuration", "sectionOrder",
-      "itemOrder", "enableGroups", "filterEquipmentLocation", "filterExpansion", "filterGearSet", "filterRecentItems",
+      "itemOrder", "itemOrderThen", "itemOrderLast", "enableGroups", "filterEquipmentLocation", "filterExpansion", "filterGearSet", "filterRecentItems",
       "filterTradeSkill", "filterType", "filterSubtype", "markRecentItems", "newItemFlash", "mergeStacks",
       "mergeUnstackable", "dontMergePartial", "dontMergeTransmog", "unmergeAtShop", "itemLevel", "itemLevelColor",
       "fullSectionNames", "showAllFreeSpace", "preserveGaps", "glowIntensity", "resizableWindow", "snapToContent",

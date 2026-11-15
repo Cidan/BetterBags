@@ -80,6 +80,11 @@ local function stubModules()
   override(const, "BRIEF_EXPANSION_MAP", { [0] = "classic" })
   override(const, "TRADESKILL_MAP", {})
   override(const, "INVENTORY_TYPE_TO_INVENTORY_SLOTS", { [1] = { 1 } })
+  override(const, "ITEM_ORDER_KEY", {
+    QUALITY = "quality", NAME = "name", ITEM_LEVEL = "itemLevel", UPGRADE_TRACK = "upgradeTrack",
+    EQUIPMENT_SLOT = "equipmentSlot", ITEM_TYPE = "itemType", EXPANSION = "expansion", COUNT = "count",
+    SELL_PRICE_STACK = "sellPriceStack", SELL_PRICE_EACH = "sellPriceEach",
+  })
 
   database = stubModule("Database")
   override(database, "GetNewItemTime", function() return 30 end)
@@ -109,6 +114,8 @@ local function stubModules()
   override(categories, "SkipsRecentOf", function() return false end)
   override(categories, "HiddenIn", function() return false end)
   override(categories, "CategoryIn", function() return nil end)
+  override(categories, "ItemOrderOf", function() return nil end)
+  override(categories, "HasItemOrders", function() return false end)
   override(categories, "ConvertNamed", function() return false end)
   override(categories, "DoesCategoryExist", function() return false end)
   override(categories, "IsCategoryShown", function() return true end)
@@ -4623,8 +4630,9 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
     end)
   end)
 
-  -- The bags' item order, the real Sort module's (this spec stubs it).
-  local function useItemOrder(sortType)
+  -- The bags' item order, the keys given, through the real Sort module (this spec stubs it).
+  local function useItemOrder(...)
+    local order = { ... }
     local aceAddon = LibStub("AceAddon-3.0")
     local stub, stubAddon = addon.modules.Sort, aceAddon.addons.BetterBags_Sort
     ResetModuleStub("Sort", "util/sort.lua")
@@ -4632,9 +4640,7 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
     local real = addon:GetModule("Sort")
     ResetModuleStub("Sort", "util/sort.lua")
     addon.modules.Sort, aceAddon.addons.BetterBags_Sort = stub, stubAddon
-    override(const, "ITEM_SORT_TYPE", { ALPHABETICALLY_THEN_QUALITY = 1, QUALITY_THEN_ALPHABETICALLY = 2,
-      ITEM_LEVEL = 3, EXPANSION = 4, SELL_PRICE_STACK = 5, SELL_PRICE_EACH = 6, UPGRADE_TRACK = 7 })
-    override(database, "GetItemSortType", function() return const.ITEM_SORT_TYPE[sortType] end)
+    override(database, "GetItemOrder", function() return { unpack(order) } end)
     override(stub, "GetItemDataSortFunction", function(_, kind, view) return real:GetItemDataSortFunction(kind, view) end)
   end
 
@@ -4668,7 +4674,7 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
     end)
 
     it("puts the stack worth more first, a merged stack counted whole (Sell Price (Stack))", function()
-      useItemOrder("SELL_PRICE_STACK")
+      useItemOrder("sellPriceStack")
       mergeStacks()
       mockContainer[0] = { slot(101, "g101a", 5), slot(202, "g202", 20), slot(201, "g201", 1), slot(101, "g101b", 5),
         slot(303, "g303", 1, { hasNoValue = true }) }
@@ -4677,7 +4683,7 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
     end)
 
     it("puts the item worth more each first, whatever its count (Sell Price (Each))", function()
-      useItemOrder("SELL_PRICE_EACH")
+      useItemOrder("sellPriceEach")
       mockContainer[0] = { slot(101, "g101", 20), slot(202, "g202", 20), slot(201, "g201", 1) }
       assert.are.same({ 201, 101, 202 }, idsInOrder(refreshBackpack({ wipe = true })))
     end)
@@ -4694,7 +4700,7 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
 
     it("keeps a stack that grew past another's worth in its place while the bag is open, marking it to re-sort on close",
       function()
-      useItemOrder("SELL_PRICE_STACK")
+      useItemOrder("sellPriceStack")
       local bag = openBag()
       mockContainer[0] = { slot(101, "g101", 5), slot(201, "g201", 1) }
       -- 101: 50; 201: 60.
@@ -4713,7 +4719,7 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
 
     it("appends an item looted while the bag is open at the end, marking it to re-sort on close (Sell Price (Each))",
       function()
-      useItemOrder("SELL_PRICE_EACH")
+      useItemOrder("sellPriceEach")
       local bag = openBag()
       mockContainer[0] = { slot(101, "g101", 5), {} }
       refreshBackpack()
@@ -4728,7 +4734,7 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
 
     -- Every item order: two piles of one item under Quality go by count, the bigger first.
     it("marks the bag to re-sort on close under the other item orders too (Quality)", function()
-      useItemOrder("QUALITY_THEN_ALPHABETICALLY")
+      useItemOrder("quality")
       local bag = openBag()
       mockContainer[0] = { slot(101, "g101a", 20), slot(101, "g101b", 15) }
       local function keys(slotInfo)
@@ -4776,15 +4782,91 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
     end)
 
     it("puts gear on the higher track first, then what is on no track by item level (Upgrade Track)", function()
-      useItemOrder("UPGRADE_TRACK")
+      useItemOrder("upgradeTrack", "itemLevel")
       local slotInfo = refreshBackpack({ wipe = true })
       assert.are.equal("Hero", slotInfo.itemsBySlotKey["0_4"].itemInfo.traits.upgradeTrack)
       assert.are.same({ 201, 101, 202, 303 }, idsInOrder(slotInfo))
     end)
 
     it("mixes the tracks by item level under Item Level", function()
-      useItemOrder("ITEM_LEVEL")
+      useItemOrder("itemLevel")
       assert.are.same({ 202, 101, 201, 303 }, idsInOrder(refreshBackpack({ wipe = true })))
+    end)
+  end)
+
+  -- Issue #108: "each category can have it's own sort order". Through the real Sort module: Gear (101 Alpha Sword, 201
+  -- Delta Axe) has its own order, Mats (202 Beta Shield, 303 Gamma Ring) takes the bag's, by name.
+  describe("a category's own item order", function()
+    local own
+
+    -- Each category's items, in the order of the list the sections take theirs from.
+    local function byCategory(slotInfo)
+      local out = {}
+      for _, item in ipairs(slotInfo.sortedItems) do
+        if not item.isItemGap then
+          local category = item.itemInfo.category
+          out[category] = out[category] or {}
+          table.insert(out[category], item.itemInfo.itemID)
+        end
+      end
+      return out
+    end
+
+    before_each(function()
+      own = { "itemLevel" }
+      override(categories, "GetCustomCategory", function(_, _, _, data)
+        local name = ({ [101] = "Gear", [201] = "Gear", [202] = "Mats", [303] = "Mats" })[data.itemInfo.itemID]
+        if name then return name, 10 end
+        return nil, nil
+      end)
+      override(categories, "HasItemOrders", function() return true end)
+      override(categories, "ItemOrderOf", function(_, name, kind)
+        assert.are.equal(const.BAG_KIND.BACKPACK, kind)
+        return name == "Gear" and own or nil
+      end)
+      local levels = { [101] = 300, [201] = 320, [202] = 1, [303] = 50 }
+      override(_G.C_Item, "GetCurrentItemLevel", function(location)
+        local bagid, slotid = location:GetBagAndSlot()
+        local slot = mockContainer[bagid] and mockContainer[bagid][slotid]
+        return slot and levels[slot.itemID]
+      end)
+      useItemOrder("name")
+    end)
+
+    it("sorts that category's items by it, the others by the bag's", function()
+      mockContainer[0] = { { itemID = 101, guid = "g101", count = 1 }, { itemID = 303, guid = "g303", count = 1 },
+        { itemID = 201, guid = "g201", count = 1 }, { itemID = 202, guid = "g202", count = 1 } }
+      local slotInfo = refreshBackpack({ wipe = true })
+      assert.are.same({ Gear = { 201, 101 }, Mats = { 202, 303 } }, byCategory(slotInfo))
+      local sections = {}
+      for _, item in ipairs(slotInfo.tabs[1].items) do
+        local category = item.itemInfo.category
+        sections[category] = sections[category] or {}
+        table.insert(sections[category], item.itemInfo.itemID)
+      end
+      assert.are.same({ Gear = { 201, 101 }, Mats = { 202, 303 } }, sections, "each section takes its items so")
+    end)
+
+    -- A count is not in an item's hash (GenerateItemHash), so a pile that grew keeps its place while the bag is open.
+    it("keeps an open bag's items in place, marking it to re-sort on close by the category's order", function()
+      own = { "count" }
+      override(database, "GetPreserveItemGaps", function() return true end)
+      local state = { open = true, marks = {} }
+      override(items, "IsBagOpen", function() return state.open end)
+      override(items, "MarkDrawOnClose", function(_, kind) table.insert(state.marks, kind) end)
+      mockContainer[0] = { { itemID = 101, guid = "g101", count = 5 }, { itemID = 201, guid = "g201", count = 10 },
+        { itemID = 202, guid = "g202", count = 1 } }
+      assert.are.same({ Gear = { 201, 101 }, Mats = { 202 } }, byCategory(refreshBackpack()))
+      assert.are.same({ Gear = { 201, 101 }, Mats = { 202 } }, byCategory(refreshBackpack({ bags = { [0] = true } })))
+      assert.are.same({}, state.marks, "nothing out of order yet")
+
+      mockContainer[0][1].count = 20
+      assert.are.same({ Gear = { 201, 101 }, Mats = { 202 } }, byCategory(refreshBackpack({ bags = { [0] = true } })),
+        "kept in place while open")
+      assert.are.same({ const.BAG_KIND.BACKPACK }, state.marks)
+
+      state.open = false
+      assert.are.same({ Gear = { 101, 201 }, Mats = { 202 } }, byCategory(refreshBackpack()), "in order once closed")
     end)
   end)
 

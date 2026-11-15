@@ -148,7 +148,7 @@ describe("BetterBags Next's settings window on the whole addon", function()
     assert.are.same({ "general > main", "appearance > theme", "appearance > animation",
       "itemcolors > main",
       "categories > blizzard", "categories > settings",
-      "categories > rule", "categories > items", "categories > ignored", "categories > automation",
+      "categories > rule", "categories > items", "categories > ignored", "categories > automation", "categories > order",
       "currencies > tracked", "currencies > currencies", "currencies > items", "currencies > display",
       "fooddrink > display", "backpack > layout", "backpack > size", "backpack > items", "backpack > categories",
       "backpack > order", "bank > general", "bank > layout", "bank > size", "bank > items", "bank > categories",
@@ -276,7 +276,8 @@ describe("BetterBags Next's settings window on the whole addon", function()
     addon:GetModule("Events"):SendMessage(ctx(addon), "config/Open")
     assert.is_true(settings:IsShown())
     assert.are.same({ "general > main", "appearance > theme", "itemcolors > main", "categories > blizzard",
-      "categories > settings", "categories > rule", "categories > items", "categories > ignored", "categories > automation", "currency > main",
+      "categories > settings", "categories > rule", "categories > items", "categories > ignored", "categories > automation", "categories > order",
+      "currency > main",
       "backpack > layout", "backpack > items", "backpack > categories", "backpack > order", "bank > general",
       "bank > layout", "bank > items", "bank > categories", "bank > order", "profiles > profiles", "profiles > transfer",
       "quickfind > main" }, builtEveryTab(addon))

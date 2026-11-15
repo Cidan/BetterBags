@@ -21,8 +21,11 @@ const.BAG_KIND = const.BAG_KIND or { UNDEFINED = -1, BACKPACK = 0, BANK = 1 }
 const.BAG_KIND.GUILD = const.BAG_KIND.GUILD or 2
 const.NEXT_SECTION_COLUMNS_MAX = const.NEXT_SECTION_COLUMNS_MAX or 4
 const.SECTION_SORT_TYPE = const.SECTION_SORT_TYPE or { ALPHABETICALLY = 1, SIZE_DESCENDING = 2, SIZE_ASCENDING = 3 }
-const.ITEM_SORT_TYPE = const.ITEM_SORT_TYPE
-  or { ALPHABETICALLY_THEN_QUALITY = 1, QUALITY_THEN_ALPHABETICALLY = 2, ITEM_LEVEL = 3, EXPANSION = 4 }
+const.ITEM_ORDER_KEY = const.ITEM_ORDER_KEY or {
+  QUALITY = "quality", NAME = "name", ITEM_LEVEL = "itemLevel", UPGRADE_TRACK = "upgradeTrack",
+  EQUIPMENT_SLOT = "equipmentSlot", ITEM_TYPE = "itemType", EXPANSION = "expansion", COUNT = "count",
+  SELL_PRICE_STACK = "sellPriceStack", SELL_PRICE_EACH = "sellPriceEach",
+}
 
 local context = LoadFreshBetterBagsModule("Context", "core/context.lua")
 local events = stubModule("Events")
@@ -31,6 +34,10 @@ local bucket = stubModule("Bucket")
 local sonata = stubModule("Sonata")
 local bagSystem = stubModule("BagSystem")
 stubModule("Items")
+stubModule("Localization")
+stubModule("Categories")
+-- The item order's choices are the Sort module's (util/sort.lua), which the catalog asks when it loads.
+LoadFreshBetterBagsModule("Sort", "util/sort.lua")
 LoadFreshBetterBagsModule("SettingsCatalog", "config/catalog.lua")
 local catalog = addon:GetModule("SettingsCatalog")
 
@@ -86,9 +93,9 @@ describe("What each setting asks the bags for", function()
       GetStackingOptions = function() return { mergeStacks = false } end,
       SetUpgradeIconProvider = function() end,
       SetSectionSortType = function() end,
-      SetItemSortType = function() end,
+      SetItemOrder = function() end,
       GetSectionSortType = function() return 1 end,
-      GetItemSortType = function() return 1 end,
+      GetItemOrder = function() return { "quality", "itemLevel" } end,
       SetGroupsEnabled = function() end,
       GetCategoryFilters = function() return {} end,
       SetShowAllFreeSpace = function() end,
@@ -166,7 +173,9 @@ describe("What each setting asks the bags for", function()
   local derived = {
     { "Upgrade Icon Provider", "Pawn" },
     { "Section Order", "Alphabetically" },
-    { "Item Order", "Alphabetically" },
+    { "Item Order", "Name" },
+    { "Then By", "Count" },
+    { "And Then By", "Count" },
     { "Enable Groups", true },
     { "Equipment Location", true },
     { "Expansion", true },

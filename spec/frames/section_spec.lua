@@ -18,9 +18,7 @@ const.BAG_KIND = { BACKPACK = 1, BANK = 2 }
 -- The real values (core/constants.lua).
 const.MOVEMENT_FLOW = { UNDEFINED = -1, BANK = 0, REAGENT = 1, WARBANK = 2, SENDMAIL = 3, TRADE = 4, NPCSHOP = 5 }
 
-local sort = StubBetterBagsModule("Sort")
-sort.GetItemSortBySlot = function() end
-sort.GetItemSortFunction = function() end
+StubBetterBagsModule("Sort")
 
 local database = StubBetterBagsModule("Database")
 database.GetShowFullSectionNames = function() return false end

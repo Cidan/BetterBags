@@ -81,7 +81,14 @@ const.GLOW_INTENSITY_DEFAULT = 60
 const.BAG_VIEW = { UNDEFINED = 0, SECTION_GRID = 2, SECTION_ALL_BAGS = 4 }
 const.SECTION_SORT_TYPE = { ALPHABETICALLY = 1, SIZE_DESCENDING = 2, SIZE_ASCENDING = 3 }
 const.ITEM_SORT_TYPE = { ALPHABETICALLY_THEN_QUALITY = 1, QUALITY_THEN_ALPHABETICALLY = 2, ITEM_LEVEL = 3, EXPANSION = 4,
-  SELL_PRICE_STACK = 5, SELL_PRICE_EACH = 6 }
+  SELL_PRICE_STACK = 5, SELL_PRICE_EACH = 6, UPGRADE_TRACK = 7 }
+const.ITEM_ORDER_KEY = {
+  QUALITY = "quality", NAME = "name", ITEM_LEVEL = "itemLevel", UPGRADE_TRACK = "upgradeTrack",
+  EQUIPMENT_SLOT = "equipmentSlot", ITEM_TYPE = "itemType", EXPANSION = "expansion", COUNT = "count",
+  SELL_PRICE_STACK = "sellPriceStack", SELL_PRICE_EACH = "sellPriceEach",
+}
+const.ITEM_ORDER_DEPTH = 3
+const.DEFAULT_ITEM_ORDER = { "quality" }
 const.GRID_COMPACT_STYLE = { NONE = 0, SIMPLE = 1, COMPACT = 2 }
 const.SEARCH_CATEGORY_GROUP_BY = { NONE = 0, TYPE = 1, SUBTYPE = 2, EXPANSION = 3 }
 const.FORM_LAYOUT = { TWO_COLUMN = 1, STACKED = 2 }
@@ -185,10 +192,7 @@ const.DATABASE_DEFAULTS = {
       [0] = { [1] = 1, [2] = 1, [3] = 1, [4] = 1 },
       [1] = { [1] = 1, [2] = 1, [3] = 1, [4] = 1 },
     },
-    itemSort = {
-      [0] = { [1] = 2, [2] = 2, [3] = 2, [4] = 2 },
-      [1] = { [1] = 2, [2] = 2, [3] = 2, [4] = 2 },
-    },
+    itemOrder = {},
     customSectionSort = { [0] = {}, [1] = {} },
     size = {
       [1] = {
@@ -1036,9 +1040,31 @@ describe("Database", function()
       assert.are.equal(const.SECTION_SORT_TYPE.SIZE_DESCENDING, DB:GetSectionSortType(const.BAG_KIND.BACKPACK, const.BAG_VIEW.SECTION_GRID))
     end)
 
-    it("GetItemSortType / SetItemSortType", function()
-      DB:SetItemSortType(const.BAG_KIND.BANK, const.BAG_VIEW.SECTION_ALL_BAGS, const.ITEM_SORT_TYPE.ITEM_LEVEL)
-      assert.are.equal(const.ITEM_SORT_TYPE.ITEM_LEVEL, DB:GetItemSortType(const.BAG_KIND.BANK, const.BAG_VIEW.SECTION_ALL_BAGS))
+    -- Issue #108: an item order is the keys it sorts by, first to last (item-sort.md §1).
+    it("gives Quality for a bag's item order until one is chosen", function()
+      assert.are.same({ "quality" }, DB:GetItemOrder(const.BAG_KIND.BACKPACK, const.BAG_VIEW.SECTION_GRID))
+      assert.are.same({ "quality" }, DB:GetItemOrder(const.BAG_KIND.BANK, const.BAG_VIEW.SECTION_ALL_BAGS))
+    end)
+
+    it("keeps each bag's item order in each view", function()
+      DB:SetItemOrder(const.BAG_KIND.BANK, const.BAG_VIEW.SECTION_GRID, { "equipmentSlot", "itemLevel" })
+      assert.are.same({ "equipmentSlot", "itemLevel" }, DB:GetItemOrder(const.BAG_KIND.BANK, const.BAG_VIEW.SECTION_GRID))
+      assert.are.same({ "quality" }, DB:GetItemOrder(const.BAG_KIND.BANK, const.BAG_VIEW.SECTION_ALL_BAGS))
+      assert.are.same({ "quality" }, DB:GetItemOrder(const.BAG_KIND.BACKPACK, const.BAG_VIEW.SECTION_GRID))
+    end)
+
+    it("keeps a copy of an order, and gives a copy, so changing either changes nothing saved", function()
+      local order = { "count" }
+      DB:SetItemOrder(const.BAG_KIND.BACKPACK, const.BAG_VIEW.SECTION_GRID, order)
+      order[1] = "name"
+      local got = DB:GetItemOrder(const.BAG_KIND.BACKPACK, const.BAG_VIEW.SECTION_GRID)
+      assert.are.same({ "count" }, got)
+      got[1] = "name"
+      assert.are.same({ "count" }, DB:GetItemOrder(const.BAG_KIND.BACKPACK, const.BAG_VIEW.SECTION_GRID))
+      local default = DB:GetItemOrder(const.BAG_KIND.BANK, const.BAG_VIEW.SECTION_GRID)
+      default[1] = "name"
+      assert.are.same({ "quality" }, DB:GetItemOrder(const.BAG_KIND.BANK, const.BAG_VIEW.SECTION_GRID))
+      assert.are.same({ "quality" }, const.DEFAULT_ITEM_ORDER)
     end)
   end)
 
@@ -1422,6 +1448,14 @@ describe("Database", function()
       DB:UpdateEphemeralItemCategory("Openable", { enabled = { [0] = true }, skipRecent = true })
       DB:CreateOrUpdateCategory({ name = "Openable", enabled = { [0] = true }, priority = 1 })
       assert.is_true(DB.data.profile.ephemeralCategoryFilters["Openable"].skipRecent)
+    end)
+
+    it("keeps a plugin's category's own item order when the plugin makes it again", function()
+      DB:UpdateEphemeralItemCategory("Openable", { enabled = { [0] = true }, itemOrder = { "count", "name" } })
+      DB:CreateOrUpdateCategory({ name = "Openable", enabled = { [0] = true }, priority = 1 })
+      assert.are.same({ "count", "name" }, DB.data.profile.ephemeralCategoryFilters["Openable"].itemOrder)
+      DB:UpdateEphemeralItemCategory("Openable", { enabled = { [0] = true } })
+      assert.is_nil(DB.data.profile.ephemeralCategoryFilters["Openable"].itemOrder, "the bag's again")
     end)
 
     it("keeps Auto Deposit for a plugin's category when the plugin makes it again", function()
@@ -1883,7 +1917,8 @@ describe("Database", function()
           Herbs = { name = "Herbs", save = true, priority = 3, blizzard = true, automation = "destroy", confirmSale = false,
             deposit = "warbank", itemList = { [765] = true }, ignoredItems = { [99] = true },
             searchCategory = { query = "type = herb" }, groupBy = 2, color = { 0.1, 0.8, 0.2, 1 },
-            enabled = { [0] = true, [1] = false }, hidden = { [1] = true }, note = "n", skipRecent = true },
+            enabled = { [0] = true, [1] = false }, hidden = { [1] = true }, note = "n", skipRecent = true,
+            itemOrder = { "equipmentSlot", "itemLevel" } },
         }
         DB.data.profile.ephemeralCategoryFilters = { Openable = { name = "Openable", itemList = {} } }
       end)
@@ -1894,7 +1929,38 @@ describe("Database", function()
         assert.are.same({ version = 3, category = { name = "Herbs", itemList = { [765] = true },
           ignoredItems = { [99] = true }, searchCategory = { query = "type = herb" }, groupBy = 2,
           color = { 0.1, 0.8, 0.2, 1 }, enabled = { [0] = true, [1] = false }, hidden = { [1] = true }, note = "n",
-          skipRecent = true } }, serialization:Decode(exported:sub(6)))
+          skipRecent = true, itemOrder = { "equipmentSlot", "itemLevel" } } }, serialization:Decode(exported:sub(6)))
+      end)
+
+      -- Issue #108: a category's own item order is how it shows, shared as its group by and color are.
+      it("ReadImport reads an item order of keys BetterBags has, each once, at most three", function()
+        local function read(itemOrder)
+          return DB:ReadImport("!BB2!" .. serialization:Encode({ version = 3,
+            category = { name = "Herbs", itemOrder = itemOrder } })).category.itemOrder
+        end
+        assert.are.same({ "count", "name" }, read({ "count", "name" }))
+        assert.are.same({ "count", "name" }, read({ "count", "nope", 7, "name" }), "keys it does not have dropped")
+        assert.are.same({ "count", "name" }, read({ "count", "count", "name" }), "each once")
+        assert.are.same({ "count", "name", "quality" }, read({ "count", "name", "quality", "itemLevel" }), "three at most")
+        assert.is_nil(read({}))
+        assert.is_nil(read({ "nope" }))
+        assert.is_nil(read("count"))
+        assert.is_nil(read({ x = "count" }))
+      end)
+
+      -- A whole set of categories pasted in is anyone's too: what it says a category's order is, as one shared alone.
+      it("ApplyImport keeps a category's item order only of keys BetterBags has", function()
+        local text = "!BB2!" .. serialization:Encode({ version = 3,
+          customCategoryFilters = {
+            Gear = { name = "Gear", itemList = {}, itemOrder = { "equipmentSlot", "nope", "itemLevel" } },
+            Junk = { name = "Junk", itemList = {}, itemOrder = "quality" },
+          },
+          ephemeralCategoryFilters = { Openable = { name = "Openable", itemList = {}, itemOrder = { 1, "count" } } },
+        })
+        assert.is_true(importSettings(text))
+        assert.are.same({ "equipmentSlot", "itemLevel" }, DB.data.profile.customCategoryFilters.Gear.itemOrder)
+        assert.is_nil(DB.data.profile.customCategoryFilters.Junk.itemOrder)
+        assert.are.same({ "count" }, DB.data.profile.ephemeralCategoryFilters.Openable.itemOrder)
       end)
 
       it("ExportCategory writes nothing for a name that is not a category of yours", function()

@@ -18,6 +18,11 @@ local L =  addon:GetModule('Localization')
 ---@class Items: AceModule
 local items = addon:GetModule('Items')
 
+---@class Categories: AceModule
+local categories = addon:GetModule('Categories')
+
+local KEY = const.ITEM_ORDER_KEY
+
 ---@param aData ItemData
 ---@param bData ItemData
 ---@return boolean
@@ -33,35 +38,24 @@ local function invalidData(aData, bData)
   return false
 end
 
--- stackWorth is what a vendor pays for the stack an item's button shows: a virtual stack's
--- total, else the item's own count.
+-- shownCount is the count an item's button shows: a virtual stack's total, else the item's own count.
+---@param data ItemData
+---@return number
+local function shownCount(data)
+  return data.stackedCount or data.itemInfo.currentItemCount
+end
+
+-- stackWorth is what a vendor pays for the stack an item's button shows.
 ---@param data ItemData
 ---@return number
 local function stackWorth(data)
-  return items:SellPriceOf(data) * (data.stackedCount or data.itemInfo.currentItemCount)
+  return items:SellPriceOf(data) * shownCount(data)
 end
 
 ---@param data ItemData
 ---@return number
 local function eachWorth(data)
   return items:SellPriceOf(data)
-end
-
--- byWorth orders two items by worth, highest first, then as the other item orders do.
----@param aData ItemData
----@param bData ItemData
----@param worth fun(data: ItemData): number
----@return boolean
-local function byWorth(aData, bData, worth)
-  local aWorth, bWorth = worth(aData), worth(bData)
-  if aWorth ~= bWorth then
-    return aWorth > bWorth
-  elseif aData.itemInfo.itemName ~= bData.itemInfo.itemName then
-    return aData.itemInfo.itemName < bData.itemInfo.itemName
-  elseif aData.itemInfo.currentItemCount ~= bData.itemInfo.currentItemCount then
-    return aData.itemInfo.currentItemCount > bData.itemInfo.currentItemCount
-  end
-  return aData.itemInfo.itemGUID < bData.itemInfo.itemGUID
 end
 
 -- trackTop is the item level an item's upgrade track takes it to (items:ReadItemTraits), which ranks the tracks
@@ -73,22 +67,307 @@ local function trackTop(data)
   return traits and traits.upgradeTrack and traits.upgradeMaxItemLevel or 0
 end
 
--- byTrack orders two items by upgrade track, the highest first, then as the Item Level order does.
----@param aData ItemData
----@param bData ItemData
----@return boolean
-local function byTrack(aData, bData)
-  local aTop, bTop = trackTop(aData), trackTop(bData)
-  if aTop ~= bTop then
-    return aTop > bTop
-  elseif aData.itemInfo.currentItemLevel ~= bData.itemInfo.currentItemLevel then
-    return aData.itemInfo.currentItemLevel > bData.itemInfo.currentItemLevel
-  elseif aData.itemInfo.itemName ~= bData.itemInfo.itemName then
-    return aData.itemInfo.itemName < bData.itemInfo.itemName
-  elseif aData.itemInfo.currentItemCount ~= bData.itemInfo.currentItemCount then
-    return aData.itemInfo.currentItemCount > bData.itemInfo.currentItemCount
+-- The equipment slots in the character sheet's order, top to bottom, then the weapons, then what is equipped elsewhere;
+-- a robe goes where a chest piece does (Enum.InventoryType's ItemEquipLoc, warcraft.wiki.gg).
+local SLOTS = {
+  { "INVTYPE_HEAD" }, { "INVTYPE_NECK" }, { "INVTYPE_SHOULDER" }, { "INVTYPE_BODY" }, { "INVTYPE_CHEST", "INVTYPE_ROBE" },
+  { "INVTYPE_WAIST" }, { "INVTYPE_LEGS" }, { "INVTYPE_FEET" }, { "INVTYPE_WRIST" }, { "INVTYPE_HAND" },
+  { "INVTYPE_FINGER" }, { "INVTYPE_TRINKET" }, { "INVTYPE_CLOAK" }, { "INVTYPE_2HWEAPON" }, { "INVTYPE_WEAPONMAINHAND" },
+  { "INVTYPE_WEAPON" }, { "INVTYPE_WEAPONOFFHAND" }, { "INVTYPE_SHIELD" }, { "INVTYPE_HOLDABLE" }, { "INVTYPE_RANGED" },
+  { "INVTYPE_RANGEDRIGHT" }, { "INVTYPE_THROWN" }, { "INVTYPE_RELIC" }, { "INVTYPE_AMMO" }, { "INVTYPE_QUIVER" },
+  { "INVTYPE_TABARD" }, { "INVTYPE_PROFESSION_TOOL" }, { "INVTYPE_PROFESSION_GEAR" },
+  { "INVTYPE_EQUIPABLESPELL_OFFENSIVE" }, { "INVTYPE_EQUIPABLESPELL_UTILITY" }, { "INVTYPE_EQUIPABLESPELL_DEFENSIVE" },
+  { "INVTYPE_EQUIPABLESPELL_WEAPON" }, { "INVTYPE_BAG" },
+}
+
+---@type table<string, number>
+local SLOT_RANK = {}
+for rank, locs in ipairs(SLOTS) do
+  for _, loc in ipairs(locs) do
+    SLOT_RANK[loc] = rank
   end
-  return aData.itemInfo.itemGUID < bData.itemInfo.itemGUID
+end
+
+-- slotRank is where an item's slot is in SLOTS; after every slot for what is not equipment.
+---@param data ItemData
+---@return number
+local function slotRank(data)
+  return SLOT_RANK[data.itemInfo.itemEquipLoc] or #SLOTS + 1
+end
+
+-- Each key's comparison of two items with their data: below 0 when the first goes first, above 0 when the second does,
+-- 0 when the key holds them equal. Each compares its values itself: a sort calls them thousands of times.
+---@type table<ItemOrderKey, fun(aData: ItemData, bData: ItemData): number>
+local compare = {
+  [KEY.QUALITY] = function(a, b)
+    local x, y = a.itemInfo.itemQuality, b.itemInfo.itemQuality
+    if x == y then return 0 end
+    return x > y and -1 or 1
+  end,
+  [KEY.NAME] = function(a, b)
+    local x, y = a.itemInfo.itemName, b.itemInfo.itemName
+    if x == y then return 0 end
+    return x < y and -1 or 1
+  end,
+  [KEY.ITEM_LEVEL] = function(a, b)
+    local x, y = a.itemInfo.currentItemLevel, b.itemInfo.currentItemLevel
+    if x == y then return 0 end
+    return x > y and -1 or 1
+  end,
+  [KEY.UPGRADE_TRACK] = function(a, b)
+    local x, y = trackTop(a), trackTop(b)
+    if x == y then return 0 end
+    return x > y and -1 or 1
+  end,
+  [KEY.EQUIPMENT_SLOT] = function(a, b)
+    local x, y = slotRank(a), slotRank(b)
+    if x == y then return 0 end
+    return x < y and -1 or 1
+  end,
+  -- Blizzard's item class, then its subclass, by their IDs (Enum.ItemClass): the same in every language.
+  [KEY.ITEM_TYPE] = function(a, b)
+    local x, y = a.itemInfo.classID, b.itemInfo.classID
+    if x == y then
+      x, y = a.itemInfo.subclassID, b.itemInfo.subclassID
+      if x == y then return 0 end
+    end
+    return x < y and -1 or 1
+  end,
+  -- A missing expansion is Classic's.
+  [KEY.EXPANSION] = function(a, b)
+    local x, y = a.itemInfo.expacID or 0, b.itemInfo.expacID or 0
+    if x == y then return 0 end
+    return x < y and -1 or 1
+  end,
+  [KEY.COUNT] = function(a, b)
+    local x, y = shownCount(a), shownCount(b)
+    if x == y then return 0 end
+    return x > y and -1 or 1
+  end,
+  [KEY.SELL_PRICE_STACK] = function(a, b)
+    local x, y = stackWorth(a), stackWorth(b)
+    if x == y then return 0 end
+    return x > y and -1 or 1
+  end,
+  [KEY.SELL_PRICE_EACH] = function(a, b)
+    local x, y = eachWorth(a), eachWorth(b)
+    if x == y then return 0 end
+    return x > y and -1 or 1
+  end,
+}
+
+-- Each key's name in the dropdowns that choose an order. Not translated, as the settings catalog's choices are not.
+---@type table<ItemOrderKey, string>
+local KEY_NAMES = {
+  [KEY.NAME] = 'Name',
+  [KEY.QUALITY] = 'Quality',
+  [KEY.ITEM_LEVEL] = 'Item Level',
+  [KEY.UPGRADE_TRACK] = 'Upgrade Track',
+  [KEY.EQUIPMENT_SLOT] = 'Equipment Slot',
+  [KEY.ITEM_TYPE] = 'Item Type',
+  [KEY.EXPANSION] = 'Expansion',
+  [KEY.COUNT] = 'Count',
+  [KEY.SELL_PRICE_STACK] = 'Sell Price (Stack)',
+  [KEY.SELL_PRICE_EACH] = 'Sell Price (Each)',
+}
+
+---@type table<string, ItemOrderKey>
+local KEY_OF_NAME = {}
+for key, name in pairs(KEY_NAMES) do
+  KEY_OF_NAME[name] = key
+end
+
+-- A later tier's choice of no key.
+local NONE = 'None'
+
+-- The keys an order is chosen from, in the dropdowns' order. Upgrade Track only where the client reads upgrade tracks
+-- (items:ReadItemTraits): elsewhere no item has one, and it would order nothing. A client's APIs do not change while
+-- it runs, so this is decided once.
+---@type ItemOrderKey[]
+local OFFERED = { KEY.NAME, KEY.QUALITY, KEY.ITEM_LEVEL, KEY.EQUIPMENT_SLOT, KEY.ITEM_TYPE, KEY.EXPANSION, KEY.COUNT,
+  KEY.SELL_PRICE_STACK, KEY.SELL_PRICE_EACH }
+if C_Item.GetItemUpgradeInfo then
+  table.insert(OFFERED, 4, KEY.UPGRADE_TRACK)
+end
+
+---@type table<ItemOrderKey, boolean>
+local OFFERS = {}
+for _, key in ipairs(OFFERED) do
+  OFFERS[key] = true
+end
+
+-- inOrder returns the comparison an order makes of two items with their data: its keys first to last, the name after
+-- them when it is not one of them, then the bigger pile and the GUID, which make the order total.
+---@param order ItemOrderKey[]
+---@return fun(aData: ItemData, bData: ItemData): boolean
+local function inOrder(order)
+  local compares, named = {}, false
+  for _, key in ipairs(order) do
+    assert(compare[key] ~= nil, "Unknown item order key: " .. tostring(key))
+    table.insert(compares, compare[key])
+    named = named or key == KEY.NAME
+  end
+  if not named then
+    table.insert(compares, compare[KEY.NAME])
+  end
+  local count = #compares
+  return function(aData, bData)
+    for i = 1, count do
+      local c = compares[i](aData, bData)
+      if c ~= 0 then
+        return c < 0
+      end
+    end
+    if aData.itemInfo.currentItemCount ~= bData.itemInfo.currentItemCount then
+      return aData.itemInfo.currentItemCount > bData.itemInfo.currentItemCount
+    end
+    return aData.itemInfo.itemGUID < bData.itemInfo.itemGUID
+  end
+end
+
+-- ItemDataComparator returns the comparison of two items' data an order makes (item-sort.md §1): free slots and gaps
+-- last, two items either of which lacks its data unordered, the rest by the order's keys.
+---@param order ItemOrderKey[]
+---@return fun(aData: ItemData, bData: ItemData): boolean
+function sort:ItemDataComparator(order)
+  local ordered = inOrder(order)
+  return function(aData, bData)
+    if aData.isFreeSlot or aData.isItemGap then return false end
+    if bData.isFreeSlot or bData.isItemGap then return true end
+    if invalidData(aData, bData) then return false end
+    return ordered(aData, bData)
+  end
+end
+
+-- GetItemDataSortFunction returns how the data pipeline sorts a bag's items (items:Phase9_Sort, BuildOrderedItems): a
+-- category's items by its own order where it has one (Categories:ItemOrderOf), the others by the bag's in the view
+-- (DB:GetItemOrder). A section shows its category's items in the list's order (Phase10_PartitionIntoTabs), so the
+-- items of a category with its own order are kept apart in the list, after the bag's order's, by the category's name:
+-- one order over the whole list, as table.sort needs. Each category's order is read once, the first time the sort meets it. With no category the
+-- bag uses having its own order (Categories:HasItemOrders), the bag's order is the whole sort, read per item no further.
+---@param kind BagKind
+---@param view BagView
+---@return fun(aData: ItemData, bData: ItemData): boolean
+function sort:GetItemDataSortFunction(kind, view)
+  if kind == const.BAG_KIND.UNDEFINED then
+    return function() return false end
+  end
+  local order = database:GetItemOrder(kind, view)
+  if not categories:HasItemOrders(kind) then
+    return self:ItemDataComparator(order)
+  end
+  local bagOrder = inOrder(order)
+  -- Each category's own order's comparison, or false for the bag's.
+  ---@type table<string, fun(aData: ItemData, bData: ItemData): boolean|false>
+  local own = {}
+  local function read(category)
+    local ownOrder = categories:ItemOrderOf(category, kind)
+    local ordered = ownOrder and inOrder(ownOrder) or false
+    own[category] = ordered
+    return ordered
+  end
+  return function(aData, bData)
+    if aData.isFreeSlot or aData.isItemGap then return false end
+    if bData.isFreeSlot or bData.isItemGap then return true end
+    if invalidData(aData, bData) then return false end
+    local aCategory, bCategory = aData.itemInfo.category or "", bData.itemInfo.category or ""
+    local aOwn, bOwn = own[aCategory], own[bCategory]
+    if aOwn == nil then
+      aOwn = read(aCategory)
+    end
+    if bOwn == nil then
+      bOwn = read(bCategory)
+    end
+    if not aOwn then
+      if bOwn then
+        return true
+      end
+      return bagOrder(aData, bData)
+    end
+    if not bOwn then
+      return false
+    end
+    if aCategory ~= bCategory then
+      return aCategory < bCategory
+    end
+    return aOwn(aData, bData)
+  end
+end
+
+-- ItemOrderKeys returns the keys an order is chosen from on this client, in the dropdowns' order.
+---@return ItemOrderKey[]
+function sort:ItemOrderKeys()
+  return { unpack(OFFERED) }
+end
+
+-- OffersItemOrderKey says whether an order is chosen from a key on this client.
+---@param key ItemOrderKey
+---@return boolean
+function sort:OffersItemOrderKey(key)
+  return OFFERS[key] == true
+end
+
+-- ItemOrderKeyName returns a key's name, as the dropdowns show it.
+---@param key ItemOrderKey
+---@return string
+function sort:ItemOrderKeyName(key)
+  return KEY_NAMES[key]
+end
+
+-- ItemOrderChoices returns what a tier of an order (1 for Item Order, 2 for Then By, 3 for And Then By) can be, as its
+-- dropdown lists them: for the first, every key offered; for a later one, None, then the keys the tiers above it have
+-- not taken.
+---@param order ItemOrderKey[]
+---@param tier number
+---@return string[]
+function sort:ItemOrderChoices(order, tier)
+  local taken = {}
+  for i = 1, tier - 1 do
+    if order[i] ~= nil then
+      taken[order[i]] = true
+    end
+  end
+  local choices = tier > 1 and { NONE } or {}
+  for _, key in ipairs(OFFERED) do
+    if not taken[key] then
+      table.insert(choices, KEY_NAMES[key])
+    end
+  end
+  return choices
+end
+
+-- ItemOrderChoice returns what a tier of an order is, as its dropdown shows it: its key's name, or None.
+---@param order ItemOrderKey[]
+---@param tier number
+---@return string
+function sort:ItemOrderChoice(order, tier)
+  local key = order[tier]
+  return key ~= nil and KEY_NAMES[key] or NONE
+end
+
+-- WithItemOrderChoice returns a new order: order with a tier set to a choice of its dropdown. A key is in an order once,
+-- so a key chosen leaves the tier below that had it; None takes a later tier out, the tiers below it moving up.
+---@param order ItemOrderKey[]
+---@param tier number
+---@param choice string
+---@return ItemOrderKey[]
+function sort:WithItemOrderChoice(order, tier, choice)
+  local chosen = { unpack(order) }
+  if choice == NONE then
+    if tier > 1 and tier <= #chosen then
+      table.remove(chosen, tier)
+    end
+    return chosen
+  end
+  local key = KEY_OF_NAME[choice]
+  tier = math.min(tier, #chosen + 1)
+  chosen[tier] = key
+  for i = #chosen, 1, -1 do
+    if i ~= tier and chosen[i] == key then
+      table.remove(chosen, i)
+    end
+  end
+  return chosen
 end
 
 ---@param kind BagKind
@@ -114,33 +393,6 @@ function sort:GetSectionSortFunction(kind, view)
   return function(a, b)
     return self.SortSectionsAlphabetically(kind, a, b)
   end
-end
-
----@param kind BagKind
----@param view BagView
----@return function
-function sort:GetItemSortFunction(kind, view)
-  if kind == const.BAG_KIND.UNDEFINED then
-    return function() return false end
-  end
-  local sortType = database:GetItemSortType(kind, view)
-  if sortType == const.ITEM_SORT_TYPE.ALPHABETICALLY_THEN_QUALITY then
-    return self.SortItemsByAlphaThenQuality
-  elseif sortType == const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY then
-    return self.SortItemsByQualityThenAlpha
-  elseif sortType == const.ITEM_SORT_TYPE.ITEM_LEVEL then
-    return self.SortItemsByItemLevel
-  elseif sortType == const.ITEM_SORT_TYPE.EXPANSION then
-    return self.SortItemsByExpansion
-  elseif sortType == const.ITEM_SORT_TYPE.SELL_PRICE_STACK then
-    return self.SortItemsBySellPriceStack
-  elseif sortType == const.ITEM_SORT_TYPE.SELL_PRICE_EACH then
-    return self.SortItemsBySellPriceEach
-  elseif sortType == const.ITEM_SORT_TYPE.UPGRADE_TRACK then
-    return self.SortItemsByUpgradeTrack
-  end
-  assert(false, "Unknown sort type: " .. sortType)
-  return function() end
 end
 
 ---@param kind BagKind
@@ -226,231 +478,6 @@ function sort.SortSectionsBySizeAscending(kind, a, b)
   return a.title:GetText() < b.title:GetText()
 end
 
----@param a Item
----@param b Item
----@return boolean
-function sort.SortItemsByQualityThenAlpha(a, b)
-  if a.isFreeSlot then return false end
-  if b.isFreeSlot then return true end
-  local aData, bData = a:GetItemData(), b:GetItemData()
-  if invalidData(aData, bData) then return false end
-  if aData.itemInfo.itemQuality ~= bData.itemInfo.itemQuality then
-    return aData.itemInfo.itemQuality > bData.itemInfo.itemQuality
-  elseif aData.itemInfo.itemName ~= bData.itemInfo.itemName then
-    return aData.itemInfo.itemName < bData.itemInfo.itemName
-  elseif aData.itemInfo.currentItemCount ~= bData.itemInfo.currentItemCount then
-    return aData.itemInfo.currentItemCount > bData.itemInfo.currentItemCount
-  end
-  return aData.itemInfo.itemGUID < bData.itemInfo.itemGUID
-end
-
----@param a Item
----@param b Item
----@return boolean
-function sort.SortItemsByAlphaThenQuality(a, b)
-  if a.isFreeSlot then return false end
-  if b.isFreeSlot then return true end
-  local aData, bData = a:GetItemData(), b:GetItemData()
-  if invalidData(aData, bData) then return false end
-  if aData.itemInfo.itemName ~= bData.itemInfo.itemName then
-    return aData.itemInfo.itemName < bData.itemInfo.itemName
-  elseif aData.itemInfo.itemQuality ~= bData.itemInfo.itemQuality then
-    return aData.itemInfo.itemQuality > bData.itemInfo.itemQuality
-  elseif aData.itemInfo.currentItemCount ~= bData.itemInfo.currentItemCount then
-    return aData.itemInfo.currentItemCount > bData.itemInfo.currentItemCount
-  end
-  return aData.itemInfo.itemGUID < bData.itemInfo.itemGUID
-end
-
----@param a Item
----@param b Item
----@return boolean
-function sort.SortItemsByItemLevel(a, b)
-  if a.isFreeSlot then return false end
-  if b.isFreeSlot then return true end
-  local aData, bData = a:GetItemData(), b:GetItemData()
-  if invalidData(aData, bData) then return false end
-  if aData.itemInfo.currentItemLevel ~= bData.itemInfo.currentItemLevel then
-    return aData.itemInfo.currentItemLevel > bData.itemInfo.currentItemLevel
-  elseif aData.itemInfo.itemName ~= bData.itemInfo.itemName then
-    return aData.itemInfo.itemName < bData.itemInfo.itemName
-  elseif aData.itemInfo.currentItemCount ~= bData.itemInfo.currentItemCount then
-    return aData.itemInfo.currentItemCount > bData.itemInfo.currentItemCount
-  end
-  return aData.itemInfo.itemGUID < bData.itemInfo.itemGUID
-end
----@param a Item
----@param b Item
----@return boolean
-function sort.SortItemsByExpansion(a, b)
-  if a.isFreeSlot then return false end
-  if b.isFreeSlot then return true end
-  local aData, bData = a:GetItemData(), b:GetItemData()
-  if invalidData(aData, bData) then return false end
-
-  -- Get expansion IDs, defaulting to 0 (Classic) if missing
-  local aExpacID = aData.itemInfo.expacID or 0
-  local bExpacID = bData.itemInfo.expacID or 0
-
-  -- Sort by expansion (chronological order)
-  if aExpacID ~= bExpacID then
-    return aExpacID < bExpacID
-  -- If same expansion, fall back to alphabetical
-  elseif aData.itemInfo.itemName ~= bData.itemInfo.itemName then
-    return aData.itemInfo.itemName < bData.itemInfo.itemName
-  -- If same name, fall back to item count
-  elseif aData.itemInfo.currentItemCount ~= bData.itemInfo.currentItemCount then
-    return aData.itemInfo.currentItemCount > bData.itemInfo.currentItemCount
-  end
-  -- Finally, fall back to GUID for stable sort
-  return aData.itemInfo.itemGUID < bData.itemInfo.itemGUID
-end
-
----@param a Item
----@param b Item
----@return boolean
-function sort.SortItemsBySellPriceStack(a, b)
-  if a.isFreeSlot then return false end
-  if b.isFreeSlot then return true end
-  local aData, bData = a:GetItemData(), b:GetItemData()
-  if invalidData(aData, bData) then return false end
-  return byWorth(aData, bData, stackWorth)
-end
-
----@param a Item
----@param b Item
----@return boolean
-function sort.SortItemsBySellPriceEach(a, b)
-  if a.isFreeSlot then return false end
-  if b.isFreeSlot then return true end
-  local aData, bData = a:GetItemData(), b:GetItemData()
-  if invalidData(aData, bData) then return false end
-  return byWorth(aData, bData, eachWorth)
-end
-
----@param a Item
----@param b Item
----@return boolean
-function sort.SortItemsByUpgradeTrack(a, b)
-  if a.isFreeSlot then return false end
-  if b.isFreeSlot then return true end
-  local aData, bData = a:GetItemData(), b:GetItemData()
-  if invalidData(aData, bData) then return false end
-  return byTrack(aData, bData)
-end
-
----@param a Item
----@param b Item
----@return boolean
-function sort.GetItemSortBySlot(a, b)
-  local aData, bData = a:GetItemData(), b:GetItemData()
-  if not aData then return false end
-  if not bData then return true end
-  return aData.slotid < bData.slotid
-end
-
----@param aData ItemData
----@param bData ItemData
----@return boolean
-function sort.SortItemDataByQualityThenAlpha(aData, bData)
-  if aData.isFreeSlot or aData.isItemGap then return false end
-  if bData.isFreeSlot or bData.isItemGap then return true end
-  if invalidData(aData, bData) then return false end
-  if aData.itemInfo.itemQuality ~= bData.itemInfo.itemQuality then
-    return aData.itemInfo.itemQuality > bData.itemInfo.itemQuality
-  elseif aData.itemInfo.itemName ~= bData.itemInfo.itemName then
-    return aData.itemInfo.itemName < bData.itemInfo.itemName
-  elseif aData.itemInfo.currentItemCount ~= bData.itemInfo.currentItemCount then
-    return aData.itemInfo.currentItemCount > bData.itemInfo.currentItemCount
-  end
-  return aData.itemInfo.itemGUID < bData.itemInfo.itemGUID
-end
-
----@param aData ItemData
----@param bData ItemData
----@return boolean
-function sort.SortItemDataByAlphaThenQuality(aData, bData)
-  if aData.isFreeSlot or aData.isItemGap then return false end
-  if bData.isFreeSlot or bData.isItemGap then return true end
-  if invalidData(aData, bData) then return false end
-  if aData.itemInfo.itemName ~= bData.itemInfo.itemName then
-    return aData.itemInfo.itemName < bData.itemInfo.itemName
-  elseif aData.itemInfo.itemQuality ~= bData.itemInfo.itemQuality then
-    return aData.itemInfo.itemQuality > bData.itemInfo.itemQuality
-  elseif aData.itemInfo.currentItemCount ~= bData.itemInfo.currentItemCount then
-    return aData.itemInfo.currentItemCount > bData.itemInfo.currentItemCount
-  end
-  return aData.itemInfo.itemGUID < bData.itemInfo.itemGUID
-end
-
----@param aData ItemData
----@param bData ItemData
----@return boolean
-function sort.SortItemDataByItemLevel(aData, bData)
-  if aData.isFreeSlot or aData.isItemGap then return false end
-  if bData.isFreeSlot or bData.isItemGap then return true end
-  if invalidData(aData, bData) then return false end
-  if aData.itemInfo.currentItemLevel ~= bData.itemInfo.currentItemLevel then
-    return aData.itemInfo.currentItemLevel > bData.itemInfo.currentItemLevel
-  elseif aData.itemInfo.itemName ~= bData.itemInfo.itemName then
-    return aData.itemInfo.itemName < bData.itemInfo.itemName
-  elseif aData.itemInfo.currentItemCount ~= bData.itemInfo.currentItemCount then
-    return aData.itemInfo.currentItemCount > bData.itemInfo.currentItemCount
-  end
-  return aData.itemInfo.itemGUID < bData.itemInfo.itemGUID
-end
-
----@param aData ItemData
----@param bData ItemData
----@return boolean
-function sort.SortItemDataByExpansion(aData, bData)
-  if aData.isFreeSlot or aData.isItemGap then return false end
-  if bData.isFreeSlot or bData.isItemGap then return true end
-  if invalidData(aData, bData) then return false end
-
-  local aExpacID = aData.itemInfo.expacID or 0
-  local bExpacID = bData.itemInfo.expacID or 0
-
-  if aExpacID ~= bExpacID then
-    return aExpacID < bExpacID
-  elseif aData.itemInfo.itemName ~= bData.itemInfo.itemName then
-    return aData.itemInfo.itemName < bData.itemInfo.itemName
-  elseif aData.itemInfo.currentItemCount ~= bData.itemInfo.currentItemCount then
-    return aData.itemInfo.currentItemCount > bData.itemInfo.currentItemCount
-  end
-  return aData.itemInfo.itemGUID < bData.itemInfo.itemGUID
-end
-
----@param aData ItemData
----@param bData ItemData
----@return boolean
-function sort.SortItemDataBySellPriceStack(aData, bData)
-  if aData.isFreeSlot or aData.isItemGap then return false end
-  if bData.isFreeSlot or bData.isItemGap then return true end
-  if invalidData(aData, bData) then return false end
-  return byWorth(aData, bData, stackWorth)
-end
-
----@param aData ItemData
----@param bData ItemData
----@return boolean
-function sort.SortItemDataBySellPriceEach(aData, bData)
-  if aData.isFreeSlot or aData.isItemGap then return false end
-  if bData.isFreeSlot or bData.isItemGap then return true end
-  if invalidData(aData, bData) then return false end
-  return byWorth(aData, bData, eachWorth)
-end
-
----@param aData ItemData
----@param bData ItemData
----@return boolean
-function sort.SortItemDataByUpgradeTrack(aData, bData)
-  if aData.isFreeSlot or aData.isItemGap then return false end
-  if bData.isFreeSlot or bData.isItemGap then return true end
-  if invalidData(aData, bData) then return false end
-  return byTrack(aData, bData)
-end
-
 -- slotOrder is where a bag's slots go in slot order: the backpack's keyring (Classic Era, WoW: Forever), whose bag
 -- ID is below the backpack's, after every bag, as its number says (items:GetBagName).
 ---@param bagid number
@@ -472,33 +499,6 @@ function sort.SortItemDataBySlot(aData, bData)
     return slotOrder(aData.bagid) < slotOrder(bData.bagid)
   end
   return aData.slotid < bData.slotid
-end
-
----@param kind BagKind
----@param view BagView
----@return function
-function sort:GetItemDataSortFunction(kind, view)
-  if kind == const.BAG_KIND.UNDEFINED then
-    return function() return false end
-  end
-  local sortType = database:GetItemSortType(kind, view)
-  if sortType == const.ITEM_SORT_TYPE.ALPHABETICALLY_THEN_QUALITY then
-    return self.SortItemDataByAlphaThenQuality
-  elseif sortType == const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY then
-    return self.SortItemDataByQualityThenAlpha
-  elseif sortType == const.ITEM_SORT_TYPE.ITEM_LEVEL then
-    return self.SortItemDataByItemLevel
-  elseif sortType == const.ITEM_SORT_TYPE.EXPANSION then
-    return self.SortItemDataByExpansion
-  elseif sortType == const.ITEM_SORT_TYPE.SELL_PRICE_STACK then
-    return self.SortItemDataBySellPriceStack
-  elseif sortType == const.ITEM_SORT_TYPE.SELL_PRICE_EACH then
-    return self.SortItemDataBySellPriceEach
-  elseif sortType == const.ITEM_SORT_TYPE.UPGRADE_TRACK then
-    return self.SortItemDataByUpgradeTrack
-  end
-  assert(false, "Unknown sort type: " .. sortType)
-  return function() end
 end
 
 ---@param kind BagKind

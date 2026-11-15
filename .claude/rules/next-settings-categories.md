@@ -15,7 +15,8 @@ item and search categories combined, each able to hold both. Then (2026-10-21), 
 crowded a list and an editor into one box (a cut-off button, a scrolling page, unclear "Placed Here",
 icons over text, no room to drop onto a long list): the list moves to the sidebar, the category gets
 the whole content area in three tabs, and the window grew to 720. A fourth, Automation, came with
-category automation (2026-10-22, automation.md). The data model is
+category automation (2026-10-22, automation.md), and Item Order with each category's own item order (2026-11-15,
+issue #108, item-sort.md §5). The data model is
 category-lifecycle.md §6. Every question is a `NextDialog` over the window.
 
 **The Categories page** (`next/settings/categories.lua`, `NextSettingsCategories`; page `categories`,
@@ -122,6 +123,13 @@ page's `Content.Top` and `Bottom`).
   Warbank); and Recent Items. Shown while a category is chosen, a plugin's too. The heading's line ends
   "Sells at merchants" or "Sells, destroys the rest", then "Deposits in the bank" or "Deposits in the
   Warbank".
+- **Item Order tab** (item-sort.md §5; tab `order`, after Automation): one section ("Order") of four settings rows, as the
+  Automation tab draws its own: Own Item Order (a switch; on gives the category the default order, Quality, off takes its
+  order away), then Item Order, Then By and And Then By, the dropdowns a bag's Layout tab chooses its order with (the
+  Sort module's choices and saving, `NextSettingsCategories:ItemOrderOptions`), disabled while the switch is off (they
+  show Quality, None, None then) and And Then By while Then By is None. Each saves at once (`UpdateCategory {
+  itemOrder }`) and shows the page's rows again. Shown while a category is chosen, a plugin's too
+  (`ItemOrderTabShown`).
 - `NextSettingsCategories:Show(name)` chooses a category for the next time the page shows (a bag's tab
   links here); `NewFromSearch(query)` makes the list ask for a new category's name with the search as
   its rule (the search box's Enter to Make Category, through `config/NewCategoryFromSearch`, which

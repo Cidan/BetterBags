@@ -26,7 +26,14 @@ describe("Backpack Module Loading and Compatibility Tests", function()
     const.BAG_VIEW = { UNDEFINED = 0, SECTION_GRID = 2, SECTION_ALL_BAGS = 4 }
     const.SECTION_SORT_TYPE = { ALPHABETICALLY = 1, SIZE_DESCENDING = 2, SIZE_ASCENDING = 3 }
     const.ITEM_SORT_TYPE = { ALPHABETICALLY_THEN_QUALITY = 1, QUALITY_THEN_ALPHABETICALLY = 2, ITEM_LEVEL = 3, EXPANSION = 4,
-      SELL_PRICE_STACK = 5, SELL_PRICE_EACH = 6 }
+      SELL_PRICE_STACK = 5, SELL_PRICE_EACH = 6, UPGRADE_TRACK = 7 }
+    const.ITEM_ORDER_KEY = {
+      QUALITY = "quality", NAME = "name", ITEM_LEVEL = "itemLevel", UPGRADE_TRACK = "upgradeTrack",
+      EQUIPMENT_SLOT = "equipmentSlot", ITEM_TYPE = "itemType", EXPANSION = "expansion", COUNT = "count",
+      SELL_PRICE_STACK = "sellPriceStack", SELL_PRICE_EACH = "sellPriceEach",
+    }
+    const.ITEM_ORDER_DEPTH = 3
+    const.DEFAULT_ITEM_ORDER = { "quality" }
     const.GRID_COMPACT_STYLE = { NONE = 0, SIMPLE = 1, COMPACT = 2 }
     const.SEARCH_CATEGORY_GROUP_BY = { NONE = 0, TYPE = 1, SUBTYPE = 2, EXPANSION = 3 }
     const.FORM_LAYOUT = { TWO_COLUMN = 1, STACKED = 2 }
@@ -81,10 +88,7 @@ describe("Backpack Module Loading and Compatibility Tests", function()
           [0] = { [1] = 1, [2] = 1, [3] = 1, [4] = 1 },
           [1] = { [1] = 1, [2] = 1, [3] = 1, [4] = 1 },
         },
-        itemSort = {
-          [0] = { [1] = 2, [2] = 2, [3] = 2, [4] = 2 },
-          [1] = { [1] = 2, [2] = 2, [3] = 2, [4] = 2 },
-        },
+        itemOrder = {},
         customSectionSort = { [0] = {}, [1] = {} },
         size = {
           [1] = {

@@ -10,6 +10,12 @@ const.BAG_KIND = const.BAG_KIND or { UNDEFINED = -1, BACKPACK = 0, BANK = 1 }
 const.BAG_KIND.GUILD = const.BAG_KIND.GUILD or 2
 const.SEARCH_CATEGORY_GROUP_BY = const.SEARCH_CATEGORY_GROUP_BY or { NONE = 0, TYPE = 1, SUBTYPE = 2, EXPANSION = 3 }
 const.BAG_VIEW = const.BAG_VIEW or { SECTION_GRID = 2, SECTION_ALL_BAGS = 4 }
+const.ITEM_ORDER_KEY = const.ITEM_ORDER_KEY or {
+  QUALITY = "quality", NAME = "name", ITEM_LEVEL = "itemLevel", UPGRADE_TRACK = "upgradeTrack",
+  EQUIPMENT_SLOT = "equipmentSlot", ITEM_TYPE = "itemType", EXPANSION = "expansion", COUNT = "count",
+  SELL_PRICE_STACK = "sellPriceStack", SELL_PRICE_EACH = "sellPriceEach",
+}
+const.DEFAULT_ITEM_ORDER = const.DEFAULT_ITEM_ORDER or { "quality" }
 
 LoadBetterBagsModule("core/context.lua")
 local L = StubBetterBagsModule("Localization")
@@ -20,7 +26,7 @@ local categories = StubBetterBagsModule("Categories")
 local items = StubBetterBagsModule("Items")
 local search = StubBetterBagsModule("Search")
 local settings = StubBetterBagsModule("NextSettings")
-for _, m in ipairs({ { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.lua" },
+for _, m in ipairs({ { "Sort", "util/sort.lua" }, { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.lua" },
   { "NextFrameArt", "next/frameart.lua" }, { "NextFill", "next/fill.lua" }, { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
   { "NextButton", "next/controls/button.lua" }, { "NextToggle", "next/controls/toggle.lua" },
   { "NextInput", "next/controls/input.lua" }, { "NextMenu", "next/controls/menu.lua" },
@@ -226,6 +232,7 @@ describe("NextSettingsCategories", function()
         f.confirmSale = nil
       end
       if fields.skipRecent ~= nil then f.skipRecent = fields.skipRecent == true or nil end
+      if fields.itemOrder ~= nil then f.itemOrder = fields.itemOrder and { unpack(fields.itemOrder) } or nil end
       if fields.deposit ~= nil then f.deposit = fields.deposit or nil end
       for k, v in pairs(fields.enabled or {}) do f.enabled[k] = v end
       for k, v in pairs(fields.hidden or {}) do
@@ -1663,6 +1670,94 @@ describe("NextSettingsCategories", function()
       depositOption.set(ctx(), true)
       intoOption.set(ctx(), "Warbank")
       assert.are.same({}, updates())
+    end)
+  end)
+
+  -- Asked (issue #108): "global order goes in the bag's layout/order section, but then each category can have it's own
+  -- sort order": a switch, and the three dropdowns a bag's Layout tab chooses its order with, read and saved as the
+  -- category's own order.
+  describe("the Item Order settings", function()
+    local sort = addon:GetModule("Sort")
+    local own, first, second, third
+
+    local function shown()
+      return { first.get(), second.get(), third.get() }
+    end
+
+    before_each(function()
+      own, first, second, third = unpack(editor:ItemOrderOptions())
+    end)
+
+    it("are a switch and three dropdowns, named and described", function()
+      assert.are.same({ "toggle", "dropdown", "dropdown", "dropdown" }, { own.kind, first.kind, second.kind, third.kind })
+      assert.are.same({ "Own Item Order", "Item Order", "Then By", "And Then By" },
+        { own.title, first.title, second.title, third.title })
+      for _, option in ipairs({ own, first, second, third }) do
+        assert.truthy(#option.description > 0)
+        assert.truthy(#option.keywords > 0)
+      end
+      assert.is_nil(own.disabled)
+    end)
+
+    it("show the chosen category's own order, the dropdowns off while it takes its bag's", function()
+      editor.selected = "Mats"
+      assert.is_false(own.get())
+      assert.are.same({ "Quality", "None", "None" }, shown(), "the default order")
+      assert.is_true(first.disabled())
+      assert.is_true(second.disabled())
+      assert.is_true(third.disabled())
+      filters.Mats.itemOrder = { "equipmentSlot", "itemLevel" }
+      assert.is_true(own.get())
+      assert.are.same({ "Equipment Slot", "Item Level", "None" }, shown())
+      assert.is_false(first.disabled())
+      assert.is_false(second.disabled())
+      assert.is_false(third.disabled())
+      filters.Mats.itemOrder = { "count" }
+      assert.is_false(second.disabled())
+      assert.is_true(third.disabled(), "And Then By needs Then By")
+    end)
+
+    it("list what a bag's dropdowns list", function()
+      editor.selected = "Mats"
+      filters.Mats.itemOrder = { "equipmentSlot", "itemLevel" }
+      assert.are.same(sort:ItemOrderChoices({ "equipmentSlot", "itemLevel" }, 1), first.itemsFunction())
+      assert.are.same(sort:ItemOrderChoices({ "equipmentSlot", "itemLevel" }, 2), second.itemsFunction())
+      assert.are.same(sort:ItemOrderChoices({ "equipmentSlot", "itemLevel" }, 3), third.itemsFunction())
+    end)
+
+    it("save at once and show the page's rows again, for a plugin's category too", function()
+      editor.selected = "Mats"
+      own.set(ctx(), true)
+      second.set(ctx(), "Item Level")
+      first.set(ctx(), "Item Level")
+      own.set(ctx(), false)
+      editor.selected = "Openable"
+      own.set(ctx(), true)
+      assert.are.same({
+        { "UpdateCategory", "Mats", { itemOrder = { "quality" } } },
+        { "UpdateCategory", "Mats", { itemOrder = { "quality", "itemLevel" } } },
+        { "UpdateCategory", "Mats", { itemOrder = { "itemLevel" } } },
+        { "UpdateCategory", "Mats", { itemOrder = false } },
+        { "UpdateCategory", "Openable", { itemOrder = { "quality" } } },
+      }, updates())
+      assert.are.equal(5, refreshed)
+    end)
+
+    it("change nothing with no category chosen, or a dropdown while the category takes its bag's order", function()
+      editor.selected = nil
+      assert.is_false(own.get())
+      own.set(ctx(), true)
+      first.set(ctx(), "Name")
+      editor.selected = "Mats"
+      first.set(ctx(), "Name")
+      assert.are.same({}, updates())
+    end)
+
+    it("are a tab of their own while a category is chosen", function()
+      editor.selected = "Mats"
+      assert.is_true(editor:ItemOrderTabShown())
+      editor.selected = nil
+      assert.is_false(editor:ItemOrderTabShown())
     end)
   end)
 

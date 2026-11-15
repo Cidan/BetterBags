@@ -72,6 +72,9 @@ local pixel = addon:GetModule('NextPixel')
 ---@class NextSettingsItemsTab: AceModule
 local itemsTab = addon:GetModule('NextSettingsItemsTab')
 
+---@class Sort: AceModule
+local sort = addon:GetModule('Sort')
+
 -- NextSettingsCategories is the Categories page (next-settings.md §5, category-lifecycle.md §6), where
 -- every category is defined once: one kind of category, a rule, items added by hand, or both. The page
 -- shows its own list in the window's sidebar (pages.lua sidebar): every category, yours and the plugins',
@@ -87,6 +90,8 @@ local itemsTab = addon:GetModule('NextSettingsItemsTab')
 --   bank or the Warbank (DepositOptions), as settings rows.
 -- - Added Items: the items added to it by hand, as a grid that holds thousands (NextItemGrid), filtered
 --   by name; an item dropped anywhere on it is added, a right click removes one, Remove All asks first.
+-- - Item Order: Own Item Order, and the three dropdowns a bag's Layout tab chooses its item order with
+--   (ItemOrderOptions, item-sort.md §5), as settings rows.
 -- A plugin's category can be used in bags, colored, ordered and automated; its rule (when it has one)
 -- and its items show read-only. Under the categories, a heading and the Blizzard categories the backpack
 -- shows now, in the same list (category-lifecycle.md §11): one chosen shows what it is and Convert to
@@ -478,6 +483,74 @@ function editor:DepositOptions()
       set = function(ctx, name) save(ctx, DEPOSIT_OF_NAME[name]) end,
     },
   }
+end
+
+-- ItemOrderTabShown says whether the Item Order tab shows: while a category is chosen, a plugin's too.
+---@return boolean
+function editor:ItemOrderTabShown()
+  return self:Chosen() ~= nil
+end
+
+-- ItemOrderOptions returns the Item Order tab's settings (item-sort.md §5): Own Item Order, which gives the chosen
+-- category an order of its own, the default to start from, or takes it away (its items follow the order of the bag they
+-- are in), and the three dropdowns a bag's Layout tab chooses its order with (config/catalog.lua: the Sort module's
+-- choices, each a tier of the order), off while it has none. Each saves at once and shows the page's rows again.
+---@return NextSettingsOption[]
+function editor:ItemOrderOptions()
+  local function order()
+    local filter = self:Chosen()
+    return filter and filter.itemOrder
+  end
+  -- What the dropdowns show: its order, or the one Own Item Order starts it with.
+  local function shown()
+    return order() or const.DEFAULT_ITEM_ORDER
+  end
+  local function save(ctx, value)
+    if self.selected then
+      categories:UpdateCategory(ctx, self.selected, { itemOrder = value })
+    end
+    settings:Refresh(ctx)
+  end
+  local options = {
+    {
+      kind = "toggle",
+      title = L:G("Own Item Order"),
+      description = L:G("Order this category's items its own way, in every bag it is used in. Turned off, they follow "
+        .. "the Item Order of the bag they are in (its Layout tab)."),
+      keywords = { "sort", "order", "items", "item order", "own" },
+      get = function() return order() ~= nil end,
+      set = function(ctx, on) save(ctx, on and { unpack(const.DEFAULT_ITEM_ORDER) } or false) end,
+    },
+  }
+  local tiers = {
+    { title = L:G("Item Order"), description = L:G("What this category's items are ordered by first. Items still "
+      .. "equal go by name, then the bigger pile."),
+      keywords = { "sort", "order", "items", "quality", "item level", "slot", "type", "count", "name", "sell price" } },
+    { title = L:G("Then By"), description = L:G("What its items the Item Order holds equal are ordered by; None for "
+      .. "nothing more. Items still equal go by name, then the bigger pile."),
+      keywords = { "sort", "order", "items", "then", "tie", "second" } },
+    { title = L:G("And Then By"), description = L:G("What its items still equal after Then By are ordered by; None for "
+      .. "nothing more. Items still equal go by name, then the bigger pile."),
+      keywords = { "sort", "order", "items", "then", "tie", "third" } },
+  }
+  for tier, def in ipairs(tiers) do
+    table.insert(options, {
+      kind = "dropdown",
+      title = def.title,
+      description = def.description,
+      keywords = def.keywords,
+      itemsFunction = function() return sort:ItemOrderChoices(shown(), tier) end,
+      disabled = function() return order() == nil or #shown() < tier - 1 end,
+      get = function() return sort:ItemOrderChoice(shown(), tier) end,
+      set = function(ctx, choice)
+        local current = order()
+        if current then
+          save(ctx, sort:WithItemOrderChoice(current, tier, choice))
+        end
+      end,
+    })
+  end
+  return options
 end
 
 -- RecentOptions returns the Automation tab's Recent Items settings (docs/next-batch-2.md §1), a section of

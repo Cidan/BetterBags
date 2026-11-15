@@ -28,7 +28,8 @@ A custom category's name is a key in **multiple** independent profile tables (`c
 - `ephemeralCategoryFilters[name]` — the saved state of plugins' (ephemeral) categories:
   their bags (`enabled`), flags (`dynamic`; groupBy sub-categories `"Parent - Suffix"`,
   `isGroupBySubcategory = true`) and the color, priority and automation a player set
-  (automation.md: `automation`, `confirmSale`, `deposit`, `skipRecent`). `itemList` is empty here: the
+  (automation.md: `automation`, `confirmSale`, `deposit`, `skipRecent`), and its own item order (`itemOrder`,
+  item-sort.md §5). `itemList` is empty here: the
   plugin gives its items again each session.
 - `customCategoryIndex[itemID] = name` — the item's home: the persistent category it was placed
   in by hand. Rebuilt from the item lists at every load (§6).
@@ -401,7 +402,8 @@ turns it into a category of the player's, whose Blizzard items keep landing in i
   options"). A converted category turned off in a bag leaves that bag's section of its name to Blizzard: no color, no
   Hide In, no automation, no Ignored Items. `categories:CategoryIn(name, kind)` is the one lookup: the category of that
   name (a group by's section resolves to its category) while `enabled[kind]` is on, else nil. `AutomationOf`,
-  `SkipsRecentOf`, `HiddenIn`, `ConfirmsSaleOf` and `DepositOf` take `(name, kind)` and go through it; the classic
+  `SkipsRecentOf`, `HiddenIn`, `ConfirmsSaleOf`, `DepositOf` and `ItemOrderOf` (item-sort.md §5) take `(name, kind)` and
+  go through it; the classic
   sections' color (`views.lua` `GetOrCreateSection`, the view's kind) and the ignore check above do too. Automation
   passes the backpack's kind (it acts on backpack items only). For a category that is not converted nothing changes:
   items only land in it in bags that use it. The Categories page counts an item under a category only in bags that use
