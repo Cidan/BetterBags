@@ -856,6 +856,25 @@ define('sectionCompact', {
   end,
 })
 
+-- Asked: "let's have an option for 'leave a gap between sections' which keeps things 1 icon grid apart", in each bag's
+-- layout, off by default (next-columns.md §7c).
+define('sectionGap', {
+  kind = "toggle",
+  bag = true,
+  title = 'Gap Between Sections',
+  description = function(bag)
+    return 'Leaves one empty icon space between the ' .. lower(bag) .. "'s sections side by side, so they stand apart "
+      .. "and every icon stays on the bag's icon grid."
+  end,
+  keywords = { 'gap', 'space', 'spacing', 'padding', 'apart', 'separate', 'columns', 'side by side', 'sections' },
+  disabled = function(bag) return db:GetNextSectionColumns(bag.kind) <= 1 end,
+  get = function(_, bag) return db:GetNextSectionGap(bag.kind) end,
+  set = function(ctx, value, bag)
+    db:SetNextSectionGap(bag.kind, value)
+    events:SendMessage(ctx, 'next/SectionColumnsChanged', bag.kind)
+  end,
+})
+
 local sectionFills = {
   ["Side to Side"] = "across",
   ["Top to Bottom"] = "down",

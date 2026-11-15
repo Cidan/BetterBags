@@ -154,6 +154,7 @@ describe("BetterBags Next, pixel perfect", function()
     override(stubs.database, "GetNextSectionFill", function() return "across" end)
     override(stubs.database, "GetNextSectionSpan", function() return false end)
     override(stubs.database, "GetNextSectionCompact", function() return false end)
+    override(stubs.database, "GetNextSectionGap", function() return false end)
     override(stubs.database, "GetNextSectionWideRows", function() return 2 end)
     override(stubs.database, "SetNextSize", function(_, size) db.size = size end)
     -- Where a small panel was left before it held its bottom corner, and the corner it holds (docs/next-bag-anchor.md).
@@ -662,6 +663,34 @@ describe("BetterBags Next, pixel perfect", function()
           assert.is_true(math.abs(lefts[i] - lefts[i - 1] - step) < 0.01,
             "icon " .. i .. " is a step from the one before, across the columns too")
         end
+      end)
+
+      -- Asked: "'leave a gap between sections' which keeps things 1 icon grid apart".
+      it("stands every icon on one grid with a gap between sections, on " .. screenName(screen), function()
+        useScreen(screen[1], screen[2], screen[3])
+        db.size = "small"
+        columns(2, "across")
+        override(stubs.database, "GetNextSectionGap", function() return true end)
+        local bag = open(function(c) return nextBag:Create(c) end, BACKPACK)
+        local items = {}
+        for i = 1, 4 do items[i] = item("0_" .. i, i <= 2 and "A" or "B") end
+        bag:Draw(ctx(), { sortedItems = {}, tabs = { [1] = { categories = { { name = "A" }, { name = "B" } },
+          items = items } } }, function() end)
+        settle()
+        assert.are.same({}, offGrid(bag))
+        assert.are.equal(1, bag.content.grid.apart)
+        local lefts = {}
+        for i = 1, 4 do
+          lefts[i] = layout.Rect(buttons["0_" .. i].frame).left
+        end
+        local step = lefts[2] - lefts[1]
+        assert.is_true(step > 0)
+        for i = 2, 4 do
+          local steps = (lefts[i] - lefts[1]) / step
+          assert.is_true(math.abs(steps - math.floor(steps + 0.5)) < 0.01, "icon " .. i .. " on the grid of the first")
+        end
+        assert.is_true(math.abs(lefts[3] - lefts[1] - (bag.content.grid.split[1] + 1) * step) < 0.01,
+          "B's first icon a cell past A's column")
       end)
     end
 

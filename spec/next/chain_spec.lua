@@ -233,6 +233,7 @@ describe("NextChain", function()
     override(stubs.database, "GetNextSectionFill", function() return "across" end)
     override(stubs.database, "GetNextSectionSpan", function() return false end)
     override(stubs.database, "GetNextSectionCompact", function() return false end)
+    override(stubs.database, "GetNextSectionGap", function() return false end)
     override(stubs.database, "GetNextSectionWideRows", function() return 2 end)
     override(stubs.database, "SetNextChain", function(_, value) layout = value end)
     -- What the backpack does at each interaction (interaction-bags.md): opened and closed, until a spec says.

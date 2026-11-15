@@ -28,6 +28,7 @@ db.GetNextSectionColumns = db.GetNextSectionColumns or function() return 1 end
 db.GetNextSectionFill = db.GetNextSectionFill or function() return "across" end
 db.GetNextSectionSpan = db.GetNextSectionSpan or function() return true end
 db.GetNextSectionCompact = db.GetNextSectionCompact or function() return false end
+db.GetNextSectionGap = db.GetNextSectionGap or function() return false end
 db.GetNextSectionWideRows = db.GetNextSectionWideRows or function() return 2 end
 -- The Animation switches (next-themes.md §20), all on, which SonataNext lays over the theme it uses.
 db.GetNextAnimation = db.GetNextAnimation or function() return true end
@@ -450,7 +451,8 @@ describe("NextSettingsContent", function()
       assert.are.same({
         { "General", "Bank Window", { "enableBankBags" } },
         { "Layout", "Order", { "sectionOrder", "itemOrder" } },
-        { "Layout", "Sections [next]", { "sectionColumns", "sectionCompact", "sectionFill", "sectionSpan", "sectionWideRows" } },
+        { "Layout", "Sections [next]", { "sectionColumns", "sectionCompact", "sectionGap", "sectionFill", "sectionSpan",
+          "sectionWideRows" } },
         { "Layout", "Tabs", { "enableGroups" } },
         { "Layout", "Slots", { "showAllFreeSpace", "preserveGaps" } },
         { "Layout", "Window [classic]", { "resizableWindow", "snapToContent", "itemsPerRow", "columns", "opacity",
@@ -578,7 +580,7 @@ describe("NextSettingsContent", function()
         nextCurrencyScale = true, nextCurrencyBackground = true, nextCurrencyHideInCombat = true,
         nextCurrencyGrow = true, nextFoodDrinkBar = true, nextFoodDrinkPick = true, nextFoodDrinkLayout = true,
         nextFoodDrinkGrow = true, nextFoodDrinkScale = true, nextFoodDrinkBackground = true,
-        nextFoodDrinkHideInCombat = true }
+        nextFoodDrinkHideInCombat = true, sectionGap = true }
       addon.hasGuildBank = true
       content:Init()
       local named = 0
@@ -609,10 +611,10 @@ describe("NextSettingsContent", function()
       end
       -- The general pages' 41 (the ten Interactions the latest, interaction-bags.md; Enable QuickFind Integration, #1262;
       -- Enable Bank Bags, Enable Vendor Window and Enable Guild Bank Window moved to their bags, and the Size tab's four to
-      -- every bag), the Currencies page's 10 (currency.md §6), the Food & Drink page's 7 (food-drink.md §5), each bag's 39
-      -- (its Size tab's four the latest, Show Keystone Level before them, #202), the bank's and the guild bank's switch on
-      -- their General tabs, and the vendor's 5 (its switch and its Size tab).
-      assert.are.equal(41 + 10 + 7 + 3 * 39 + 2 + 5, named)
+      -- every bag), the Currencies page's 10 (currency.md §6), the Food & Drink page's 7 (food-drink.md §5), each bag's 40
+      -- (Gap Between Sections the latest, next-columns.md §7c; its Size tab's four before it, Show Keystone Level before them,
+      -- #202), the bank's and the guild bank's switch on their General tabs, and the vendor's 5 (its switch and its Size tab).
+      assert.are.equal(41 + 10 + 7 + 3 * 40 + 2 + 5, named)
     end)
 
     -- The Food & Drink bar's options (food-drink.md §5): a page of their own after Currencies, BetterBags Next only.

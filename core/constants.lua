@@ -863,6 +863,11 @@ const.DATABASE_DEFAULTS = {
       [const.BAG_KIND.BANK] = false,
       [const.BAG_KIND.GUILD] = false,
     },
+    nextSectionGap = {
+      [const.BAG_KIND.BACKPACK] = false,
+      [const.BAG_KIND.BANK] = false,
+      [const.BAG_KIND.GUILD] = false,
+    },
     preserveItemGaps = {
       [const.BAG_KIND.BACKPACK] = true,
       [const.BAG_KIND.BANK] = true,

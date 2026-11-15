@@ -1422,7 +1422,7 @@ function guildProto:applyLogSearch()
 end
 
 -- SectionColumns lays a log and Info out in one column (a log's cards across it), and the items as the guild bank is set.
----@return number count, string? fill, boolean? span, number? wideRows, boolean? compact
+---@return number count, string? fill, boolean? span, number? wideRows, boolean? compact, boolean? apart
 function guildProto:SectionColumns()
   if self.view ~= VIEW_ITEMS then
     return 1

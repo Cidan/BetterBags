@@ -242,6 +242,32 @@ describe("The settings catalog", function()
     assert.is_true(toggle.disabled())
   end)
 
+  -- Asked: "let's have an option for 'leave a gap between sections' which keeps things 1 icon grid apart. this should go in
+  -- each bag's layout section, disabled by default".
+  it("turns a bag's gap between sections on and off, that bag's alone, off at one column", function()
+    local columns, gaps = { [backpack.kind] = 2, [bank.kind] = 2 }, {}
+    override(db, "GetNextSectionColumns", function(_, kind) return columns[kind] or 1 end)
+    override(db, "GetNextSectionGap", function(_, kind) return gaps[kind] == true end)
+    override(db, "SetNextSectionGap", function(_, kind, on) gaps[kind] = on end)
+    local toggle = catalog:Get("sectionGap", backpack)
+    assert.are.equal("toggle", toggle.kind)
+    assert.are.equal("Gap Between Sections", toggle.title)
+    assert.is_truthy(toggle.description:find("backpack", 1, true), "names its bag")
+    assert.is_truthy(toggle.description:find("grid", 1, true))
+    local words = {}
+    for _, word in ipairs(toggle.keywords) do words[word] = true end
+    assert.is_true(words.gap and words.spacing and words.padding and words["side by side"] and true or false)
+    assert.is_false(toggle.get(ctx()))
+    assert.is_false(toggle.disabled())
+    toggle.set(ctx(), true)
+    assert.are.same({ [backpack.kind] = true }, gaps)
+    assert.is_true(toggle.get(ctx()))
+    assert.is_false(catalog:Get("sectionGap", bank).get(ctx()), "the bank's stays")
+    assert.are.same({ { message = "next/SectionColumnsChanged", args = { backpack.kind } } }, sent)
+    columns[backpack.kind] = 1
+    assert.is_true(toggle.disabled(), "nothing stands side by side in one column")
+  end)
+
   -- Asked of a small bag fitting its names: "with an option to enable/disable this behavior in settings, default disable";
   -- then: "every appearance -> size option needs to become per-bag".
   it("turns a bag's Fit Names While Open on and off, that bag's alone", function()

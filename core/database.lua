@@ -1606,6 +1606,19 @@ function DB:SetNextSectionCompact(kind, on)
   DB.data.profile.nextSectionCompact[kind] = on
 end
 
+-- GetNextSectionGap is whether a bag leaves an empty cell of the icon grid between its sections side by side.
+---@param kind BagKind
+---@return boolean
+function DB:GetNextSectionGap(kind)
+  return DB.data.profile.nextSectionGap[kind] == true
+end
+
+---@param kind BagKind
+---@param on boolean
+function DB:SetNextSectionGap(kind, on)
+  DB.data.profile.nextSectionGap[kind] = on
+end
+
 -- GetNextSectionWideRows is how many rows a section takes in one of a bag's columns before it counts as wide.
 ---@param kind BagKind
 ---@return number

@@ -80,11 +80,11 @@ describe("BetterBags Next's settings window on the whole addon", function()
   end
 
   -- On the real database: a bag nobody has set anything on.
-  it("starts every bag in two columns, side to side, wide sections spanning them, its largest section first", function()
+  it("starts every bag in two columns, side to side, wide sections spanning them, no gap, its largest section first", function()
     local addon = start({ next = true })
     local database, const = addon:GetModule("Database"), addon:GetModule("Constants")
     for _, panel in ipairs({ addon.Bags.Backpack, addon.Bags.Bank, addon.Bags.GuildBank }) do
-      assert.are.same({ 2, "across", true, 2, false }, { panel:SectionColumns() }, "bag " .. panel.kind)
+      assert.are.same({ 2, "across", true, 2, false, false }, { panel:SectionColumns() }, "bag " .. panel.kind)
       assert.are.equal(const.SECTION_SORT_TYPE.SIZE_DESCENDING,
         database:GetSectionSortType(panel.kind, const.BAG_VIEW.SECTION_GRID), "bag " .. panel.kind)
     end
@@ -227,12 +227,16 @@ describe("BetterBags Next's settings window on the whole addon", function()
     assert.is_true(db:GetNextSectionCompact(0))
     assert.is_false(db:GetNextSectionCompact(1), "another bag keeps its own")
     rowOf(settings, "sectionCompact").option.set(c, false)
+    rowOf(settings, "sectionGap").option.set(c, true)
+    assert.is_true(db:GetNextSectionGap(0))
+    assert.is_false(db:GetNextSectionGap(1), "another bag keeps its own")
     assert.are.equal(3, db:GetNextSectionColumns(0))
     assert.are.equal("down", db:GetNextSectionFill(0))
     assert.are.equal(3, db:GetNextSectionWideRows(0))
     assert.are.equal(1, db:GetNextSectionColumns(1), "another bag keeps its own")
     addon:GetModule("Render"):Flush()
     assert.is_not_nil(addon.Bags.Backpack.content.grid)
+    assert.are.equal(1, addon.Bags.Backpack.content.grid.apart, "a cell between its sections")
     assert.is_nil(addon.Bags.Bank.content.grid)
     assert.are.same({}, handle.errors)
   end)
