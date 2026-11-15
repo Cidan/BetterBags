@@ -119,7 +119,7 @@ passed (next-bagsystem.md §11f). The whole-addon helper loads and starts all of
   the classic ones unless `next` is set; `install = "new"` starts with none at all, a new install,
   which starts with BetterBags Next (next.md §1). Before new installs started with Next, every load
   had none; the existing install keeps every spec written then meaning what it did.
-- **The retail client:** Blizzard's `Enum.BagIndex`, `Enum.PlayerInteractionType`,
+- **The retail client:** Blizzard's `Enum.BagIndex`, `Enum.PlayerInteractionType`, `Enum.BankType`,
   `Enum.ItemQuality` from the API documentation of the live branch, the other values as
   `spec/core/constants_spec.lua` sets them, Blizzard's bag frames and bag-bar buttons (with their
   `SlotHighlightTexture`), `NUM_TOTAL_BAG_FRAMES` 5. Mocks that other specs never needed were added

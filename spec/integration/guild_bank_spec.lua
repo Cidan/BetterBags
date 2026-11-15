@@ -95,20 +95,72 @@ describe("a guild bank visit on the whole addon", function()
     return setmetatable({ GetContainerNumSlots = function() return 0 end }, { __index = _G.C_Container })
   end
 
+  -- holding has the backpack (bag 0) hold the given items by slot, each { id, refused }, as the client's container and
+  -- item functions describe them (ContainerDocumentation.lua, ItemDocumentation.lua), every other bag empty. Whether
+  -- the guild bank takes each is C_Bank.IsItemAllowedInBankType's answer (BankDocumentation.lua: its location is an
+  -- ItemLocation, so one with no item is an error), and Blizzard's item context API answers as it does with no context
+  -- active (ItemUtil.lua).
+  local function holding(globals, backpack)
+    local function at(bag, slot) return bag == 0 and backpack[slot] or nil end
+    globals.C_Container = setmetatable({
+      GetContainerNumSlots = function(bag) return bag == 0 and #backpack or 0 end,
+      GetContainerNumFreeSlots = function() return 0, 0 end,
+      GetContainerItemID = function(bag, slot) return at(bag, slot) and at(bag, slot).id or nil end,
+      GetContainerItemLink = function(bag, slot) return at(bag, slot) and linkOf(at(bag, slot).id) or nil end,
+      GetContainerItemInfo = function(bag, slot)
+        local item = at(bag, slot)
+        if not item then return nil end
+        return { iconFileID = 134400 + item.id, stackCount = 1, isLocked = false, quality = 2, isReadable = false,
+          hasLoot = false, hyperlink = linkOf(item.id), isFiltered = false, hasNoValue = false, itemID = item.id,
+          isBound = false, itemName = ITEMS[item.id].name }
+      end,
+    }, { __index = _G.C_Container })
+    local wornGUID = globals.C_Item.GetItemGUID
+    globals.C_Item.GetItemGUID = function(location)
+      if not location:IsBagAndSlot() then
+        return wornGUID(location)
+      end
+      local bag, slot = location:GetBagAndSlot()
+      if not at(bag, slot) then
+        error("bad argument #1 to 'GetItemGUID' (Usage: local itemGUID = C_Item.GetItemGUID(itemLocation))", 2)
+      end
+      return "guid-" .. bag .. "-" .. slot
+    end
+    globals.C_Bank = setmetatable({ IsItemAllowedInBankType = function(bankType, location)
+      local bag, slot = location:GetBagAndSlot()
+      if not at(bag, slot) then
+        error("bad argument #2 to '?' (Usage: local isItemAllowedInBankType = "
+          .. "C_Bank.IsItemAllowedInBankType(bankType, itemLocation))", 2)
+      end
+      return bankType ~= Enum.BankType.Guild or not at(bag, slot).refused
+    end }, { __index = _G.C_Bank })
+    globals.ItemButtonUtil = setmetatable({
+      ItemContextMatchResult = { Match = 1, Mismatch = 2, DoesNotApply = 3 },
+      GetItemContext = function() return nil end,
+      GetItemContextMatchResultForItem = function() return 3 end,
+    }, { __index = _G.ItemButtonUtil })
+  end
+
   ---@param design "classic"|"next"
-  local function start(design)
+  ---@param backpack? { id: number, refused?: boolean }[] What the backpack holds (holding), or nothing.
+  local function start(design, backpack)
     local gameMenu = CreateFrame("Frame")
     gameMenu:Hide()
-    handle = WholeAddon.Load({
-      next = design == "next",
-      globals = {
-        C_Timer = clock(), GameMenuFrame = gameMenu, C_Container = emptyBags(), C_Item = itemFunctions(),
-        SetItemButtonDesaturated = function(button, desaturated) button.icon:SetDesaturated(desaturated and true or false) end,
-      },
-    })
+    local globals = {
+      C_Timer = clock(), GameMenuFrame = gameMenu, C_Container = emptyBags(), C_Item = itemFunctions(),
+      SetItemButtonDesaturated = function(button, desaturated) button.icon:SetDesaturated(desaturated and true or false) end,
+    }
+    if backpack then
+      holding(globals, backpack)
+    end
+    handle = WholeAddon.Load({ next = design == "next", globals = globals })
     handle:Start()
     assert.are.same({}, handle.errors, "starting")
     local addon = handle.addon
+    -- The frame mock has no item button template, so no item button is drawn (test-harness.md §5).
+    if backpack then
+      addon.Bags.Backpack.Draw = function(_, _, _, callback) if callback then callback() end end
+    end
     local refresh = addon:GetModule("Refresh")
     refresh._worldFrame:GetScript("OnEvent")(refresh._worldFrame, "LOADING_SCREEN_DISABLED")
     refresh._worldFrame:GetScript("OnUpdate")(refresh._worldFrame, 0.016)
@@ -519,4 +571,32 @@ describe("a guild bank visit on the whole addon", function()
     assert.is_not_nil(panel.content.buttons["1002_2"], "its items drawn")
     assert.are.same({}, handle.errors)
   end)
+
+  -- Issue #768: the backpack's items the guild bank would refuse dim while it is open. The guild bank's own listener
+  -- sets addon.atGuildBank on the guild banker interaction's events, and the backpack is recalculated for the window on
+  -- the same events (core/hooks.lua), as the visit starts and as it ends.
+  for _, design in ipairs({ "classic", "next" }) do
+    it("dims the backpack's items the guild bank refuses while it is open, with the " .. design .. " bags", function()
+      local addon = start(design, { { id = 100 }, { id = 200, refused = true } })
+      guild()
+      local items = addon:GetModule("Items")
+      local backpack = addon:GetModule("Constants").BAG_KIND.BACKPACK
+      local function dim(slotkey)
+        return items:GetAllSlotInfo()[backpack].itemsBySlotKey[slotkey].itemContextMatchResult
+      end
+      assert.are.equal(3, dim("0_2"), "before the visit")
+      openGuildBank(addon)
+      if design == "next" then slideIn(addon) end
+      assert.is_true(addon.Bags.Backpack:IsShown(), "the backpack opened with it")
+      assert.are.equal(2, dim("0_2"), "refused")
+      assert.are.equal(3, dim("0_1"), "taken")
+      addon:GetModule("Events")._eventMap["PLAYER_INTERACTION_MANAGER_FRAME_HIDE"].fn(
+        "PLAYER_INTERACTION_MANAGER_FRAME_HIDE", Enum.PlayerInteractionType.GuildBanker)
+      HideUIPanel(GuildBankFrame)
+      frames()
+      if design == "next" then slideIn(addon) end
+      assert.are.equal(3, dim("0_2"), "once the visit ends")
+      assert.are.same({}, handle.errors)
+    end)
+  end
 end)

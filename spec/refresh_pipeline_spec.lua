@@ -2717,6 +2717,102 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
 
     end)
 
+    -- Issue #768: what the guild bank would refuse dims in the backpack while it is open, as what the Warbank refuses
+    -- does at the bank. Blizzard has no item context for the guild bank (ItemButtonUtil.GetItemContext, ItemUtil.lua),
+    -- so the rule is BetterBags' own, asking C_Bank.IsItemAllowedInBankType(Enum.BankType.Guild, itemLocation)
+    -- (BankDocumentation.lua), which Blizzard's own code asks only of the bank and the Warbank.
+    describe("at the guild bank", function()
+      -- ItemButtonUtil.ItemContextMatchResult (ItemUtil.lua).
+      local MATCH, MISMATCH, DOES_NOT_APPLY = 1, 2, 3
+      local asked
+
+      before_each(function()
+        mockContainer[0] = { { itemID = 101, guid = "guid-101", count = 1 }, { itemID = 202, guid = "guid-202", count = 1 } }
+        asked = {}
+        -- ItemConstantsDocumentation.lua, on retail and WoW: Forever.
+        override(_G.Enum, "BankType", { Character = 0, Guild = 1, Account = 2 })
+        -- Its location is an ItemLocation, not an EmptiableItemLocation (BankDocumentation.lua), so one with no item is
+        -- an error here, as for every such call the mocks model. The guild bank refuses the Beta Shield (202); every
+        -- bank takes the Alpha Sword.
+        override(_G, "C_Bank", { IsItemAllowedInBankType = function(bankType, location)
+          if not _G.C_Item.DoesItemExist(location) then
+            error("bad argument #2 to '?' (Usage: local isItemAllowedInBankType = "
+              .. "C_Bank.IsItemAllowedInBankType(bankType, itemLocation))", 2)
+          end
+          local bag, slot = location:GetBagAndSlot()
+          if bankType == _G.Enum.BankType.Guild then
+            table.insert(asked, bag .. ":" .. slot)
+          end
+          return bankType ~= _G.Enum.BankType.Guild or _G.C_Container.GetContainerItemID(bag, slot) ~= 202
+        end })
+        -- No item context active (ItemUtil.lua: GetItemContextMatchResultForItem says it does not apply).
+        override(_G, "ItemButtonUtil", {
+          ItemContextMatchResult = { Match = MATCH, Mismatch = MISMATCH, DoesNotApply = DOES_NOT_APPLY },
+          GetItemContext = function() return nil end,
+          GetItemContextMatchResultForItem = function() return DOES_NOT_APPLY end,
+        })
+        override(addon, "atGuildBank", nil)
+      end)
+
+      local function dim(slotkey)
+        return items.slotInfo[0].itemsBySlotKey[slotkey].itemContextMatchResult
+      end
+
+      local function guildAsked()
+        local out = asked
+        asked = {}
+        table.sort(out)
+        return out
+      end
+
+      it("dims what it refuses while it is open, and nothing once it closes", function()
+        local kept = refreshBackpack().itemsBySlotKey["0_2"]
+        assert.are.equal(DOES_NOT_APPLY, dim("0_2"), "closed")
+        assert.are.same({}, guildAsked(), "nothing asked of it while it is closed")
+        addon.atGuildBank = true
+        refreshBackpack({ derive = true, categoriesUnchanged = true })
+        assert.are.equal(kept, items.slotInfo[0].itemsBySlotKey["0_2"], "a kept item's dimming is worked out again")
+        assert.are.equal(MISMATCH, dim("0_2"))
+        assert.are.equal(DOES_NOT_APPLY, dim("0_1"), "what it takes is left alone")
+        assert.are.same({ "0:1", "0:2" }, guildAsked())
+        addon.atGuildBank = false
+        refreshBackpack({ derive = true, categoriesUnchanged = true })
+        assert.are.equal(DOES_NOT_APPLY, dim("0_2"))
+        assert.are.same({}, guildAsked())
+      end)
+
+      it("keeps the dimming it worked out while it stays open", function()
+        addon.atGuildBank = true
+        refreshBackpack()
+        guildAsked()
+        refreshBackpack({ derive = true, categoriesUnchanged = true })
+        assert.are.equal(MISMATCH, dim("0_2"))
+        assert.are.same({}, guildAsked())
+      end)
+
+      it("dims nothing on a client without the check (TBC Anniversary, Mists)", function()
+        override(_G, "C_Bank", {})
+        addon.atGuildBank = true
+        refreshBackpack()
+        assert.are.equal(DOES_NOT_APPLY, dim("0_2"))
+      end)
+
+      it("leaves an item another window's context matches alone", function()
+        override(_G.ItemButtonUtil, "GetItemContext", function() return 15 end)
+        override(_G.ItemButtonUtil, "GetItemContextMatchResultForItem", function() return MATCH end)
+        addon.atGuildBank = true
+        refreshBackpack()
+        assert.are.equal(MATCH, dim("0_2"))
+      end)
+
+      it("does not dim the bank's items", function()
+        mockContainer[6] = { { itemID = 202, guid = "guid-202b", count = 1 } }
+        addon.atGuildBank = true
+        assert.are.equal(MATCH, items:ResolveItemContextMatchResult({ bagid = 6, slotid = 1, itemInfo = {} }))
+        assert.are.same({}, guildAsked())
+      end)
+    end)
+
     -- Pet counts follow the account. Nothing is asked before the pet journal has loaded (a login
     -- capture: 0 owned until PET_JOURNAL_LIST_UPDATE); the journal's events recalculate the bags
     -- holding a pet item whose counts changed, and nothing else.

@@ -147,6 +147,34 @@ nothing.
   `bags/Rederive` naming no kind recalculates every kind. `guildLoad` says why a read ran
   (`"primed"`, `"timeout"`), for profiler traces.
 
+## 3a. Dimming what it refuses in the backpack (issue #768)
+
+While the guild bank is open, a backpack item it would refuse is dimmed, as an item the Warbank
+refuses is at the bank and one that cannot be posted is at the Auction House (item-drawing.md §8).
+With both bag designs: the flag is the guild bank's own (`addon.atGuildBank`, §2), set whether or not
+BetterBags Next's panel shows the guild bank, and the backpack is BetterBags' either way.
+
+- **The check:** `C_Bank.IsItemAllowedInBankType(Enum.BankType.Guild, itemLocation)`
+  (`BankDocumentation.lua`; `Enum.BankType` is Character 0, Guild 1, Account 2 on retail and WoW:
+  Forever). Blizzard has no item context for the guild bank and its own code asks the check only of
+  the bank and the Warbank, so what it answers for the guild bank has not been seen (§7). Written
+  without a capture, at the user's request; the Dump tab's probe records the check's answer for every
+  bank type (`bankAllowed`, data-driven.md), so one dump at a guild bank settles it.
+- **Where:** `items:ResolveItemContextMatchResult`, after the Auction House's rule, for backpack items
+  only; a window's own item context wins. A client without the check (TBC Anniversary, Mists: the
+  `classic` and `classic_anniversary` branches' `BankDocumentation.lua` have no such function) dims
+  nothing. Only the item: a tab the player cannot deposit in, or a full one, dims nothing.
+- **When:** the guild banker interaction recalculates the backpack on open and close (`core/hooks.lua`),
+  and `contextSignature` holds the flag, so kept grey-out is worked out again. The guild bank's listener
+  and the interaction's are separate, and the recalculation reads the flag a step after both ran:
+  their order does not matter (the whole-addon spec passes with them swapped).
+- **Left as is (bug review):** with the game menu showing as the guild bank opens, `OpenInteractionWindow`
+  returns before it recalculates (or opens) the backpack, while the guild bank's listener still sets the
+  flag: nothing dims until the next backpack read in the visit (a loot, a deposit), then everything that
+  should. Closing clears it as usual. At the Auction House that early return leaves the flag unset, so
+  nothing dims all visit. Making the early return recalculate for one window would split it by case;
+  nobody has reported opening the guild bank behind the game menu.
+
 ## 4. Two views
 
 - **All Tabs** (`GUILD_BANK_ALL_TAB`, the Category view): every tab's items in the categories the
@@ -385,6 +413,10 @@ None of it has been seen in a client. Per data-driven.md, the first visit should
   and out of combat. `Logs/taint.log` should have no BetterBags entries blocking an action.
 - Whether the server answers a query for every tab with `GUILDBANKBAGSLOTS_CHANGED` (Syndicator relies
   on it), and whether Blizzard's tab item buttons, under the hidden frame, ever show.
+- **What `C_Bank.IsItemAllowedInBankType(Enum.BankType.Guild, …)` answers** (§3a): a `/bbdb` dump at
+  the guild bank with soulbound, warbound, warbound-until-equipped, bind-on-equip, quest, conjured and
+  unbound items in the backpack (`bankAllowed` beside each), checked against depositing each one. Also
+  whether it answers the same away from the guild bank, and whether a dimmed item draws dimmed.
 - **The views** (§5): a capture of opening Log on All Tabs, Money Log, and Info, with
   `GuildBank.Answered` (each log's and text's `"answered"` or `"timeout"`), `GuildBank.OnLogUpdate` and
   `NextGuildBankPanel.DrawView`. It shows whether every `QueryGuildBankLog` is answered by one
@@ -411,9 +443,6 @@ None of it has been seen in a client. Per data-driven.md, the first visit should
   - Halloween's log glyphs read at 2.9, 2.6 and 3.0 to one on its orange cards (in, out, moved: its `Lime`, `Maroon`,
     `Night`), under WCAG's 3:1 for graphics for in and out: its palette has no green or red darker or lighter that keeps
     the color coding there. Measured, not seen in game; a darker green and red of its own would fix it.
-- Dimming bag items the guild bank would refuse (issue #768): Blizzard has no item context for the
-  guild bank (`ItemButtonUtil.ItemContextEnum` stops at `BankDepositing`, while its own `BankPanel`
-  shows), so it would be a rule of BetterBags' own.
 - Two tabs with the same name share one Free Space entry in All Tabs (entries are keyed by name).
 
 ## 9. Coverage
@@ -423,7 +452,9 @@ None of it has been seen in a client. Per data-driven.md, the first visit should
 the item's tab, placing the cursor's item, moving many items, gold and tabs, "the logs", "the tabs' info
 text"), `spec/next/guildbank_spec.lua` ("its views": every view, one tab chosen down the rail, from All
 Tabs to a tab to the money log and back, reads kept, the search again, the action glyphs, tabs coming into
-view, the rail's order, same-named tabs, editing lost, the visit ending, the box being typed in), `spec/integration/guild_bank_spec.lua` ("shows the money log from the rail's foot"),
+view, the rail's order, same-named tabs, editing lost, the visit ending, the box being typed in), `spec/integration/guild_bank_spec.lua` ("shows the money log from the rail's foot"; "dims the backpack's items the
+guild bank refuses while it is open", with both bag designs), `spec/refresh_pipeline_spec.lua` ("at the guild bank"),
+`spec/debug/itemprobe_spec.lua` ("records whether each bank takes the item"),
 `spec/guildbank_pipeline_spec.lua` (reading, kept slots, cold reads, binding, derive, both views,
 stacking across tabs, empty slots in place, the shared index, an ended read), `spec/tooltip_spec.lua`
 ("guild bank items"), `spec/loader_spec.lua` (`PrimeGuildBank`), `spec/refresh_spec.lua` ("the guild
