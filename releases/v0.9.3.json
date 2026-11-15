@@ -1,0 +1,223 @@
+{
+  "id": 1794767511,
+  "version": "v0.9.3",
+  "channel": "release",
+  "date": "2026-11-15",
+  "from": "v0.9.2",
+  "to": "v0.9.3",
+  "headline": "Adds a Food \u0026 Drink bar, bag anchors, Auto Deposit, per-interaction bag controls, single-category sharing, guild bank logs, and numerous fixes.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "Food and Drink bar for quick eating and drinking",
+      "details": "BetterBags Next now includes a floating Food \u0026 Drink bar (Settings \u003e Food \u0026 Drink) showing your highest or lowest item-level food and drink. Right-click a button to consume it, drag to move the bar, or drop it on the backpack to hide it.",
+      "clients": []
+    },
+    {
+      "category": "New",
+      "title": "Drop items on a bag title to assign a category",
+      "details": "In BetterBags Next, dropping an item on the backpack or bank title (or the bag button in Plain) opens a filterable category picker. Assign the item to any category, return it to its natural category, or create a new one on the spot.",
+      "clients": []
+    },
+    {
+      "category": "New",
+      "title": "Bag anchors and corner growth for small bags",
+      "details": "Small Next bags now grow from a held corner, and small backpack and bank bags gain an Anchor button (replacing Sort; right-click the title bar to sort). Click to show a 4-quadrant anchor square or lock the bag; dragging the title bar anchors to a bottom corner.",
+      "clients": []
+    },
+    {
+      "category": "New",
+      "title": "Log, Money Log, and Info tabs in the Next guild bank",
+      "details": "BetterBags Next's guild bank now includes Log, Money Log, and Info tabs at the bottom of its tab rail. Log entries display color-coded deposit, withdraw, and move icons, and authorized members can edit tab info text.",
+      "clients": []
+    },
+    {
+      "category": "New",
+      "title": "Auto Deposit items to Bank or Warbank by category",
+      "details": "Categories now have an Auto Deposit toggle and Deposit Into dropdown (Bank or Warbank, where available) under their Automation tab to deposit matching items when the bank opens. Hold Shift to skip depositing during a visit.",
+      "clients": []
+    },
+    {
+      "category": "New",
+      "title": "Choose bag behavior for each NPC and trade window",
+      "details": "General \u003e Interactions now offers a dropdown for each interaction (vendor, bank, mail, auction house, trade, and more) in both designs. Choose Open and Close (default), Open Only, or Leave Alone.",
+      "clients": []
+    },
+    {
+      "category": "New",
+      "title": "Export and import individual categories",
+      "details": "Your categories now have an Export button on the Categories page to share a single category. Importing one in Settings \u003e Profiles \u003e Import / Export lets you replace a matching category or keep both while keeping your own automation settings.",
+      "clients": []
+    },
+    {
+      "category": "New",
+      "title": "View and convert Blizzard categories in settings",
+      "details": "The Categories page now lists active Blizzard-built categories under Blizzard Categories with a Convert to Category button. Dropping an item on a Blizzard header or naming or renaming a category after one converts it too; converted categories cannot use Group By.",
+      "clients": []
+    },
+    {
+      "category": "New",
+      "title": "Hide Empty Groups option for backpack and bank",
+      "details": "A new Hide Empty Groups toggle on each bag's Layout tab under Tabs (off by default, both designs) hides tabs for empty groups. All group tabs reappear while dragging a section so you can still drop categories onto them.",
+      "clients": []
+    },
+    {
+      "category": "New",
+      "title": "Gap Between Sections layout toggle in BetterBags Next",
+      "details": "A new Gap Between Sections toggle on the Backpack, Bank, and Guild Bank Layout tabs under Sections (off by default) keeps one empty grid cell between side-by-side sections.",
+      "clients": []
+    },
+    {
+      "category": "New",
+      "title": "Sort items by Sell Price (Stack) and Sell Price (Each)",
+      "details": "Each bag's Item Order dropdown adds Sell Price (Stack) and Sell Price (Each), sorting items from highest vendor value to lowest with unsellable items placed last.",
+      "clients": []
+    },
+    {
+      "category": "New",
+      "title": "Show Mythic Keystone level on item buttons",
+      "details": "Mythic Keystones now show their key level on item buttons, tinted by level when Show Item Level Color is enabled. Toggle this with Show Keystone Level under the Item Level section on the Backpack and Bank pages.",
+      "clients": [
+        "Retail"
+      ]
+    },
+    {
+      "category": "New",
+      "title": "Toggles to disable Next vendor and guild bank windows",
+      "details": "Enable Vendor Window (Vendor \u003e General) and Enable Guild Bank Window (Guild Bank \u003e General) let you switch back to Blizzard's frames immediately without reloading. With the vendor window off, Auto Sell confirmations sell by right-clicking the category title.",
+      "clients": []
+    },
+    {
+      "category": "New",
+      "title": "Toggle to disable QuickFind integration",
+      "details": "A new Enable QuickFind Integration toggle under Integrations \u003e QuickFind (on by default) lets you turn the QuickFind item source and login message off immediately without reloading.",
+      "clients": []
+    },
+    {
+      "category": "Improved",
+      "title": "Per-bag Size and General settings tabs, plus Vendor page",
+      "details": "Size settings (Icon Scale, Bag Scale, Autosize, Fit Names While Open) moved from Appearance to a Size tab on each bag's page, including a new Vendor page (with Autosize defaulting to off). Bank, Guild Bank, and Vendor enable toggles are now on each bag's General tab.",
+      "clients": []
+    },
+    {
+      "category": "Improved",
+      "title": "Compact export format and safer category imports",
+      "details": "Exporting categories now uses a compact format starting with !BB2!, and Settings \u003e Profiles \u003e Import / Export parses both new and older !BB strings strictly as data without running code.",
+      "clients": []
+    },
+    {
+      "category": "Improved",
+      "title": "Improved vendor quantity dialog with -, + and Max",
+      "details": "Shift-clicking a vendor item in BetterBags Next now opens a quantity dialog with -, + and Max buttons, pre-filled with one purchase's stack size and counting held currencies where supported. It no longer opens if you cannot afford any.",
+      "clients": []
+    },
+    {
+      "category": "Improved",
+      "title": "Plain theme full bags dock clear of screen edges",
+      "details": "In BetterBags Next's Plain theme, full-height docked bags now leave an 8-pixel margin at the top and bottom so frame artwork and the bag button no longer clip off the edge of the screen.",
+      "clients": []
+    },
+    {
+      "category": "Improved",
+      "title": "Plain bag button right-clicks to sort and adds menu items",
+      "details": "Right-clicking the bag button in BetterBags Next's Plain theme now sorts the backpack or bank (shown in its tooltip). Its menu also includes Sort and Small Bags across all panels.",
+      "clients": []
+    },
+    {
+      "category": "Improved",
+      "title": "Bag tab icons align neatly along the tab rail",
+      "details": "In BetterBags Next, icons on shown bag tabs now align in a single vertical column beside the panel edge instead of shifting horizontally with each tab's name.",
+      "clients": []
+    },
+    {
+      "category": "Improved",
+      "title": "Bags with slot gaps re-sort out-of-order items on close",
+      "details": "When Preserve Empty Slots as Gaps is enabled, closing a bag now re-sorts sections if newly looted items or growing stacks ended up out of order under the active Item Order.",
+      "clients": []
+    },
+    {
+      "category": "Fixed",
+      "title": "Blizzard panels open beside Next windows, not behind",
+      "details": "Blizzard frames such as the Character pane and Dressing Room now open beside BetterBags Next's vendor, bank, and guild bank windows instead of appearing underneath them.",
+      "clients": []
+    },
+    {
+      "category": "Fixed",
+      "title": "Deleting the active group switches to the default group",
+      "details": "Deleting the group tab you are currently viewing in either design now switches to the default group and refreshes it immediately so the deleted group's categories reappear.",
+      "clients": []
+    },
+    {
+      "category": "Fixed",
+      "title": "Classic backpack stays on its active group tab",
+      "details": "The classic backpack now stays on the group tab you last viewed instead of resetting the tab highlight to Backpack when renaming groups, toggling settings, or reopening.",
+      "clients": []
+    },
+    {
+      "category": "Fixed",
+      "title": "Papercraft font no longer sticks on item buttons",
+      "details": "Item stack counts and item level numbers no longer keep the Papercraft theme's hand-drawn font after ending a theme preview or switching to another theme or the classic design.",
+      "clients": []
+    },
+    {
+      "category": "Fixed",
+      "title": "Items dim for Feed Pet, enchants, and weapon stones",
+      "details": "Bag items now dim properly again when targeting spells or effects such as Feed Pet, enchants, and sharpening stones.",
+      "clients": [
+        "Retail",
+        "Forever"
+      ]
+    },
+    {
+      "category": "Fixed",
+      "title": "Docked vendor sections return if items remain unsold",
+      "details": "When a category or dragged section in BetterBags Next's vendor dock skips unsellable or protected items, it now returns to the backpack instead of flying into the vendor as if empty.",
+      "clients": []
+    },
+    {
+      "category": "Fixed",
+      "title": "Next vendor shows tooltips for alternate costs",
+      "details": "Hovering over a currency or item cost besides gold on a BetterBags Next vendor card now shows that cost's own tooltip instead of the sold item's tooltip.",
+      "clients": []
+    },
+    {
+      "category": "Fixed",
+      "title": "Junk gold coin icon updates reliably at vendors",
+      "details": "Junk items in your bags now consistently show Blizzard's gold coin icon when a vendor opens and remove it when the vendor closes.",
+      "clients": []
+    },
+    {
+      "category": "Fixed",
+      "title": "Specialized bag empty slots show their own bag icons",
+      "details": "Empty slots in quivers, ammo pouches, soul bags, profession bags, reagent bags, and the keyring now display their own bag-type icon instead of the herbalism leaf.",
+      "clients": []
+    },
+    {
+      "category": "Fixed",
+      "title": "Keyring hides locked slots and sorts last in Show Bags",
+      "details": "In Show Blizzard Bags, the keyring now shows only its unlocked open slots instead of padlocked slots and appears last after all other bags.",
+      "clients": [
+        "Classic",
+        "Forever"
+      ]
+    },
+    {
+      "category": "Fixed",
+      "title": "Clamp Bags to Screen keeps small bag tabs on screen",
+      "details": "With Clamp Bags to Screen enabled, small BetterBags Next bags now keep their side tab rail inside the screen bounds as well as the bag body.",
+      "clients": []
+    },
+    {
+      "category": "Fixed",
+      "title": "Chained bags stay aligned past screen edges",
+      "details": "With Clamp Bags to Screen turned off, dragging a chained pair of small BetterBags Next bags past the edge of the screen no longer breaks their alignment.",
+      "clients": []
+    },
+    {
+      "category": "Fixed",
+      "title": "Updated Enable Groups tooltip for both designs",
+      "details": "The Enable Groups tooltip now says \"Show group tabs on the backpack.\" instead of claiming the tabs are always at the bottom.",
+      "clients": []
+    }
+  ]
+}
