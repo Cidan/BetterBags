@@ -244,7 +244,8 @@ Right-click context menu system.
 - Anchor controls
 - Character bank tabs toggle (retail)
 - Bank tab purchases
-- Sort operations
+- Sort operations (Sort Bank only sorts; Clean Up Warbank)
+- The Warbank's item deposit, with a Warbank: Deposit All Warbound Items (the bank's deposit, which asks first when a refund would end) and Include tradeable reagents (the client's `bankAutoDepositReagents` CVar), Blizzard's button and checkbox in Blizzard's words (`.claude/rules/warbank-deposit.md`)
 
 ### Tabs (`tabs.lua`)
 

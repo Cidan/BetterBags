@@ -25,8 +25,10 @@ The button registers `LeftButtonUp`/`RightButtonUp` and branches on the click ar
   (`const.ACCOUNT_BANK_BAGS[bag.bankTab]`), else `bags/SortBank`. No auto-deposit happens on a
   plain right-click. (The membership test replaced the old `bag.bankTab <= CharacterBankTab_6`
   bound, which misrouted character tabs 7-9 on 9-tab clients.)
-- **Shift + right-click, bank (retail with warbank)** — **deposit** eligible items into the
-  Warbank (`C_Bank.AutoDepositItemsIntoBank(Enum.BankType.Account)`). No sort.
+- **Shift + right-click, bank (retail with warbank)** — **deposit** every warbound item into the
+  Warbank through the bank's own deposit (`bag.behavior:DepositWarboundItems()`), which asks first
+  when the deposit would end a refund, as Blizzard's Deposit All Warbound Items button does
+  (warbank-deposit.md). No sort.
 - **Right-click, bank (retail *without* warbank — WoW: Forever, `addon.isRetail` and not
   `addon.hasWarbank`)** — always `bags/SortBank`; there is no Warbank, so no shift-deposit and
   no `bags/SortWarbank` branch. See camelot-forever.md §4.
@@ -39,8 +41,9 @@ now split — plain right-click sorts, shift+right-click deposits.
 
 The hover tooltip (the button's `OnEnter`, same file) must mirror the click map. The retail
 bank tooltip lists **Right Click → Sort Bank** and, **only when `addon.hasWarbank`**, **Shift
-Right Click → Deposit Warbank Items** (on Forever the deposit line is omitted). Keep these in
-sync whenever the click branches change.
+Right Click → Deposit All Warbound Items** (Blizzard's `ACCOUNT_BANK_DEPOSIT_BUTTON_LABEL`, the name
+the bank's menu gives it too; on Forever the deposit line is omitted). Keep these in sync whenever
+the click branches change.
 
 The right click is `BagMenuButton:Sort(ctx, bag)`, which a theme's Sort action button
 (window.md, "Action buttons") and BetterBags Next's bank sort button (next.md §6, retail) call
@@ -74,7 +77,8 @@ backpack with the bank open (retail)", "…(classic)", and the unchanged closed-
 
 ## 3. The menu a left-click opens (`frames/contextmenu.lua`, `CreateContextMenu`)
 
-The toggles come first, then Bag Anchor, then the bank's sorts, then the common entries:
+The toggles come first, then Bag Anchor, then the bank's sorts and its Warbank deposit, then the
+common entries:
 
 | Backpack | Bank |
 |---|---|
@@ -83,6 +87,8 @@ The toggles come first, then Bag Anchor, then the bank's sorts, then the common 
 | Show Bag Button | Bag Anchor ▸ |
 | Bag Anchor ▸ | Sort Bank |
 | | Clean Up Warbank (with a Warbank) |
+| | Deposit All Warbound Items (with a Warbank) |
+| | Include tradeable reagents (with a Warbank) |
 | Switch to Next | |
 | What's New | What's New |
 | Open Options Screen | Open Options Screen |
@@ -102,7 +108,15 @@ bags cannot switch.
   The options screen reads the same setting when it opens.
 - New strings ("Drag to Resize" and its tooltip) have no translations yet and show in English
   (`L:G` falls back to the key), like "What's New".
+- **Sort Bank** only sorts (`bags/SortBank`). It used to deposit every reagent into the character
+  bank first, unseen; that was removed (warbank-deposit.md §3).
+- **Deposit All Warbound Items** and **Include tradeable reagents** are Blizzard's button and
+  checkbox under its Warbank, which BetterBags hides, in Blizzard's words (warbank-deposit.md): the
+  first is the bank's deposit (`bag.behavior:DepositWarboundItems()`, asking first when a refund
+  would end, as the Shift right click does); the second toggles the client's
+  `bankAutoDepositReagents` CVar, checked while `GetCVarBool` says so. Their tooltips' text is new
+  and shows in English.
 
 Coverage: `spec/frames/contextmenu_spec.lua` ("menu order and Drag to Resize": the backpack, the
-retail bank, a bank without a Warbank, and the toggle on both bags). Each guard was
-mutation-tested.
+retail bank, a bank without a Warbank, and the toggle on both bags; "the Warbank's deposit": the
+deposit entries and Sort Bank depositing nothing). Each guard was mutation-tested.

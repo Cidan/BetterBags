@@ -464,6 +464,29 @@ describe("The settings catalog", function()
     end
   end)
 
+  -- Blizzard's Include tradeable reagents checkbox under its Warbank (issue #750, warbank-deposit.md): the client's own
+  -- setting, which Deposit All Warbound Items reads, on the bank's page alone.
+  it("includes tradeable reagents in the Warbank's deposit by the client's own setting, the bank's alone", function()
+    override(_G, "_cvars", { bankAutoDepositReagents = "0" })
+    addon.hasGuildBank = true
+    for _, bag in ipairs(catalog:Bags()) do
+      assert.are.equal(bag.kind == bank.kind, catalog:Has("bankAutoDepositReagents", bag), bag.name)
+    end
+    local setting = catalog:Get("bankAutoDepositReagents", bank)
+    assert.are.equal("toggle", setting.kind)
+    assert.are.equal("Include Tradeable Reagents", setting.title)
+    assert.is_truthy(setting.description:find("Deposit All Warbound Items", 1, true))
+    assert.is_nil(setting.reload)
+    assert.is_false(setting.get(ctx()))
+    setting.set(ctx(), true)
+    assert.are.equal("1", _G._cvars.bankAutoDepositReagents)
+    assert.is_true(setting.get(ctx()))
+    setting.set(ctx(), false)
+    assert.are.equal("0", _G._cvars.bankAutoDepositReagents)
+    assert.is_false(setting.get(ctx()))
+    assert.are.same({}, sent, "nothing to show again: only a deposit reads it")
+  end)
+
   it("says a change was refused", function()
     local switched = true
     override(bagSystem, "Switch", function(_, _, design)

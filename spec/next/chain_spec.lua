@@ -35,10 +35,15 @@ local stubs = {
   bankBehavior = trackStub("BankBehavior"),
   bankSlots = trackStub("BankSlots"),
   menuButton = trackStub("BagMenuButton"),
+  -- The bank asks a Warbank deposit's question in it (next/bank.lua); nothing here asks one.
+  dialog = trackStub("NextDialog"),
   sectionFrame = trackStub("SectionFrame"),
   categories = trackStub("Categories"),
   bagButton = trackStub("BagButton"),
 }
+if stubs.dialog.IsShown == nil then
+  function stubs.dialog:IsShown() return false end
+end
 
 local replaced = {}
 local function override(tbl, key, value)

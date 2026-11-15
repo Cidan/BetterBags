@@ -39,6 +39,9 @@ local nextPanel = addon:GetModule('NextPanel')
 ---@class NextPixel: AceModule
 local pixel = addon:GetModule('NextPixel')
 
+---@class NextDialog: AceModule
+local nextDialog = addon:GetModule('NextDialog')
+
 -- NextBank is BetterBagsNext's bank (next.md §6): the backpack's panel mirrored on the left of the
 -- screen (next/panel.lua). It does what the classic retail, WoW: Forever and Classic banks do,
 -- reusing their code wherever it is not drawing: the groups and the Warbank, Blizzard's bank tabs
@@ -99,6 +102,10 @@ function nextBank:Create(ctx)
     SwitchToBlizzardTab = function(_, ectx, bagIndex)
       b:SwitchToBlizzardTab(ectx, bagIndex)
     end,
+    -- The menu button's Shift right click (BagMenuButton:Sort), from a right click on the title.
+    DepositWarboundItems = function()
+      b:DepositWarboundItems()
+    end,
   }
   b:BuildPurchaseBankButton()
   return b
@@ -117,12 +124,32 @@ function bankProto:GetHeaderButtons()
       onClick = function(ctx) self:ToggleBankTabs(ctx) end })
   end
   if addon.hasWarbank then
-    table.insert(buttons, { key = "depositButton", tooltip = L:G("Deposit Warbank Items"),
-      onClick = function() C_Bank.AutoDepositItemsIntoBank(Enum.BankType.Account) end })
+    table.insert(buttons, { key = "depositButton", tooltip = ACCOUNT_BANK_DEPOSIT_BUTTON_LABEL,
+      onClick = function() self:DepositWarboundItems() end })
   end
   -- The anchor (docs/next-bag-anchor.md), where the sort button was: a right click on the title sorts (OnTitleRightClick).
   table.insert(buttons, self:AnchorButton())
   return buttons
+end
+
+-- DepositWarboundItems puts every warbound item in the bags into the Warbank (BankBehavior:DepositWarbound): at once,
+-- or, when that would end a refund, once the player accepts Blizzard's question (its button's, BankFrame.lua), asked in
+-- the dialog over the bank. Nothing is asked, or deposited, over a dialog another window shows: there is one dialog,
+-- and showing it again would replace that one unanswered.
+function bankProto:DepositWarboundItems()
+  bankBehavior:DepositWarbound(function(deposit)
+    if nextDialog:IsShown() then
+      return
+    end
+    nextDialog:Show(self.frame, {
+      title = ACCOUNT_BANK_DEPOSIT_BUTTON_LABEL,
+      text = ACCOUNT_BANK_DEPOSIT_ALL_NO_REFUND_CONFIRM,
+      buttons = {
+        { text = L:G("Cancel"), onClick = function() end },
+        { text = L:G("Deposit"), style = "Danger", onClick = function() deposit() end },
+      },
+    })
+  end)
 end
 
 -- CanSort says the client can sort the bank (SortBankBags).
@@ -656,9 +683,13 @@ function bankProto:EndBankInteraction()
 end
 
 -- Hide slides the panel out; on retail it ends the bank interaction at once, as the classic
--- bank's hook on its Hide does.
+-- bank's hook on its Hide does. Its own question (a Warbank deposit's) closes at once, answering
+-- Cancel, as the bank it was asked of is gone.
 ---@param ctx Context
 function bankProto:Hide(ctx)
+  if nextDialog:IsShown() and nextDialog.owner == self.frame then
+    nextDialog:Hide()
+  end
   nextPanel.proto.Hide(self, ctx)
   if addon.isRetail then
     self:EndBankInteraction()

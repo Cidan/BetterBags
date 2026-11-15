@@ -36,7 +36,9 @@ The Bags group lists Backpack, Bank, Guild Bank (Next, on a client with one) and
 
 - **General tab**, first, on a bag with a switch that leaves it to Blizzard's own window (`generalTab`): the bank's
   (Enable Bank Bags, section "Bank Window", both designs), the guild bank's (Enable Guild Bank Window, "Guild Bank
-  Window") and the vendor's (Enable Vendor Window, "Vendor Window"). The backpack is always BetterBags', has no switch,
+  Window") and the vendor's (Enable Vendor Window, "Vendor Window"). The bank's has a second section after its switch,
+  "Warbank", where there is one (the row's `hidden`): Include Tradeable Reagents (`bankAutoDepositReagents`, both
+  designs), what its Deposit All Warbound Items takes (warbank-deposit.md). The backpack is always BetterBags', has no switch,
   and so no General tab: a tab with nothing in it would be a tab for its own sake. General keeps the switches for every
   bag (BetterBags Next, Show Blizzard Bag Button, Clamp Bags to Screen, Enable Bag Fading, Animate Item Movement).
 - **Size tab** (`sizeTab`, BetterBags Next only, after Layout): Icon Scale, Bag Scale, Autosize, Fit Names While Open,
@@ -63,6 +65,9 @@ The Bags group lists Backpack, Bank, Guild Bank (Next, on a client with one) and
   message with the bag's kind: `next/ScalesChanged`, `next/AutosizeChanged`, `next/FitNamesChanged`.
 - **The switches** are bag settings of one bag each: `enableBankBags` (`only = { BANK }`), `nextVendor`
   (`only = { VENDOR }`), `nextGuildBank` (`only = { GUILD }`). Their get and set are unchanged.
+- **Include Tradeable Reagents** (`bankAutoDepositReagents`, `only = { BANK }`) reads and writes the client's own
+  `bankAutoDepositReagents` CVar (`GetCVarBool`, `SetCVar`), kept per character, and sends nothing: only a Warbank deposit
+  reads it. The window shows it again on `CVAR_UPDATE` for it, a change made elsewhere (warbank-deposit.md §3).
 
 ## 3. What is saved (`core/constants.lua`, `core/database.lua`)
 
