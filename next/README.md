@@ -113,6 +113,11 @@ tab's categories in their order, Free Space) and draws the static per-slot item 
 44 pixels; `NextContent:Render` lays them out in one column inside the panel's scroll box, through
 Motion so what changed place glides there. A draw while the panel is hidden waits for it to open.
 
+Each bag's Layout tab can set its sections out side by side instead, read from the panel at every layout
+(`NextPanel:SectionColumns`, `NextContent:SetColumnSource`): Section Columns, Compact Sections, Gap Between Sections (an
+empty cell of the grid between sections side by side), Fill Order and the wide sections' two settings. Every icon in a
+bag stands on one grid. The rules are in `.claude/rules/next-columns.md` §7a to §7c.
+
 ## A small panel's width
 
 A small panel's width sits on a grid step, whole cells of icons and the room beside them, at the first step from

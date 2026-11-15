@@ -189,6 +189,7 @@ describe("BetterBags Next's small mode", function()
     override(stubs.database, "GetNextSectionFill", function() return "across" end)
     override(stubs.database, "GetNextSectionSpan", function() return false end)
     override(stubs.database, "GetNextSectionCompact", function() return false end)
+    override(stubs.database, "GetNextSectionGap", function() return false end)
     override(stubs.database, "GetNextSectionWideRows", function() return 2 end)
     override(stubs.database, "SetNextSize", function(_, size) db.size = size end)
     -- Where a small panel was left before it held its bottom corner (docs/next-bag-anchor.md): its top left, taken over the

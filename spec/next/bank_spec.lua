@@ -183,6 +183,7 @@ describe("NextBank", function()
     override(stubs.database, "GetNextSectionFill", function() return "across" end)
     override(stubs.database, "GetNextSectionSpan", function() return false end)
     override(stubs.database, "GetNextSectionCompact", function() return false end)
+    override(stubs.database, "GetNextSectionGap", function() return false end)
     override(stubs.database, "GetNextSectionWideRows", function() return 2 end)
     override(stubs.database, "GetInBagSearch", function() return db.inBagSearch end)
     db.tabOrder = {}

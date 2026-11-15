@@ -1999,7 +1999,7 @@ describe("NextContent", function()
       local function compact(opts)
         opts = opts or {}
         canvas:SetColumnSource(function()
-          return opts.columns or 2, opts.fill or "across", opts.span ~= false, opts.rows or 2, true
+          return opts.columns or 2, opts.fill or "across", opts.span ~= false, opts.rows or 2, true, opts.gap == true
         end)
       end
 
@@ -2853,16 +2853,20 @@ describe("NextContent", function()
           return { name = name, start = where[1] / STEP, cells = (s.frame:GetWidth() + GAP) / STEP, top = where[2], height = s.height }
         end
 
-        local function clash(a, b)
-          return not (a.start + a.cells <= b.start or b.start + b.cells <= a.start
+        -- With a gap between sections, one empty cell stands between two sections side by side.
+        local function clash(a, b, apart)
+          apart = apart or 0
+          return not (a.start + a.cells + apart <= b.start or b.start + b.cells + apart <= a.start
             or a.top + a.height + SPACING <= b.top or b.top + b.height + SPACING <= a.top)
         end
 
-        it("keeps what was asked, in 400 random bags", function()
-          math.randomseed(1244)
+        for _, case in ipairs({ { apart = 0, seed = 1244, title = "" }, { apart = 1, seed = 1312, title = ", a gap between sections" } }) do
+        it("keeps what was asked, in 400 random bags" .. case.title, function()
+          math.randomseed(case.seed)
           local rand = math.random
+          local apart = case.apart
           for _ = 1, 400 do
-            local opts = { columns = rand(2, 4), span = rand(1, 3) > 1, rows = rand(2, 4) }
+            local opts = { columns = rand(2, 4), span = rand(1, 3) > 1, rows = rand(2, 4), gap = apart == 1 }
             compact(opts)
             local cells = rand(2, 14)
             local list = randomBag(rand)
@@ -2888,7 +2892,8 @@ describe("NextContent", function()
                 assert.are.equal(0, (where[1] + ix) % STEP, "every icon on one grid across")
               end
               for _, other in ipairs(blocks) do
-                assert.is_false(clash(block, other), name .. " and " .. other.name .. " overlap, or stand closer than the spacing")
+                assert.is_false(clash(block, other, apart), name .. " and " .. other.name
+                  .. " overlap, or stand closer than the spacing or the gap")
               end
               -- As high as it can stand, in its shape, with what stands before it in the list: right at the top, or right under one.
               local tops = { 0 }
@@ -2901,7 +2906,7 @@ describe("NextContent", function()
                     local higher = { start = start, cells = block.cells, top = top, height = block.height }
                     local blocked = false
                     for _, other in ipairs(blocks) do
-                      blocked = blocked or clash(higher, other)
+                      blocked = blocked or clash(higher, other, apart)
                     end
                     assert.is_true(blocked, name .. " would fit higher, at " .. start .. "," .. top)
                   end
@@ -2911,12 +2916,14 @@ describe("NextContent", function()
             end
           end
         end)
+        end
 
-        it("keeps every section where it stands when a window snaps to what it says it needs", function()
-          math.randomseed(1245)
+        for _, case in ipairs({ { gap = false, seed = 1245, title = "" }, { gap = true, seed = 1313, title = ", a gap between sections" } }) do
+        it("keeps every section where it stands when a window snaps to what it says it needs" .. case.title, function()
+          math.randomseed(case.seed)
           local rand = math.random
           for _ = 1, 300 do
-            compact({ columns = rand(2, 4), span = rand(1, 3) > 1, rows = rand(2, 4) })
+            compact({ columns = rand(2, 4), span = rand(1, 3) > 1, rows = rand(2, 4), gap = case.gap })
             local cells = rand(4, 20)
             local list = randomBag(rand)
             canvas:ReleaseWidths()
@@ -2936,6 +2943,7 @@ describe("NextContent", function()
             assert.are.equal(snapped, math.min(snapped, canvas:Widest(canvas:RowWidth(snapped))), "and it stays there")
           end
         end)
+        end
       end)
 
       describe("reordering by drag", function()
@@ -3734,7 +3742,7 @@ describe("NextContent", function()
         for seed = 1, 40 do
           math.randomseed(seed)
           local fill = seed % 2 == 0 and "across" or "down"
-          canvas:SetColumnSource(function() return 2 + seed % 3, fill, seed % 4 ~= 0, 2 end)
+          canvas:SetColumnSource(function() return 2 + seed % 3, fill, seed % 4 ~= 0, 2, false, seed % 5 < 2 end)
           local list = {}
           for i = 1, math.random(2, 12) do list[i] = { "S" .. string.format("%02d", i), math.random(1, 30) } end
           sections(list)
@@ -3854,6 +3862,254 @@ describe("NextContent", function()
         draw()
         assert.are.equal(3, canvas:Widest(canvas:RowWidth(12)))
         assert.are.equal(3, canvas:Widest())
+      end)
+    end)
+
+    -- Asked, of sections side by side running together: "let's have an option for 'leave a gap between sections' which keeps
+    -- things 1 icon grid apart", in each bag's layout, off by default. One empty cell of the icon grid stands between two
+    -- sections side by side, so every icon stays on the bag's one grid.
+    describe("a gap between sections", function()
+      local function apart(count, fill, wide, rows)
+        canvas:SetColumnSource(function() return count, fill, wide, rows, false, true end)
+      end
+
+      local function widthOf(name)
+        return canvas.byName[name].frame:GetWidth()
+      end
+
+      it("leaves one empty cell between columns, the spare cells in the first", function()
+        apart(2, "across")
+        sections({ { "A", 8 }, { "B", 8 } })
+        local result = draw()
+        assert.are.same({ 4, 3 }, canvas.grid.split, "eight cells less the one between")
+        assert.are.same({ 0, 0 }, place("A"))
+        assert.are.same({ 5 * STEP, 0 }, place("B"), "a cell further on than without it")
+        assert.are.equal(4 * STEP - style.GAP, widthOf("A"))
+        assert.are.equal(3 * STEP - style.GAP, widthOf("B"))
+        local _, x, y = at(buttons["0_12"].frame)
+        assert.are.same({ 0, -STEP }, { x, y }, "B's fourth item starts its second row")
+        assert.are.equal(height(3), result.Height)
+      end)
+
+      it("keeps every icon on the bag's one grid", function()
+        apart(3, "across")
+        sections({ { "A", 3 }, { "B", 5 }, { "C", 2 } })
+        draw()
+        for _, name in ipairs({ "A", "B", "C" }) do
+          local x = place(name)[1]
+          for _, entry in ipairs(canvas.byName[name].entries) do
+            local _, ix = at(entry.item.frame)
+            assert.are.equal(0, (x + ix) % STEP, name)
+          end
+        end
+      end)
+
+      it("shows fewer columns where the gaps leave no room for them", function()
+        apart(4, "across")
+        sections({ { "A", 1 }, { "B", 1 }, { "C", 1 }, { "D", 1 } })
+        draw()
+        assert.are.same({ 2, 2, 2 }, canvas.grid.split, "four columns of two need eleven cells")
+        assert.are.same({ { 0, 0 }, { 3 * STEP, 0 }, { 6 * STEP, 0 }, { 0, height(1) + SPACING } },
+          { place("A"), place("B"), place("C"), place("D") })
+        apart(2, "across")
+        draw(canvas:RowWidth(4))
+        assert.is_nil(canvas.grid, "two columns of two and a gap need five cells")
+      end)
+
+      it("fills top to bottom with the same gap", function()
+        apart(2, "down")
+        sections({ { "A", 1 }, { "B", 1 }, { "C", 1 }, { "D", 1 } })
+        draw()
+        local row = height(1) + SPACING
+        assert.are.same({ { 0, 0 }, { 0, row }, { 5 * STEP, 0 }, { 5 * STEP, row } },
+          { place("A"), place("B"), place("C"), place("D") })
+      end)
+
+      it("gives a wide section the cells between the columns it spans", function()
+        apart(2, "across", true, 4)
+        sections({ { "A", 16 }, { "B", 1 }, { "C", 1 } })
+        draw()
+        assert.are.equal(style.GRID_WIDTH, widthOf("A"), "the whole row, the gap's cell too")
+        assert.are.same({ 0, height(2) + SPACING }, place("B"))
+        assert.are.same({ 5 * STEP, height(2) + SPACING }, place("C"))
+        apart(3, "across", true, 4)
+        canvas:ReleaseWidths()
+        sections({ { "A", 9 }, { "B", 1 } })
+        draw()
+        assert.are.equal(5 * STEP - style.GAP, widthOf("A"), "two columns of two and the cell between them")
+        assert.are.same({ 6 * STEP, 0 }, place("B"))
+        assert.are.equal(2 * STEP - style.GAP, widthOf("B"))
+      end)
+
+      it("lays out again with or without it, nothing read", function()
+        local on = false
+        canvas:SetColumnSource(function() return 2, "across", false, 2, false, on end)
+        sections({ { "A", 1 }, { "B", 1 } })
+        draw()
+        assert.are.same({ 4 * STEP, 0 }, place("B"))
+        on = true
+        draw()
+        assert.are.same({ 5 * STEP, 0 }, place("B"))
+        on = false
+        draw()
+        assert.are.same({ 4 * STEP, 0 }, place("B"))
+      end)
+
+      it("needs its columns' cells and the ones between them", function()
+        apart(2, "across")
+        sections({ { "A", 3 }, { "B", 1 } })
+        draw()
+        assert.are.equal(7, canvas:Widest(canvas:RowWidth(12)))
+        sections({ { "A", 1 }, { "B", 1 } })
+        draw()
+        assert.are.equal(5, canvas:Widest(canvas:RowWidth(12)), "never so few its columns would go")
+      end)
+
+      it("needs no more than a section spanning columns takes with the cell between them", function()
+        apart(3, "across", true, 2)
+        sections({ { "A", 7 }, { "B", 1 } })
+        draw(canvas:RowWidth(12))
+        assert.are.equal((4 + 1 + 3) * STEP - style.GAP, widthOf("A"), "two columns and the cell between them")
+        local needs = canvas:Widest(canvas:RowWidth(12))
+        assert.are.equal(11, needs, "columns of three: seven in three, the cell between and three")
+        canvas:ReleaseWidths()
+        draw(canvas:RowWidth(needs))
+        assert.are.equal(7 * STEP - style.GAP, widthOf("A"))
+        assert.are.same({ 8 * STEP, 0 }, place("B"), "still beside it")
+      end)
+
+      -- Its drag works out where each place stands for the gap it lays out with.
+      it("works its drag's places out again when the gap changes", function()
+        local on = false
+        canvas:SetColumnSource(function() return 2, "across", false, 2, false, on end)
+        sections({ { "A", 1 }, { "B", 1 }, { "C", 1 } })
+        draw()
+        canvas:BeginDrag(canvas.byName.C)
+        draw()
+        assert.are.equal(4 * STEP, canvas:dragSlots()[2].x)
+        on = true
+        draw()
+        assert.are.equal(5 * STEP, canvas:dragSlots()[2].x)
+        canvas:EndDrag(false)
+      end)
+
+      -- Whatever the bag holds: every icon on one grid, one empty cell at least between sections side by side, rows on one line.
+      it("keeps a cell between sections side by side, across random bags", function()
+        for seed = 1, 60 do
+          math.randomseed(seed)
+          local count, fill = math.random(2, 4), seed % 2 == 0 and "across" or "down"
+          local wide, cells = seed % 3 ~= 0, math.random(4, 16)
+          apart(count, fill, wide, math.random(2, 3))
+          local list = {}
+          for i = 1, math.random(1, 14) do
+            list[i] = { "S" .. string.format("%02d", i), math.random() < 0.3 and math.random(9, 40) or math.random(1, 8) }
+          end
+          canvas:Settle()
+          sections(list)
+          draw(canvas:RowWidth(cells))
+          local lines = {}
+          for _, s in ipairs(canvas.order) do
+            assert.are.equal(0, s.x % STEP, "on the grid, seed " .. seed)
+            lines[s.y] = lines[s.y] or {}
+            table.insert(lines[s.y], s)
+          end
+          for _, line in pairs(lines) do
+            table.sort(line, function(a, b) return a.x < b.x end)
+            for i, s in ipairs(line) do
+              local right = s.x + s.frame:GetWidth()
+              assert.is_true(right <= canvas:RowWidth(cells) + 0.5, "inside the width, seed " .. seed)
+              local nextOne = line[i + 1]
+              if nextOne ~= nil and canvas.grid ~= nil then
+                assert.is_true(nextOne.x - right >= STEP + style.GAP - 0.5, "a cell between, seed " .. seed)
+              end
+            end
+          end
+        end
+      end)
+
+      describe("compact", function()
+        local function compact(opts)
+          opts = opts or {}
+          canvas:SetColumnSource(function()
+            return opts.columns or 2, "across", opts.span ~= false, opts.rows or 2, true, opts.gap ~= false
+          end)
+        end
+
+        it("stands sections side by side a cell apart, each as far left as that leaves it", function()
+          compact()
+          sections({ { "A", 4 }, { "B", 1 }, { "C", 1 } })
+          draw()
+          assert.are.same({ 0, 0 }, place("A"))
+          assert.are.same({ 5 * STEP, 0 }, place("B"))
+          assert.are.same({ 7 * STEP, 0 }, place("C"))
+        end)
+
+        it("takes a narrower shape beside a taller section, a cell apart", function()
+          compact({ span = false })
+          sections({ { "A", 16 }, { "B", 4 } })
+          draw()
+          assert.are.equal(4 * STEP - style.GAP, widthOf("A"))
+          assert.are.same({ 5 * STEP, 0 }, place("B"), "past the cell beside A")
+          assert.are.equal(2 * STEP - style.GAP, widthOf("B"), "two rows of two end higher than four under A")
+        end)
+
+        it("stands a section that does not fit beside another under it", function()
+          compact({ span = false })
+          local long = string.rep("x", 25)
+          sections({ { "A", 4 }, { long, 4 } })
+          draw()
+          assert.are.same({ 0, height(1) + SPACING }, place(long), "its name needs four cells, and three are past the gap")
+        end)
+
+        -- Found by the bug review: drawn again while it shows, each section keeps its cells and only finds its row
+        -- (compactLayout's held places), which must keep the cell beside it clear too.
+        it("keeps a cell between sections drawn again while it shows, across random bags", function()
+          parent:Show()
+          canvas.frame:Show()
+          local function blockOf(s)
+            local where = place(s.name)
+            return { name = s.name, start = where[1] / STEP, cells = (s.frame:GetWidth() + style.GAP) / STEP,
+              top = where[2], height = s.height }
+          end
+          for seed = 1, 300 do
+            math.randomseed(seed)
+            local count, wide, rows = math.random(2, 4), math.random() < 0.5, math.random(2, 3)
+            canvas:SetColumnSource(function() return count, "across", wide, rows, true, true end)
+            local list = {}
+            for i = 1, math.random(2, 9) do
+              list[i] = { "S" .. i .. string.rep("n", math.random(0, 20)), math.random(1, 18) }
+            end
+            canvas:Settle()
+            canvas:ReleaseWidths()
+            sections(list)
+            local cells = math.random(4, 16)
+            draw(canvas:RowWidth(cells))
+            draw(canvas:RowWidth(cells))
+            local blocks = {}
+            for _, s in ipairs(canvas.order) do table.insert(blocks, blockOf(s)) end
+            for i, a in ipairs(blocks) do
+              for j = i + 1, #blocks do
+                local b = blocks[j]
+                local beside = a.top < b.top + b.height + SPACING and b.top < a.top + a.height + SPACING
+                assert.is_false(beside and a.start < b.start + b.cells + 1 and b.start < a.start + a.cells + 1,
+                  a.name .. " and " .. b.name .. " closer than a cell, seed " .. seed)
+              end
+            end
+          end
+        end)
+
+        it("packs afresh when the gap changes while it shows", function()
+          parent:Show()
+          canvas.frame:Show()
+          compact({ gap = false })
+          sections({ { "A", 4 }, { "B", 1 }, { "C", 1 } })
+          draw()
+          assert.are.same({ 4 * STEP, 0 }, place("B"))
+          compact()
+          draw()
+          assert.are.same({ 5 * STEP, 0 }, place("B"))
+          assert.are.same({ 7 * STEP, 0 }, place("C"))
+        end)
       end)
     end)
 
@@ -4068,7 +4324,9 @@ describe("NextContent", function()
           end
           local count, fill = math.random(1, 4), math.random() < 0.5 and "across" or "down"
           local wide, compact, rows = math.random() < 0.5, math.random() < 0.3, math.random(2, 3)
-          canvas:SetColumnSource(function() return count, fill, wide, rows, compact end)
+          -- From the seed, so every bag stays the one it was without the gap.
+          local apart = seed % 3 == 0
+          canvas:SetColumnSource(function() return count, fill, wide, rows, compact, apart end)
           canvas:Settle()
           sections(list, { recent = math.random() < 0.3 and { item("0_99", "Recent Items") } or nil })
           local from = math.random(1, 6)

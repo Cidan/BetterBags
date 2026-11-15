@@ -339,8 +339,8 @@ local function bagPage(id, bag, general, shown, design)
     { id = "layout", title = L:G("Layout"), sections = {
       { title = L:G("Order"), rows = { { setting = 'sectionOrder' }, { setting = 'itemOrder' } } },
       { title = L:G("Sections"), design = "next", rows = {
-        { setting = 'sectionColumns' }, { setting = 'sectionCompact' }, { setting = 'sectionFill' }, { setting = 'sectionSpan' },
-        { setting = 'sectionWideRows' },
+        { setting = 'sectionColumns' }, { setting = 'sectionCompact' }, { setting = 'sectionGap' }, { setting = 'sectionFill' },
+        { setting = 'sectionSpan' }, { setting = 'sectionWideRows' },
       } },
       { title = L:G("Tabs"), rows = { { setting = 'enableGroups' } } },
       { title = L:G("Slots"), rows = { { setting = 'showAllFreeSpace' }, { setting = 'preserveGaps' } } },
@@ -688,8 +688,8 @@ function content:OnEnable()
       settings:Refresh(ctx)
     end
   end)
-  -- A bag's Compact Sections, Fill Order, Wide Sections Span Columns and Wide Column Limit are off at one column, and its
-  -- Fill Order while it is compact.
+  -- A bag's Compact Sections, Gap Between Sections, Fill Order, Wide Sections Span Columns and Wide Column Limit are off at
+  -- one column, and its Fill Order while it is compact.
   events:RegisterMessage('next/SectionColumnsChanged', function(ctx)
     if settings:IsShown() then
       settings:Refresh(ctx)

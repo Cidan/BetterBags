@@ -82,7 +82,8 @@ three are disabled at one column, the limit also with wide sections off. Each se
   each name is measured once (`titleRowWidth`, the sum `titleFits` and `compactTextCells` take, a name cut short by its
   `titleWhole`). Whole names are not monotonic in cells (more cells, more columns, each narrower: the reported bag is whole at three
   cells, cut at four and five, whole from six), so it goes up a cell at a time.
-- **Nothing between columns.** A divider was built and removed, asked: "remove that divider for columns, looks terrible".
+- **Nothing between columns.** A divider was built and removed, asked: "remove that divider for columns, looks terrible". Room
+  between them, an empty cell of the grid, is a bag's Gap Between Sections (§7c).
 - **Dragging reorders, as in one column:** asked, "we're not storing column positions, just list positions here, so what we save is
   still just an ordered list". The room is a place in the list (`drag.index`, as ever): `renderColumns` stands the dragged section there
   among the others, the rows follow, and whatever moved slides there. A drop saves the list as one column does (`SaveOrder`), and tabs,
@@ -254,3 +255,50 @@ drag's slots under Recent Items, their height, how far down they stand; a snap f
 section's start: either alone finds a layout that fits). Rounding a name or a count up alone cannot be told apart either, as any fraction left in the sum still goes past a whole pixel, while both together are caught.
 
 **Not seen in game** since the packing. To check: a bag with wide sections off and a tall section (the reported Consumable 16 with Back, Item Enhancement, Miscellaneous and Quest), on a few themes; drag a section; resize a small panel; loot into a small section with the bag open.
+
+## 7c. A gap between sections (`NextColumnSplit.apart`)
+
+Reported (issue #1312): sections side by side "all run together". They stood only the icon gap apart, the gap between two icons of
+one section (§7a: that gap keeps every icon on one grid), so a row of sections read as one grid. Asked: "let's have an option for
+'leave a gap between sections' which keeps things 1 icon grid apart. this should go in each bag's layout section, disabled by default."
+
+- **The setting:** **Gap Between Sections** (`sectionGap`, per bag, off by default, BetterBags Next only, `DB:GetNextSectionGap`, saved in
+  `nextSectionGap`), in a bag's Layout tab's Sections, after Compact Sections. Off at one column (`disabled`): nothing stands side by side.
+  Sends `next/SectionColumnsChanged`, as the others do: the bag lays out again, nothing read. The panel hands it to the canvas as its column
+  source's sixth value (`panel:SectionColumns`).
+- **One empty cell, on the grid:** on, `ColumnSplit` sets `apart` to 1 (else 0). One cell of the icon grid stands empty between two columns,
+  and the columns share the rest, the spare cells in the first: 8 cells are 4+3 in two columns, 2+2+2 in three; Quiet's 9 are 4+4. A column
+  starts `split + apart` steps after the one before (`renderColumns`'s `xs`), so every icon stays on the bag's one grid. A window with no room
+  for its columns and the cells between them shows fewer: `min(wanted, floor((cells + apart) / (MIN_COLUMN_CELLS + apart)))`, so four
+  columns at 8 cells are three, and two need 5 cells.
+- **Judgment call:** the cell comes out of the columns. At the full panel's 8 cells two columns are 4 and 3, not 4 and 4, so 4 icons in the
+  second column take two rows. Any gap less than a cell would put the second column off the grid.
+- **A wide section spans the cells between** the columns it takes (`cellsOf`, `spanFrom`): across 4 and 3 it is all 8 cells, its icons in
+  line with both columns' and its right edge with the row's.
+- **Compact** (§7b): the packing holds the cell either side of a section to the rule its own cells keep (`compactFreeTop`'s `apart`, from
+  `compactLengths`): nothing whose top and bottom reach within the usual spacing of its own stands closer beside it than an empty cell. So a
+  section in the cell after another stands the usual spacing below it, as one under it does, and §7b's "a minimum of the icon grid's normal gap"
+  becomes an empty cell. Held places are kept to it when drawn again, and packed afresh when the gap changes (`compactGridKey`).
+- **What follows the split as it is:** `NameCells` (a section's room is its cells, a span's cells between columns included), the drag's places
+  (`dragSlots`, from `xs` and `cellsOf`; the key they are kept for, `shape`, holds the gap, so a toggle mid-drag works them out again), and a small
+  panel's snap (`Widest`: the columns' cells and the cells between them, `count * column + (count - 1) * apart`; a spanning section's share
+  `ceil((needed - (span - 1) * apart) / span)`). Recent Items and Free Space stay at the full width. Held widths (`neededCells`) stay held through
+  a toggle: they do not depend on the gap.
+- **Room, not a divider:** nothing is drawn in the cell (§7a).
+
+Coverage: `spec/next/content_spec.lua` ("a gap between sections": the split and its spare cells, every icon on one grid, fewer columns, filling
+down, a wide section across the cells between, laying out again either way, how wide it needs to be, a span's share, a drag's places after a
+toggle, 60 random bags keeping a cell between sections side by side; compact: a cell apart, a narrower shape beside a taller section, one that
+does not fit going under, 300 random bags drawn again while they show, packed afresh on a toggle; and with the gap too, the 400 random compact
+bags, the 300 snaps, the names agreeing with the layout and the drag in random bags), `spec/next/pixel_perfect_spec.lua` (one grid across columns
+a cell apart, on four screens), `spec/next/bag_spec.lua`, `spec/config/catalog_spec.lua`, `spec/config/settings_effects_spec.lua`,
+`spec/database_spec.lua`, `spec/core/constants_spec.lua`, `spec/next/settings/content_spec.lua`, `spec/integration/next_settings_spec.lua`.
+
+Bug review: no bug found in the change. Of 15 mutations of the gap code 14 were caught; the one that survived (held compact places drawn again
+without the gap) led to the 300 random bags drawn again, and the pixel-perfect test, which passed with the gap left out of where columns start,
+asserts where the second column starts now. Noted there before the change, in behaviour it does not alter: `Widest` lets a section alone in a row
+filling across take the whole row, so at the width snapped to it can take other rows (as often with the gap off); and a Sections setting changed
+with a small bag open lays its content out again without fitting its names to it until the next read of the bag, Fit Names While Open or not.
+
+**Not seen in game.** To check: two and three columns with the gap, full height and small; a wide section across both columns; compact with the
+gap; drag a section; resize a small panel.

@@ -278,6 +278,7 @@ describe("Constants Module Offsets", function()
       assert.are.equal(2, profile.nextSectionColumns[kind], "columns of bag " .. kind)
       assert.are.equal("across", profile.nextSectionFill[kind], "fill of bag " .. kind)
       assert.is_false(profile.nextSectionCompact[kind], "compact sections off")
+      assert.is_false(profile.nextSectionGap[kind], "no gap between sections")
       assert.is_true(profile.nextSectionSpan[kind], "wide sections of bag " .. kind)
       assert.are.equal(2, profile.nextSectionWideRows[kind], "wide column limit of bag " .. kind)
       for _, view in ipairs({ const.BAG_VIEW.SECTION_GRID, const.BAG_VIEW.SECTION_ALL_BAGS }) do

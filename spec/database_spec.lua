@@ -150,6 +150,7 @@ const.DATABASE_DEFAULTS = {
     nextSectionFill = { [0] = "across", [1] = "across" },
     nextSectionSpan = { [0] = true, [1] = true },
     nextSectionCompact = { [0] = false, [1] = false },
+    nextSectionGap = { [0] = false, [1] = false },
     nextSectionWideRows = { [0] = 2, [1] = 2 },
     preserveItemGaps = { [0] = true, [1] = true },
     glowIntensity = { [0] = 60, [1] = 60 },
@@ -1133,6 +1134,15 @@ describe("Database", function()
       assert.is_false(DB:GetNextSectionCompact(const.BAG_KIND.BANK))
       DB:SetNextSectionCompact(const.BAG_KIND.BACKPACK, false)
       assert.is_false(DB:GetNextSectionCompact(const.BAG_KIND.BACKPACK))
+    end)
+
+    it("keeps whether each bag leaves a gap between its sections, off until turned on", function()
+      assert.is_false(DB:GetNextSectionGap(const.BAG_KIND.BACKPACK))
+      DB:SetNextSectionGap(const.BAG_KIND.BACKPACK, true)
+      assert.is_true(DB:GetNextSectionGap(const.BAG_KIND.BACKPACK))
+      assert.is_false(DB:GetNextSectionGap(const.BAG_KIND.BANK))
+      DB:SetNextSectionGap(const.BAG_KIND.BACKPACK, false)
+      assert.is_false(DB:GetNextSectionGap(const.BAG_KIND.BACKPACK))
     end)
 
     it("keeps each bag's limit of rows before a section is wide, two until set and never below", function()

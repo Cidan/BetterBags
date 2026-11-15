@@ -4327,8 +4327,9 @@ function panelProto:OnHeaderReceiveDrag(ctx, section)
 end
 
 -- SectionColumns is how many columns of sections this bag is set to, how they fill, whether wide sections span
--- them and whether they are compact (next.md §7a, §7b). Show Bags (a bag's slots, or a guild tab's, in order) is one column.
----@return number count, string? fill, boolean? span, number? wideRows, boolean? compact
+-- them, whether they are compact and whether a cell stands between sections side by side (next-columns.md §7a, §7b,
+-- §7c). Show Bags (a bag's slots, or a guild tab's, in order) is one column.
+---@return number count, string? fill, boolean? span, number? wideRows, boolean? compact, boolean? apart
 function panelProto:SectionColumns()
   -- The logout stripped the settings these read (initialization.md).
   if addon.loggingOut or database:GetBagView(self.kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
@@ -4336,7 +4337,7 @@ function panelProto:SectionColumns()
   end
   return database:GetNextSectionColumns(self.kind), database:GetNextSectionFill(self.kind),
     database:GetNextSectionSpan(self.kind), database:GetNextSectionWideRows(self.kind),
-    database:GetNextSectionCompact(self.kind)
+    database:GetNextSectionCompact(self.kind), database:GetNextSectionGap(self.kind)
 end
 
 -- OnHeaderEnter tells what a header does.
