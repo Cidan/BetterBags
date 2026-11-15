@@ -1,0 +1,17 @@
+{
+  "id": 1794710294,
+  "version": "v0.9.2-24-g4c0adf8",
+  "channel": "alpha",
+  "date": "2026-11-15",
+  "from": "f46aeeff76fd9d83767536f674203d95a73fcd46",
+  "to": "4c0adf8c1292b8f3f4c2064b17da14862e483af7",
+  "headline": "You can now choose whether the backpack opens and closes automatically for each NPC and trade window.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "Per-interaction backpack open and close settings",
+      "details": "In General \u003e Interactions (both designs), set each NPC or trade window to Open and Close (default), Open Only, or Leave Alone. Only interactions in your game version are shown. Escape still closes the backpack, and leaving it open still updates it for the window.",
+      "clients": []
+    }
+  ]
+}
