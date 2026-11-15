@@ -219,6 +219,7 @@ ITEM_SORT_TYPE = {
   EXPANSION = 4,
   SELL_PRICE_STACK = 5,
   SELL_PRICE_EACH = 6,
+  UPGRADE_TRACK = 7,
 }
 ```
 
@@ -245,6 +246,8 @@ ITEM_SORT_TYPE = {
 - Expansion (oldest first) → Name → Count → GUID
 - Sell Price (Stack): what the stack the button shows sells for (`items:SellPriceOf` times a virtual stack's total, else the item's count), highest first → Name → Count → GUID
 - Sell Price (Each): what one sells for (`items:SellPriceOf`), highest first → Name → Count → GUID
+
+- Upgrade Track: the upgrade track, highest first, ranked by the item level the track upgrades to (`itemInfo.traits.upgradeMaxItemLevel`, as the track's name is in the game's language) → Item Level → Name → Count → GUID; items on no track (and items read cold) after every track. The Item Order setting (`config/catalog.lua`) offers it only where the client has `C_Item.GetItemUpgradeInfo`.
 
 The sell price is Auto Sell's: the item's link's price once loaded, else its base item's, and 0 for an item no merchant buys (`hasNoValue`), so those go last.
 

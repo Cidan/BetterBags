@@ -4623,31 +4623,32 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
     end)
   end)
 
+  -- The bags' item order, the real Sort module's (this spec stubs it).
+  local function useItemOrder(sortType)
+    local aceAddon = LibStub("AceAddon-3.0")
+    local stub, stubAddon = addon.modules.Sort, aceAddon.addons.BetterBags_Sort
+    ResetModuleStub("Sort", "util/sort.lua")
+    LoadBetterBagsModule("util/sort.lua")
+    local real = addon:GetModule("Sort")
+    ResetModuleStub("Sort", "util/sort.lua")
+    addon.modules.Sort, aceAddon.addons.BetterBags_Sort = stub, stubAddon
+    override(const, "ITEM_SORT_TYPE", { ALPHABETICALLY_THEN_QUALITY = 1, QUALITY_THEN_ALPHABETICALLY = 2,
+      ITEM_LEVEL = 3, EXPANSION = 4, SELL_PRICE_STACK = 5, SELL_PRICE_EACH = 6, UPGRADE_TRACK = 7 })
+    override(database, "GetItemSortType", function() return const.ITEM_SORT_TYPE[sortType] end)
+    override(stub, "GetItemDataSortFunction", function(_, kind, view) return real:GetItemDataSortFunction(kind, view) end)
+  end
+
+  local function idsInOrder(slotInfo)
+    local ids = {}
+    for _, item in ipairs(slotInfo.sortedItems) do
+      if not item.isItemGap then table.insert(ids, item.itemInfo.itemID) end
+    end
+    return ids
+  end
+
   -- Issue #1303: Sell Price (Stack) and Sell Price (Each), through the real Sort module's item orders: the
   -- price Auto Sell uses (items:SellPriceOf, the link's), times the count the button shows for the stack.
   describe("sorting by sell price", function()
-    local function useItemOrder(sortType)
-      local aceAddon = LibStub("AceAddon-3.0")
-      local stub, stubAddon = addon.modules.Sort, aceAddon.addons.BetterBags_Sort
-      ResetModuleStub("Sort", "util/sort.lua")
-      LoadBetterBagsModule("util/sort.lua")
-      local real = addon:GetModule("Sort")
-      ResetModuleStub("Sort", "util/sort.lua")
-      addon.modules.Sort, aceAddon.addons.BetterBags_Sort = stub, stubAddon
-      override(const, "ITEM_SORT_TYPE", { ALPHABETICALLY_THEN_QUALITY = 1, QUALITY_THEN_ALPHABETICALLY = 2,
-        ITEM_LEVEL = 3, EXPANSION = 4, SELL_PRICE_STACK = 5, SELL_PRICE_EACH = 6 })
-      override(database, "GetItemSortType", function() return const.ITEM_SORT_TYPE[sortType] end)
-      override(stub, "GetItemDataSortFunction", function(_, kind, view) return real:GetItemDataSortFunction(kind, view) end)
-    end
-
-    local function idsInOrder(slotInfo)
-      local ids = {}
-      for _, item in ipairs(slotInfo.sortedItems) do
-        if not item.isItemGap then table.insert(ids, item.itemInfo.itemID) end
-      end
-      return ids
-    end
-
     local function mergeStacks()
       override(database, "GetStackingOptions", function()
         return { mergeStacks = true, mergeUnstackable = true, unmergeAtShop = false,
@@ -4743,6 +4744,47 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
 
       bag.open = false
       assert.are.same({ "0_2", "0_1" }, keys(refreshBackpack()), "the bigger pile first once closed")
+    end)
+  end)
+
+  -- Issue #769: gear by its upgrade track, read from the slot's link (items:ReadItemTraits), through the real Sort
+  -- module's item orders.
+  describe("sorting by upgrade track", function()
+    before_each(function()
+      -- 101 Champion 6/6 at 308; 201 Hero 1/6 at 305; 202 gear on no track at 310, answering as a retail dump's
+      -- last-season cloak did (0/0, maximum item level 0; that a track string alone is no track is items_spec's);
+      -- 303 not gear, at 1. GetItemUpgradeInfo answered a table of zeros for what is not gear in the same dump
+      -- (spec/fixtures/dump_retail_12_1_5.lua).
+      local tracks = {
+        [101] = { currentLevel = 6, maxLevel = 6, maxItemLevel = 308, trackString = "Champion" },
+        [201] = { currentLevel = 1, maxLevel = 6, maxItemLevel = 321, trackString = "Hero" },
+        [202] = { currentLevel = 0, maxLevel = 0, maxItemLevel = 0, trackString = "Adventurer", trackStringID = 971 },
+      }
+      local levels = { [101] = 308, [201] = 305, [202] = 310, [303] = 1 }
+      local function idOf(l) return tonumber(l) or tonumber(tostring(l):match("item:(%d+)")) end
+      override(_G.C_Item, "IsEquippableItem", function(l) return tracks[idOf(l)] ~= nil end)
+      override(_G.C_Item, "GetItemUpgradeInfo", function(l)
+        return tracks[idOf(l)] or { currentLevel = 0, maxLevel = 0, maxItemLevel = 0 }
+      end)
+      override(_G.C_Item, "GetCurrentItemLevel", function(location)
+        local bagid, slotid = location:GetBagAndSlot()
+        local slot = mockContainer[bagid] and mockContainer[bagid][slotid]
+        return slot and levels[slot.itemID]
+      end)
+      mockContainer[0] = { { itemID = 303, guid = "g303", count = 1 }, { itemID = 202, guid = "g202", count = 1 },
+        { itemID = 101, guid = "g101", count = 1 }, { itemID = 201, guid = "g201", count = 1 } }
+    end)
+
+    it("puts gear on the higher track first, then what is on no track by item level (Upgrade Track)", function()
+      useItemOrder("UPGRADE_TRACK")
+      local slotInfo = refreshBackpack({ wipe = true })
+      assert.are.equal("Hero", slotInfo.itemsBySlotKey["0_4"].itemInfo.traits.upgradeTrack)
+      assert.are.same({ 201, 101, 202, 303 }, idsInOrder(slotInfo))
+    end)
+
+    it("mixes the tracks by item level under Item Level", function()
+      useItemOrder("ITEM_LEVEL")
+      assert.are.same({ 202, 101, 201, 303 }, idsInOrder(refreshBackpack({ wipe = true })))
     end)
   end)
 

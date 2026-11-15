@@ -26,6 +26,10 @@ Next: a bag's Layout tab, Order).
 | Expansion | `EXPANSION` (4) | expansion (oldest first), name, count, GUID |
 | Sell Price (Stack) | `SELL_PRICE_STACK` (5) | what the stack the button shows sells for, name, count, GUID |
 | Sell Price (Each) | `SELL_PRICE_EACH` (6) | what one sells for, name, count, GUID |
+| Upgrade Track | `UPGRADE_TRACK` (7) | upgrade track (highest first), current item level, name, count, GUID (§4) |
+
+The dropdown lists them in the order Alphabetically, Quality, Item Level, Upgrade Track, Expansion, Sell Price
+(Stack), Sell Price (Each); the constants keep the numbers saved profiles hold.
 
 - **Two forms of each order.** `SortItemDataBy*` compares two `ItemData` and is what the bags use: the data
   pipeline sorts with `sort:GetItemDataSortFunction(kind, view)` (`items:Phase9_Sort`, and the new items
@@ -129,3 +133,54 @@ Mutation-tested (15 mutations, each caught: the button's count, the order's dire
 dispatch, the re-sort mark, gaps in the check, the check before the new items, the neighbour comparison reversed,
 equal neighbours as out of order, the category ignored, each item against its category's first, `hasNoValue`,
 the link's price, Auto Sell's total, the dropdown's order).
+
+## 4. Upgrade Track (issue #769)
+
+Asked: arrange gear "according to their upgrade level (i.e mythic, hero, champion) instead of current item level".
+Item Level mixes the tracks, because they overlap: each track's lowest ranks sit below the highest ranks of the track
+under it (a Veteran 6/6 sorts above a Champion 1/6). Upgrade Track keeps each track together, the highest first, and within a
+track puts the most upgraded (the highest current item level) first. The user decided against a Group By Track for
+search categories in the same change; a category of one track is a search category (`track = hero`, README).
+
+- **A track's rank is the item level it upgrades to** (`trackTop` in `util/sort.lua`): the item's
+  `itemInfo.traits.upgradeMaxItemLevel`, from `C_Item.GetItemUpgradeInfo(link).maxItemLevel`
+  (`items:ReadItemTraits`, search-indexing.md §10). Within a season every track tops out at its own item level,
+  higher for a higher track. The track's name (`trackString`) cannot rank it: it is in the game's language.
+  `trackStringID` was not used either: one value has been seen (Adventurer, 971, `spec/fixtures/dump_retail_12_1_5.lua`),
+  so nothing says its IDs follow the tracks' order.
+- **No track is rank 0, after every track:** gear `ReadItemTraits` does not put on a track (a track string with no
+  levels, as last season's gear reads: 0/0 and maximum item level 0 in the 12.1.5 dump), everything that is not gear,
+  and an item read cold (no traits yet). Among those the order is Item Level's: current item level, name, count,
+  GUID. So a section with no gear in it sorts as under Item Level.
+- **Once a cold item's data loads**, it gets its traits and its rank in place; with the bag open it is kept where it
+  was and the bag is marked, and closing it puts it in order (§3). So does an item upgraded at the upgrade vendor
+  while the bag is open (a new link and item level). Choosing the order re-sorts the bags at once. The bug review
+  checked each through the real Items and Sort modules.
+- **Offered where the client reads tracks:** the catalog decides when it loads, by the check `ReadItemTraits` makes
+  (`C_Item.GetItemUpgradeInfo` exists: retail and WoW: Forever; not Classic Era, Anniversary, Mists or Titan, by the
+  UI source's branches). There the dropdown lists Upgrade Track after Item Level, its description says what it does,
+  and its keywords (`upgrade track`, `track`, `myth`, `hero`, `champion`) find it; elsewhere none of the three
+  mention it (no item has a track there, so the order would be Item Level's under another name). A client's APIs do
+  not change while it runs, so the setting keeps a plain `items` list.
+  - **Left as is:** a saved order 7 on a client without the API would show "Upgrade Track" with no choice checked in
+    the menu (and still sort, as Item Level). Not reachable: saved variables are per client, and nothing there can
+    choose it.
+- **Not verified in game, by the user's decision** ("no need for a capture"): no capture has held gear with upgrade
+  levels (docs/vendor-compat.md, "Needs an in-game check"), so neither the `maxItemLevel` the client reports for each
+  track nor the gap Vendor patches after the Midnight item level squish (a `maxItemLevel` more than 26 above the item
+  level, docs/vendor-compat.md) has been seen. The order holds as long as a higher track reports a higher
+  `maxItemLevel` than a lower one in the same bag.
+- **Bug review:** it found no bug in the order, the dispatch or the re-sort on close. It found the description and
+  keywords naming Upgrade Track where the dropdown did not offer it (the choice was then read each time the menu
+  opened), and a gap test that passed with the gap check removed (its gap had no item data, so `invalidData` left it
+  unordered either way); both fixed. The catalog now decides once, and the test's gap is a copy of an item, as
+  `CloneAsGap` makes one.
+
+Coverage: `spec/sort_spec.lua` ("by upgrade track": a higher track above a lower one at a higher item level, item
+level within a track, the tracks ranked by their top over a whole list, no track and cold items last, ties, free slots
+and gaps, an item without its data, the button form, the dispatch), `spec/config/catalog_spec.lua` ("offers Upgrade
+Track where the client has upgrade tracks, and saves it"; "neither lists nor names Upgrade Track where the client has
+no upgrade tracks", a fresh catalog loaded without the API), `spec/refresh_pipeline_spec.lua` ("sorting by upgrade
+track": the traits read from the link through the real Items and Sort modules, against the same bag under Item
+Level). Mutation-tested by the review: 22 of 25 caught; the gap check (since fixed), one equivalent mutation, and
+dropping a track string with no levels (caught by `spec/items_spec.lua`, "item traits").
