@@ -1,0 +1,35 @@
+{
+  "id": 1794776962,
+  "version": "v0.9.3-4-g53b5dbe",
+  "channel": "alpha",
+  "date": "2026-11-15",
+  "from": "b3d9e8c237e74321960b09656f03f7b7d8bd4743",
+  "to": "53b5dbe7a54c3803e12bc52da8bc00e819075074",
+  "headline": "Warbound bank deposits now warn before ending refunds, Warbank options are in the menu and settings, and Sort Bank only sorts.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "Deposit All Warbound Items in the bank menu",
+      "details": "The bank's left-click menu in the classic bag design now includes Deposit All Warbound Items when a Warbank is available. The bank menu button's Shift right-click tooltip now names this action as well.",
+      "clients": []
+    },
+    {
+      "category": "New",
+      "title": "Include Tradeable Reagents setting for Warbank",
+      "details": "Added an Include Tradeable Reagents toggle on the Bank settings page under a new Warbank section on the General tab, and in the classic bag design's bank menu, when a Warbank is available.",
+      "clients": []
+    },
+    {
+      "category": "Improved",
+      "title": "Sort Bank no longer deposits reagents automatically",
+      "details": "Sorting your bank now only sorts items instead of silently depositing all reagents into your character bank first.",
+      "clients": []
+    },
+    {
+      "category": "Fixed",
+      "title": "Warbound deposit asks before ending item refunds",
+      "details": "Depositing all warbound items now checks your bags for refundable items and asks for confirmation before removing their refund timers, instead of ending refunds silently.",
+      "clients": []
+    }
+  ]
+}
