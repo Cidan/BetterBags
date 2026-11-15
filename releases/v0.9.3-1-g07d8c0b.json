@@ -1,0 +1,17 @@
+{
+  "id": 1794771316,
+  "version": "v0.9.3-1-g07d8c0b",
+  "channel": "alpha",
+  "date": "2026-11-15",
+  "from": "219fd7920c785ad7ed6b90e7443f98d578533ca5",
+  "to": "07d8c0b1a832bd6c4c9522bd5335bf8b73581786",
+  "headline": "Fixes the hint in empty group tabs being clipped and overlapping Free Space.",
+  "entries": [
+    {
+      "category": "Fixed",
+      "title": "Empty group hint clipped and overlapping Free Space",
+      "details": "The hint in an empty group's tab now displays in full above the Free Space section instead of being clipped at the top and left edges or overlapping Free Space.",
+      "clients": []
+    }
+  ]
+}
