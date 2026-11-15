@@ -141,7 +141,7 @@ the same API with the same table shape: `CreateCategory` moves a group by passed
 it was) to the category's own, and `categories:RuleOf(filter)` reads a rule (nil for an empty one).
 
 **Normalization** (`DB:NormalizeCategories`, from `DB:Migrate` at every load and after
-`DB:ImportSettings`; it changes nothing a second time):
+`DB:ApplyImport`; it changes nothing a second time):
 - every category gets a value for every bag: a bag it does not name, it is used in; the old single
   `enabled` boolean holds for every bag. Before, `CreateCategory` set only the backpack and bank,
   so (read from the code, not seen in game) no user category ever applied in the guild bank;
@@ -216,7 +216,8 @@ stays where it was put. No help text yet (a help system is planned).
 - **New categories go on top** (`CreateCategory`): one of yours never saved before, or a plugin's never
   seen before (no saved state), gets a number below every other (`topPriority`); a plugin's is saved
   with it, so it stays there next session. A plugin's category seen before keeps the number the player
-  gave it, else its own; a category made again, and a group by's section, keep theirs.
+  gave it, else its own; a category made again, and a group by's section, keep theirs. A category imported from
+  text (`ImportCategory`, import-export.md §7) is new, so it goes on top too; one that replaces yours keeps its number.
 - **Hand-added items** (§6, Resolution): an item you add to a category of yours stays there whatever
   the order; the order decides between rules, and between a rule and a plugin's item list.
 - **Plugins** still pass `priority` to `CreateCategory`; it places a category the player has not moved,

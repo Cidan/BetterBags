@@ -324,7 +324,8 @@ dragged into the bank moves.
   is asked of the client here.
 - **No Warbank, only the bank.** On a client without a Warbank (`addon.hasWarbank` false) every deposit goes
   into the bank, and the heading says "Deposits in the bank": a category set to the Warbank on retail can
-  arrive there through Import Categories (`DB:ImportSettings` copies the filters whole), where Deposit Into is
+  arrive there through Import Categories (`DB:ApplyImport` copies the filters whole; one category shared alone carries
+  no automation, import-export.md §7), where Deposit Into is
   not shown. Found by the bug review: Classic's and Era's `C_Bank` have no `IsItemAllowedInBankType`, so such
   a category raised an error at every bank opening, after the items before it in slot order had moved; on
   WoW: Forever (`isRetail`) it asked `CanUseBank(Account)` and deposited nothing.

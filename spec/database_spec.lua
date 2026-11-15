@@ -1846,6 +1846,97 @@ describe("Database", function()
 
   describe("import/export", function()
     local legacyExport = dofile("spec/helpers/legacy_export.lua")
+    local serialization = addon:GetModule("Serialization")
+
+    -- What Import Categories does with a string of your categories: read it, then apply it.
+    local function importSettings(text)
+      local data, err = DB:ReadImport(text)
+      if not data then
+        return false, err
+      end
+      DB:ApplyImport(data)
+      return true
+    end
+
+    -- #1250: one category, shared.
+    describe("one category", function()
+      before_each(function()
+        DB.data.profile.customCategoryFilters = {
+          Herbs = { name = "Herbs", save = true, priority = 3, blizzard = true, automation = "destroy", confirmSale = false,
+            deposit = "warbank", itemList = { [765] = true }, ignoredItems = { [99] = true },
+            searchCategory = { query = "type = herb" }, groupBy = 2, color = { 0.1, 0.8, 0.2, 1 },
+            enabled = { [0] = true, [1] = false }, hidden = { [1] = true }, note = "n", skipRecent = true },
+        }
+        DB.data.profile.ephemeralCategoryFilters = { Openable = { name = "Openable", itemList = {} } }
+      end)
+
+      it("ExportCategory writes what a category of yours is: never what it does on its own, or its place", function()
+        local exported = DB:ExportCategory("Herbs")
+        assert.is_truthy(exported:match("^!BB2![A-Za-z0-9+/]+=*$"))
+        assert.are.same({ version = 3, category = { name = "Herbs", itemList = { [765] = true },
+          ignoredItems = { [99] = true }, searchCategory = { query = "type = herb" }, groupBy = 2,
+          color = { 0.1, 0.8, 0.2, 1 }, enabled = { [0] = true, [1] = false }, hidden = { [1] = true }, note = "n",
+          skipRecent = true } }, serialization:Decode(exported:sub(6)))
+      end)
+
+      it("ExportCategory writes nothing for a name that is not a category of yours", function()
+        assert.is_nil(DB:ExportCategory("Openable"))
+        assert.is_nil(DB:ExportCategory("Nothing"))
+      end)
+
+      it("ReadImport reads either: your categories, or one", function()
+        local whole = DB:ReadImport(DB:ExportSettings())
+        assert.is_nil(whole.category)
+        assert.is_not_nil(whole.customCategoryFilters.Herbs)
+        local one = DB:ReadImport(DB:ExportCategory("Herbs"))
+        assert.are.equal(3, one.version)
+        assert.are.equal("Herbs", one.category.name)
+        assert.is_nil(one.customCategoryFilters)
+      end)
+
+      -- A pasted string is anyone's: a category in it gives only what one shares, of the shapes it has.
+      it("ReadImport keeps only what a category shares, of the shapes it has", function()
+        local text = "!BB2!" .. serialization:Encode({ version = 3, category = {
+          name = "  Herbs  ", save = false, dynamic = true, blizzard = true, priority = -100, automation = "destroy",
+          confirmSale = false, deposit = "warbank", isGroupBySubcategory = true, groupByParent = "X", readOnly = true,
+          itemList = { [765] = true, [0] = true, [-1] = true, [1.5] = true, x = true, [6] = "yes", [2147483647] = true,
+            [2147483648] = true, [1e300] = true, [math.huge] = true },
+          ignoredItems = { [99] = true, [98] = false },
+          searchCategory = { query = "  type = herb  ", groupBy = 1 }, groupBy = 9, color = { 2, 0, 0 },
+          enabled = { [0] = false, [7] = true, [1] = "no" }, hidden = { [1] = true, [0] = 1 }, note = 42,
+          skipRecent = "yes",
+        } })
+        local data, err = DB:ReadImport(text)
+        assert.is_nil(err)
+        assert.are.same({ version = 3, category = { name = "Herbs", itemList = { [765] = true, [2147483647] = true },
+          ignoredItems = { [99] = true }, searchCategory = { query = "type = herb" }, enabled = { [0] = false, [1] = true },
+          hidden = { [1] = true } } }, data)
+      end)
+
+      it("ReadImport reads a color of three or four parts between 0 and 1, and a group by BetterBags has", function()
+        local function read(category)
+          category.name = "Herbs"
+          return DB:ReadImport("!BB2!" .. serialization:Encode({ version = 3, category = category })).category
+        end
+        assert.are.same({ 0, 0.5, 1 }, read({ color = { 0, 0.5, 1 } }).color)
+        assert.is_nil(read({ color = { 0, 0.5 } }).color)
+        assert.is_nil(read({ color = { 0, 0.5, 1, 1, 1 } }).color)
+        assert.is_nil(read({ color = { 0, "x", 1 } }).color)
+        assert.is_nil(read({ color = { 0, -0.1, 1 } }).color)
+        assert.are.equal(0, read({ groupBy = 0 }).groupBy)
+        assert.are.equal(3, read({ groupBy = 3 }).groupBy)
+        assert.is_nil(read({ groupBy = 1.5 }).groupBy)
+        assert.is_nil(read({ searchCategory = { query = "   " } }).searchCategory)
+      end)
+
+      it("ReadImport refuses a category with no name", function()
+        for _, category in ipairs({ { name = "" }, { name = "   " }, { name = 5 }, "Herbs", { itemList = {} } }) do
+          local data, err = DB:ReadImport("!BB2!" .. serialization:Encode({ version = 3, category = category }))
+          assert.is_nil(data)
+          assert.is_string(err)
+        end
+      end)
+    end)
 
     -- C_EncodingUtil's CBOR, Deflate and Base64 after "!BB2!" (#1317).
     it("ExportSettings writes '!BB2!' and Base64", function()
@@ -1857,7 +1948,7 @@ describe("Database", function()
 
     it("imports a string the '!BB' exporter wrote before", function()
       local fixture = dofile("spec/fixtures/legacy_export_v3.lua")
-      local ok, msg = DB:ImportSettings(fixture.text)
+      local ok, msg = importSettings(fixture.text)
       assert.is_true(ok, msg)
       local p = DB.data.profile
       local name = 'Mats "&" Herbs'
@@ -1878,7 +1969,7 @@ describe("Database", function()
       _G.BB1317_RAN = nil
       DB.data.profile.customCategoryFilters = { Kept = { name = "Kept", itemList = {} } }
       local payload = "(function() _G.BB1317_RAN = true return { version = 3, customCategoryFilters = {} } end)()"
-      local ok, msg = DB:ImportSettings("!BB" .. C_EncodingUtil.EncodeBase64(payload))
+      local ok, msg = importSettings("!BB" .. C_EncodingUtil.EncodeBase64(payload))
       assert.is_false(ok)
       assert.is_string(msg)
       assert.is_nil(_G.BB1317_RAN)
@@ -1886,7 +1977,7 @@ describe("Database", function()
     end)
 
     it("refuses a '!BB2!' string that is not what ExportSettings writes", function()
-      local ok, msg = DB:ImportSettings("!BB2!" .. C_EncodingUtil.EncodeBase64("not compressed"))
+      local ok, msg = importSettings("!BB2!" .. C_EncodingUtil.EncodeBase64("not compressed"))
       assert.is_false(ok)
       assert.is_string(msg)
     end)
@@ -1897,14 +1988,14 @@ describe("Database", function()
       local fixture = dofile("spec/fixtures/legacy_export_v3.lua")
       local stray = { ".", "`", '"', "\226\128\139", "\194\160" }
       for _, s in ipairs(stray) do
-        local ok, msg = DB:ImportSettings(fixture.text:sub(1, 40) .. s .. fixture.text:sub(41) .. s)
+        local ok, msg = importSettings(fixture.text:sub(1, 40) .. s .. fixture.text:sub(41) .. s)
         assert.is_true(ok, msg)
         assert.is_not_nil(DB.data.profile.customCategoryFilters['Mats "&" Herbs'])
       end
       DB.data.profile.customCategoryFilters = { Stray = { name = "Stray", itemList = { [7] = true } } }
       local exported = DB:ExportSettings()
       DB.data.profile.customCategoryFilters = {}
-      local ok, msg = DB:ImportSettings(exported:sub(1, 30) .. "\194\160" .. exported:sub(31) .. ".")
+      local ok, msg = importSettings(exported:sub(1, 30) .. "\194\160" .. exported:sub(31) .. ".")
       assert.is_true(ok, msg)
       assert.is_true(DB.data.profile.customCategoryFilters.Stray.itemList[7])
     end)
@@ -1914,30 +2005,30 @@ describe("Database", function()
       local exported = DB:ExportSettings()
       DB.data.profile.customCategoryFilters = {}
       local wrapped = exported:sub(1, 20) .. "\n  " .. exported:sub(21, 40) .. "\r\n" .. exported:sub(41)
-      local ok, msg = DB:ImportSettings(wrapped)
+      local ok, msg = importSettings(wrapped)
       assert.is_true(ok, msg)
       assert.is_true(DB.data.profile.customCategoryFilters.Wrapped.itemList[42])
     end)
 
-    it("ImportSettings returns false for nil data", function()
-      local ok, err = DB:ImportSettings(nil)
+    it("ReadImport refuses nil data", function()
+      local ok, err = importSettings(nil)
       assert.is_false(ok)
       assert.is_not_nil(err)
     end)
 
-    it("ImportSettings returns false for empty string", function()
-      local ok = DB:ImportSettings("")
+    it("ReadImport refuses an empty string", function()
+      local ok = importSettings("")
       assert.is_false(ok)
     end)
 
-    it("ImportSettings returns false for missing !BB prefix", function()
-      local ok, err = DB:ImportSettings("garbage")
+    it("ReadImport refuses a string without the !BB prefix", function()
+      local ok, err = importSettings("garbage")
       assert.is_false(ok)
       assert.is_not_nil(string.find(err, "prefix"))
     end)
 
-    it("ImportSettings returns false for invalid base64", function()
-      local ok = DB:ImportSettings("!BB!!!not-valid-base64!!!")
+    it("ReadImport refuses invalid Base64", function()
+      local ok = importSettings("!BB!!!not-valid-base64!!!")
       assert.is_false(ok)
     end)
 
@@ -1961,7 +2052,7 @@ describe("Database", function()
         customCategoryIndex = {},
         categoryOptions = { Mats = { shown = false } },
       })
-      local ok, msg = DB:ImportSettings(old)
+      local ok, msg = importSettings(old)
       assert.is_true(ok, msg)
       local f = DB.data.profile.customCategoryFilters
       assert.is_false(f.Mats.enabled[const.BAG_KIND.BANK])
@@ -1983,10 +2074,10 @@ describe("Database", function()
           customCategoryIndex = {},
         })
       end
-      assert.is_true((DB:ImportSettings(export(2))))
+      assert.is_true((importSettings(export(2))))
       assert.are.equal("(type = armor OR type = weapon) AND ilvl > 200",
         DB.data.profile.customCategoryFilters.Gear.searchCategory.query)
-      assert.is_true((DB:ImportSettings(export(3))))
+      assert.is_true((importSettings(export(3))))
       assert.are.equal("type = armor OR type = weapon AND ilvl > 200",
         DB.data.profile.customCategoryFilters.Gear.searchCategory.query)
     end)
@@ -2002,7 +2093,7 @@ describe("Database", function()
       DB.data.profile.customCategoryFilters = {}
       DB.data.profile.customCategoryIndex = {}
 
-      local ok, msg = DB:ImportSettings(exported)
+      local ok, msg = importSettings(exported)
       assert.is_true(ok, msg)
       assert.is_not_nil(DB.data.profile.customCategoryFilters["ExportTest"])
       assert.is_true(DB.data.profile.customCategoryFilters["ExportTest"].itemList[42])

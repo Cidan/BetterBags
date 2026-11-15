@@ -64,9 +64,10 @@ page's `Content.Top` and `Bottom`).
   Blizzard"; no Rename or Delete.
 - **The header**: the chosen category's name, and its line (a plugin's starts "Made by a plugin", a converted
   one's "Converted from Blizzard", with "Nothing added yet" for nothing added: Blizzard's items are in it);
-  "Categories" and "Make a category to sort your items your way." for none. Rename and Delete for your
-  categories; for a plugin's or none they hide and the buttons' frame shrinks so the title takes the
-  room. Renaming a converted category warns that it becomes a separate category and Blizzard's items go back to the
+  "Categories" and "Make a category to sort your items your way." for none. Export, Rename and Delete, right to left
+  from Delete, for your categories; for a plugin's or none they hide and the buttons' frame shrinks so the title takes
+  the room. Export (#1250, import-export.md §7) shows the category's string (`DB:ExportCategory`) in a `NextDialog`'s
+  field, selected to copy, with Close; its text says what the category does on its own is not in it. Renaming a converted category warns that it becomes a separate category and Blizzard's items go back to the
   built-in one (asked: "accept with a warning that it's making a new category technically"). Renaming a category that
   groups onto a Blizzard category's name (`items:KnowsBlizzardCategory`) asks first, in a second `NextDialog`, since it
   becomes a converted category and its Group By goes (category-lifecycle.md §11).
@@ -200,7 +201,8 @@ a category chosen elsewhere, New Category, a search waiting, changes; "N items m
 tab counts, in the bags shown, counted again when a bag is read while it shows; a drag lifting a row,
 the others making room, landing it and moving its category; each category's own row, its width, rows put
 away; the heading and which tabs show;
-Rename and Delete; the Settings tab: its height, none, fields, saving, a plugin's, what the bags show
+Export, Rename and Delete; importing one shared (`AskImport`, import-export.md §7); the Settings tab: its height,
+none, fields, saving, a plugin's, what the bags show
 and reading them again; the Search Rule tab: its names, the count as typed, the results in full color,
 the box where the Settings tab's is, Apply Search Rule, typed text kept, a plugin's; the Added Items
 tab: order, icons, faded items, the filter, names loading once, drops, removing, Remove All, a plugin's,

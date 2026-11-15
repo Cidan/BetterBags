@@ -794,16 +794,221 @@ describe("NextSettingsCategories", function()
       assert.is_true(editor:RuleTabShown())
     end)
 
-    it("has Rename and Delete for your categories only", function()
+    it("has Export, Rename and Delete for your categories only, in that order", function()
       local actions = editor:CreateActions(CreateFrame("Frame"), owner)
       editor.selected = "Mats"
       actions:Refresh(ctx())
-      assert.is_true(actions.rename.frame:IsShown() and actions.delete.frame:IsShown())
-      assert.is_true(actions.frame:GetWidth() > 1)
+      assert.is_true(actions.export.frame:IsShown() and actions.rename.frame:IsShown() and actions.delete.frame:IsShown())
+      assert.are.equal(actions.export.frame:GetWidth() + actions.rename.frame:GetWidth() + actions.delete.frame:GetWidth()
+        + 2 * style.Theme.Settings.Categories.FieldGap, actions.frame:GetWidth())
+      local _, renameAnchor = actions.rename.frame:GetPoint(1)
+      local _, exportAnchor = actions.export.frame:GetPoint(1)
+      assert.are.equal(actions.delete.frame, renameAnchor)
+      assert.are.equal(actions.rename.frame, exportAnchor)
       editor.selected = "Openable"
       actions:Refresh(ctx())
-      assert.is_false(actions.rename.frame:IsShown() or actions.delete.frame:IsShown())
+      assert.is_false(actions.export.frame:IsShown() or actions.rename.frame:IsShown() or actions.delete.frame:IsShown())
       assert.are.equal(1, actions.frame:GetWidth(), "the title takes the room")
+    end)
+
+    -- #1250: a category shared as text, in the dialog every question is asked in.
+    it("exports the chosen category as text, selected to copy, saying what it does on its own stays", function()
+      local asked = {}
+      override(database, "ExportCategory", function(_, name)
+        table.insert(asked, name)
+        return "!BB2!c2hhcmVk"
+      end)
+      local actions = editor:CreateActions(CreateFrame("Frame"), owner)
+      editor.selected = "Mats"
+      actions:Refresh(ctx())
+      click(actions.export)
+      assert.are.same({ "Mats" }, asked)
+      assert.are.equal("Export Category", nextDialog.title:GetText())
+      assert.are.equal("!BB2!c2hhcmVk", nextDialog.input:GetText())
+      assert.is_true(nextDialog.input.frame:HasFocus())
+      local text = nextDialog.text:GetText()
+      assert.is_truthy(text:find("'Mats'", 1, true))
+      assert.is_truthy(text:find("Auto Sell", 1, true))
+      assert.are.equal(1, #nextDialog.opts.buttons)
+      answer("Close")
+      assert.is_false(nextDialog:IsShown())
+    end)
+
+    describe("importing one shared (AskImport)", function()
+      local imports, done, opened, moves, importOK, blizzard
+
+      local function shared(name, groupBy)
+        return { name = name, itemList = { [11] = true, [70] = true }, groupBy = groupBy }
+      end
+
+      before_each(function()
+        imports, done, opened, moves, importOK, blizzard = {}, {}, {}, { [false] = 0 }, true, {}
+        override(items, "KnowsBlizzardCategory", function(_, name) return blizzard[name] == true end)
+        override(categories, "ImportCategory", function(_, _, category, name, replace)
+          table.insert(imports, { category.name, name, replace == true })
+          if importOK then
+            filters[name] = { name = name, save = true, itemList = {}, enabled = { [BACKPACK] = true } }
+          end
+          return importOK
+        end)
+        override(categories, "MovesOnImport", function(_, _, name)
+          return moves[name or false] or 0
+        end)
+        override(settings, "Open", function(_, page, tab) table.insert(opened, { page, tab }) end)
+      end)
+
+      local function ask(category)
+        editor:AskImport(owner, category, function(_, name) table.insert(done, name) end)
+      end
+
+      it("asks first, saying how many of its items move to it, then shows it on request", function()
+        moves[false] = 2
+        ask(shared("Herbs"))
+        assert.are.equal("Import Category", nextDialog.title:GetText())
+        local text = nextDialog.text:GetText()
+        assert.is_truthy(text:find("Import the category 'Herbs'?", 1, true))
+        assert.is_truthy(text:find("2 of its items are in other categories of yours now", 1, true))
+        answer("Import")
+        assert.are.same({ { "Herbs", "Herbs", false } }, imports)
+        assert.are.same({ "Herbs" }, done)
+        assert.are.equal("Category Imported", nextDialog.title:GetText())
+        answer("Show Category")
+        assert.are.equal("Herbs", editor.selected)
+        assert.are.same({ { "categories" } }, opened)
+      end)
+
+      it("says nothing of moving when none of its items is filed elsewhere, or names the one that is", function()
+        ask(shared("Herbs"))
+        assert.are.equal("Import the category 'Herbs'?", nextDialog.text:GetText())
+        answer("Cancel")
+        moves[false] = 1
+        ask(shared("Herbs"))
+        assert.is_truthy(nextDialog.text:GetText():find("1 of its items is in another category of yours now", 1, true))
+      end)
+
+      it("imports nothing when cancelled", function()
+        ask(shared("Herbs"))
+        answer("Cancel")
+        assert.are.same({}, imports)
+        assert.are.same({}, done)
+        assert.is_false(nextDialog:IsShown())
+      end)
+
+      it("replaces a category of yours of its name after asking again, saying what stays", function()
+        moves.Mats = 1
+        ask(shared("Mats"))
+        local text = nextDialog.text:GetText()
+        assert.is_truthy(text:find("You already have a category named 'Mats'", 1, true))
+        assert.are.same({ "Cancel", "Keep Both", "Replace" },
+          { nextDialog.opts.buttons[1].text, nextDialog.opts.buttons[2].text, nextDialog.opts.buttons[3].text })
+        answer("Replace")
+        text = nextDialog.text:GetText()
+        assert.is_truthy(text:find("Replace the category 'Mats'", 1, true))
+        assert.is_truthy(text:find("1 of its items is in another category of yours now", 1, true))
+        assert.are.same({}, imports)
+        answer("Replace")
+        assert.are.same({ { "Mats", "Mats", true } }, imports)
+        assert.are.same({ "Mats" }, done)
+      end)
+
+      it("keeps both, asking a name of its own, a free one filled in", function()
+        filters["Mats (2)"] = { name = "Mats (2)", save = true, itemList = {} }
+        filters["Mats (3)"] = { name = "Mats (3)", save = true, itemList = {} }
+        moves[false] = 2
+        ask(shared("Mats"))
+        answer("Keep Both")
+        assert.are.equal("Mats (4)", nextDialog.input:GetText())
+        assert.is_truthy(nextDialog.text:GetText():find("2 of its items are in other categories of yours now", 1, true))
+        nextDialog.input.frame:SetText("Potions")
+        answer("Import")
+        assert.are.equal("A category named 'Potions' already exists.", nextDialog.text:GetText())
+        nextDialog.input.frame:SetText("Herbs")
+        answer("Import")
+        assert.are.same({ { "Mats", "Herbs", false } }, imports)
+        assert.are.same({ "Herbs" }, done)
+      end)
+
+      it("only keeps both beside a plugin's category of its name", function()
+        ask(shared("Openable"))
+        assert.is_truthy(nextDialog.text:GetText():find("A plugin's category is named 'Openable'", 1, true))
+        assert.are.same({ "Cancel", "Keep Both" }, { nextDialog.opts.buttons[1].text, nextDialog.opts.buttons[2].text })
+        assert.are.equal(2, #nextDialog.opts.buttons)
+      end)
+
+      -- Found by the bug review: a group by's section is not saved, so it read as a plugin's category.
+      it("names a group by's section as one, and only keeps both beside it", function()
+        ask(shared("Potions - Flask"))
+        assert.are.equal("'Potions - Flask' is a section the category 'Potions' groups into. Keep both, naming the one "
+          .. "imported?", nextDialog.text:GetText())
+        assert.are.same({ "Cancel", "Keep Both" }, { nextDialog.opts.buttons[1].text, nextDialog.opts.buttons[2].text })
+        assert.are.equal(2, #nextDialog.opts.buttons)
+      end)
+
+      -- Found by the bug review: Rename says this (category-lifecycle.md §11); importing under the name said nothing.
+      it("says its Group By goes when it would become a converted category, and only then", function()
+        blizzard.Junk = true
+        ask(shared("Junk", 1))
+        assert.is_truthy(nextDialog.text:GetText():find("can't be grouped, so its Group By will be turned off", 1, true))
+        answer("Cancel")
+        ask(shared("Junk", const.SEARCH_CATEGORY_GROUP_BY.NONE))
+        assert.are.equal("Import the category 'Junk'?", nextDialog.text:GetText())
+        answer("Cancel")
+        ask(shared("Herbs", 1))
+        assert.are.equal("Import the category 'Herbs'?", nextDialog.text:GetText())
+        answer("Cancel")
+        assert.are.same({}, imports)
+      end)
+
+      it("asks before keeping it under a Blizzard category's name, which would turn its Group By off", function()
+        blizzard.Junk = true
+        ask(shared("Mats", 1))
+        answer("Keep Both")
+        nextDialog.input.frame:SetText("Junk")
+        answer("Import")
+        assert.is_truthy(nextDialog.text:GetText():find("can't be grouped", 1, true))
+        assert.are.same({}, imports)
+        answer("Import")
+        assert.are.same({ { "Mats", "Junk", false } }, imports)
+        imports = {}
+        ask(shared("Mats", 1))
+        answer("Keep Both")
+        nextDialog.input.frame:SetText("Herbs")
+        answer("Import")
+        assert.are.same({ { "Mats", "Herbs", false } }, imports, "no Blizzard name: no question")
+      end)
+
+      it("says its Group By goes when it replaces a converted category", function()
+        filters.Junk = { name = "Junk", save = true, blizzard = true, itemList = {}, enabled = { [BACKPACK] = true } }
+        ask(shared("Junk", 2))
+        answer("Replace")
+        assert.is_truthy(nextDialog.text:GetText():find("can't be grouped", 1, true))
+        answer("Cancel")
+        filters.Junk.blizzard = nil
+        ask(shared("Junk", 2))
+        answer("Replace")
+        assert.is_falsy(nextDialog.text:GetText():find("can't be grouped", 1, true))
+      end)
+
+      -- Between the question and the answer a plugin may make a category of the name.
+      it("says it could not import when the name was taken meanwhile", function()
+        importOK = false
+        ask(shared("Herbs"))
+        answer("Import")
+        assert.are.same({ { "Herbs", "Herbs", false } }, imports)
+        assert.are.same({}, done)
+        assert.is_truthy(nextDialog.text:GetText():find("could not be imported: a category of that name was made meanwhile",
+          1, true))
+      end)
+
+      it("says it could not import when the category it replaces was deleted meanwhile", function()
+        importOK = false
+        ask(shared("Mats"))
+        answer("Replace")
+        answer("Replace")
+        assert.are.same({ { "Mats", "Mats", true } }, imports)
+        assert.are.same({}, done)
+        assert.is_truthy(nextDialog.text:GetText():find("could not be imported: it was deleted meanwhile", 1, true))
+      end)
     end)
 
     it("renames, keeping it chosen, or says why it cannot", function()
