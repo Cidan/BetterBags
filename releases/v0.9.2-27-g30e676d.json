@@ -1,0 +1,17 @@
+{
+  "id": 1794729184,
+  "version": "v0.9.2-27-g30e676d",
+  "channel": "alpha",
+  "date": "2026-11-15",
+  "from": "404662b2f2262993336d048833304ec855af2f70",
+  "to": "30e676dc93e8433ed55ea01f6841dc1687caa717",
+  "headline": "BetterBags Next adds a Gap Between Sections option to keep side-by-side sections apart.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "Gap Between Sections option for BetterBags Next",
+      "details": "Adds a Gap Between Sections toggle to each bag's Layout tab under Sections in BetterBags Next, off by default. When enabled with multiple columns, an empty icon cell separates side-by-side sections so categories stand apart. Windows without enough room show fewer columns.",
+      "clients": []
+    }
+  ]
+}
