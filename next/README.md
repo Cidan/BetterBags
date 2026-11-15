@@ -100,6 +100,11 @@ room in the layout and the layout's left edge (`LEFT_OFFSET`) moves past what Be
 Character pane, the Dressing Room and every other Blizzard panel open beside it, not under it. `NextChain:Update` and
 `NextPanel:SetSize` update it (`.claude/rules/next-uipanels.md`).
 
+Each companion also names the interactions it opens at (`opts.interactions`: the vendor `Merchant`, the guild bank
+`GuildBanker`, the bank `Banker` and, with a Warband bank, `AccountBanker`). Chained to a closed backpack, a companion
+waits for the backpack its interaction opens, unless every one of them is set to leave the backpack alone
+(`NextChain:WaitsForAnchor`, `.claude/rules/interaction-bags.md` §3).
+
 ## Drawing
 
 `NextPanel:Draw` is the classic draw pass: claim the buttons drawn, then release the ones the last

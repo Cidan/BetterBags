@@ -371,10 +371,50 @@ describe("NextSettingsContent", function()
       assert.are.same({
         { "General", "Bags", { "nextEnabled", "enableBankBags", "nextVendor [next]", "nextGuildBank [next]", "showBagButton",
           "clampBagsToScreen", "bagFading [classic]", "animateItemMovement [classic]" } },
+        { "General", "Interactions", { "interactionTrade", "interactionBank", "interactionWarbank", "interactionVendor",
+          "interactionMail", "interactionAuctionHouse", "interactionGuildBank", "interactionVoidStorage",
+          "interactionScrapper", "interactionItemUpgrade" } },
         { "General", "Search", { "inBagSearch", "enterToMakeCategory [classic]" } },
         { "General", "Items", { "upgradeProvider", "newItemDuration", "categorySell" } },
         { "General", "What's New", { "changelogOnLogin" } },
       }, idsOf(pages:Get("general")))
+    end)
+
+    -- Only the interactions the player's client has (interaction-bags.md): the Warband bank where there is one, the
+    -- guild bank where there is one, Void Storage on Cataclysm and Mists Classic (patch 4.3.0 to 11.2.0 on retail),
+    -- the Scrapper on retail (8.0.1), Item Upgrade on retail and Mists Classic (Blizzard_ItemUpgradeUI's game types).
+    -- WoW: Forever runs retail's code in Vanilla's world (camelot-forever.md).
+    it("lists only the interactions the player's client has", function()
+      local section
+      for _, s in ipairs(pages:Sections(pages:Get("general").tabs[1])) do
+        if s.title == "Interactions" then
+          section = s
+        end
+      end
+      local function listed(flags)
+        for _, key in ipairs({ "isRetail", "isForever", "isClassic", "isBCC", "isCata", "isMists", "hasWarbank",
+          "hasGuildBank" }) do
+          override(addon, key, flags[key] == true)
+        end
+        local out = {}
+        for _, row in ipairs(section.rows) do
+          if not (row.hidden and row.hidden()) then
+            table.insert(out, (row.setting:gsub("^interaction", "")))
+          end
+        end
+        return out
+      end
+      assert.are.same({ "Trade", "Bank", "Warbank", "Vendor", "Mail", "AuctionHouse", "GuildBank", "Scrapper",
+        "ItemUpgrade" }, listed({ isRetail = true, hasWarbank = true, hasGuildBank = true }), "retail")
+      assert.are.same({ "Trade", "Bank", "Vendor", "Mail", "AuctionHouse" },
+        listed({ isRetail = true, isForever = true }), "WoW: Forever")
+      assert.are.same({ "Trade", "Bank", "Vendor", "Mail", "AuctionHouse", "GuildBank", "VoidStorage", "ItemUpgrade" },
+        listed({ isMists = true, hasGuildBank = true }), "Mists Classic")
+      assert.are.same({ "Trade", "Bank", "Vendor", "Mail", "AuctionHouse", "GuildBank", "VoidStorage" },
+        listed({ isCata = true, hasGuildBank = true }), "Cataclysm Classic")
+      assert.are.same({ "Trade", "Bank", "Vendor", "Mail", "AuctionHouse", "GuildBank" },
+        listed({ isBCC = true, hasGuildBank = true }), "TBC Classic")
+      assert.are.same({ "Trade", "Bank", "Vendor", "Mail", "AuctionHouse" }, listed({ isClassic = true }), "Classic Era")
     end)
 
     it("gives every bag its layout, items and categories, bound to it", function()
@@ -502,9 +542,10 @@ describe("NextSettingsContent", function()
           end
         end
       end
-      -- The general pages' 38 (Enable Vendor Window, Enable Guild Bank Window and Enable QuickFind Integration the latest,
-      -- #1262), the Currencies page's 10 (currency.md §6), the Food & Drink page's 7 (food-drink.md §5), and each bag's 34.
-      assert.are.equal(38 + 10 + 7 + 3 * 34, named)
+      -- The general pages' 48 (the ten Interactions the latest, interaction-bags.md; before them Enable Vendor Window,
+      -- Enable Guild Bank Window and Enable QuickFind Integration, #1262), the Currencies page's 10 (currency.md §6), the
+      -- Food & Drink page's 7 (food-drink.md §5), and each bag's 34.
+      assert.are.equal(48 + 10 + 7 + 3 * 34, named)
     end)
 
     -- The Food & Drink bar's options (food-drink.md §5): a page of their own after Currencies, BetterBags Next only.
@@ -947,7 +988,7 @@ describe("NextSettingsContent", function()
         GetNextGuildBankEnabled = per(true), GetShowBagButton = per(true), GetClampBagsToScreen = per(false),
         GetEnableBagFading = per(false), GetAnimateItemMovement = per(false), GetInBagSearch = per(true),
         GetEnterToMakeCategory = per(true), GetCategorySell = per(false), GetChangelogAutoOpen = per(true),
-        GetData = per({ profile = { newItemTime = 300 } }),
+        GetData = per({ profile = { newItemTime = 300 } }), GetInteractionBags = per("openClose"),
       }) do
         override(db, name, value)
       end
@@ -1305,7 +1346,7 @@ describe("NextSettingsContent", function()
         GetSectionSortType = per(1), GetShowAllFreeSpace = per(false), GetShowBagButton = per(true),
         GetShowFullSectionNames = per(false), GetShowNewItemFlash = per(false), GetStackingOptions = per(stacking),
         GetCurrentProfileName = per("Default"), GetAvailableProfiles = per({ "Default" }),
-        GetProfileCharacterCounts = per({ Default = 1 }),
+        GetProfileCharacterCounts = per({ Default = 1 }), GetInteractionBags = per("openClose"),
       }) do
         override(db, name, value)
       end

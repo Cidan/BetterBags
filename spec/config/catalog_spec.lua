@@ -357,6 +357,41 @@ describe("The settings catalog", function()
     assert.are.same({}, sent)
   end)
 
+  -- What the backpack does at each interaction (interaction-bags.md): a choice for each, saved by the interaction's
+  -- name in Enum.PlayerInteractionType and read as its window opens and closes, so choosing sends nothing.
+  it("offers what the backpack does at each interaction, saved by the interaction's name, sending nothing", function()
+    local chosen = {}
+    override(db, "GetInteractionBags", function(_, name) return chosen[name] end)
+    override(db, "SetInteractionBags", function(_, name, value) chosen[name] = value end)
+    local interactions = {
+      interactionTrade = { "Trade", "TradePartner" }, interactionBank = { "Bank", "Banker" },
+      interactionWarbank = { "Warband Bank", "AccountBanker" }, interactionVendor = { "Vendor", "Merchant" },
+      interactionMail = { "Mailbox", "MailInfo" }, interactionAuctionHouse = { "Auction House", "Auctioneer" },
+      interactionGuildBank = { "Guild Bank", "GuildBanker" },
+      interactionVoidStorage = { "Void Storage", "VoidStorageBanker" },
+      interactionScrapper = { "Scrapper", "ScrappingMachine" }, interactionItemUpgrade = { "Item Upgrade", "ItemUpgrade" },
+    }
+    for id, want in pairs(interactions) do
+      local name = want[2]
+      chosen[name] = "openClose"
+      local setting = catalog:Get(id)
+      assert.are.equal("dropdown", setting.kind, id)
+      assert.are.equal(want[1], setting.title, id)
+      assert.are.same({ "Open and Close", "Open Only", "Leave Alone" }, setting.items, id)
+      assert.is_nil(setting.reload, id)
+      assert.are.equal("Open and Close", setting.get(ctx()), id)
+      setting.set(ctx(), "Open Only")
+      assert.are.equal("open", chosen[name], id)
+      assert.are.equal("Open Only", setting.get(ctx()), id)
+      setting.set(ctx(), "Leave Alone")
+      assert.are.equal("none", chosen[name], id)
+      assert.are.equal("Leave Alone", setting.get(ctx()), id)
+      setting.set(ctx(), "Open and Close")
+      assert.are.equal("openClose", chosen[name], id)
+    end
+    assert.are.same({}, sent)
+  end)
+
   it("defines every setting the classic window had, once each", function()
     local ids = catalog:Ids()
     local seen = {}

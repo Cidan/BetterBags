@@ -19,26 +19,31 @@ local context = addon:GetModule('Context')
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
 
+---@class Database: AceModule
+local database = addon:GetModule('Database')
+
 addon.backpackShouldOpen = false
 addon.backpackShouldClose = false
 
+-- The interactions that open and close the backpack, each by its name in Enum.PlayerInteractionType: what the
+-- backpack does at each is the player's choice (DB:GetInteractionBags, interaction-bags.md).
 local interactionEvents = {
-  [Enum.PlayerInteractionType.TradePartner] = true,
-  [Enum.PlayerInteractionType.Banker] = true,
-  [Enum.PlayerInteractionType.Merchant] = true,
-  [Enum.PlayerInteractionType.MailInfo] = true,
-  [Enum.PlayerInteractionType.Auctioneer] = true,
-  [Enum.PlayerInteractionType.GuildBanker] = true,
-  [Enum.PlayerInteractionType.VoidStorageBanker] = true,
-  [Enum.PlayerInteractionType.ScrappingMachine] = true,
-  [Enum.PlayerInteractionType.ItemUpgrade] = true,
+  [Enum.PlayerInteractionType.TradePartner] = "TradePartner",
+  [Enum.PlayerInteractionType.Banker] = "Banker",
+  [Enum.PlayerInteractionType.Merchant] = "Merchant",
+  [Enum.PlayerInteractionType.MailInfo] = "MailInfo",
+  [Enum.PlayerInteractionType.Auctioneer] = "Auctioneer",
+  [Enum.PlayerInteractionType.GuildBanker] = "GuildBanker",
+  [Enum.PlayerInteractionType.VoidStorageBanker] = "VoidStorageBanker",
+  [Enum.PlayerInteractionType.ScrappingMachine] = "ScrappingMachine",
+  [Enum.PlayerInteractionType.ItemUpgrade] = "ItemUpgrade",
 }
 
 -- The Account (warband) banker only exists on clients with a warbank. WoW:
 -- Forever (Camelot) has none, so don't register its interaction (Enum.
 -- PlayerInteractionType.AccountBanker may not even exist there).
 if addon.hasWarbank then
-  interactionEvents[Enum.PlayerInteractionType.AccountBanker] = true
+  interactionEvents[Enum.PlayerInteractionType.AccountBanker] = "AccountBanker"
 end
 
 -- SetBlizzardBankType sets the bank type of Blizzard's hidden BankPanel, which decides where
@@ -106,7 +111,8 @@ end
 ---@param ctx Context
 ---@param interactionType Enum.PlayerInteractionType
 function addon.OpenInteractionWindow(ctx, _, interactionType)
-  if interactionEvents[interactionType] == nil then return end
+  local name = interactionEvents[interactionType]
+  if name == nil then return end
   if GameMenuFrame:IsShown() then
     return
   end
@@ -117,6 +123,11 @@ function addon.OpenInteractionWindow(ctx, _, interactionType)
     addon.atAuctionHouse = true
   end
   addon.atInteracting = true
+  -- Left alone, the backpack is recalculated for the window here, as opening it would have (OnUpdate).
+  if database:GetInteractionBags(name) == "none" then
+    events:SendMessage(ctx, 'bags/Rederive', interactionRecalculation())
+    return
+  end
   addon.backpackShouldOpen = true
   events:SendMessageLater(ctx, 'bags/OpenClose')
 end
@@ -124,13 +135,17 @@ end
 ---@param ctx Context
 ---@param interactionType Enum.PlayerInteractionType
 function addon.CloseInteractionWindow(ctx, _, interactionType)
-  if interactionEvents[interactionType] == nil then return end
+  local name = interactionEvents[interactionType]
+  if name == nil then return end
   debug:Log("Interaction", "CloseInteractionWindow", interactionType)
   addon.atInteracting = false
   addon.atWarbank = false
   addon.atAuctionHouse = false
-  addon.backpackShouldClose = true
   events:SendMessage(ctx, 'bags/Rederive', interactionRecalculation())
+  if database:GetInteractionBags(name) ~= "openClose" then
+    return
+  end
+  addon.backpackShouldClose = true
   events:SendMessageLater(ctx, 'bags/OpenClose')
 end
 

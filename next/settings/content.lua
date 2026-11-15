@@ -387,6 +387,20 @@ function content:Init()
         { setting = 'showBagButton' }, { setting = 'clampBagsToScreen' }, { setting = 'bagFading', design = "classic" },
         { setting = 'animateItemMovement', design = "classic" },
       } },
+      -- What the backpack does at each interaction (interaction-bags.md), for the interactions the client has: the
+      -- Warband bank and the guild bank where there is one, Void Storage on Cataclysm and Mists Classic (patch 4.3.0 to
+      -- 11.2.0 on retail), the Scrapper on retail (8.0.1), Item Upgrade on retail and Mists Classic. WoW: Forever runs
+      -- retail's code in Vanilla's world (camelot-forever.md).
+      { title = L:G("Interactions"), rows = {
+        { setting = 'interactionTrade' }, { setting = 'interactionBank' },
+        { setting = 'interactionWarbank', hidden = function() return not addon.hasWarbank end },
+        { setting = 'interactionVendor' }, { setting = 'interactionMail' }, { setting = 'interactionAuctionHouse' },
+        { setting = 'interactionGuildBank', hidden = function() return not addon.hasGuildBank end },
+        { setting = 'interactionVoidStorage', hidden = function() return not (addon.isCata or addon.isMists) end },
+        { setting = 'interactionScrapper', hidden = function() return not (addon.isRetail and not addon.isForever) end },
+        { setting = 'interactionItemUpgrade',
+          hidden = function() return not ((addon.isRetail and not addon.isForever) or addon.isMists) end },
+      } },
       -- Only the classic bags' search box makes a category on Enter (frames/search.lua).
       { title = L:G("Search"), rows = { { setting = 'inBagSearch' }, { setting = 'enterToMakeCategory', design = "classic" } } },
       { title = L:G("Items"), rows = { { setting = 'upgradeProvider' }, { setting = 'newItemDuration' }, { setting = 'categorySell' } } },

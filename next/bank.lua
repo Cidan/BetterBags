@@ -85,6 +85,8 @@ function nextBank:Create(ctx)
     closeSound = SOUNDKIT.IG_MAINMENU_CLOSE,
     chainRole = "companion",
     standIn = "BankFrame",
+    -- The Warband banker opens it too, on a client with one (core/hooks.lua).
+    interactions = addon.hasWarbank and { "Banker", "AccountBanker" } or { "Banker" },
   })
   b.bankTab = const.BANK_TAB.BANK
   b.wipeWhenHidden = false

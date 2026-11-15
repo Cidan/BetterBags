@@ -149,6 +149,7 @@ function nextGuildBank:Create(ctx)
     closeSound = SOUNDKIT.GUILD_VAULT_CLOSE,
     chainRole = "companion",
     standIn = "GuildBankFrame",
+    interactions = { "GuildBanker" },
   })
   g.closeRequested = false
   g.wipeWhenHidden = false

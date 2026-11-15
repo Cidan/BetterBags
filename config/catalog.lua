@@ -93,6 +93,19 @@ local function lower(bag)
   return string.lower(bag.name)
 end
 
+-- choiceOf returns the item of a choice whose value is value, or nil.
+---@param choices table<string, any>
+---@param value any
+---@return string?
+local function choiceOf(choices, value)
+  for item, v in pairs(choices) do
+    if v == value then
+      return item
+    end
+  end
+  return nil
+end
+
 -- Bags returns the bags with settings of their own: the backpack, the bank, and the guild bank
 -- (BetterBags Next's, guild-bank.md §5) on a client with one.
 ---@return SettingBag[]
@@ -374,6 +387,49 @@ define('newItemDuration', {
   set = function(_, value) db:GetData().profile.newItemTime = value * 60 end,
 })
 
+-- What the backpack does at each interaction (interaction-bags.md): a choice for each, read as the interaction's
+-- window opens and closes, so choosing sends nothing.
+local interactionChoices = { ["Open and Close"] = "openClose", ["Open Only"] = "open", ["Leave Alone"] = "none" }
+
+---@param id string
+---@param name string The interaction's name in Enum.PlayerInteractionType.
+---@param title string
+---@param opening string What the player does, for the description ("you talk to a vendor").
+---@param keywords string[]
+local function interactionOption(id, name, title, opening, keywords)
+  define(id, {
+    kind = "dropdown",
+    title = title,
+    description = 'What your backpack does when ' .. opening .. ': it opens, and closes again after (Open and Close); '
+      .. 'it opens, and stays open after (Open Only); or it stays as it is (Leave Alone).',
+    keywords = keywords,
+    items = { 'Open and Close', 'Open Only', 'Leave Alone' },
+    get = function() return choiceOf(interactionChoices, db:GetInteractionBags(name)) end,
+    set = function(_, value) db:SetInteractionBags(name, interactionChoices[value]) end,
+  })
+end
+
+interactionOption('interactionTrade', 'TradePartner', 'Trade', 'you trade with another player',
+  { 'interaction', 'open', 'close', 'trade', 'player' })
+interactionOption('interactionBank', 'Banker', 'Bank', 'you open your bank',
+  { 'interaction', 'open', 'close', 'bank', 'banker' })
+interactionOption('interactionWarbank', 'AccountBanker', 'Warband Bank', 'you open the Warband bank',
+  { 'interaction', 'open', 'close', 'warband', 'warbank', 'account bank' })
+interactionOption('interactionVendor', 'Merchant', 'Vendor', 'you talk to a vendor',
+  { 'interaction', 'open', 'close', 'vendor', 'merchant', 'shop', 'npc' })
+interactionOption('interactionMail', 'MailInfo', 'Mailbox', 'you open a mailbox',
+  { 'interaction', 'open', 'close', 'mail', 'mailbox' })
+interactionOption('interactionAuctionHouse', 'Auctioneer', 'Auction House', 'you open the auction house',
+  { 'interaction', 'open', 'close', 'auction house', 'auctioneer', 'ah' })
+interactionOption('interactionGuildBank', 'GuildBanker', 'Guild Bank', 'you open the guild bank',
+  { 'interaction', 'open', 'close', 'guild bank', 'guild' })
+interactionOption('interactionVoidStorage', 'VoidStorageBanker', 'Void Storage', 'you open Void Storage',
+  { 'interaction', 'open', 'close', 'void storage' })
+interactionOption('interactionScrapper', 'ScrappingMachine', 'Scrapper', 'you use a scrapper',
+  { 'interaction', 'open', 'close', 'scrapper', 'scrapping machine' })
+interactionOption('interactionItemUpgrade', 'ItemUpgrade', 'Item Upgrade', 'you upgrade an item',
+  { 'interaction', 'open', 'close', 'item upgrade', 'upgrade' })
+
 --[[
 -- Each bag
 ]]--
@@ -383,19 +439,6 @@ local sectionOrders = {
   ["Size Descending"] = const.SECTION_SORT_TYPE.SIZE_DESCENDING,
   ["Size Ascending"] = const.SECTION_SORT_TYPE.SIZE_ASCENDING,
 }
-
--- choiceOf returns the item of a choice whose value is value, or nil.
----@param choices table<string, any>
----@param value any
----@return string?
-local function choiceOf(choices, value)
-  for item, v in pairs(choices) do
-    if v == value then
-      return item
-    end
-  end
-  return nil
-end
 
 define('sectionOrder', {
   kind = "dropdown",

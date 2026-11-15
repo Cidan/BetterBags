@@ -556,17 +556,31 @@ function chain:ExitOffset(panel)
   return panel:HiddenOffset()
 end
 
+-- opensBackpack says whether one of the interactions a companion opens at opens the backpack too
+-- (interaction-bags.md): one that leaves it alone does not.
+---@param panel NextPanelFrame
+---@return boolean
+local function opensBackpack(panel)
+  for _, name in ipairs(panel.interactions) do
+    if database:GetInteractionBags(name) ~= "none" then
+      return true
+    end
+  end
+  return false
+end
+
 -- WaitsForAnchor says whether panel, opening, waits for its anchor out of sight: a companion
 -- chained to the backpack (layout "right") while the backpack is closed. A companion opens only at
 -- a bank or a vendor, whose interaction opens the backpack a frame later (addon.OpenInteractionWindow
 -- sends bags/OpenClose later), so it would otherwise open alone at its own edge and then fly across
--- the screen. The backpack opens after its companion, so it never waits.
+-- the screen. The backpack opens after its companion, so it never waits; nor does a companion whose
+-- interactions leave the backpack alone.
 ---@param panel NextPanelFrame
 ---@return boolean
 function chain:WaitsForAnchor(panel)
   local backpack = self.backpack
   return panel.chainRole == "companion" and ANCHOR_ROLE[self:Layout()] == "backpack" and backpack ~= nil
-    and not isOpen(backpack) and self:Distance(backpack, panel) >= 0
+    and not isOpen(backpack) and self:Distance(backpack, panel) >= 0 and opensBackpack(panel)
 end
 
 -- Anchor returns the open anchor of panel when panel is the chained bag of the layout.

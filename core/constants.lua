@@ -744,6 +744,12 @@ const.DATABASE_DEFAULTS = {
     animateItemMovement = false,
     -- Whether every bag is kept on the screen (window.md §3a): off, bags may be moved off it.
     clampBagsToScreen = false,
+    -- What the backpack does at each interaction BetterBags follows (General > Interactions, interaction-bags.md),
+    -- by the interaction's name in Enum.PlayerInteractionType: "openClose" opens it with the interaction's window and
+    -- closes it with it, "open" only opens it, "none" leaves it as it is. These are the only names there are.
+    interactionBags = { TradePartner = "openClose", Banker = "openClose", AccountBanker = "openClose",
+      Merchant = "openClose", MailInfo = "openClose", Auctioneer = "openClose", GuildBanker = "openClose",
+      VoidStorageBanker = "openClose", ScrappingMachine = "openClose", ItemUpgrade = "openClose" },
     nextEnabled = false,
     -- Whether BetterBags Next's vendor and guild bank stand in for Blizzard's merchant and guild bank frames (Enable
     -- Vendor Window, Enable Guild Bank Window; next-bagsystem.md §11g); off, Blizzard's frame shows the vendor or the guild bank.
