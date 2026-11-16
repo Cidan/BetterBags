@@ -539,6 +539,23 @@ describe("SonataNext", function()
       assert.are.equal("", sonataNext:Resolve("Elvish").Variables.Flags)
     end)
 
+    -- What Map names is the theme's own data: ElvUI's pixel mode (a boolean) turns its outlines (a list of rings) on or
+    -- off (next-themes-elvui.md §27). Only a value read straight from the addon must be the Fallback's kind.
+    it("takes what Map names as it is, the theme's own values: a list of tables, or false", function()
+      local rings = { { Offset = 1, Color = "Black" }, { Offset = -1, Color = "Black" } }
+      sonataNext:RegisterTheme({ Name = "Elvish", Variables = {
+        Outlines = ref({ 1, "media", "pixel" }, false, { Map = { [true] = false, [false] = rings } }),
+      } })
+      assert.is_false(sonataNext:Resolve("Elvish").Variables.Outlines, "pixel mode: none")
+      SpecAddon[1].media.pixel = false
+      local read = sonataNext:Resolve("Elvish").Variables.Outlines
+      assert.are.same(rings, read)
+      read[1].Offset = 9
+      assert.are.equal(1, rings[1].Offset, "a copy")
+      SpecAddon[1].media.pixel = {}
+      assert.is_false(sonataNext:Resolve("Elvish").Variables.Outlines, "a value Map does not name, of another kind")
+    end)
+
     it("reads tables raw: nothing of the addon runs", function()
       local ran = false
       SpecAddon[1].media = setmetatable({}, { __index = function() ran = true return { r = 1, g = 1, b = 1 } end })

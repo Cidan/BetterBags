@@ -59,9 +59,18 @@ local function text(size, color)
   return { File = "$Font", Flags = "$FontFlags", Shadow = "$Shadowed", Size = size, Color = color }
 end
 
--- ElvUI's one-pixel edge (SetTemplate: E.twoPixelsPlease is always false, General/Initialize.lua:103), and lit.
-local EDGE = { Color = "Border", Alpha = 1, Size = 1 }
-local LIT = { Color = "Accent", Alpha = 1, Size = 1 }
+-- ElvUI's one-pixel edge (SetTemplate: E.twoPixelsPlease is always false, General/Initialize.lua:103), and lit; with
+-- its black lines inside and outside it outside pixel mode ($Outlines). A line (a divider, a tab rail's) has none.
+local EDGE = { Color = "Border", Alpha = 1, Size = 1, Outlines = "$Outlines" }
+local LIT = { Color = "Accent", Alpha = 1, Size = 1, Outlines = "$Outlines" }
+local LINE = { Color = "Border", Alpha = 1, Size = 1 }
+-- Outside pixel mode SetTemplate puts a black one-pixel line just inside its edge and one just outside it
+-- (General/Toolkit.lua:331-359): rings in NextControls' terms, and in Sonata's for item buttons.
+local RINGS = { { Offset = 1, Color = "Black", Size = 1 }, { Offset = -1, Color = "Black", Size = 1 } }
+local ITEM_RINGS = {
+  { Offset = 1, EdgeSize = 1, Color = { 0, 0, 0, 1 } },
+  { Offset = -1, EdgeSize = 1, Color = { 0, 0, 0, 1 } },
+}
 -- A button on the gloss template (HandleButton: SetTemplate(template, true)), its edge lit under the pointer
 -- (S.SetModifiedBackdrop); no pushed look (its pushed texture cleared).
 local GLOSS = { Texture = "$Gloss", Color = "Card", Alpha = 1 }
@@ -78,8 +87,6 @@ end
 -- HandleCategoriesButtons' highlight).
 local ROW_HOVER = { Texture = "Highlight", Color = "White", Alpha = 0.3 }
 local ROW_CHOSEN = { Texture = "Highlight", Color = "Accent", Alpha = 0.5 }
--- StyleButton's under the pointer and pressed, inside the border.
-local INSIDE = { Left = 1, Right = 1, Top = 1, Bottom = 1 }
 
 sonataNext:RegisterTheme({
   Name = "ElvUI",
@@ -108,12 +115,24 @@ sonataNext:RegisterTheme({
     -- The icon crop: 0.04 times cropIcon (2) in from each side once ElvUI has started (E:UpdateTexCoords,
     -- General/Toolkit.lua:69-81); 0 to 1 until then.
     TexCoords = elvui({ "TexCoords" }, { 0.08, 0.92, 0.08, 0.92 }),
+    -- Pixel mode (Thin Borders, on by default, Defaults/Private.lua:24; E.PixelMode, General/Initialize.lua:727): off,
+    -- the black lines inside and outside every edge, what is inside an edge inset past them (E.Border 2, :728; drawn
+    -- here as an Inset of "Edge", from the lines themselves). Changing it needs a reload (ElvUI_Options General.lua:192):
+    -- read, not watched.
+    Outlines = elvui({ "PixelMode" }, false, { Map = { [true] = false, [false] = RINGS } }),
+    ItemOutlines = elvui({ "PixelMode" }, false, { Map = { [true] = false, [false] = ITEM_RINGS } }),
+    -- The bags' quest colors (Defaults/Profile.lua:534-535): an item while its quest is not active, and once it is
+    -- (Modules/Bags/Bags.lua:615-617, B.QuestColors).
+    QuestStarter = elvui({ "db", "bags", "colors", "items", "questStarter" }, { 1, 0.96, 0.41, 1 }, { Alpha = 1 }),
+    QuestItem = elvui({ "db", "bags", "colors", "items", "questItem" }, { 0.9, 0.3, 0.3, 1 }, { Alpha = 1 }),
   },
   -- ElvUI's options call E:UpdateMedia after every change (ElvUI_Options/Game/Shared/General.lua), and its start calls
-  -- E:UpdateTexCoords after E:UpdateMedia (General/Core.lua:2047-2055).
+  -- E:UpdateTexCoords after E:UpdateMedia (General/Core.lua:2047-2055); its bags' color options call UpdateBagColors on
+  -- its bags module (E.Bags, General/Initialize.lua:79; ElvUI_Options/Game/Shared/Bags.lua:196).
   Watch = {
     { Global = "ElvUI", Path = { 1 }, Method = "UpdateMedia" },
     { Global = "ElvUI", Path = { 1 }, Method = "UpdateTexCoords" },
+    { Global = "ElvUI", Path = { 1, "Bags" }, Method = "UpdateBagColors" },
   },
 
   Textures = {
@@ -147,8 +166,6 @@ sonataNext:RegisterTheme({
     Bead = { 1, 1, 1, 1 },
     Shadow = "$ShadowColor",
     Scrim = { 0, 0, 0, 0.5 },
-    -- Its quest colors (Defaults/Profile.lua:534-535): an item that starts a quest, and a quest's item.
-    QuestStarter = { 1, 0.96, 0.41, 1 },
   },
 
   FontShadow = { Color = "Shadow", X = 1, Y = -1 },
@@ -251,7 +268,7 @@ sonataNext:RegisterTheme({
     Fill = { Color = "Body" },
     Feather = false,
     Wash = false,
-    Edge = { Color = "Border", Alpha = 1, Size = 1, Full = true },
+    Edge = { Color = "Border", Alpha = 1, Size = 1, Full = true, Outlines = "$Outlines" },
     DropGlow = { Color = "Accent", Alpha = 0.15, BlendMode = "ADD" },
   },
 
@@ -278,7 +295,7 @@ sonataNext:RegisterTheme({
   Search = {
     Fill = "SearchFill",
     FocusFill = "SearchFillFocus",
-    Edge = { Color = "Border", Size = 1, Idle = 1, Hover = 1, Focus = 1 },
+    Edge = { Color = "Border", Size = 1, Idle = 1, Hover = 1, Focus = 1, Outlines = "$Outlines" },
     Icon = { Color = "Text", Idle = 0.6, Active = 1, FocusColor = "White" },
   },
 
@@ -340,18 +357,21 @@ sonataNext:RegisterTheme({
   -- in the border color as ElvUI draws them; StyleButton's under the pointer and pressed; its quest and upgrade icons;
   -- its count font.
   ItemButton = {
-    Icon = { Inset = 1, TexCoords = "$TexCoords" },
-    Backdrop = { Texture = "$Gloss", VertexColor = "$Backdrop", BorderColor = "$Border", EdgeSize = 1 },
+    -- Inside the border and the black line inside it outside pixel mode (SetInside), from the lines themselves.
+    Icon = { Inset = "Edge", TexCoords = "$TexCoords" },
+    Backdrop = { Texture = "$Gloss", VertexColor = "$Backdrop", BorderColor = "$Border", EdgeSize = 1,
+      Outlines = "$ItemOutlines" },
     QualityBorder = { Texture = "Interface\\Common\\WhiteIconFrame", Alpha = 1 },
     QualityColors = { [0] = "$Border", [1] = "$Border" },
-    QuestBorderColor = { 1, 0.96, 0.41, 1 },
+    QuestBorderColor = "$QuestStarter",
+    QuestActiveBorderColor = "$QuestItem",
     -- Its "!" only on an item that starts a quest not yet taken, nothing over other quest items, on every client
     -- (Modules/Bags/Bags.lua:793; on Era its tooltip scan marks quest items active, :663-683).
     QuestStarterIcon = { Texture = TEX .. "BagQuestIcon.tga" },
     QuestIcon = { Texture = TEX .. "Invisible.tga" },
     UpgradeIcon = { Texture = TEX .. "BagUpgradeIcon.tga", Scale = 1.2 },
-    Highlight = { Color = { 1, 1, 1, 0.3 }, BlendMode = "ADD", Inset = INSIDE },
-    Pushed = { Color = { 0.9, 0.8, 0.1, 0.3 }, BlendMode = "ADD", Inset = INSIDE },
+    Highlight = { Color = { 1, 1, 1, 0.3 }, BlendMode = "ADD", Inset = "Edge" },
+    Pushed = { Color = { 0.9, 0.8, 0.1, 0.3 }, BlendMode = "ADD", Inset = "Edge" },
     Count = { Font = { Path = MEDIA .. "Fonts\\Homespun.ttf", Size = 10, Flags = "MONOCHROMEOUTLINE" } },
   },
 
@@ -359,7 +379,7 @@ sonataNext:RegisterTheme({
     Fill = { Color = "Body" },
     Wash = false,
     Edge = EDGE,
-    Sidebar = { Fill = { Color = "Card", Alpha = 0.5 }, Line = EDGE },
+    Sidebar = { Fill = { Color = "Card", Alpha = 0.5 }, Line = LINE },
     Brand = { IconColor = "Accent", Line = { Color = "Accent", From = 1, To = 0, Size = 1 } },
     Search = { IconColor = "Text" },
     Back = { IconColor = "Text" },
@@ -370,7 +390,7 @@ sonataNext:RegisterTheme({
       Divider = { Color = "White", Alpha = 0.06, Size = 1 },
       Hover = { Color = "White", Alpha = 0.05 },
     },
-    Footer = { Line = EDGE },
+    Footer = { Line = LINE },
     Cards = {
       Fill = { Color = "Card" },
       HoverFill = { Texture = "Highlight", Color = "White", Alpha = 0.15 },
@@ -396,7 +416,7 @@ sonataNext:RegisterTheme({
     -- no highlight (cleared).
     Toggle = {
       Style = "Square",
-      Width = 16, Height = 16, KnobSize = 14, KnobInset = 1,
+      Width = 16, Height = 16, KnobSize = "Fill", KnobInset = "Edge",
       Off = { Color = "ControlFill" },
       On = { Color = "ControlFill", Alpha = 1 },
       Edge = EDGE,
@@ -413,7 +433,7 @@ sonataNext:RegisterTheme({
     Input = {
       Fill = { Color = "ControlFill" },
       FocusFill = { Color = "ControlFill" },
-      Edge = { Color = "Border", Size = 1, Idle = 1, Hover = 1, Focus = 1 },
+      Edge = { Color = "Border", Size = 1, Idle = 1, Hover = 1, Focus = 1, Outlines = "$Outlines" },
     },
     -- HandleSliderFrame: a 12-tall box on the default template, a gold square thumb 10 across; no fill.
     Slider = {
@@ -429,7 +449,7 @@ sonataNext:RegisterTheme({
       Fill = { Color = "ControlFill" },
       HoverFill = { Color = "ControlFill" },
       OpenFill = { Color = "ControlFill" },
-      Edge = { Color = "Border", Size = 1, Idle = 1, Hover = 1, Open = 1 },
+      Edge = { Color = "Border", Size = 1, Idle = 1, Hover = 1, Open = 1, Outlines = "$Outlines" },
       Chevron = { Texture = "Arrow", TexCoords = { 0, 1, 1, 0 }, Color = "Text", Size = 14 },
     },
     -- ElvUI's menus (Skins/Menu.lua): the transparent template; the chosen row's mark a square of the bar texture in the
@@ -442,9 +462,15 @@ sonataNext:RegisterTheme({
       Picker = { NewIcon = { Color = "Accent" }, BackIcon = { Color = "Text" } },
     },
     Swatch = { Edge = EDGE, HoverEdge = LIT },
-    TopTabs = { Indicator = { Color = "Accent", Height = 2 }, Line = EDGE },
+    TopTabs = { Indicator = { Color = "Accent", Height = 2 }, Line = LINE },
     -- ElvUI's popups: the transparent template.
     Dialog = { Card = { Color = "Body" }, Edge = EDGE },
     ItemGrid = { CommonEdge = EDGE, Hover = { Color = "White", Alpha = 0.3 } },
+  },
+
+  -- On Era ElvUI marks every quest item active but a quest starter (its tooltip scan, Modules/Bags/Bags.lua:661-685):
+  -- its quest item color for every one but a starter.
+  Clients = {
+    Era = { ItemButton = { QuestBorderColor = "$QuestItem", QuestStarterBorderColor = "$QuestStarter" } },
   },
 })

@@ -197,5 +197,103 @@ describe("NextControls", function()
         assert.is_false(edge[side]:IsShown(), side)
       end
     end)
+
+    local SIDES = { "Top", "Bottom", "Left", "Right" }
+    local function shown(ring)
+      for _, side in ipairs(SIDES) do
+        if not ring[side]:IsShown() then return false end
+      end
+      return true
+    end
+
+    -- ElvUI outside its pixel mode draws a black line inside and one outside every edge (General/Toolkit.lua,
+    -- SetTemplate; docs/next-elvui-theme.md). An edge's Outlines are rings round its frame, each Offset outside it (inside
+    -- for less than 0), Size thick, in its Color at its own Alpha: a strength asked of the edge is the edge's alone.
+    it("draws its outlines, rings Offset outside its frame (inside for less than 0), and takes them away", function()
+      controls:PaintEdge(edge, { Color = "Lavender", Size = 1, Outlines = {
+        { Offset = 1, Color = "Black", Size = 1 },
+        { Offset = -1, Color = "Black", Alpha = 0.5, Size = 1 },
+      } }, 0.3)
+      local rings = edge.outlines.rings
+      local outer, inner = rings[1], rings[2]
+      assert.are.same({ "TOPLEFT", frame, "TOPLEFT", -1, 1 }, { outer.Top:GetPoint(1) })
+      assert.are.same({ "TOPRIGHT", frame, "TOPRIGHT", 1, 1 }, { outer.Top:GetPoint(2) })
+      assert.are.equal(1, outer.Top:GetHeight())
+      assert.are.same({ "BOTTOMLEFT", frame, "BOTTOMLEFT", -1, -1 }, { outer.Bottom:GetPoint(1) })
+      assert.are.same({ "TOPLEFT", frame, "TOPLEFT", -1, 0 }, { outer.Left:GetPoint(1) })
+      assert.are.same({ "BOTTOMLEFT", frame, "BOTTOMLEFT", -1, 0 }, { outer.Left:GetPoint(2) })
+      assert.are.equal(1, outer.Left:GetWidth())
+      assert.are.same({ "TOPRIGHT", frame, "TOPRIGHT", 1, 0 }, { outer.Right:GetPoint(1) })
+      assert.are.same({ "TOPLEFT", frame, "TOPLEFT", 1, -1 }, { inner.Top:GetPoint(1) })
+      assert.are.same({ "TOPRIGHT", frame, "TOPRIGHT", -1, -1 }, { inner.Top:GetPoint(2) })
+      assert.are.same({ "TOPLEFT", frame, "TOPLEFT", 1, -2 }, { inner.Left:GetPoint(1) })
+      assert.are.same({ "BOTTOMLEFT", frame, "BOTTOMLEFT", 1, 2 }, { inner.Left:GetPoint(2) })
+      local r, g, b = style:RGBA("Black")
+      for _, side in ipairs(SIDES) do
+        assert.are.same({ r = r, g = g, b = b, a = 1 }, outer[side]._colorTexture, side .. ": its own alpha")
+        assert.are.same({ r = r, g = g, b = b, a = 0.5 }, inner[side]._colorTexture, side)
+        assert.are.equal(frame, outer[side]:GetParent(), side .. ": the frame's lines")
+      end
+      assert.is_true(shown(outer) and shown(inner))
+      assert.are.equal(0.3, edge.Top._colorTexture.a, "the edge at its strength")
+      -- The render recorder lists every ring with the edges (render-recorder.md).
+      assert.is_true(controls.edges[outer])
+      controls:PaintEdge(edge, { Color = "Lavender", Size = 1, Outlines = { { Offset = 1, Color = "Black", Size = 1 } } })
+      assert.is_true(shown(outer))
+      assert.is_false(inner.Top:IsShown(), "a ring the edge no longer has")
+      controls:PaintEdge(edge, { Color = "Lavender", Size = 1 })
+      assert.is_false(outer.Left:IsShown(), "an edge without outlines")
+      controls:PaintEdge(edge, { Color = "Lavender", Size = 1, Outlines = { { Offset = 1, Color = "Black", Size = 1 } } })
+      controls:PaintEdge(edge, false)
+      assert.is_false(outer.Bottom:IsShown(), "no edge")
+    end)
+
+    -- Found in review: on a coarse grid (a small bag at a low UI scale: a screen pixel over 2 units) a ring's offset
+    -- rounded to nothing while its line kept its pixel, so all three lines fell on one row. An offset is rounded as a
+    -- length: a whole pixel at least, never nothing.
+    it("keeps each ring a whole pixel apart from the edge on a coarse grid, and on whole pixels", function()
+      local layout = dofile("spec/helpers/layout.lua")
+      local pixel = addon:GetModule("NextPixel")
+      local undo = layout.UseScreen(1920, 1080, 0.64)
+      local parent = CreateFrame("Frame", nil, UIParent)
+      parent:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 0, 0)
+      parent:SetSize(400, 400)
+      parent:SetScale(0.5)
+      local box = CreateFrame("Frame", nil, parent)
+      local unit = pixel:Unit(box)
+      box:SetPoint("TOPLEFT", parent, "TOPLEFT", 10 * unit, -10 * unit)
+      box:SetSize(40 * unit, 20 * unit)
+      local e = controls:CreateEdge(box)
+      controls:PaintEdge(e, { Color = "Lavender", Size = 1, Outlines = {
+        { Offset = 1, Color = "Black", Size = 1 }, { Offset = -1, Color = "Black", Size = 1 } } })
+      local outer, inner = e.outlines.rings[1], e.outlines.rings[2]
+      assert.is_true(unit > 2, "a coarse grid: " .. unit)
+      local _, _, _, ox, oy = outer.Top:GetPoint(1)
+      assert.are.same({ -unit, unit }, { ox, oy }, "a pixel outside")
+      local _, _, _, ix, iy = inner.Top:GetPoint(1)
+      assert.are.same({ unit, -unit }, { ix, iy }, "a pixel inside")
+      assert.are.same({}, layout.PixelCheck(parent))
+      undo()
+    end)
+
+    -- A part that draws its own edge's lines (the panel's body, faded through a size switch) draws its outlines with them.
+    it("places, colors and shows outlines apart, for a part that fades its own edge", function()
+      local set = controls:CreateOutlines(frame, "BORDER", 1)
+      local made = controls:PlaceOutlines(set, { { Offset = 1, Color = "Black", Size = 1 } })
+      assert.are.equal(4, #made)
+      assert.is_false(set.rings[1].Top:IsShown(), "placed, not shown")
+      controls:ColorOutlines(set, 0.5)
+      local r, g, b = style:RGBA("Black")
+      assert.are.same({ r = r, g = g, b = b, a = 0.5 }, set.rings[1].Left._colorTexture)
+      controls:ShowOutlines(set, true)
+      assert.is_true(shown(set.rings[1]))
+      assert.are.same({}, controls:PlaceOutlines(set, { { Offset = 2, Color = "Black", Size = 1 } }), "none made again")
+      assert.are.same({ "TOPLEFT", frame, "TOPLEFT", -2, 2 }, { set.rings[1].Top:GetPoint(1) })
+      controls:ShowOutlines(set, false)
+      assert.is_false(set.rings[1].Right:IsShown())
+      controls:PlaceOutlines(set, nil)
+      controls:ShowOutlines(set, true)
+      assert.is_false(set.rings[1].Top:IsShown(), "no rings to show")
+    end)
   end)
 end)

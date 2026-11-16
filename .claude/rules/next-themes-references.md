@@ -22,13 +22,14 @@ classic bags' themes do; it **names** where the value is, and the engine reads i
   it whole (`SonataResolve.Merge`), nothing of the base's `Alpha` or `Map` kept.
 - **Reading** (`SonataResolve.ReadReference`, every time the theme resolves, so every apply reads it again):
   `_G[Global]`, then each key of `Path` (strings or numbers), **raw** (`rawget`: no metamethod of the other addon runs;
-  `SonataResolve.Walk`); a value on the way that is not a table, or a missing key, reads nothing. Then `Map` (a table:
-  the value read is looked up in it, and a value it does not name is read as it is). Then the value is taken when it
-  is the `Fallback`'s kind: a fallback of three or four numbers takes a **color** (`r`, `g`, `b` numbers and `a`, read as
+  `SonataResolve.Walk`); a value on the way that is not a table, or a missing key, reads nothing. Then `Map` (a table): a value it names
+  is mapped to what it says, the theme's own data, **taken as it is** (a list of tables, `false`, anything: ElvUI's
+  pixel mode, a boolean, turns the theme's outlines, a list of rings, on or off). Any other value is taken when it is
+  the `Fallback`'s kind: a fallback of three or four numbers takes a **color** (`r`, `g`, `b` numbers and `a`, read as
   `{ r, g, b, a }`, opaque without an `a`: ElvUI's color tables and Blizzard's ColorMixins) or a list of as many numbers;
   a longer or shorter list of numbers a list of as many; a string, a number or a boolean the same kind; **`false`** any
   string, number or boolean (a part that reads `false` treats it as unset: a font role's `File` false is the client's
-  font). Otherwise the `Fallback` is drawn. `Alpha` replaces a color's alpha, the fallback's too. What is read is a
+  font). Otherwise the `Fallback` is drawn. `Alpha` replaces a color's alpha (a list of numbers), the fallback's too. What is read is a
   copy, never filled in with `$` variables.
 - **Registration refuses** (`SonataNext:RegisterTheme`, the theme's `Variables` and each `Clients` override's): a
   `Global` that is not a name, a `Path` that is not a list of keys, an `Alpha` that is not a number, a `Map` that is
@@ -68,7 +69,7 @@ options write the setting and call `E:UpdateMedia()`, once per step while a colo
   watched call and what each read did (data-driven.md).
 
 Coverage: `spec/sonata/next_engine_spec.lua` ("references to another addon's values": every kind, read again, copies,
-fallbacks, alpha and map, raw reads, a `Global` without a `Fallback` kept as data, a client's override replacing a
+fallbacks, alpha and map, what Map names taken as it is, raw reads, a `Global` without a `Fallback` kept as data, a client's override replacing a
 reference whole, registration, `Check`; "watching another addon's methods": the form (a map refused), one hook,
 late themes, one read per frame, unchanged, restyled with fonts kept, applied for a font's file and for a font's color,
 not watched and not started), `spec/sonata/engine_spec.lua` (the classic engine reads one).

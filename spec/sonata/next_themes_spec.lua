@@ -545,9 +545,11 @@ describe("BetterBags Next's shipped themes", function()
     local savedElvUI
 
     -- elvui stands in for ElvUI's engine (unpack(ElvUI) is E) as E:UpdateMedia leaves it (General/Core.lua): the
-    -- player's colors (r, g, b, a and [1] to [4]), bar textures and font, the font's style, the icon crop.
-    local function elvui(style)
+    -- player's colors (r, g, b, a and [1] to [4]), bar textures and font, the font's style, the icon crop, pixel mode
+    -- and the border's width (General/Initialize.lua), the bags' quest colors (as AceDB keeps the profile: r, g, b, a).
+    local function elvui(style, pixelMode)
       local function color(r, g, b, a) return { r = r, g = g, b = b, a = a, r, g, b, a } end
+      if pixelMode == nil then pixelMode = true end
       local E = {
         media = {
           bordercolor = color(0.3, 0.2, 0.1, 1),
@@ -558,8 +560,13 @@ describe("BetterBags Next's shipped themes", function()
           glossTex = "Interface\\AddOns\\SharedMedia\\gloss.tga",
           normFont = "Interface\\AddOns\\SharedMedia\\font.ttf",
         },
-        db = { general = { fontStyle = style or "SHADOWOUTLINE" } },
+        db = { general = { fontStyle = style or "SHADOWOUTLINE" },
+          bags = { colors = { items = { questStarter = { r = 0.9, g = 0.9, b = 0.2, a = 1 },
+            questItem = { r = 0.8, g = 0.1, b = 0.1, a = 1 } } } } },
         TexCoords = { 0.1, 0.9, 0.1, 0.9 },
+        PixelMode = pixelMode,
+        Border = pixelMode and 1 or 2,
+        Bags = { UpdateBagColors = function() end },
         UpdateMedia = function() end,
         UpdateTexCoords = function() end,
       }
@@ -621,16 +628,26 @@ describe("BetterBags Next's shipped themes", function()
     it("reads only what ElvUI's source keeps where it reads, and watches methods ElvUI has", function()
       local core = source("ElvUI/Game/Shared/General/Core.lua")
       local toolkit = source("ElvUI/Game/Shared/General/Toolkit.lua")
+      local init = source("ElvUI/Game/Shared/General/Initialize.lua")
       local profile = source("ElvUI/Game/Shared/Defaults/Profile.lua")
+      local bags = source("ElvUI/Game/Shared/Modules/Bags/Bags.lua")
       for name, ref in pairs(sonataNext.themes.ElvUI.Variables) do
         assert.are.equal("ElvUI", ref.Global, name)
         assert.are.equal(1, ref.Path[1], name .. ": E, unpack(ElvUI)'s first")
         local key = ref.Path[2]
         if key == "media" then
           assert.is_truthy(core:find("E.media." .. ref.Path[3] .. " = ", 1, true), name .. ": E.media." .. ref.Path[3])
-        elseif key == "db" then
+        elseif key == "db" and ref.Path[3] == "general" then
           assert.are.same({ 1, "db", "general", "fontStyle" }, ref.Path, name)
           assert.is_truthy(profile:find("fontStyle = 'OUTLINE'", 1, true), name)
+        elseif key == "db" then
+          -- The bags' quest colors (Defaults/Profile.lua: bags.colors.items), read by B.QuestColors (Bags.lua).
+          assert.are.same({ "bags", "colors", "items" }, { ref.Path[3], ref.Path[4], ref.Path[5] }, name)
+          assert.is_truthy(profile:find(ref.Path[6] .. "%s*=%s*{"), name)
+          assert.is_truthy(bags:find("db.colors.items." .. ref.Path[6] .. ")", 1, true), name)
+        elseif key == "PixelMode" or key == "Border" then
+          assert.are.equal(2, #ref.Path, name)
+          assert.is_truthy(init:find("E." .. key .. " = ", 1, true), name)
         else
           assert.are.same({ 1, "TexCoords" }, ref.Path, name)
           assert.is_truthy(core:find("E.TexCoords = {0, 1, 0, 1}", 1, true), name)
@@ -638,13 +655,21 @@ describe("BetterBags Next's shipped themes", function()
       end
       local methods = {}
       for _, watch in ipairs(sonataNext.themes.ElvUI.Watch) do
-        assert.are.same({ "ElvUI", { 1 } }, { watch.Global, watch.Path })
+        assert.are.equal("ElvUI", watch.Global)
+        if watch.Method == "UpdateBagColors" then
+          -- Its bags module (E.Bags, General/Initialize.lua), whose color options call it (ElvUI_Options Bags.lua).
+          assert.are.same({ 1, "Bags" }, watch.Path)
+        else
+          assert.are.same({ 1 }, watch.Path)
+        end
         table.insert(methods, watch.Method)
       end
       table.sort(methods)
-      assert.are.same({ "UpdateMedia", "UpdateTexCoords" }, methods)
+      assert.are.same({ "UpdateBagColors", "UpdateMedia", "UpdateTexCoords" }, methods)
       assert.is_truthy(core:find("function E:UpdateMedia()", 1, true))
       assert.is_truthy(toolkit:find("function E:UpdateTexCoords()", 1, true))
+      assert.is_truthy(bags:find("function B:UpdateBagColors(", 1, true))
+      assert.is_truthy(init:find("E.Bags = E:NewModule('Bags'", 1, true))
     end)
 
     it("follows the player's ElvUI: its colors, bar and gloss textures, font and style, and icon crop", function()
@@ -806,13 +831,16 @@ describe("BetterBags Next's shipped themes", function()
       elvui()
       for _, flag in ipairs(FLAGS) do addon[flag] = CLIENTS.Retail[flag] == true end
       local b = t().ItemButton
-      assert.are.equal(1, b.Icon.Inset, "inset by its border")
+      assert.are.equal("Edge", b.Icon.Inset, "inside its border, from the line itself")
       assert.are.same({ 0.15, 0.15, 0.2, 1 }, b.Backdrop.VertexColor)
       assert.are.same({ 0.3, 0.2, 0.1, 1 }, b.Backdrop.BorderColor)
       assert.are.equal("table", type(b.QualityBorder), "quality on the icon's border, as every Next theme")
       assert.are.same({ 0.3, 0.2, 0.1, 1 }, b.QualityColors[0], "Poor in the border color")
       assert.are.same({ 0.3, 0.2, 0.1, 1 }, b.QualityColors[1], "Common in the border color")
-      assert.are.same({ 1, 0.96, 0.41, 1 }, b.QuestBorderColor, "its quest starter color")
+      -- Its Quest Starter color while the quest is not active, its quest item color once it is: the player's
+      -- (Modules/Bags/Bags.lua:615-617, B.QuestColors).
+      assert.are.same({ 0.9, 0.9, 0.2, 1 }, b.QuestBorderColor, "the player's Quest Starter color")
+      assert.are.same({ 0.8, 0.1, 0.1, 1 }, b.QuestActiveBorderColor, "the player's quest item color")
       -- Its "!" only on an item that starts a quest not yet taken, nothing over other quest items, on every client
       -- (Modules/Bags/Bags.lua:793; on Era, E.Classic, its tooltip scan marks quest items active, :663-683). Found in
       -- review: it was on every quest item, and then, by a misreading, on every one on the Classic clients.
@@ -827,6 +855,66 @@ describe("BetterBags Next's shipped themes", function()
       assert.are.same({ { 0.9, 0.8, 0.1, 0.3 }, "ADD" }, { b.Pushed.Color, b.Pushed.BlendMode }, "StyleButton")
       assert.are.same({ MEDIA .. "Fonts\\Homespun.ttf", 10, "MONOCHROMEOUTLINE" },
         { b.Count.Font.Path, b.Count.Font.Size, b.Count.Font.Flags })
+    end)
+
+    -- ElvUI's quest colors (Defaults/Profile.lua:534-535) while the player's are not where it keeps them. On Era it marks
+    -- every quest item active but a quest starter (its tooltip scan, Modules/Bags/Bags.lua:661-685): its quest item color
+    -- for every one but a starter.
+    it("edges quest items in ElvUI's quest colors, Era's its own way", function()
+      for _, flag in ipairs(FLAGS) do addon[flag] = CLIENTS.Retail[flag] == true end
+      local b = t().ItemButton
+      assert.are.same({ 1, 0.96, 0.41, 1 }, b.QuestBorderColor)
+      assert.are.same({ 0.9, 0.3, 0.3, 1 }, b.QuestActiveBorderColor)
+      assert.is_nil(b.QuestStarterBorderColor)
+      elvui()
+      for _, flag in ipairs(FLAGS) do addon[flag] = CLIENTS.Era[flag] == true end
+      b = t().ItemButton
+      assert.are.same({ 0.8, 0.1, 0.1, 1 }, b.QuestBorderColor, "Era: the quest item color")
+      assert.are.same({ 0.9, 0.9, 0.2, 1 }, b.QuestStarterBorderColor, "but a starter's")
+      for _, client in ipairs({ "TBC", "Mists", "Cata", "Anniversary" }) do
+        for _, flag in ipairs(FLAGS) do addon[flag] = CLIENTS[client][flag] == true end
+        assert.is_nil(t().ItemButton.QuestStarterBorderColor, client .. " reads the quest data as Retail")
+      end
+    end)
+
+    -- Outside its pixel mode (Thin Borders off) ElvUI draws a black line inside and one outside every edge
+    -- (General/Toolkit.lua:331-359, SetTemplate), and insets what is inside an edge by 2, not 1 (E.Border,
+    -- General/Initialize.lua:728). Changing the option needs a reload (ElvUI_Options General.lua:192), so it is read, not
+    -- watched.
+    it("draws a black line inside and one outside every edge outside ElvUI's pixel mode, and none in it", function()
+      local RINGS = { { Offset = 1, Color = "Black", Size = 1 }, { Offset = -1, Color = "Black", Size = 1 } }
+      local function edges(theme)
+        local C = theme.Controls
+        return {
+          panel = theme.Panel.Edge, search = theme.Search.Edge, tab = theme.Tabs.Edge, chosenTab = theme.Tabs.SelectedEdge,
+          headerButton = theme.Header.Buttons.Backdrop.Edge, litHeaderButton = theme.Header.Buttons.Backdrop.HoverEdge,
+          button = C.Button.Plain.Edge, litButton = C.Button.Plain.HoverEdge, primary = C.Button.Primary.Edge,
+          danger = C.Button.Danger.HoverEdge, input = C.Input.Edge, dropdown = C.Dropdown.Edge, toggle = C.Toggle.Edge,
+          slider = C.Slider.Edge, menu = C.Menu.Edge, dialog = C.Dialog.Edge, swatch = C.Swatch.Edge,
+          itemGrid = C.ItemGrid.CommonEdge, settings = theme.Settings.Edge, card = theme.Settings.Cards.Edge,
+          chosenCard = theme.Settings.Cards.SelectedEdge, tracker = theme.Currency.Tracker.Edge,
+        }
+      end
+      elvui(nil, false)
+      local outside = t()
+      for name, edge in pairs(edges(outside)) do
+        assert.are.same(RINGS, edge.Outlines, name)
+      end
+      local b = outside.ItemButton
+      assert.are.same({ { Offset = 1, EdgeSize = 1, Color = { 0, 0, 0, 1 } }, { Offset = -1, EdgeSize = 1, Color = { 0, 0, 0, 1 } } },
+        b.Backdrop.Outlines, "item buttons")
+      -- What is inside an edge sits just inside its innermost line (SetInside: E.Border), measured from the lines.
+      assert.are.same({ "Edge", "Edge", "Edge" }, { b.Icon.Inset, b.Highlight.Inset, b.Pushed.Inset })
+      assert.are.same({ "Edge", "Fill" }, { outside.Controls.Toggle.KnobInset, outside.Controls.Toggle.KnobSize }, "the check mark")
+      assert.are.same({}, sonataNext:Check("ElvUI"))
+      elvui(nil, true)
+      local pixel = t()
+      for name, edge in pairs(edges(pixel)) do
+        assert.is_false(edge.Outlines, name)
+      end
+      assert.is_false(pixel.ItemButton.Backdrop.Outlines)
+      _G.ElvUI = nil
+      assert.is_false(t().Panel.Edge.Outlines, "pixel mode, ElvUI's default, while it is not there")
     end)
 
     it("draws the settings window on ElvUI's templates, its lists lit as ElvUI lights them", function()

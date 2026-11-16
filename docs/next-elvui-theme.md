@@ -100,6 +100,13 @@ One Next theme, **ElvUI** (`ElvUI`, `sonata/themes/next/elvui.lua`), `Requires =
 3. **Header buttons on a backdrop** (`Header.Buttons.Backdrop`: `Fill`, `Edge`, `HoverEdge`; false in Default; an
    icon's own `Backdrop`, false for none, wins: ElvUI's close button is bare).
 4. **A slider's track edge** (`Controls.Slider.Edge`; unset in Default).
+5. **Outlines** (asked after the first build: "do it"): rings round an edge (`Outlines`, `{ Offset, Size, Color,
+   Alpha }`) in `NextControls` for every edge it draws and the panel's and search box's own, and on Sonata's item
+   button backdrop (`{ Offset, EdgeSize, Color }`); a value a reference's `Map` names is taken as it is, so ElvUI's
+   pixel mode (a boolean) turns the rings (a list) on or off.
+6. **Quest colors** (asked: "makes sense, do it"): `QuestActiveBorderColor` and `QuestStarterBorderColor` on Sonata's
+   item button style, the theme reading the player's Quest Starter and quest item colors and watching
+   `E.Bags:UpdateBagColors`.
 
 ## Done (branch `worktree-kind-gliding-firefly`)
 
@@ -114,8 +121,6 @@ The bug review found seven issues, all fixed test first; they are listed in `.cl
 
 ## Left out
 
-- **Outside pixel mode**, ElvUI's black lines inside and outside every edge: BetterBags Next draws one edge per part.
-  Pixel mode is ElvUI's default.
 - **Following ElvUI's font size**: a theme drawn again with other sizes makes new font objects, and font objects can
   never be freed; a size slider dragged would leave a set behind on every step.
 - **ElvUI's per-bag text settings** (its count, item level and info fonts are LibSharedMedia names, which only a

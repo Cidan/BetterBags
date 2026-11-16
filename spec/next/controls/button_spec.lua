@@ -262,6 +262,34 @@ describe("NextToggle", function()
     assert.are.same(rgb("White"), colorOf(on.knob))
   end)
 
+  -- ElvUI's check box: its mark fills the box inside its border and the black line inside it outside pixel mode
+  -- (HandleCheckBox: SetInside). KnobInset = "Edge" is measured from the same rounded lines the edge and its outlines
+  -- are drawn with, and KnobSize = "Fill" fills what is inside, so no gap or overlap shows at any pixel ratio (found in
+  -- review: 2 units rounded once against two lines rounded each).
+  it("puts its knob just inside its edge and the outlines inside it, filling the box, on any grid", function()
+    local layout = dofile("spec/helpers/layout.lua")
+    local pixel = addon:GetModule("NextPixel")
+    for _, setup in ipairs({ { 1920, 1080, 0.64, 0.5 }, { 1920, 1080, 768 / 1080, 1.25 }, { 2560, 1440, 1, 1.6 } }) do
+      local undo = layout.UseScreen(setup[1], setup[2], setup[3])
+      local parent = CreateFrame("Frame", nil, UIParent)
+      parent:SetScale(setup[4])
+      UseNextTheme({ Controls = { Toggle = { Style = "Square", Width = 16, Height = 16, KnobInset = "Edge", KnobSize = "Fill",
+        Edge = { Color = "Black", Size = 1, Outlines = { { Offset = 1, Color = "Black", Size = 1 },
+          { Offset = -1, Color = "Black", Size = 1 } } } } } })
+      local t = nextToggle:Create(parent, { checked = true, onChange = function() end })
+      local inner = t.edge.outlines.rings[2]
+      local _, _, _, ringX = inner.Left:GetPoint(1)
+      local depth = ringX + inner.Left:GetWidth()
+      assert.are.equal(pixel:Length(t.frame, 1) * 2, depth, "the border and the line inside it")
+      assert.are.equal(depth, knobX(t), "just inside them: " .. table.concat(setup, " "))
+      assert.are.equal(t.frame:GetWidth() - 2 * depth, t.knob:GetWidth(), "filling the box")
+      assert.are.equal(t.knob:GetWidth(), t.knob:GetHeight())
+      UseNextTheme(nil)
+      nextToggle:ApplyStyle()
+      undo()
+    end
+  end)
+
   it("flips on a click, sliding its knob and calling back with the new state", function()
     local t = make(false)
     t.frame:GetScript("OnClick")(t.frame, "LeftButton")

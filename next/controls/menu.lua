@@ -629,7 +629,8 @@ function nextMenu:styleHead(head, left, right, top, iconSize, gap)
   self.headIcon:SetTexture(head.icon)
   local K = controls:Theme("ItemGrid")
   if head.edge ~= nil then
-    controls:PaintEdge(self.headEdge, { Color = { head.edge[1], head.edge[2], head.edge[3] }, Size = K.CommonEdge.Size }, 1)
+    controls:PaintEdge(self.headEdge, { Color = { head.edge[1], head.edge[2], head.edge[3] }, Size = K.CommonEdge.Size,
+      Outlines = K.CommonEdge.Outlines }, 1)
   else
     controls:PaintEdge(self.headEdge, K.CommonEdge)
   end

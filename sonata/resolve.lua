@@ -176,24 +176,25 @@ local function isColor(value)
     and type(rawget(value, "b")) == "number"
 end
 
--- ReadReference reads a reference: the value at its Path (Walk), mapped through Map (a value Map does not name is read
--- as it is), taken when it is the Fallback's kind, else the Fallback. A Fallback of three or four numbers takes a color
--- (r, g, b and a, read as { r, g, b, a }, opaque without an a) or a list of as many numbers; any other list of numbers
--- a list of as many; a string, a number or a boolean the same kind; false any string, number or boolean. Alpha replaces
--- a color's alpha, the fallback's too. What is read is a copy. It also returns whether the value was taken.
+-- ReadReference reads a reference: the value at its Path (Walk). A value Map names is mapped to what Map says, the
+-- theme's own data, taken as it is (a list of tables, false, anything). Any other value is taken when it is the
+-- Fallback's kind, else the Fallback: a Fallback of three or four numbers takes a color (r, g, b and a, read as
+-- { r, g, b, a }, opaque without an a) or a list of as many numbers; any other list of numbers a list of as many; a
+-- string, a number or a boolean the same kind; false any string, number or boolean. Alpha replaces a color's alpha (a
+-- list of numbers), the fallback's too. What is read is a copy. It also returns whether the value was taken.
 ---@param ref table
 ---@return any value, boolean read
 function resolve.ReadReference(ref)
   local value = resolve.Walk(ref.Global, ref.Path)
+  local mapped
   if ref.Map ~= nil and value ~= nil then
-    local mapped = ref.Map[value]
-    if mapped ~= nil then
-      value = mapped
-    end
+    mapped = ref.Map[value]
   end
   local fallback = ref.Fallback
   local read
-  if type(fallback) == "table" then
+  if mapped ~= nil then
+    read = resolve.DeepCopy(mapped)
+  elseif type(fallback) == "table" then
     local n = #fallback
     if (n == 3 or n == 4) and isColor(value) then
       local a = rawget(value, "a")
@@ -221,7 +222,7 @@ function resolve.ReadReference(ref)
   if not taken then
     read = resolve.DeepCopy(fallback)
   end
-  if ref.Alpha ~= nil and type(read) == "table" and #read >= 3 then
+  if ref.Alpha ~= nil and type(read) == "table" and #read >= 3 and type(read[1]) == "number" then
     read[4] = ref.Alpha
   end
   return read, taken

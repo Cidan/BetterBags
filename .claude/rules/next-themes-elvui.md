@@ -55,7 +55,11 @@ every TOC, so it loads first). Nothing of ElvUI's is called:
 - Item buttons (Next's `ItemButton` style): the gloss template behind the icon, inset by the border and cropped by
   ElvUI's crop; the border color's edge; quality on the icon's border in Blizzard's frame (`Interface\Common\WhiteIconFrame`,
   as every Next theme draws quality there, next-themes.md §6), Poor and Common in the border color as ElvUI draws them;
-  `StyleButton`'s white and gold fills under the pointer and pressed; quest items edged in its quest-starter yellow,
+  `StyleButton`'s white and gold fills under the pointer and pressed; quest items edged in the player's Quest Starter
+  color while the quest is not active and their quest item color once it is (`QuestBorderColor`,
+  `QuestActiveBorderColor`: `E.db.bags.colors.items`, watched through `E.Bags:UpdateBagColors`; on Era, where ElvUI's
+  tooltip scan marks every quest item active but a starter, the quest item color for every one but a starter,
+  `Clients.Era`, `QuestStarterBorderColor`; Era's quest data is not seen in game),
   its "!" (`QuestStarterIcon`) only on an item that starts a quest not yet taken and nothing over other quest items
   (`QuestIcon`: ElvUI's `Invisible.tga`), on every client, as `Modules/Bags/Bags.lua:793` shows it (on Era, `E.Classic`,
   its tooltip scan marks quest items active, :663-683; Blizzard's Era bags show no quest mark at all); its upgrade icon; counts in Homespun 10 `MONOCHROMEOUTLINE`.
@@ -63,6 +67,13 @@ every TOC, so it loads first). Nothing of ElvUI's is called:
   sizes fixed per role (12 for most, as ElvUI's general size). The vendor's
   card names and prices are 11, so two lines of a name and a price fit beside its 36-pixel icon.
 - Layout: 36-pixel icons ten to a row, 4 apart (ElvUI's bags: 34), a shorter header.
+- **Outside pixel mode** (Thin Borders off, `E.PixelMode` false; it needs a reload in ElvUI, so it is read, not
+  watched): a black line just inside and one just outside every edge, as `SetTemplate` draws them (`$Outlines`: two
+  rings, `Offset` 1 and -1, on every edge the theme draws, the panel's, the search box's, the controls', the header
+  buttons', the tabs' and cards'; `$ItemOutlines` on item buttons, in Sonata's terms), and what is inside an edge
+  just inside its innermost line (`SetInside`, `E.Border`: 1 in pixel mode, 2 outside it): the icon, the item buttons'
+  hover and pushed fills (`Inset = "Edge"`), the check box's mark (`KnobInset = "Edge"`, `KnobSize = "Fill"`), each
+  measured from the rounded lines themselves. Lines that are not edges (dividers, the tab rail's line) have none.
 
 **Found in review** (Prime Directive #2), each fixed test first: six text roles drawn in the value color made 56 font
 objects a frame while it was dragged in ElvUI's options (now gold or gray); the dropdown arrow's `TexCoords` were never
@@ -76,15 +87,23 @@ data again). The second review also found a style's quest art left on a Classic 
 went, over the next item or an empty slot (its buttons have no `UpdateQuestItem`), and a third that a theme without
 quest art after one with it left it too: on those buttons the quest texture now shows a style's art over a quest item
 and nothing else, and on Retail's a style with quest art owns it (`SonataElements:DrawItemQuest`, also called with no
-quest data for a free or reset slot, `frames/item.lua`; sonata.md §3a), which the classic bags' ElvUI theme gets too. Left as they are: ElvUI edges an item that starts a quest already taken in its red (`questItem`); the theme's one
-quest color is its yellow. And: a `Watch` in a `Clients` override is not hooked (no theme has one), and the engine's
+quest data for a free or reset slot, `frames/item.lua`; sonata.md §3a), which the classic bags' ElvUI theme gets too. Left as they are: a `Watch` in a `Clients` override is not hooked (no theme has one), and the engine's
 font check does not count `White`, the color a role without one is drawn in (every theme inherits Default, whose
 roles all name a color).
 
+The review of the outlines and quest colors found two drawing bugs, both fixed test first: on a coarse grid (a small
+bag at a low UI scale, a screen pixel over 2 units) a ring's offset rounded to nothing while its line kept its pixel, so
+the border and both rings fell on one row (offsets are now rounded as lengths: `NextControls` `signedLength`, Sonata
+`signedLengthOf`); and an inset of 2 units, rounded once, missed the border and inner ring, each rounded on its own, by
+a pixel at some bag scales (a gap at 1.25 and 1.5 pixels per unit, an overlap at 1.6 and 2.6): what sits inside an
+edge is now placed from the same rounded lines (`"Edge"`, `"Fill"`). It also found no spec took the rings through a
+size switch or the rounded corners' masks; both are covered now. Left as they are: a theme with `Panel.Corners` and
+outlines would draw square outer rings round a rounded body (the corner masks lie inside the body; no theme has both);
+and on Era a quest starter whose quest the client reports active gets the quest item color, where ElvUI, going by the
+tooltip, gives the starter's (no one has seen what Era's quest data says for one).
+
 **Left out, and why** (also in the design doc):
 
-- Outside pixel mode ElvUI draws black lines inside and outside every edge; BetterBags Next draws one edge per part.
-  Pixel mode is ElvUI's default.
 - ElvUI's font size is not followed: a theme drawn again at other sizes makes new font objects, which can never be freed
   (a size slider dragged would leave a set behind on every step).
 - ElvUI's per-bag text settings (its count, item level and info fonts) are LibSharedMedia names, which only a function
@@ -95,6 +114,6 @@ roles all name a color).
 
 Coverage: `spec/sonata/next_themes_spec.lua` ("ElvUI": its files there in ElvUI, its paths what ElvUI's source keeps
 and its watched methods ElvUI's, the player's values followed and Check clean with them, ElvUI's defaults without them,
-every font style, flat, the bag buttons, tabs, search and sections, every control, item buttons, the settings window;
+every font style, quest colors (Era's own), outlines outside pixel mode and none in it, flat, the bag buttons, tabs, search and sections, every control, item buttons, the settings window;
 "needs no other addon" and the shipped list), and every shipped-theme spec (`spec/next/shipped_themes_spec.lua`,
 `spec/next/pixel_perfect_spec.lua`, `spec/next/theme_panel_spec.lua`) draws it with ElvUI marked loaded.

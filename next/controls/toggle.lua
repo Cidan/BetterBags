@@ -121,6 +121,19 @@ local function circled(fill)
   return copy
 end
 
+-- knobInset is how far in the knob sits from the switch's ends, in whole pixels: KnobInset, or for "Edge" just inside
+-- its edge and the outlines inside it (NextControls:EdgeDepth: from the same rounded lines, so no pixel's gap or overlap
+-- shows at any pixel ratio; ElvUI's check box mark, HandleCheckBox: SetInside).
+---@param frame Frame
+---@param T table The theme's Controls.Toggle.
+---@return number
+local function knobInset(frame, T)
+  if T.KnobInset == "Edge" then
+    return controls:EdgeDepth(frame, T.Edge)
+  end
+  return pixel:Snap(frame, T.KnobInset)
+end
+
 -- Style sizes the switch and draws it in its style at how far it is on.
 function toggleProto:Style()
   local T = controls:Theme("Toggle")
@@ -131,7 +144,14 @@ function toggleProto:Style()
   else
     pixel:Size(self.frame, T.Width, T.Height)
   end
-  pixel:Size(self.knob, T.KnobSize, T.KnobSize)
+  if T.KnobSize == "Fill" then
+    -- The square style's knob filling the switch inside its inset (ElvUI's mark fills its box), square.
+    local inset = knobInset(self.frame, T)
+    local side = math.max(0, math.min(self.frame:GetWidth(), self.frame:GetHeight()) - 2 * inset)
+    self.knob:SetSize(side, side)
+  else
+    pixel:Size(self.knob, T.KnobSize, T.KnobSize)
+  end
   if self.round then
     self:styleRound(T)
   elseif self.check then
@@ -250,7 +270,7 @@ function toggleProto:Place(amount)
     controls:Paint(self.on, mark, (mark.Alpha or 1) * amount)
     return
   end
-  local inset = self.round and 0 or pixel:Snap(frame, T.KnobInset)
+  local inset = self.round and 0 or knobInset(frame, T)
   local travel = frame:GetWidth() - 2 * inset - knob:GetWidth()
   knob:ClearAllPoints()
   knob:SetPoint("TOPLEFT", frame, "TOPLEFT", inset + travel * amount,

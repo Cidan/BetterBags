@@ -1792,6 +1792,9 @@ function panelProto:BuildPanel(name)
     edge:Hide()
     table.insert(self.edges, edge)
   end
+  -- Rings outlining the border (Panel.Edge.Outlines: ElvUI's black lines inside and outside it outside its pixel mode),
+  -- shown, faded and masked with it.
+  self.edgeOutlines = controls:CreateOutlines(frame, "BORDER", 1, body)
 
   local glow = frame:CreateTexture(nil, "BORDER")
   glow:SetAllPoints(self.body)
@@ -1839,6 +1842,14 @@ function panelProto:styleBody()
         pixel:Height(edge, E.Size)
       else
         pixel:Width(edge, E.Size)
+      end
+    end
+  end
+  -- A ring made now takes the corner masks already on the edges (shapeCorners puts each on only once).
+  for _, line in ipairs(controls:PlaceOutlines(self.edgeOutlines, E and E.Outlines)) do
+    for _, mask in pairs(self.cornerMasks or {}) do
+      if mask.applied then
+        line:AddMaskTexture(mask)
       end
     end
   end
@@ -1911,6 +1922,11 @@ function panelProto:shapeCorners()
   for _, edge in ipairs(self.edges) do
     table.insert(parts, edge)
   end
+  for _, ring in ipairs(self.edgeOutlines.rings) do
+    for _, side in ipairs({ "Top", "Bottom", "Left", "Right" }) do
+      table.insert(parts, ring[side])
+    end
+  end
   local rounded, count = {}, 0
   for _, side in ipairs(CORNER_ORDER) do
     local radius = small and C and C[side] or 0
@@ -1971,6 +1987,7 @@ function panelProto:paintEdges(strength)
   for _, edge in ipairs(self.edges) do
     edge:SetVertexColor(r, g, b, a * strength)
   end
+  controls:ColorOutlines(self.edgeOutlines, strength)
 end
 
 -- EdgeAlphaFor is how strong the border is at a size: 1 where the theme draws it (a small panel's,
@@ -2770,6 +2787,7 @@ function panelProto:ApplyGeometry()
   for _, edge in ipairs(self.edges) do
     edge:SetShown(edgeShown)
   end
+  controls:ShowOutlines(self.edgeOutlines, edgeShown)
   self.ribbonLength = pixel:LengthIn(unit, self:RibbonBase())
   for _, line in ipairs(self.ribbonLines) do
     line:SetWidth(self.ribbonLength)
@@ -3017,6 +3035,7 @@ function panelProto:Morph()
   for _, edge in ipairs(edges) do
     edge:SetShown(bordered)
   end
+  controls:ShowOutlines(self.edgeOutlines, bordered)
   -- The frame is the body plus the feather at full size: only the body's width glides.
   local bodyLeft, extra = self:BodyLeft(), self:Width() - self:BodyWidth()
   local at = { x = from.x, y = from.y, h = from.h, w = from.w, scale = from.scale, ribbon = from.ribbon,
@@ -5593,6 +5612,8 @@ function panelProto:BuildSearch()
     end
     table.insert(self.searchEdges, edge)
   end
+  -- Rings outlining its edge (Search.Edge.Outlines), at their own alpha.
+  self.searchOutlines = controls:CreateOutlines(sf.frame, "BORDER")
   local help = t.Instructions
   help:SetJustifyH("LEFT")
   self.searchBox = sf
@@ -5660,6 +5681,7 @@ function panelProto:styleSearch()
     end
   end
   self.searchEdgeAlpha = E and E.Idle or 0
+  controls:PaintOutlines(self.searchOutlines, E and E.Outlines)
   style:SetTemplateFont(t.Instructions, S.HelpFont)
   -- A theme may keep the template's own color for its help (HelpColor: InputBoxInstructionsTemplate's 0.35 gray).
   if S.HelpColor then

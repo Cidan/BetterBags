@@ -634,6 +634,57 @@ describe("BetterBags Next's panels and themes", function()
       assert.is_true(full.edges[1]:IsShown())
     end)
 
+    -- ElvUI outside its pixel mode draws a black line inside and one outside every edge (General/Toolkit.lua,
+    -- SetTemplate): the body's border draws its Outlines (NextControls' outlines) with it, shown, faded and gone with it.
+    it("draws its border's outlines with its border, at its strength, and none without them", function()
+      db.size = "small"
+      local bag = nextBag:Create(ctx())
+      apply({ Panel = { Edge = { Color = "Gold", Alpha = 1, Size = 1,
+        Outlines = { { Offset = 1, Color = "Black", Size = 1 }, { Offset = -1, Color = "Black", Size = 1 } } } } })
+      local rings = bag.edgeOutlines.rings
+      assert.are.equal(2, #rings)
+      for _, ring in ipairs(rings) do
+        for _, side in ipairs({ "Top", "Bottom", "Left", "Right" }) do
+          assert.is_true(ring[side]:IsShown(), side)
+          assert.are.equal(1, ring[side]._colorTexture.a, side)
+        end
+      end
+      assert.are.same({ "TOPLEFT", bag.body, "TOPLEFT", -1, 1 }, { rings[1].Top:GetPoint(1) })
+      bag:paintEdges(0.5)
+      assert.are.equal(0.5, rings[2].Left._colorTexture.a, "faded with the border")
+      apply({ Panel = { Edge = { Color = "Gold", Alpha = 1, Size = 1 } } })
+      assert.is_false(rings[1].Top:IsShown(), "a border without outlines")
+      apply({ Panel = { Edge = false } })
+      assert.is_false(rings[1].Top:IsShown(), "no border")
+      db.size = "full"
+      local full = nextBag:Create(ctx())
+      apply({ Panel = { Edge = { Outlines = { { Offset = 1, Color = "Black", Size = 1 } } } } })
+      assert.is_false(full.edgeOutlines.rings[1].Top:IsShown(), "a full panel without its border")
+      apply({ Panel = { Edge = { Full = true, Outlines = { { Offset = 1, Color = "Black", Size = 1 } } } } })
+      assert.is_true(full.edgeOutlines.rings[1].Top:IsShown(), "a full panel with it")
+    end)
+
+    -- Found in review: no spec took the outlines through a size switch.
+    it("shows its border's outlines with its border through a size switch, and not on a full panel without it", function()
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      apply({ Panel = { Edge = { Color = "Gold", Size = 1, Outlines = { { Offset = 1, Color = "Black", Size = 1 } } } } })
+      local ring = bag.edgeOutlines.rings[1]
+      assert.is_false(ring.Top:IsShown(), "a full panel without its border")
+      bag.sizeButton:GetScript("OnClick")(bag.sizeButton, "LeftButton")
+      tween.driver:GetScript("OnUpdate")(tween.driver, style.Time.Morph / 2)
+      assert.are.equal(bag.edges[1]:IsShown(), ring.Top:IsShown(), "with the border through the switch")
+      finishTweens()
+      assert.is_true(bag:IsSmall())
+      assert.is_true(ring.Top:IsShown(), "small")
+      bag.sizeButton:GetScript("OnClick")(bag.sizeButton, "LeftButton")
+      tween.driver:GetScript("OnUpdate")(tween.driver, style.Time.Morph / 2)
+      assert.is_true(bag.edges[1]:IsShown(), "the border fading out on the way back")
+      assert.is_true(ring.Top:IsShown(), "and its outlines with it")
+      assert.is_true(select(4, ring.Top:GetVertexColor()) <= 1)
+      finishTweens()
+      assert.is_false(ring.Top:IsShown(), "full again")
+    end)
+
     it("keeps a border it draws at both sizes through a switch", function()
       local bag = opened(function(c) return nextBag:Create(c) end)
       apply({ Panel = { Edge = { Full = true } } })
@@ -1561,6 +1612,25 @@ describe("BetterBags Next's panels and themes", function()
       assert.are.same({ 0.6, 0.6, 0.6, 1 }, { icon:GetVertexColor() }, "empty again")
     end)
 
+    -- ElvUI's search box, outside its pixel mode, has a black line inside and one outside its border (SetTemplate).
+    it("draws its edge's outlines at their own strength, none without them or on the template's look", function()
+      local bag = nextBag:Create(ctx())
+      apply({ Search = { Edge = { Color = "Gold", Size = 1, Idle = 0.3, Hover = 0.6, Focus = 1,
+        Outlines = { { Offset = 1, Color = "Black", Size = 1 } } } } })
+      local ring = bag.searchOutlines.rings[1]
+      assert.are.same({ "TOPLEFT", bag.searchBox.frame, "TOPLEFT", -1, 1 }, { ring.Top:GetPoint(1) })
+      assert.is_true(ring.Top:IsShown())
+      local t = bag.searchBox.textBox
+      t:GetScript("OnEnter")(t)
+      finishTweens()
+      assert.are.equal(1, ring.Top._colorTexture.a, "not the edge's hover strength")
+      t:GetScript("OnLeave")(t)
+      apply({ Search = { Edge = { Color = "Gold", Size = 1, Idle = 0.3, Hover = 0.6, Focus = 1 } } })
+      assert.is_false(ring.Top:IsShown())
+      apply({ Search = { Template = true, Edge = { Outlines = { { Offset = 1, Color = "Black", Size = 1 } } } } })
+      assert.is_false(ring.Top:IsShown(), "the template's own look")
+    end)
+
     -- The Plain theme (docs/next-plain-theme.md): Blizzard's own bag search box (BagSearchBoxTemplate's border,
     -- InputBoxVisualTemplate), not Next's fill and edges.
     it("keeps its template's own border for a theme that says so, and Next's look for one that does not", function()
@@ -2380,6 +2450,27 @@ describe("BetterBags Next's panels and themes", function()
       addon:GetModule("NextPanel"):SetSize(ctx(), "full")
       finishTweens()
       backToDefault()
+    end)
+
+    -- The border's outlines are cut with it; a ring made while a corner's mask is on gets it too (shapeCorners puts a
+    -- mask on once), and every one comes off with the corners. Found in review: no spec looked.
+    it("cuts its border's outlines with its corners, a ring made later too, and takes them off with the corners", function()
+      local RING = { Offset = -1, Color = "Black", Size = 1 }
+      apply({ Panel = { Corners = { TOPINNER = 20 }, Edge = { Color = "Gold", Size = 1, Outlines = { RING } } } })
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      small(bag)
+      local top = bag.cornerMasks.TOPINNER
+      local rings = bag.edgeOutlines.rings
+      assert.are.same({ [top] = true }, masksOf(rings[1].Left))
+      apply({ Panel = { Corners = { TOPINNER = 20 }, Edge = { Color = "Gold", Size = 1, Outlines = { RING, RING } } } })
+      assert.are.same(masksOf(bag.fill), masksOf(rings[2].Top), "a ring made with the mask on")
+      assert.are.same({ [top] = true }, masksOf(rings[2].Top))
+      apply({ Panel = { Edge = { Color = "Gold", Size = 1, Outlines = { RING, RING } } } })
+      for _, ring in ipairs(rings) do
+        for _, side in ipairs({ "Top", "Bottom", "Left", "Right" }) do
+          assert.are.same({}, masksOf(ring[side]), side)
+        end
+      end
     end)
 
     it("rounds a small panel's corners, each a mask over every part across its body", function()

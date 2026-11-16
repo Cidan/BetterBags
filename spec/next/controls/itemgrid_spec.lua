@@ -152,6 +152,19 @@ describe("NextItemGrid", function()
       assert.are.equal(G().DimAlpha, common.frame:GetAlpha())
     end)
 
+    -- A quality is the edge's color, not its look: a cell keeps the common edge's outlines (ElvUI's black lines inside
+    -- and outside every edge outside its pixel mode).
+    it("keeps the common edge's outlines on a cell edged in its quality", function()
+      UseNextTheme({ Controls = { ItemGrid = { CommonEdge = { Color = "Lavender", Alpha = 1, Size = 1,
+        Outlines = { { Offset = 1, Color = "Black", Size = 1 } } } } } })
+      grid:Place(400, 200)
+      grid:SetEntries({ { id = 1, itemID = 11, icon = 501, quality = 4 }, { id = 2, itemID = 12, icon = 502, quality = 1 } })
+      for _, cell in ipairs({ cellOf(1), cellOf(2) }) do
+        assert.is_true(cell.edge.outlines.rings[1].Top:IsShown())
+      end
+      UseNextTheme(nil)
+    end)
+
     it("shows the item's tooltip, by link or by ID, with its note and the grid's hint", function()
       grid:Place(400, 200)
       grid:SetEntries({
