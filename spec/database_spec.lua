@@ -1766,11 +1766,16 @@ describe("Database", function()
       assert.is_nil(p.customSectionSort[const.BAG_KIND.BACKPACK]["Gear: Prot"])
     end)
 
-    it("forgets, deleted, what was saved for it, its pins and tabs too", function()
-      DB:SetGearSet(3, { name = "Gear: Tank", color = { 1, 0, 0 } })
+    -- Asked: "deleted should mean deleted": the older entry it copied goes too, so a set made again under it starts fresh.
+    it("forgets, deleted, what was saved for it, its pins and tabs and the older entry it copied too", function()
+      DB:SetGearSet(3, { name = "Gear: Tank", older = "Gear: Tank", color = { 1, 0, 0 } })
+      p.ephemeralCategoryFilters["Gear: Tank"] = { name = "Gear: Tank", enabled = { [0] = true }, itemList = {}, dynamic = true }
+      p.ephemeralCategoryFilters["Gear: Heal"] = { name = "Gear: Heal", enabled = { [0] = true }, itemList = {}, dynamic = true }
       p.customSectionSort[const.BAG_KIND.BACKPACK]["Mats"] = 1
-      DB:DeleteGearSet(3, true)
+      DB:DeleteGearSet(3, true, "Gear: Tank")
       assert.is_nil(p.gearSets[3])
+      assert.is_nil(p.ephemeralCategoryFilters["Gear: Tank"])
+      assert.is_not_nil(p.ephemeralCategoryFilters["Gear: Heal"], "another set's kept")
       assert.is_nil(p.categoryToGroup[const.BAG_KIND.BACKPACK]["Gear: Tank"])
       assert.is_nil(p.categoryToGroup[const.BAG_KIND.BANK]["Gear: Tank"])
       assert.is_nil(p.customSectionSort[const.BAG_KIND.BACKPACK]["Gear: Tank"])
@@ -1779,10 +1784,32 @@ describe("Database", function()
       DB:DeleteGearSet(8, true)
     end)
 
-    it("keeps, deleted, the pins and tabs under its name when they are another category's", function()
+    -- Found by the bug review: a set renamed after it copied an older entry left that entry behind when deleted, and
+    -- deleting by its current name took an entry it never copied.
+    it("deletes, deleted, the older entry it copied under a name it had before, and no other", function()
+      DB:SetGearSet(3, { name = "Gear: Ret", older = "Gear: Tank" })
+      p.ephemeralCategoryFilters["Gear: Tank"] = { name = "Gear: Tank", enabled = { [0] = true }, itemList = {}, dynamic = true }
+      p.ephemeralCategoryFilters["Gear: Ret"] = { name = "Gear: Ret", enabled = { [0] = true }, itemList = {}, dynamic = true }
+      DB:DeleteGearSet(3, true, "Gear: Tank")
+      assert.is_nil(p.ephemeralCategoryFilters["Gear: Tank"])
+      assert.is_not_nil(p.ephemeralCategoryFilters["Gear: Ret"], "never copied, left alone")
+    end)
+
+    -- Found by the bug review: only the categories spec's stand-in showed a rename keeping the entry a record was copied
+    -- from.
+    it("keeps the older entry a record was copied from through a rename", function()
+      DB:SetGearSet(3, { name = "Gear: Tank", older = "Gear: Tank" })
+      DB:RenameGearSets({ { id = 3, name = "Gear: Ret", bags = true } })
+      assert.are.equal("Gear: Ret", p.gearSets[3].name)
+      assert.are.equal("Gear: Tank", p.gearSets[3].older)
+    end)
+
+    it("keeps, deleted, the pins, tabs and saved state under its name when they are another category's", function()
       DB:SetGearSet(3, { name = "Gear: Tank" })
+      p.ephemeralCategoryFilters["Gear: Tank"] = { name = "Gear: Tank", enabled = { [0] = true }, itemList = {} }
       DB:DeleteGearSet(3, false)
       assert.is_nil(p.gearSets[3])
+      assert.is_not_nil(p.ephemeralCategoryFilters["Gear: Tank"])
       assert.are.equal(5, p.customSectionSort[const.BAG_KIND.BACKPACK]["Gear: Tank"])
       assert.are.equal(1, p.categoryToGroup[const.BAG_KIND.BACKPACK]["Gear: Tank"])
     end)

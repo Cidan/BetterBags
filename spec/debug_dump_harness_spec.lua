@@ -323,6 +323,28 @@ describe("Debug Dump Harness with test.lua", function()
     end)
   end)
 
+  -- Asked: "deleted should mean deleted". The real Default profile's older "Gear: Ret" entry is copied into set 0's record
+  -- once; deleting the set deletes it too, so a set made again as "Ret" starts fresh.
+  it("deletes a deleted set's older entry with it, on the real profile, so it starts fresh made again", function()
+    withEquipmentSets(function(client)
+      DB.data:SetProfile("Default")
+      local profile = DB.data.profile
+      profile.ephemeralCategoryFilters["Gear: Ret"].color = { 0, 1, 0 }
+      loginAs(client, { [0] = "Ret" })
+      assert.are.same({ 0, 1, 0 }, categories:GetCategoryByName("Gear: Ret").color, "copied the first time")
+      equipmentSets:SetsChanged()
+      client.sets = {}
+      equipmentSets:Update(context:New("sweep"))
+      assert.is_nil(profile.gearSets[0])
+      assert.is_nil(profile.ephemeralCategoryFilters["Gear: Ret"], "deleted with the set")
+      assert.is_not_nil(profile.ephemeralCategoryFilters["Gear: Tank"], "another set's left alone")
+      client.sets = { [0] = "Ret" }
+      equipmentSets:Update(context:New("sweep"))
+      assert.is_nil(categories:GetCategoryByName("Gear: Ret").color)
+      assert.are.equal("Gear: Ret", categories:GetOrder()[1])
+    end)
+  end)
+
   -- Found by the bug review, on the real modules: two characters of the profile whose sets have each other's names under
   -- their IDs, and a category of yours with a set's former name.
   it("swaps the pins and tabs of sets that take each other's names, and leaves a category of yours alone", function()

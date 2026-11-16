@@ -475,9 +475,14 @@ character deletes is forgotten: "we just watch the event".
   is free.
 - **Deleted on this character** (`EquipmentSets:SetsChanged`, from `EQUIPMENT_SETS_CHANGED`; asked: "we just watch the
   event"): once the client says its sets changed, the next `Update` takes a set the last one read and this one does not
-  for one this character deleted, and `categories:ForgetGearSets(ctx, ids)` forgets it before the sync: its record, its
-  pins and tabs when they are its own (`DB:DeleteGearSet(id, bags)`, `gearSetOwns`), and its category in memory. So a set the client later gives the freed ID
-  starts fresh, on top. On a shared profile this also clears that ID's settings for other characters.
+  for one this character deleted, and `categories:ForgetGearSets(ctx, ids)` forgets it before the sync: its record; its
+  pins and tabs when its name is its own (`gearSetOwns`); the older entry its record was copied from (`older`, kept
+  through renames) unless a category of yours or a plugin's now has that name (another gear set's never reads the
+  entry under its name); and its category in memory (asked: "deleted should mean
+  deleted"; `DB:DeleteGearSet(id, bags, older)`). An entry the set never copied is left alone. So a set the client later
+  gives the freed ID, or one made again under either name, starts fresh, on top. On a shared profile this also clears
+  that ID's settings for other characters, and the older entry for another character's set of that name that has no
+  record yet (older versions' entries hold only Used In).
 - **Skipped, never deleted:** a record of a set this character does not have (another character's), and a set no longer
   listed without the client saying its sets changed: its category leaves memory, its record stays. One case the reads
   cannot tell apart: a set deleted and another made that the client gives its ID, both before the next sweep, reads as a
@@ -485,18 +490,16 @@ character deletes is forgotten: "we just watch the event".
 - **Older profiles.** Older versions saved gear sets' sections as dynamic categories by name (`test.lua`: `"Gear: Tank"`,
   `"Gear: Ret"` with `dynamic = true` and no place), and the build before this one saved gear set categories by name as
   plugins' (`ephemeralCategoryFilters`). A set with no record copies what was saved under its category's name into its
-  record (`newGearSetRecord`; asked: "the first time the set has no record"), on top unless it had a place. Those entries
+  record (`newGearSetRecord`, which names the entry it copied: `older`; asked: "the first time the set has no record"),
+  on top unless it had a place. Those entries
   are left alone: not loaded (`categories:OnEnable` skips a dynamic `"Gear: "` entry but a group by's sections:
-  `isOlderGearSet`), not deleted, not changed (the record holds copies).
+  `isOlderGearSet`), not changed (the record holds copies), and deleted only with their set, by the player (above), so a
+  set made again under the name starts fresh.
 - **A set another category is named after** (yours, or a plugin's) gets no category and no record; the set's items go
   where they would without one.
 - **Plugins' older calls** (`IsCategoryEnabled`, `ToggleCategory`, `EnableCategory`, `DisableCategory`,
   `SetCategoryState`) answer a gear set's Used In from its category and save it to its record (`setEphemeralEnabled`),
   never to an older entry of its name.
-- **Left unfixed, the user's to decide:** a set deleted and made again under the same name has no record, so it copies
-  the older entry of its name again (decision: copy "the first time the set has no record") rather than starting fresh
-  (decision: a deleted set's settings are forgotten). Older versions' entries hold only Used In (`test.lua`), so on real
-  profiles it brings back Used In and nothing else.
 - **Left unfixed, the user's to decide:** two characters of the profile with sets of the same name under different IDs
   (A: 0 "DPS", 1 "Tank"; B: 0 "Tank") lose a pin and a tab. Pins and tabs are kept by name, so two records of one name
   share them: on B, set 0's rename DPS to Tank moves DPS's pin over Tank's, and back on A the rename Tank to DPS takes it
@@ -540,7 +543,12 @@ character deletes is forgotten: "we just watch the event".
   applied one at a time wiped one set's pins and tabs when two sets took each other's names; a delete or rename cleared
   or moved the pins and tabs of a category of yours that had the record's name; the older plugin calls read and wrote a
   gear set's Used In in an older entry; the remaking of a category deleted another way had no test. All fixed
-  test-first. The older entry copied again after a deletion is left to the user (above). The second, aimed at those
+  test-first. The older entry copied again after a deletion: the user chose "deleted should mean deleted" (above); its
+  review found a set renamed after copying leaving the copied entry behind, and deleting by the current name taking an
+  entry the set never copied, fixed test-first by naming the copied entry in the record; and the one after it, the
+  copied entry kept when another gear set had taken its name (after a swap, in one order of deletion), fixed
+  test-first. Records made by the build before `older` existed (only a developer's saved variables) delete no older
+  entry. The second, aimed at those
   fixes, found `DB:RenameCategory` unchanged (the old move fuzzed against take-then-put over 200,000 states), two sets
   of one name under different IDs on two characters losing a pin (left to the user, above), the page after several
   renames in one sweep (not built for, above), and three untested branches (another category in memory holding a

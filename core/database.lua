@@ -1846,6 +1846,7 @@ end
 -- it, and the name it last had ("Gear: " and the set's name), which its pins and tabs are saved under.
 ---@class (exact) GearSetRecord
 ---@field name string
+---@field older? string The older entry (ephemeralCategoryFilters) the record was copied from, deleted with the set.
 ---@field enabled? table<BagKind, boolean>
 ---@field color? number[]
 ---@field priority? number
@@ -1907,17 +1908,22 @@ function DB:RenameGearSets(renames)
   end
 end
 
--- DeleteGearSet forgets what was saved for a deleted set's category, and, with bags (no other category having its
--- name), each bag's pin and tab for it too.
+-- DeleteGearSet forgets what was saved for a deleted set's category: with bags (no other category having its name), each
+-- bag's pin and tab for it; with older, the older entry it copied (newGearSetRecord), so a set made again under that
+-- name starts fresh (asked: "deleted should mean deleted"). An entry the set never copied is left alone.
 ---@param id number
 ---@param bags boolean
-function DB:DeleteGearSet(id, bags)
+---@param older? string
+function DB:DeleteGearSet(id, bags, older)
   local record = DB.data.profile.gearSets[id]
   if record == nil then
     return
   end
   if bags then
     takeBagSettings(record.name)
+  end
+  if older ~= nil then
+    DB.data.profile.ephemeralCategoryFilters[older] = nil
   end
   DB.data.profile.gearSets[id] = nil
 end

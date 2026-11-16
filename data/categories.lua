@@ -1267,13 +1267,16 @@ end
 
 -- newGearSetRecord makes the record of a set that has none: what an older version, or the build before this one, saved
 -- under the category's name, copied (asked: "the first time the set has no record ... After that leave those entries
--- alone: not loaded, not deleted"), used in every bag when nothing says otherwise.
+-- alone: not loaded, not deleted"), used in every bag when nothing says otherwise. The record names the entry it copied
+-- (`older`), which goes when the set is deleted (asked: "deleted should mean deleted").
 ---@param name string
 ---@return GearSetRecord
 local function newGearSetRecord(name)
-  local older = database:GetEphemeralItemCategory(name) or {}
+  local saved = database:GetEphemeralItemCategory(name)
+  local older = saved or {}
   return {
     name = name,
+    older = saved ~= nil and name or nil,
     enabled = copyOf(older.enabled) or everyBag(),
     color = copyOf(older.color),
     priority = older.priority,
@@ -1439,15 +1442,23 @@ end
 
 -- ForgetGearSets forgets the categories of sets this character deleted (EquipmentSets saw them go once the client said
 -- its sets changed; asked: "we just watch the event"): what was saved for each, its pins and tabs too when they are its
--- own (gearSetOwns), so a set the client later gives the ID (Forever reuses a freed ID) starts fresh, on top. A new
--- generation starts and the Categories page is told.
+-- own (gearSetOwns), and the older entry it copied unless another category now has that name, so a set the client
+-- later gives the ID (Forever reuses a freed ID), or one made again under either name, starts fresh, on top (asked:
+-- "deleted should mean deleted"). A new generation starts and the Categories page is told.
 ---@param ctx Context
 ---@param ids number[]
 function categories:ForgetGearSets(ctx, ids)
   for _, id in ipairs(ids) do
     local record = database:GetGearSet(id)
     if record ~= nil then
-      database:DeleteGearSet(id, self:gearSetOwns(id, record.name))
+      local older = record.older
+      -- A gear set's category never reads the entry under its name (its record holds what it is), so only a category of
+      -- yours or a plugin's of that name keeps it.
+      local holder = older ~= nil and self.ephemeralCategories[older] or nil
+      if older ~= nil and (database:GetItemCategory(older) ~= nil or (holder ~= nil and holder.gearSet == nil)) then
+        older = nil
+      end
+      database:DeleteGearSet(id, self:gearSetOwns(id, record.name), older)
     end
     self:dropGearSet(id)
   end

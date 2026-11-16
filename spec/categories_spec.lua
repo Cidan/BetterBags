@@ -1703,9 +1703,12 @@ describe("Categories", function()
         table.insert(batches, batch)
         for _, rename in ipairs(renames) do dbGearSets[rename.id].name = rename.name end
       end
-      database.DeleteGearSet = function(_, id, bags)
+      database.DeleteGearSet = function(_, id, bags, older)
         table.insert(deleted, dbGearSets[id] and dbGearSets[id].name or id)
         table.insert(deletedBags, bags)
+        if older then
+          dbEphemeralCategories[older] = nil
+        end
         dbGearSets[id] = nil
       end
       database.SetEphemeralItemCategoryEnabled = function(_, kind, name, enabled)
@@ -1852,6 +1855,61 @@ describe("Categories", function()
       categories:SyncGearSets(ctx, { { id = 0, name = "Healer" } })
       assert.are.same({ 1, 0, 0 }, categories:GetCategoryByName("Gear: Healer").color)
       assert.are.same({ { "Gear: Tank", "Gear: Healer" } }, renamed)
+    end)
+
+    -- Asked: "deleted should mean deleted". A set deleted and made again under its name starts fresh, not from the older
+    -- entry of its name again.
+    it("starts a set deleted and made again under its name fresh, its older entry gone with it", function()
+      dbEphemeralCategories["Gear: Tank"] = { name = "Gear: Tank", enabled = { [0] = true }, itemList = {}, dynamic = true,
+        color = { 0, 1, 0 }, priority = 30 }
+      categories:SyncGearSets(ctx, { { id = 3, name = "Tank" } })
+      assert.are.same({ 0, 1, 0 }, categories:GetCategoryByName("Gear: Tank").color, "copied the first time")
+      categories:ForgetGearSets(ctx, { 3 })
+      assert.is_nil(dbEphemeralCategories["Gear: Tank"])
+      categories:SyncGearSets(ctx, { { id = 3, name = "Tank" } })
+      local tank = categories:GetCategoryByName("Gear: Tank")
+      assert.is_nil(tank.color)
+      assert.are.same({ [0] = true, [1] = true, [2] = true }, tank.enabled)
+      assert.are.equal("Gear: Tank", categories:GetOrder()[1], "on top")
+    end)
+
+    -- Found by the bug review: a set that copied the older entry of its first name, renamed and then deleted, left that
+    -- entry behind, so a set made again under the first name took its settings back.
+    it("deletes the older entry a set copied, even under the name it had before a rename", function()
+      dbEphemeralCategories["Gear: Tank"] = { name = "Gear: Tank", enabled = { [0] = true }, itemList = {}, dynamic = true,
+        color = { 0, 1, 0 } }
+      categories:SyncGearSets(ctx, { { id = 3, name = "Tank" } })
+      assert.are.equal("Gear: Tank", dbGearSets[3].older, "the entry it copied")
+      categories:SyncGearSets(ctx, { { id = 3, name = "Ret" } })
+      assert.are.equal("Gear: Tank", dbGearSets[3].older, "kept through a rename")
+      categories:ForgetGearSets(ctx, { 3 })
+      assert.is_nil(dbEphemeralCategories["Gear: Tank"])
+      categories:SyncGearSets(ctx, { { id = 3, name = "Tank" } })
+      assert.is_nil(categories:GetCategoryByName("Gear: Tank").color)
+      assert.is_nil(dbGearSets[3].older, "nothing to copy")
+    end)
+
+    it("keeps the older entry a set copied when another category now has its name", function()
+      dbEphemeralCategories["Gear: Tank"] = { name = "Gear: Tank", enabled = { [0] = true }, itemList = {}, dynamic = true }
+      categories:SyncGearSets(ctx, { { id = 3, name = "Tank" } })
+      categories:SyncGearSets(ctx, { { id = 3, name = "Ret" } })
+      categories:CreateCategory(ctx, { name = "Gear: Tank", itemList = {} })
+      categories:ForgetGearSets(ctx, { 3 })
+      assert.is_not_nil(dbEphemeralCategories["Gear: Tank"], "the plugin's now")
+    end)
+
+    -- Found by the bug review: another gear set holding the name of the entry a set copied kept that entry when the set
+    -- was deleted (and only in one order of deletion), though a gear set's category never reads the entry of its name.
+    it("deletes the older entry a set copied when another gear set has taken its name", function()
+      dbEphemeralCategories["Gear: Tank"] = { name = "Gear: Tank", enabled = { [0] = true }, itemList = {}, dynamic = true,
+        color = { 0, 1, 0 } }
+      categories:SyncGearSets(ctx, { { id = 3, name = "Tank" }, { id = 5, name = "Heal" } })
+      categories:SyncGearSets(ctx, { { id = 3, name = "Ret" }, { id = 5, name = "Tank" } })
+      assert.are.equal(5, categories:GetCategoryByName("Gear: Tank").gearSet)
+      categories:ForgetGearSets(ctx, { 3, 5 })
+      assert.is_nil(dbEphemeralCategories["Gear: Tank"])
+      categories:SyncGearSets(ctx, { { id = 3, name = "Tank" } })
+      assert.is_nil(categories:GetCategoryByName("Gear: Tank").color, "made again, fresh")
     end)
 
     -- Asked (option 2, "we just watch the event"): a set this character deletes is forgotten, so a set the client later
