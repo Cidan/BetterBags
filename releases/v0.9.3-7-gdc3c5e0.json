@@ -1,0 +1,25 @@
+{
+  "id": 1794799452,
+  "version": "v0.9.3-7-gdc3c5e0",
+  "channel": "alpha",
+  "date": "2026-11-16",
+  "from": "cba8c2592abc3e77f94097ae58f4f53fbf5c207e",
+  "to": "dc3c5e05a5bb452b76e7ad13d3373ab6d2368c2b",
+  "headline": "Added an ElvUI theme for BetterBags Next and fixed lingering quest art on Classic item slots.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "ElvUI theme for BetterBags Next",
+      "details": "Adds an ElvUI theme to BetterBags Next when ElvUI is enabled. It matches ElvUI's look, including Thin Borders mode, and automatically updates when you change ElvUI's colors, textures, fonts, font size, quest item colors, or bag text fonts and sizes.",
+      "clients": []
+    },
+    {
+      "category": "Fixed",
+      "title": "Quest art lingering on item slots",
+      "details": "Quest item art no longer stays on an empty slot, the next item put in that slot, or after switching to a theme without quest art. This also fixes the classic ElvUI theme and Masque's quest mark showing on every slot.",
+      "clients": [
+        "Classic"
+      ]
+    }
+  ]
+}
