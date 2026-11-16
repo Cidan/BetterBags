@@ -46,6 +46,7 @@ local context = addon:GetModule('Context')
 ---@field ignoredItems? table<number, boolean> Items that never land in it, by item ID (Ignored Items, docs/next-batch-2.md §2).
 ---@field itemOrder? ItemOrderKey[] Its items' own order, in every bag it is used in (Own Item Order, item-sort.md §5); the bag's without one.
 ---@field blizzard? boolean Made from a Blizzard category (Convert): Blizzard's items of its name show in it, and it never groups (category-lifecycle.md §11).
+---@field gearSet? number The ID of the equipment set it is made for: a gear set's category, whose items are the set's (SyncGearSets, category-lifecycle.md §12).
 
 ---@class (exact) Categories: AceModule
 ---@field private itemsWithNoCategory table<number, boolean>
@@ -53,7 +54,11 @@ local context = addon:GetModule('Context')
 ---@field private categoryCount number
 ---@field private ephemeralCategories table<string, CustomCategoryFilter>
 ---@field private ephemeralCategoryByItemID table<number, CustomCategoryFilter>
+---@field private gearSets table<string, boolean> The categories in memory that are, or may be, gear sets' (SyncGearSets).
 local categories = addon:NewModule('Categories')
+
+-- A gear set's category is named "Gear: " and its set's name.
+local GEAR_PREFIX = "Gear: "
 
 -- The generation of everything a custom category lookup (GetCustomCategory) reads. It changes with
 -- every change made through this module, so the bags work every item's category out again on their
@@ -78,6 +83,7 @@ function categories:Init()
   self.itemsWithNoCategory = {}
   self.ephemeralCategories = {}
   self.ephemeralCategoryByItemID = {}
+  self.gearSets = {}
   self.categoryCount = 0
 end
 
@@ -88,6 +94,10 @@ function categories:OnEnable()
   for _, category in pairs(database:GetAllEphemeralItemCategories()) do
     if category.dynamic then
       self.ephemeralCategories[category.name] = category
+      -- Older versions saved gear sets' sections as dynamic categories: SyncGearSets takes each over or forgets it.
+      if category.name:sub(1, #GEAR_PREFIX) == GEAR_PREFIX and not category.isGroupBySubcategory then
+        self.gearSets[category.name] = true
+      end
     end
   end
 end
@@ -859,12 +869,13 @@ end
 -- - "added": it is added to the category's Added Items (taken from the one it was in), and the
 --   category no longer ignores it; a name no category has (a Blizzard category's) is made yours first
 --   (Convert), so it shows in the same section, as the classic title's Shift drop does;
--- - "plugin": nothing: a plugin fills its own category.
+-- - "plugin": nothing: a plugin fills its own category;
+-- - "gear set": nothing: a gear set's category holds its set's items (category-lifecycle.md §12).
 ---@param ctx Context
 ---@param itemID number
 ---@param name string The header's section.
 ---@param natural? string
----@return "natural"|"added"|"plugin"
+---@return "natural"|"added"|"plugin"|"gear set"
 function categories:FileItem(ctx, itemID, name, natural)
   local target = self:parentOf(name)
   if natural ~= nil and self:parentOf(natural) == target then
@@ -873,6 +884,9 @@ function categories:FileItem(ctx, itemID, name, natural)
       self:RemoveItemFromCategory(itemID, home)
     end
     return "natural"
+  end
+  if self:IsGearSet(target) then
+    return "gear set"
   end
   if database:GetItemCategory(target) == nil and self.ephemeralCategories[target] ~= nil then
     return "plugin"
@@ -1069,12 +1083,17 @@ function categories:DeleteCategory(ctx, category)
   events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
 end
 
--- RenameCategory renames a category.
+-- RenameCategory renames a category. A gear set's is named by its set, so it is renamed only with the set, in the
+-- Equipment Manager (asked, issue #1333: "so long as we can't rename the category in BetterBags").
 ---@param ctx Context
 ---@param oldName string
 ---@param newName string
 ---@return boolean success
 function categories:RenameCategory(ctx, oldName, newName)
+  if self:IsGearSet(oldName) then
+    debug:Log("categories", "A gear set's category is renamed with its set: %s", oldName)
+    return false
+  end
   self:changed()
   -- Trim whitespace and validate new name
   newName = strtrim(newName)
@@ -1196,12 +1215,124 @@ function categories:ToggleCategoryShown(ctx, category)
   local _, _ = ctx, category
 end
 
+-- IsGearSet says whether a category is a gear set's, made by BetterBags for an equipment set (SyncGearSets): its items
+-- are its set's, nothing is added to it by hand, and it is renamed only with its set.
+---@param name string
+---@return boolean
+function categories:IsGearSet(name)
+  local filter = self.ephemeralCategories[name]
+  return filter ~= nil and filter.gearSet ~= nil and database:GetItemCategory(name) == nil
+end
+
+-- moveGearSet renames a gear set's category with its set, keeping what the player set for it and each bag's pin and
+-- tab, and says so as RenameCategory does (the Categories page keeps it chosen).
+---@private
+---@param ctx Context
+---@param oldName string
+---@param newName string
+function categories:moveGearSet(ctx, oldName, newName)
+  local filter = self.ephemeralCategories[oldName]
+  self.ephemeralCategories[oldName], self.gearSets[oldName] = nil, nil
+  filter.name = newName
+  self.ephemeralCategories[newName], self.gearSets[newName] = filter, true
+  database:RenameEphemeralCategory(oldName, newName)
+  events:SendMessage(ctx, 'categories/Changed', newName, oldName)
+end
+
+-- forgetGearSet forgets the category of a set that is gone: it leaves the list, and what the player set for it stays
+-- saved under its name, for a set of that name. An older version's is no longer loaded at login (it saved gear sets'
+-- sections as dynamic categories).
+---@private
+---@param name string
+function categories:forgetGearSet(name)
+  local filter = self.ephemeralCategories[name]
+  self.ephemeralCategories[name], self.gearSets[name] = nil, nil
+  if filter.dynamic then
+    filter.dynamic = nil
+    database:CreateOrUpdateCategory(filter)
+  end
+end
+
+-- SyncGearSets makes a category for each equipment set (issue #1333; asked: "it's time we undo the hard coding and
+-- make them function like other categories correctly"), as a plugin makes its own: "Gear: " and the set's name, its
+-- items the set's (GetCustomCategory), and what the player sets for it saved under its name (category-lifecycle.md
+-- §12). A new one goes on top of the order, the client's first set made last so it ends first; so does one an older
+-- version saved without a place. A set renamed in the Equipment Manager keeps its category, found by the set's ID
+-- while the category is in memory (each character numbers its own sets, and the profile is every character's); the
+-- category of a set that is gone leaves the list. A set another category is named after gets none. sets is what
+-- EquipmentSets:Update read. It returns whether anything changed; then a new generation starts and the Categories page
+-- is told.
+---@param ctx Context
+---@param sets EquipmentSet[]
+---@return boolean
+function categories:SyncGearSets(ctx, sets)
+  local names, nameOf = {}, {}
+  for _, set in ipairs(sets) do
+    local name = GEAR_PREFIX .. set.name
+    names[name] = set.id
+    nameOf[set.id] = name
+  end
+  local changed = false
+  local unplaced = {}
+  local held = {}
+  for name in pairs(self.gearSets) do
+    table.insert(held, name)
+  end
+  table.sort(held)
+  for _, name in ipairs(held) do
+    local filter = self.ephemeralCategories[name]
+    if filter == nil or database:GetItemCategory(name) ~= nil then
+      self.gearSets[name] = nil
+    elseif names[name] ~= nil then
+      if filter.gearSet ~= names[name] then
+        filter.gearSet = names[name]
+        changed = true
+      end
+      -- An older version's: no longer loaded at login, and on top unless the player placed it.
+      if filter.dynamic then
+        filter.dynamic = nil
+        database:CreateOrUpdateCategory(filter)
+        unplaced[name] = filter.priority == nil or nil
+        changed = true
+      end
+    else
+      local renamed = filter.gearSet ~= nil and nameOf[filter.gearSet] or nil
+      if renamed ~= nil and not self:DoesCategoryExist(renamed) then
+        self:moveGearSet(ctx, name, renamed)
+      else
+        self:forgetGearSet(name)
+      end
+      changed = true
+    end
+  end
+  for i = #sets, 1, -1 do
+    local name = nameOf[sets[i].id]
+    if not unplaced[name] and not self:DoesCategoryExist(name) then
+      self:CreateCategory(ctx, { name = name, itemList = {}, gearSet = sets[i].id })
+      self.gearSets[name] = true
+      changed = true
+      -- One an older version saved, forgotten by a character without its set (the profile is every character's).
+      unplaced[name] = self.ephemeralCategories[name].priority == nil or nil
+    end
+    if unplaced[name] then
+      self:setPriority(name, self:topPriority())
+    end
+  end
+  if changed then
+    self:changed()
+    events:SendMessage(ctx, 'categories/Changed')
+  end
+  return changed
+end
+
 -- GetCustomCategory returns the custom category for an item, or nil if it doesn't have one.
 -- This will JIT call all registered functions the first time an item is seen, returning
 -- the custom category if one is found. If no custom category is found, nil is returned. A category
 -- that ignores the item (Ignored Items) is passed over, whatever gave it the item: added by hand, a
--- plugin's list, or a category function (which does not file the item there). withoutAdded leaves out
--- the category the item was added to by hand: where it lands without it (FileItem).
+-- plugin's list, a category function (which does not file the item there) or a gear set. withoutAdded
+-- leaves out the category the item was added to by hand: where it lands without it (FileItem). An item
+-- added by hand to a category of yours is in it; else its gear set's category and a plugin's compete by
+-- the order, the one higher in the Categories list winning (category-lifecycle.md §12).
 ---@param ctx Context
 ---@param kind BagKind
 ---@param data ItemData The item data to get the custom category for.
@@ -1224,7 +1355,48 @@ function categories:GetCustomCategory(ctx, kind, data, withoutAdded)
     return filter.name, filter.priority or 10, filter
   end
 
-  filter = self.ephemeralCategoryByItemID[itemID]
+  local gear = self:gearSetOf(kind, data)
+  local name, priority, plugin = self:pluginCategoryOf(ctx, kind, data)
+  if gear ~= nil and (name == nil or before(gear, plugin or { name = name, priority = priority })) then
+    return gear.name, gear.priority or 10, gear
+  end
+  return name, priority, plugin
+end
+
+-- gearSetOf returns the category of the item's gear set used in the bag, the one higher in the order for an item in
+-- several, passing over one that ignores the item; none while the bag's Equipment Set switch is off.
+---@private
+---@param kind BagKind
+---@param data ItemData
+---@return CustomCategoryFilter?
+function categories:gearSetOf(kind, data)
+  local sets = data.itemInfo.equipmentSets
+  if sets == nil or sets[1] == nil or not database:GetCategoryFilter(kind, "GearSet") then
+    return nil
+  end
+  local best
+  for _, set in ipairs(sets) do
+    local filter = self.ephemeralCategories[GEAR_PREFIX .. set]
+    if filter ~= nil and filter.gearSet ~= nil and filter.enabled ~= nil and filter.enabled[kind]
+      and not ignores(filter, data.itemInfo.itemID) and (best == nil or before(filter, best)) then
+      best = filter
+    end
+  end
+  return best
+end
+
+-- pluginCategoryOf returns the plugin's category an item is in: the one whose list holds it, else the first a
+-- category function names, filing the item there.
+---@private
+---@param ctx Context
+---@param kind BagKind
+---@param data ItemData
+---@return string|nil categoryName
+---@return number|nil priority
+---@return CustomCategoryFilter|nil filter
+function categories:pluginCategoryOf(ctx, kind, data)
+  local itemID = data.itemInfo.itemID
+  local filter = self.ephemeralCategoryByItemID[itemID]
 
   if filter and filter.enabled[kind] and not ignores(filter, itemID) then
     return filter.name, filter.priority or 10, filter

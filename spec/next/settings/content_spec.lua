@@ -228,8 +228,10 @@ describe("NextSettingsContent", function()
       local made = {}
       local editor = addon:GetModule("NextSettingsCategories")
       local rows = addon:GetModule("NextSettingsRows")
-      local chosen, rule, blizzard = true, true, false
+      local chosen, rule, blizzard, gearSet = true, true, false, false
       override(editor, "BlizzardChosen", function() return blizzard end)
+      override(editor, "GearSetChosen", function() return gearSet end)
+      override(editor, "AddedItemsTabShown", function() return chosen and not gearSet end)
       override(editor, "CreateList", function(_, parent, owner)
         made.list = { parent = parent, owner = owner }
         local list = { frame = CreateFrame("Frame", nil, parent) }
@@ -308,6 +310,23 @@ describe("NextSettingsContent", function()
       assert.are.equal("Recent Items", sections[3].title)
       assert.are.same({ "Skip Recent Items" }, { sections[3].rows[1].option.title })
       assert.are.equal(1, #sections[3].rows)
+      -- Issue #1333: nothing in a gear set is sold, destroyed or deposited (Automation:BlockedReason), so a gear set's
+      -- category has no such rows; its items still skip Recent Items as any category's can. Its items come from its set:
+      -- no Added Items.
+      local function tabOf(id)
+        for _, t in ipairs(pages:Get("categories").tabs) do
+          if t.id == id then return t end
+        end
+      end
+      assert.is_false(sections[1].hidden() or sections[2].hidden())
+      assert.is_true(tabOf("items").shown())
+      gearSet = true
+      assert.is_true(sections[1].hidden())
+      assert.is_true(sections[2].hidden())
+      assert.is_nil(sections[3].hidden)
+      assert.is_false(tabOf("items").shown())
+      assert.is_true(tabOf("ignored").shown())
+      gearSet = false
       -- Asked (issue #108): "each category can have it's own sort order": its own switch, and the three dropdowns a
       -- bag's Layout tab chooses its order with, as settings rows.
       local itemOrder

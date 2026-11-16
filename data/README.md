@@ -264,12 +264,16 @@ Coordinates bag updates and refresh operations.
 
 ### Equipment Sets (`equipmentsets.lua`)
 
-Tracks which items belong to equipment sets.
+Tracks which items belong to equipment sets, and makes each set's category.
 
 #### Features
-- **Set Detection**: Identifies items in equipment sets
+- **Set Detection**: Identifies items in equipment sets (`GetItemSets(bag, slot)`, a map rebuilt every sweep)
 - **Multi-Set Support**: Items can belong to multiple sets
 - **Cross-Version Support**: Works on Retail and Classic
+- **Gear Set Categories**: `Update(ctx)` lists every set (`GetSets()`: `{ id, name }`) and hands them to
+  `Categories:SyncGearSets`, which makes a `Gear: <set>` category for each, as a plugin makes its own. A set's
+  category takes its items in the order of the Categories list, follows the set when it is renamed (by its ID), and
+  leaves the list when the set is deleted (`.claude/rules/category-lifecycle.md` §12)
 
 ### Binding (`binding.lua`)
 

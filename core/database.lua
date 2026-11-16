@@ -1794,6 +1794,51 @@ function DB:RenameGroup(kind, groupID, name)
   end
 end
 
+-- moveBagSettings moves what each bag saved for a category (its tab, its pin) to a new name.
+---@param oldName string
+---@param newName string
+local function moveBagSettings(oldName, newName)
+  for _, kind in pairs(const.BAG_KIND) do
+    if DB.data.profile.categoryToGroup[kind] then
+      if DB.data.profile.categoryToGroup[kind][oldName] then
+        DB.data.profile.categoryToGroup[kind][newName] = DB.data.profile.categoryToGroup[kind][oldName]
+        DB.data.profile.categoryToGroup[kind][oldName] = nil
+      end
+      if addon.isRetail and kind == const.BAG_KIND.BANK then
+        for _, tbl in pairs(DB.data.profile.categoryToGroup[kind]) do
+          if type(tbl) == "table" and tbl[oldName] then
+            tbl[newName] = tbl[oldName]
+            tbl[oldName] = nil
+          end
+        end
+      end
+    end
+    if DB.data.profile.customSectionSort[kind] and DB.data.profile.customSectionSort[kind][oldName] ~= nil then
+      DB.data.profile.customSectionSort[kind][newName] = DB.data.profile.customSectionSort[kind][oldName]
+      DB.data.profile.customSectionSort[kind][oldName] = nil
+    end
+  end
+end
+
+-- RenameEphemeralCategory moves a plugin's category's saved state to a new name, with each bag's tab and pin for it: a gear
+-- set's category follows its set when the Equipment Manager renames it (category-lifecycle.md §12). Saved state left
+-- under the new name is replaced. It moves nothing, returning false, with no saved state of the old name or onto a
+-- category of yours.
+---@param oldName string
+---@param newName string
+---@return boolean
+function DB:RenameEphemeralCategory(oldName, newName)
+  local saved = DB.data.profile.ephemeralCategoryFilters[oldName]
+  if saved == nil or DB.data.profile.customCategoryFilters[newName] ~= nil then
+    return false
+  end
+  DB.data.profile.ephemeralCategoryFilters[newName] = saved
+  DB.data.profile.ephemeralCategoryFilters[oldName] = nil
+  saved.name = newName
+  moveBagSettings(oldName, newName)
+  return true
+end
+
 -- RenameCategory renames a category by updating all data structures that use the category name as a key.
 ---@param oldName string
 ---@param newName string
@@ -1825,23 +1870,8 @@ function DB:RenameCategory(oldName, newName)
     end
   end
 
-  -- 3. Update group mapping
-  for _, kind in pairs(const.BAG_KIND) do
-    if DB.data.profile.categoryToGroup[kind] then
-      if DB.data.profile.categoryToGroup[kind][oldName] then
-        DB.data.profile.categoryToGroup[kind][newName] = DB.data.profile.categoryToGroup[kind][oldName]
-        DB.data.profile.categoryToGroup[kind][oldName] = nil
-      end
-      if addon.isRetail and kind == const.BAG_KIND.BANK then
-        for _, tbl in pairs(DB.data.profile.categoryToGroup[kind]) do
-          if type(tbl) == "table" and tbl[oldName] then
-            tbl[newName] = tbl[oldName]
-            tbl[oldName] = nil
-          end
-        end
-      end
-    end
-  end
+  -- 3. Update group mapping and custom section sort (pinned position) for all bag kinds
+  moveBagSettings(oldName, newName)
 
   -- 4. Update ephemeral filters
   if DB.data.profile.ephemeralCategoryFilters[oldName] then
@@ -1858,14 +1888,8 @@ function DB:RenameCategory(oldName, newName)
     end
   end
 
-  -- 5. Update custom section sort (pinned position) for all bag kinds
+  -- 5. Delete grouped sub-categories from custom section sort
   for _, kind in pairs(const.BAG_KIND) do
-    if DB.data.profile.customSectionSort[kind] and DB.data.profile.customSectionSort[kind][oldName] ~= nil then
-      DB.data.profile.customSectionSort[kind][newName] = DB.data.profile.customSectionSort[kind][oldName]
-      DB.data.profile.customSectionSort[kind][oldName] = nil
-    end
-
-    -- Delete grouped sub-categories from custom section sort
     if DB.data.profile.customSectionSort[kind] then
       for categoryName, _ in pairs(DB.data.profile.customSectionSort[kind]) do
         if categoryName:sub(1, #groupedPrefix) == groupedPrefix then

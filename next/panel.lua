@@ -4257,7 +4257,7 @@ end
 -- with (asked: "if you drag and drop an item onto a category header, it becomes an Added Item in that
 -- category"; docs/next-batch-2.md §8). Where the item lands without being added (Items:NaturalCategory)
 -- decides what Categories:FileItem does; the item goes back to its slot and the bags are recalculated.
--- A plugin's category and a gear set take nothing: it says why, the item staying on the cursor. It
+-- A plugin's category and a gear set's take nothing: it says why, the item staying on the cursor. It
 -- returns what it did.
 ---@param ctx Context
 ---@param section NextSection
@@ -4268,15 +4268,15 @@ function panelProto:FileCursorItem(ctx, section)
     return "ignored"
   end
   local name = section.name
-  if name:sub(1, 6) == "Gear: " and categories:GetCategoryByName(name) == nil then
-    print("BetterBags: " .. L:G("Gear sets are made in the Equipment Manager."))
-    return "gear set"
-  end
   local data = cursorItemData(itemID)
   local natural = data and items:NaturalCategory(ctx, data) or nil
   local result = categories:FileItem(ctx, itemID, name, natural)
   if result == "plugin" then
     print("BetterBags: " .. format(L:G("A plugin fills %s: items can't be added to it."), name))
+    return result
+  end
+  if result == "gear set" then
+    print("BetterBags: " .. L:G("Gear sets are made in the Equipment Manager."))
     return result
   end
   ClearCursor()

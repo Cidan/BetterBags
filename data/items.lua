@@ -2350,8 +2350,9 @@ function items:RunRefresh(ectx, kind)
   -- equipmentSets:GetItemSets. Rebuilding it here (same frame as the harvest)
   -- keeps gear-set labels correct as items are looted, moved, equipped, or the
   -- active set changes; without it the map only reflects login state, so looted
-  -- items inherit stale set labels and moved set items lose theirs.
-  equipmentSets:Update()
+  -- items inherit stale set labels and moved set items lose theirs. It also makes each
+  -- set's category (category-lifecycle.md §12) before the items are given theirs.
+  equipmentSets:Update(ectx)
 
   local bagList = self:Phase1_DetermineBags(ectx, kind)
   -- A wipe re-reads every slot; any other read keeps the committed item of each slot whose
@@ -4319,11 +4320,6 @@ function items:GetCategory(ctx, data, own, ignoreRecent, withoutAdded)
     end
   end
 
-  -- Check for equipment sets first, as it doesn't make sense to put them anywhere else.
-  if data.itemInfo.equipmentSets and database:GetCategoryFilter(data.kind, "GearSet") then
-    return "Gear: " .. data.itemInfo.equipmentSets[1] -- Always use the first set, for now.
-  end
-
   if not data.kind then
     return L:G("Everything")
   end
@@ -4339,7 +4335,7 @@ function items:GetCategory(ctx, data, own, ignoreRecent, withoutAdded)
   local customCategory, customPriority, customFilter = categories:GetCustomCategory(ctx, data.kind, data, withoutAdded)
 
   -- An item added by hand to a category of yours stays there, whatever the order (category-lifecycle.md
-  -- §7). A plugin's item lists compete with rules by priority, the list winning a tie.
+  -- §7). A plugin's item lists and gear sets (§12) compete with rules by priority, the list winning a tie.
   if searchCategory and customCategory then
     if (customFilter and customFilter.save) or (customPriority or 10) <= (searchPriority or 10) then
       return self:GroupedCategory(ctx, customCategory, customFilter, data)

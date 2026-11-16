@@ -148,13 +148,15 @@ function picker:Choices(text)
       local filter = categories:GetCategoryByName(name)
       local plugin = filter ~= nil and filter.save ~= true
       local n = self.counts[name] or 0
+      -- A gear set's category (category-lifecycle.md §12) takes its set's items, as a plugin's takes its plugin's.
+      local maker = plugin and (filter.gearSet ~= nil and L:G("Made by the Equipment Manager") or L:G("Made by a plugin"))
       table.insert(list, {
         text = name,
         value = { name = name },
         color = filter and filter.color or GOLD,
         selected = (current ~= nil and isShownIn(name, current)) or nil,
         disabled = plugin or nil,
-        note = (plugin and L:G("Made by a plugin")) or (n > 0 and count(n)) or nil,
+        note = maker or (n > 0 and count(n)) or nil,
       })
       if first == nil and not plugin then
         first = #list

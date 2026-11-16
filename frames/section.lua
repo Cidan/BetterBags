@@ -491,6 +491,11 @@ function sectionFrame:OnTitleClickOrDrop(ctx, section)
   ---@cast itemID number
   if cursorType ~= "item" then return end
   local category = section:GetTitle()
+  -- A gear set's category takes its set's items, as BetterBags Next's header says (category-lifecycle.md §12).
+  if categories:IsGearSet(category) then
+    print("BetterBags: " .. L:G("Gear sets are made in the Equipment Manager."))
+    return
+  end
   -- A Blizzard category's title makes it yours first, as BetterBags Next's header does (category-lifecycle.md §11).
   if not categories:DoesCategoryExist(category) then
     categories:Convert(ctx, category)

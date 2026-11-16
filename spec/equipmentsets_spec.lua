@@ -10,17 +10,29 @@ addon.isMidnight = false
 
 StubBetterBagsModule("Constants")
 StubBetterBagsModule("Localization")
+LoadBetterBagsModule("core/context.lua")
+local context = addon:GetModule("Context")
 
 LoadBetterBagsModule("data/equipmentsets.lua")
 local equipmentSets = addon:GetModule("EquipmentSets")
 
 describe("EquipmentSets", function()
+  -- Update makes the sets' categories (Categories:SyncGearSets): what it was asked, a stand-in put back after each test.
+  local categories, createdCategories, savedSync, synced
 
   before_each(function()
     addon.isClassic = false
     addon.isAnniversary = false
     addon.isRetail = true
     addon.isMidnight = false
+
+    categories, createdCategories = StubBetterBagsModule("Categories")
+    savedSync = rawget(categories, "SyncGearSets")
+    synced = {}
+    categories.SyncGearSets = function(_, ctx, sets)
+      table.insert(synced, { ctx = ctx, sets = sets, map = equipmentSets:GetItemSets(0, 1) })
+      return false
+    end
 
     _G.C_EquipmentSet.GetEquipmentSetIDs = function() return {} end
     _G.C_EquipmentSet.GetEquipmentSetInfo = function() return "" end
@@ -34,6 +46,13 @@ describe("EquipmentSets", function()
     end
 
     equipmentSets:Init()
+  end)
+
+  after_each(function()
+    categories.SyncGearSets = savedSync
+    if createdCategories then
+      ResetModuleStub("Categories")
+    end
   end)
 
   -- ─── Update (API feature detection) ───────────────────────────────────────────
@@ -306,6 +325,69 @@ describe("EquipmentSets", function()
       equipmentSets:UpdateMidnight()
 
       assert.are.same({"Set2"}, equipmentSets:GetItemSets(0, 1))
+    end)
+  end)
+
+  -- ─── The sets' categories ─────────────────────────────────────────────────────
+  -- Issue #1333: each set is a category BetterBags makes, as a plugin makes its own (category-lifecycle.md §12), from
+  -- the sets every Update reads, so a sweep's items find their set's category (Update runs first in a sweep).
+
+  describe("the sets' categories", function()
+    before_each(function()
+      _G.C_EquipmentSet.GetEquipmentSetIDs = function() return { 5, 2 } end
+      _G.C_EquipmentSet.GetEquipmentSetInfo = function(id) return id == 5 and "Tank" or "Heal" end
+      _G.C_EquipmentSet.GetItemLocations = function() return { "loc" } end
+    end)
+
+    it("lists every set by ID and name, in the client's order, and makes their categories once the map is built", function()
+      local ctx = context:New("sweep")
+      equipmentSets:Update(ctx)
+      assert.are.same({ { id = 5, name = "Tank" }, { id = 2, name = "Heal" } }, equipmentSets:GetSets())
+      assert.are.equal(1, #synced)
+      assert.are.equal(ctx, synced[1].ctx, "the sweep's context")
+      assert.are.same(equipmentSets:GetSets(), synced[1].sets)
+      assert.are.same({ "Tank", "Heal" }, synced[1].map)
+    end)
+
+    it("does the same on Midnight's path", function()
+      _G.EquipmentManager_UnpackLocation = nil
+      equipmentSets:Update(context:New("sweep"))
+      assert.are.same({ { id = 5, name = "Tank" }, { id = 2, name = "Heal" } }, equipmentSets:GetSets())
+      assert.are.equal(1, #synced)
+    end)
+
+    it("lists no set before an update, and none once they are deleted", function()
+      assert.are.same({}, equipmentSets:GetSets())
+      equipmentSets:Update(context:New("sweep"))
+      _G.C_EquipmentSet.GetEquipmentSetIDs = function() return {} end
+      equipmentSets:Update(context:New("sweep"))
+      assert.are.same({}, equipmentSets:GetSets())
+      assert.are.same({}, synced[2].sets, "their categories forgotten")
+    end)
+
+    -- Found by the bug review: GetEquipmentSetInfo may return nothing (MayReturnNothing, EquipmentManagerDocumentation.lua).
+    it("leaves out a set the client gives no name, on both paths", function()
+      _G.C_EquipmentSet.GetEquipmentSetInfo = function(id) if id == 5 then return "Tank" end end
+      equipmentSets:Update(context:New("sweep"))
+      assert.are.same({ { id = 5, name = "Tank" } }, equipmentSets:GetSets())
+      _G.EquipmentManager_UnpackLocation = nil
+      equipmentSets:Update(context:New("sweep"))
+      assert.are.same({ { id = 5, name = "Tank" } }, equipmentSets:GetSets())
+    end)
+
+    it("makes none on clients without the Equipment Manager", function()
+      addon.isClassic = true
+      equipmentSets:Update(context:New("sweep"))
+      addon.isClassic, addon.isAnniversary = false, true
+      equipmentSets:Update(context:New("sweep"))
+      assert.are.same({}, synced)
+    end)
+
+    it("makes them when it is enabled, with a context of its own", function()
+      equipmentSets:OnEnable()
+      assert.are.equal(1, #synced)
+      assert.is_not_nil(synced[1].ctx)
+      assert.are.same({ { id = 5, name = "Tank" }, { id = 2, name = "Heal" } }, synced[1].sets)
     end)
   end)
 

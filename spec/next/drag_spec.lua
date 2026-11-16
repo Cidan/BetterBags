@@ -2038,15 +2038,23 @@ describe("NextDrag", function()
       assert.is_true(CursorHasItem())
     end)
 
+    -- A gear set's category takes nothing (Categories:FileItem says "gear set"), but an item of the set added by hand to
+    -- another category goes back to it, as to any category it lands in anyway (issue #1333).
     it("files nothing in a gear set's section, which the Equipment Manager makes", function()
+      fileResult = "gear set"
       slots[BACKPACK].tabs[1] = tab({ "Gear: Tank" }, { item("0_3", "Gear: Tank") })
       backpack:Draw(ctx(), slots[BACKPACK], function() end)
       local gear = section(backpack, "Gear: Tank")
       hold(501, 0, 3)
       gear.header:GetScript("OnReceiveDrag")(gear.header)
-      assert.are.same({}, calls.filed)
+      assert.are.same({ { 501, "Gear: Tank", "natural of 0_3" } }, calls.filed)
       assert.are.same({ "BetterBags: Gear sets are made in the Equipment Manager." }, printed)
       assert.is_true(CursorHasItem())
+      fileResult = "natural"
+      printed = {}
+      gear.header:GetScript("OnReceiveDrag")(gear.header)
+      assert.are.same({}, printed)
+      assert.is_false(CursorHasItem(), "back in its slot, in its set's section")
     end)
 
     it("puts an item dropped on Recent Items, or on a bag in the Show Bags view, in the bag, as before", function()

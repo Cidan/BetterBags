@@ -77,7 +77,9 @@ speaking, micro windows with tiny interactions for lots of elements is bad"):
     sections with it, only in bags that use it: the settings list's count, counted once as the picker opens). A category
     made from a Blizzard category never groups, so a longer name ("Toys - Pets") is not one of its sections, for the
     check, the count or the way back (`isShownIn`, category-lifecycle.md §11). A plugin's (`filter.save ~= true`)
-    is disabled, its note "Made by a plugin": a plugin fills its own category (`FileItem` returns "plugin").
+    is disabled, its note "Made by a plugin": a plugin fills its own category (`FileItem` returns "plugin"). A gear
+    set's (`filter.gearSet`, category-lifecycle.md §12) is disabled too, its note "Made by the Equipment Manager"
+    (`FileItem` returns "gear set").
 - **Picking** (`Pick`), then `bags/Rederive` (refresh-scheduler.md §10):
   - a category: `categories:FileItem(ctx, itemID, name, natural)`, exactly the header drop's filing (natural: the
     manual category forgotten; else added to Added Items, unignored);

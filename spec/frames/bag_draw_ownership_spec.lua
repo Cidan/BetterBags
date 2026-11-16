@@ -1542,6 +1542,7 @@ describe("Bag Draw: shared item button ownership across global sections and view
         table.insert(added, { itemID = itemID, category = category })
       end)
       override(categories, "DoesCategoryExist", function(_, name) return name == "Mats" end)
+      override(categories, "IsGearSet", function() return false end)
       override(categories, "Convert", function(_, _, name)
         table.insert(added, { convert = name })
         return true
@@ -1561,6 +1562,35 @@ describe("Bag Draw: shared item button ownership across global sections and view
       holdItem()
       sectionFrame:OnTitleClickOrDrop(context:New("drop"), section)
       assert.are.same({ { itemID = 1001, category = "Mats" } }, added)
+    end)
+
+    -- Issue #1333: a gear set's category takes nothing, as BetterBags Next's header says (Categories:FileItem); before,
+    -- the title was made a category of yours of the set's name.
+    it("adds nothing to a gear set's title with Shift, the item staying on the cursor", function()
+      local sectionFrame = addon:GetModule("SectionFrame")
+      local categories = addon:GetModule("Categories")
+      local added, printed = {}, {}
+      override(categories, "AddPermanentItemToCategory", function(_, _, itemID, category)
+        table.insert(added, { itemID = itemID, category = category })
+      end)
+      override(categories, "DoesCategoryExist", function(_, name) return name == "Gear: Tank" end)
+      override(categories, "IsGearSet", function(_, name) return name == "Gear: Tank" end)
+      override(categories, "Convert", function(_, _, name)
+        table.insert(added, { convert = name })
+        return true
+      end)
+      override(_G, "print", function(text) table.insert(printed, text) end)
+      override(addon, "GetBagFromKind", function() return watchedBag() end)
+      local section = {
+        GetKind = function() return const.BAG_KIND.BACKPACK end,
+        GetTitle = function() return "Gear: Tank" end,
+      }
+      holdItem()
+      _G._isShiftKeyDown = true
+      sectionFrame:OnTitleClickOrDrop(context:New("drop"), section)
+      assert.are.same({}, added)
+      assert.are.same({ "BetterBags: Gear sets are made in the Equipment Manager." }, printed)
+      assert.is_true(CursorHasItem())
     end)
   end)
 

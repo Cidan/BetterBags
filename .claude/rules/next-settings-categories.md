@@ -63,6 +63,13 @@ page's `Content.Top` and `Bottom`).
   (`categories:Convert`, the bags recalculated, the new category chosen with every tab). One tab, so no tab bar. The Settings tab shows for anything
   else (`SettingsTabShown`); the other tabs hide already (`Chosen` is nil). The heading is its name and "Made by
   Blizzard"; no Rename or Delete.
+- **A gear set's category** (category-lifecycle.md §12; `GearSetChosen`, its `gearSet`): its line is "Made by the
+  Equipment Manager"; no Export, Rename or Delete (as a plugin's; asked: "so long as we can't rename the category in
+  BetterBags"); no Added Items tab (`AddedItemsTabShown`: its items are its set's), its Ignored Items tab kept; the
+  Automation tab without its Merchants and Bank sections (each section's `hidden`; nothing in a set is sold, destroyed
+  or deposited, `Automation:BlockedReason`), Recent Items kept. A `categories/Changed` naming a rename (`newName,
+  oldName`, from `RenameCategory` or a gear set renamed in the Equipment Manager) keeps the renamed category chosen,
+  shown or not.
 - **The header**: the chosen category's name, and its line (a plugin's starts "Made by a plugin", a converted
   one's "Converted from Blizzard", with "Nothing added yet" for nothing added: Blizzard's items are in it);
   "Categories" and "Make a category to sort your items your way." for none. Export, Rename and Delete, right to left

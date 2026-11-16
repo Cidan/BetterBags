@@ -93,7 +93,8 @@ local sort = addon:GetModule('Sort')
 -- - Item Order: Own Item Order, and the three dropdowns a bag's Layout tab chooses its item order with
 --   (ItemOrderOptions, item-sort.md §5), as settings rows.
 -- A plugin's category can be used in bags, colored, ordered and automated; its rule (when it has one)
--- and its items show read-only. Under the categories, a heading and the Blizzard categories the backpack
+-- and its items show read-only. A gear set's (category-lifecycle.md §12) is made by the Equipment Manager:
+-- no Added Items, Auto Sell or Auto Deposit. Under the categories, a heading and the Blizzard categories the backpack
 -- shows now, in the same list (category-lifecycle.md §11): one chosen shows what it is and Convert to
 -- Category, which makes it yours.
 ---@class NextSettingsCategories: AceModule
@@ -192,7 +193,10 @@ local function describe(filter)
     what = L:G("Nothing in it yet")
   end
   local line = what
-  if isPlugins(filter) then
+  if filter.gearSet ~= nil then
+    -- Its items are its set's, whatever was added (category-lifecycle.md §12).
+    line = L:G("Made by the Equipment Manager")
+  elseif isPlugins(filter) then
     line = L:G("Made by a plugin") .. " · " .. line
   elseif filter.blizzard then
     -- Blizzard's items show in it whatever was added: nothing added is not nothing in it.
@@ -376,10 +380,25 @@ function editor:RuleTabShown()
   return filter ~= nil and (not isPlugins(filter) or categories:RuleOf(filter) ~= nil)
 end
 
--- ItemsTabShown says whether the Added Items tab shows: while a category is chosen.
+-- ItemsTabShown says whether the Ignored Items tab shows: while a category is chosen.
 ---@return boolean
 function editor:ItemsTabShown()
   return self:Chosen() ~= nil
+end
+
+-- GearSetChosen says whether the one chosen is a gear set's category (category-lifecycle.md §12): its items are its
+-- set's, and nothing in a set is sold, destroyed or deposited (Automation:BlockedReason), so it has no Added Items and
+-- no such settings.
+---@return boolean
+function editor:GearSetChosen()
+  local filter = self:Chosen()
+  return filter ~= nil and filter.gearSet ~= nil
+end
+
+-- AddedItemsTabShown says whether the Added Items tab shows: while a category is chosen, not a gear set's.
+---@return boolean
+function editor:AddedItemsTabShown()
+  return self:Chosen() ~= nil and not self:GearSetChosen()
 end
 
 -- AutomationTabShown says whether the Automation tab shows: while a category is chosen, a plugin's too
@@ -879,9 +898,12 @@ function editor:CreateList(parent, owner, bags)
   list.newCategory = nextButton:Create(frame, {
     text = L:G("New Category"), onClick = function() askNewCategory(owner) end,
   })
-  -- A category changed (made, renamed, deleted, edited): the page shows it again, another one chosen for
-  -- one that is gone.
-  events:RegisterMessage('categories/Changed', function(ctx)
+  -- A category changed (made, renamed, deleted, edited): the page shows it again, a renamed one still chosen (a gear
+  -- set's follows its set, category-lifecycle.md §12), another one chosen for one that is gone.
+  events:RegisterMessage('categories/Changed', function(ctx, newName, oldName)
+    if oldName ~= nil and editor.selected == oldName then
+      editor.selected = newName
+    end
     if frame:IsVisible() then
       editor:EnsureChosen()
       settings:Reselect(ctx)

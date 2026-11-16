@@ -533,21 +533,22 @@ function content:Init()
       { id = "rule", title = L:G("Search Rule"), shown = function() return categoryEditor:RuleTabShown() end,
         sections = { tabSection(L:G("Search Rule"), { "rule", "search rule", "search category", "search", "query" },
           function(parent, window) return categoryEditor:CreateRuleTab(parent, window, shownBags) end) } },
-      { id = "items", title = L:G("Added Items"), shown = function() return categoryEditor:ItemsTabShown() end,
+      { id = "items", title = L:G("Added Items"), shown = function() return categoryEditor:AddedItemsTabShown() end,
         sections = { tabSection(L:G("Added Items"), { "items", "added", "manual", "drag" },
           function(parent, window) return categoryEditor:CreateItemsTab(parent, window, shownBags) end) } },
       -- Items the category never takes, whatever adds or matches them (docs/next-batch-2.md §2).
       { id = "ignored", title = L:G("Ignored Items"), shown = function() return categoryEditor:ItemsTabShown() end,
         sections = { tabSection(L:G("Ignored Items"), { "ignored", "ignore", "exclude", "never" },
           function(parent, window) return categoryEditor:CreateItemsTab(parent, window, shownBags, "ignored") end) } },
-      -- What the category does on its own (automation.md §5), drawn as settings rows like every page's.
+      -- What the category does on its own (automation.md §5), drawn as settings rows like every page's. Nothing in a
+      -- gear set is sold, destroyed or deposited (Automation:BlockedReason), so a gear set's has no such rows.
       { id = "automation", title = L:G("Automation"), shown = function() return categoryEditor:AutomationTabShown() end,
         sections = {
-          { title = L:G("Merchants"), rows = {
+          { title = L:G("Merchants"), hidden = function() return categoryEditor:GearSetChosen() end, rows = {
             { option = automationOptions[1] }, { option = automationOptions[2] }, { option = automationOptions[3] },
           } },
           -- Where there is no Warbank, the bank is the only place to deposit.
-          { title = L:G("Bank"), rows = {
+          { title = L:G("Bank"), hidden = function() return categoryEditor:GearSetChosen() end, rows = {
             { option = depositOptions[1] },
             { option = depositOptions[2], hidden = function() return not addon.hasWarbank end },
           } },

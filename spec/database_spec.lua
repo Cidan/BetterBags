@@ -1680,6 +1680,49 @@ describe("Database", function()
     end)
   end)
 
+  -- A gear set's category is saved as a plugin's is, and follows the set when the Equipment Manager renames it (issue
+  -- #1333, category-lifecycle.md §12).
+  describe("a gear set's category", function()
+    describe("RenameEphemeralCategory", function()
+      before_each(function()
+        DB.data.profile.ephemeralCategoryFilters["Gear: Tank"] = { name = "Gear: Tank", enabled = { [0] = true },
+          itemList = {}, color = { 1, 0, 0 } }
+        DB.data.profile.categoryToGroup[const.BAG_KIND.BACKPACK]["Gear: Tank"] = 1
+        DB.data.profile.categoryToGroup[const.BAG_KIND.BANK]["Gear: Tank"] = 2
+        DB.data.profile.customSectionSort[const.BAG_KIND.BACKPACK]["Gear: Tank"] = 5
+        DB.data.profile.customSectionSort[const.BAG_KIND.BANK]["Gear: Tank"] = 3
+      end)
+
+      it("moves its saved state, pins and tabs to the new name", function()
+        assert.is_true(DB:RenameEphemeralCategory("Gear: Tank", "Gear: Prot"))
+        local p = DB.data.profile
+        assert.is_nil(p.ephemeralCategoryFilters["Gear: Tank"])
+        assert.are.equal("Gear: Prot", p.ephemeralCategoryFilters["Gear: Prot"].name)
+        assert.are.same({ 1, 0, 0 }, p.ephemeralCategoryFilters["Gear: Prot"].color)
+        assert.are.same({ 1, 2 }, { p.categoryToGroup[const.BAG_KIND.BACKPACK]["Gear: Prot"],
+          p.categoryToGroup[const.BAG_KIND.BANK]["Gear: Prot"] })
+        assert.is_nil(p.categoryToGroup[const.BAG_KIND.BACKPACK]["Gear: Tank"])
+        assert.are.same({ 5, 3 }, { p.customSectionSort[const.BAG_KIND.BACKPACK]["Gear: Prot"],
+          p.customSectionSort[const.BAG_KIND.BANK]["Gear: Prot"] })
+        assert.is_nil(p.customSectionSort[const.BAG_KIND.BANK]["Gear: Tank"])
+      end)
+
+      it("replaces what an older category of the new name left", function()
+        DB.data.profile.ephemeralCategoryFilters["Gear: Prot"] = { name = "Gear: Prot", itemList = {}, color = { 0, 0, 1 } }
+        assert.is_true(DB:RenameEphemeralCategory("Gear: Tank", "Gear: Prot"))
+        assert.are.same({ 1, 0, 0 }, DB.data.profile.ephemeralCategoryFilters["Gear: Prot"].color)
+      end)
+
+      it("moves nothing with no saved state of the old name, or onto a category of yours", function()
+        assert.is_false(DB:RenameEphemeralCategory("Gear: Ghost", "Gear: Prot"))
+        DB.data.profile.customCategoryFilters["Gear: Prot"] = { name = "Gear: Prot", itemList = {}, save = true }
+        assert.is_false(DB:RenameEphemeralCategory("Gear: Tank", "Gear: Prot"))
+        assert.is_not_nil(DB.data.profile.ephemeralCategoryFilters["Gear: Tank"])
+        assert.are.equal(5, DB.data.profile.customSectionSort[const.BAG_KIND.BACKPACK]["Gear: Tank"])
+      end)
+    end)
+  end)
+
   -- ─── Custom section sort ───────────────────────────────────────────────────────
 
   describe("custom section sort", function()
