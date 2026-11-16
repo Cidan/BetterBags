@@ -1332,13 +1332,35 @@ function categories:gearSetOwns(id, name)
   return filter == nil or filter.gearSet == id
 end
 
+-- sharedName says whether another set's saved settings use one of names, as the records are or as the renames being
+-- made leave them (after: new names by set ID): sets of one name under different IDs on two characters of the profile.
+-- What each bag saved under such a name is the name's, not one set's, so it stays where it is (asked: a rename moves
+-- pins and tabs only when no other set's saved settings use either name; "messy, but do it").
+---@param id number
+---@param names string[]
+---@param after? table<number, string>
+---@return boolean
+local function sharedName(id, names, after)
+  for otherID, record in pairs(database:GetGearSets()) do
+    if otherID ~= id then
+      local later = after and after[otherID] or record.name
+      for _, name in ipairs(names) do
+        if record.name == name or later == name then
+          return true
+        end
+      end
+    end
+  end
+  return false
+end
+
 -- renameGearSets gives each listed set whose name differs from its record's (renamed in the Equipment Manager, or on
 -- another character of the profile) its new name: its settings stay with the ID; its pins and tabs move to the new name
--- when they are its own (gearSetOwns). All at once: two sets can take each other's names (two characters whose sets'
--- IDs are in the other order), so a name being left by another set this sweep is free, and every pin and tab moves as
--- one (DB:RenameGearSets). A category in memory is renamed in place, said as RenameCategory says it so the Categories
--- page keeps it chosen; a set renamed onto a name another category has gets none, its record as it was. It returns
--- whether anything changed.
+-- when they are its own (gearSetOwns) and no other set's saved settings use either name (sharedName). All at once: two
+-- sets can take each other's names (two characters whose sets' IDs are in the other order), so a name being left by
+-- another set this sweep is free (DB:RenameGearSets). A category in memory is renamed in place, said as RenameCategory
+-- says it so the Categories page keeps it chosen; a set renamed onto a name another category has gets none, its record
+-- as it was. It returns whether anything changed.
 ---@private
 ---@param ctx Context
 ---@param sets EquipmentSet[]
@@ -1360,7 +1382,7 @@ function categories:renameGearSets(ctx, sets)
       local free = database:GetItemCategory(name) == nil
         and (holder == nil or (holder.gearSet ~= nil and leaving[holder.gearSet] ~= nil))
       if free then
-        table.insert(renames, { id = id, name = name, old = old, bags = self:gearSetOwns(id, old) })
+        table.insert(renames, { id = id, name = name, old = old })
       elseif self.gearSetsByID[id] ~= nil then
         self:dropGearSet(id)
         changed = true
@@ -1369,6 +1391,14 @@ function categories:renameGearSets(ctx, sets)
   end
   if #renames == 0 then
     return changed
+  end
+  local after = {}
+  for _, rename in ipairs(renames) do
+    after[rename.id] = rename.name
+  end
+  for _, rename in ipairs(renames) do
+    rename.bags = self:gearSetOwns(rename.id, rename.old)
+      and not sharedName(rename.id, { rename.old, rename.name }, after)
   end
   database:RenameGearSets(renames)
   local moving = {}
@@ -1396,7 +1426,8 @@ end
 -- goes in the global profile. it's keyed by the id of the gear set"), so every character of the profile shares a set
 -- ID's category (category-lifecycle.md §12). A set with no record is new: on top of the order, the client's first set
 -- made last so it ends first. A set whose name differs from its record's was renamed (in the Equipment Manager, or on
--- another character of the profile): its settings stay with the ID, its pins and tabs move to the new name. A set no
+-- another character of the profile): its settings stay with the ID, its pins and tabs move to the new name unless
+-- another category or set uses either name (renameGearSets). A set no
 -- longer listed leaves the list, what was saved for it kept (ForgetGearSets forgets a deleted one's). A set another
 -- category is named after gets none. sets is what EquipmentSets:Update read. It returns whether anything changed; then
 -- a new generation starts and the Categories page is told.
@@ -1442,7 +1473,8 @@ end
 
 -- ForgetGearSets forgets the categories of sets this character deleted (EquipmentSets saw them go once the client said
 -- its sets changed; asked: "we just watch the event"): what was saved for each, its pins and tabs too when they are its
--- own (gearSetOwns), and the older entry it copied unless another category now has that name, so a set the client
+-- own (gearSetOwns) and no other set's saved settings use its name (sharedName), and the older entry it copied unless
+-- another category now has that name, so a set the client
 -- later gives the ID (Forever reuses a freed ID), or one made again under either name, starts fresh, on top (asked:
 -- "deleted should mean deleted"). A new generation starts and the Categories page is told.
 ---@param ctx Context
@@ -1458,7 +1490,7 @@ function categories:ForgetGearSets(ctx, ids)
       if older ~= nil and (database:GetItemCategory(older) ~= nil or (holder ~= nil and holder.gearSet == nil)) then
         older = nil
       end
-      database:DeleteGearSet(id, self:gearSetOwns(id, record.name), older)
+      database:DeleteGearSet(id, self:gearSetOwns(id, record.name) and not sharedName(id, { record.name }), older)
     end
     self:dropGearSet(id)
   end

@@ -345,9 +345,11 @@ describe("Debug Dump Harness with test.lua", function()
     end)
   end)
 
-  -- Found by the bug review, on the real modules: two characters of the profile whose sets have each other's names under
-  -- their IDs, and a category of yours with a set's former name.
-  it("swaps the pins and tabs of sets that take each other's names, and leaves a category of yours alone", function()
+  -- On the real modules: two characters of the profile whose sets have each other's names under their IDs, a third
+  -- whose one set has the name of the first's other set, and a category of yours with a set's former name. Pins and tabs
+  -- are saved by name, so a name two sets' saved settings use keeps its own (asked: a rename moves them only when no
+  -- other set's saved settings use either name; "messy, but do it").
+  it("keeps the pins and tabs of names two sets use with the names, and leaves a category of yours alone", function()
     withEquipmentSets(function(client)
       DB.data:SetProfile("Default")
       local profile = DB.data.profile
@@ -357,20 +359,32 @@ describe("Debug Dump Harness with test.lua", function()
       profile.categoryToGroup[0]["Gear: Tank"] = 2
       profile.categoryToGroup[0]["Gear: Heal"] = 3
       loginAs(client, { [0] = "Heal", [1] = "Tank" })
-      assert.are.same({ 5, 7 }, { profile.customSectionSort[0]["Gear: Heal"], profile.customSectionSort[0]["Gear: Tank"] },
-        "each set's pin went with it")
-      assert.are.same({ 2, 3 }, { profile.categoryToGroup[0]["Gear: Heal"], profile.categoryToGroup[0]["Gear: Tank"] })
+      assert.are.same({ 5, 7 }, { profile.customSectionSort[0]["Gear: Tank"], profile.customSectionSort[0]["Gear: Heal"] },
+        "each name keeps its pin")
+      assert.are.same({ 2, 3 }, { profile.categoryToGroup[0]["Gear: Tank"], profile.categoryToGroup[0]["Gear: Heal"] })
       loginAs(client, { [0] = "Tank", [1] = "Heal" })
       assert.are.same({ 5, 7 }, { profile.customSectionSort[0]["Gear: Tank"], profile.customSectionSort[0]["Gear: Heal"] })
 
-      -- Another character, with no set 1, makes a category of its own named "Gear: Heal" and pins it.
+      -- The example asked about: A has sets 0 "DPS" and 1 "Tank", B only set 0 "Tank".
+      loginAs(client, { [0] = "DPS", [1] = "Tank" })
+      DB:SetCustomSectionSort(0, "Gear: DPS", 8)
       loginAs(client, { [0] = "Tank" })
+      assert.are.same({ 5, 8 }, { profile.customSectionSort[0]["Gear: Tank"], profile.customSectionSort[0]["Gear: DPS"] },
+        "B: set 0's rename leaves both pins where they are")
+      loginAs(client, { [0] = "DPS", [1] = "Tank" })
+      assert.are.same({ 5, 8 }, { profile.customSectionSort[0]["Gear: Tank"], profile.customSectionSort[0]["Gear: DPS"] },
+        "A: Tank keeps its pin, DPS its own")
+      assert.are.same({ 2, nil }, { profile.categoryToGroup[0]["Gear: Tank"], profile.categoryToGroup[0]["Gear: DPS"] },
+        "and its tab")
+
+      -- Another character, with no set 1, makes a category of its own named "Gear: Heal" and pins it.
+      loginAs(client, { [0] = "DPS" })
       categories:CreateCategory(context:New("mine"), { name = "Gear: Heal", itemList = {}, save = true })
       DB:SetCustomSectionSort(0, "Gear: Heal", 1)
-      -- The first character deletes set 1.
-      loginAs(client, { [0] = "Tank", [1] = "Heal" })
+      -- The first character, back with its sets "DPS" and "Heal", deletes set 1.
+      loginAs(client, { [0] = "DPS", [1] = "Heal" })
       equipmentSets:SetsChanged()
-      client.sets = { [0] = "Tank" }
+      client.sets = { [0] = "DPS" }
       equipmentSets:Update(context:New("sweep"))
       assert.is_nil(profile.gearSets[1])
       assert.are.equal(1, profile.customSectionSort[0]["Gear: Heal"], "the category of yours keeps its pin")

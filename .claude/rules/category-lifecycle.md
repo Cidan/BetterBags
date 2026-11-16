@@ -463,12 +463,16 @@ character deletes is forgotten: "we just watch the event".
   first by default, as it always did.
 - **Renamed** (in the Equipment Manager, or on another character of the profile whose set has the ID; Blizzard's rename
   keeps the set's ID: `C_EquipmentSet.ModifyEquipmentSet(setID, name, icon)`, `PaperDollFrame.lua`): a set whose name
-  differs from its record's. Its settings stay with the ID; its pins and tabs move to the new name when they are its
-  own: no other category has the old name (`gearSetOwns`; a category of yours of that name, made since on another
-  character, keeps its own). Renames are worked out together (`categories:renameGearSets`, `DB:RenameGearSets`): two
+  differs from its record's. Its settings stay with the ID; its pins and tabs move to the new name only when they are
+  its own: no other category has the old name (`gearSetOwns`; a category of yours of that name, made since on another
+  character, keeps its own), and no other set's saved settings use the old or the new name, as the records are or as
+  this sweep's renames leave them (`sharedName`; asked: a rename moves them "only when no other set's saved settings use
+  either name"; "messy, but do it"). Pins and tabs are kept by name, so a name two sets use (sets of one name under
+  different IDs on two characters) keeps its own: moved on every login, A's (0 "DPS", 1 "Tank") Tank pin was written
+  over by B's (0 "Tank") rename DPS to Tank and taken away again by A's rename back. In that case they do not follow the
+  rename. Renames are worked out together (`categories:renameGearSets`, `DB:RenameGearSets`): two
   characters of the profile whose sets have each other's names under their IDs swap them at every switch, so a name
-  another set is leaving this sweep is free, and every old name's pins and tabs are taken before any is saved under its
-  new name (one at a time, the first rename wrote over the other set's before that set moved them). A category in memory
+  another set is leaving this sweep is free (their pins and tabs stay with the names). A category in memory
   is renamed in place, and `categories/Changed` names both, as `RenameCategory` does, so the Categories page keeps it
   chosen, shown or not (next-settings-categories.md §5). A rename made while BetterBags was not loaded is found the same
   way. A set renamed onto a name another category has gets no category and its record stays as it was, until the name
@@ -476,7 +480,8 @@ character deletes is forgotten: "we just watch the event".
 - **Deleted on this character** (`EquipmentSets:SetsChanged`, from `EQUIPMENT_SETS_CHANGED`; asked: "we just watch the
   event"): once the client says its sets changed, the next `Update` takes a set the last one read and this one does not
   for one this character deleted, and `categories:ForgetGearSets(ctx, ids)` forgets it before the sync: its record; its
-  pins and tabs when its name is its own (`gearSetOwns`); the older entry its record was copied from (`older`, kept
+  pins and tabs when its name is its own (`gearSetOwns`) and no other set's saved settings use it (`sharedName`, as for
+  a rename: another character's set of the name keeps its pin); the older entry its record was copied from (`older`, kept
   through renames) unless a category of yours or a plugin's now has that name (another gear set's never reads the
   entry under its name); and its category in memory (asked: "deleted should mean
   deleted"; `DB:DeleteGearSet(id, bags, older)`). An entry the set never copied is left alone. So a set the client later
@@ -500,11 +505,16 @@ character deletes is forgotten: "we just watch the event".
 - **Plugins' older calls** (`IsCategoryEnabled`, `ToggleCategory`, `EnableCategory`, `DisableCategory`,
   `SetCategoryState`) answer a gear set's Used In from its category and save it to its record (`setEphemeralEnabled`),
   never to an older entry of its name.
-- **Left unfixed, the user's to decide:** two characters of the profile with sets of the same name under different IDs
-  (A: 0 "DPS", 1 "Tank"; B: 0 "Tank") lose a pin and a tab. Pins and tabs are kept by name, so two records of one name
-  share them: on B, set 0's rename DPS to Tank moves DPS's pin over Tank's, and back on A the rename Tank to DPS takes it
-  (the decision says pins and tabs follow a rename; not moving them when another record has the name would change it).
-  Reproduced on the real modules by the second review.
+- **Open, the user's to decide** (found by the review of the shared-name rule, reproduced on the real modules over
+  `test.lua`): a pin or tab can still be written over. A rename held back leaves the set's pins under its old name, which
+  no record has any more (another character's login renamed that set's record), so `sharedName` cannot see it; a later
+  rename onto that name moves its pins over them (A: 0 "A", 1 "B"; B: 0 "B", 1 "C"; B renames "C" to "A": A's set 0
+  pin is replaced for good). Closing it means not moving pins and tabs onto a name that already has some, which narrows
+  when they follow a rename further, so it was asked, not built.
+- **Follows from the rule as asked:** a record of a set no character has any more (a character left the profile, a set
+  deleted while BetterBags was not loaded) keeps its name in use, so renames from or onto it never move pins and tabs;
+  and two renames of one character's sets in one sweep that rotate names (only while BetterBags was not loaded) leave
+  the pins with the names, not the sets.
 - **Not built for:** two or more renames of sets in memory in one sweep (a swap, a chain) send one `categories/Changed`
   per rename, and the Categories page, following each in turn, ends on the other set's category. Each rename fires its
   own `EQUIPMENT_SETS_CHANGED` and a sweep follows it, so this needs an order not seen.
@@ -550,7 +560,8 @@ character deletes is forgotten: "we just watch the event".
   test-first. Records made by the build before `older` existed (only a developer's saved variables) delete no older
   entry. The second, aimed at those
   fixes, found `DB:RenameCategory` unchanged (the old move fuzzed against take-then-put over 200,000 states), two sets
-  of one name under different IDs on two characters losing a pin (left to the user, above), the page after several
+  of one name under different IDs on two characters losing a pin (the user chose: pins move only when no other set uses
+  either name, above), the page after several
   renames in one sweep (not built for, above), and three untested branches (another category in memory holding a
   record's old name, a name left by another set, the retail bank's per-bank-type tabs), now each caught by a test.
 - **Reviews** (CLAUDE.md, Prime Directive #2), of the build before this design (by name, renames followed in memory):

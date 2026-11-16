@@ -1679,8 +1679,8 @@ describe("Categories", function()
     before_each(function()
       ctx = context:New("Test")
       gearSetFilter, sent, dbGearSets, renamed, deleted, batches, deletedBags = true, {}, {}, {}, {}, {}, {}
-      for _, key in ipairs({ "GetCategoryFilter", "GetGearSet", "SetGearSet", "UpdateGearSet", "RenameGearSets",
-        "DeleteGearSet", "SetEphemeralItemCategoryEnabled" }) do
+      for _, key in ipairs({ "GetCategoryFilter", "GetGearSet", "GetGearSets", "SetGearSet", "UpdateGearSet",
+        "RenameGearSets", "DeleteGearSet", "SetEphemeralItemCategoryEnabled" }) do
         saved[key] = rawget(database, key)
       end
       saved.SendMessage = events.SendMessage
@@ -1688,6 +1688,7 @@ describe("Categories", function()
       -- As the real ones (core/database.lua): the profile's gearSets, by set ID. Which bag settings move or go is
       -- recorded (`bags`); spec/database_spec.lua moves them.
       database.GetGearSet = function(_, id) return dbGearSets[id] end
+      database.GetGearSets = function() return dbGearSets end
       database.SetGearSet = function(_, id, record) dbGearSets[id] = record end
       database.UpdateGearSet = function(_, id, fields)
         local record = dbGearSets[id]
@@ -2004,15 +2005,16 @@ describe("Categories", function()
       assert.are.equal("Gear: Tank", dbGearSets[3].name)
     end)
 
-    -- Found by the bug review: two characters of the profile whose sets have each other's names under their IDs. Renamed
-    -- one at a time, the first rename wrote over the pins and tabs of the other set's name before that set moved them.
-    it("renames sets that take each other's names together, each moving its own pins and tabs", function()
+    -- Two characters of the profile whose sets have each other's names under their IDs: each name is another set's too,
+    -- so its pins and tabs stay with the name (asked: a rename moves them only when no other set's saved settings use
+    -- either name; "messy, but do it").
+    it("renames sets that take each other's names together, their pins and tabs staying with the names", function()
       dbGearSets[0] = { name = "Gear: Tank", enabled = { [0] = true }, priority = 1 }
       dbGearSets[1] = { name = "Gear: Heal", enabled = { [0] = true }, priority = 2 }
       categories:SyncGearSets(ctx, { { id = 0, name = "Heal" }, { id = 1, name = "Tank" } })
       assert.are.equal(1, #batches, "in one go")
       table.sort(batches[1], function(a, b) return a[1] < b[1] end)
-      assert.are.same({ { "Gear: Heal", "Gear: Tank", true }, { "Gear: Tank", "Gear: Heal", true } }, batches[1])
+      assert.are.same({ { "Gear: Heal", "Gear: Tank", false }, { "Gear: Tank", "Gear: Heal", false } }, batches[1])
       assert.are.equal(0, categories:GetCategoryByName("Gear: Heal").gearSet)
       assert.are.equal(1, categories:GetCategoryByName("Gear: Tank").gearSet)
     end)
@@ -2026,10 +2028,51 @@ describe("Categories", function()
       assert.are.equal(1, categories:GetCategoryByName("Gear: Tank").gearSet)
       assert.are.equal(1, #batches)
       table.sort(batches[1], function(a, b) return a[1] < b[1] end)
-      assert.are.same({ { "Gear: Heal", "Gear: Tank", true }, { "Gear: Tank", "Gear: Heal", true } }, batches[1],
-        "each name a set leaves free for the other, each moving its own pins and tabs")
+      assert.are.same({ { "Gear: Heal", "Gear: Tank", false }, { "Gear: Tank", "Gear: Heal", false } }, batches[1],
+        "each name a set leaves free for the other, its pins and tabs staying with the name")
       assert.are.equal("Gear: Heal", categories:GetCategoryByName("Gear: Heal").name)
       assert.are.equal("Gear: Tank", categories:GetCategoryByName("Gear: Tank").name)
+    end)
+
+    -- Asked: a rename moves pins and tabs only when no other set's saved settings use either name ("messy, but do it").
+    -- A: set 0 "DPS", set 1 "Tank"; B, on the same profile: set 0 "Tank". Moving them on each login, B's rename wrote
+    -- set 0's pin over A's Tank's, and A's took it away again.
+    it("leaves pins and tabs with the name when another set's saved settings use the old or the new one", function()
+      dbGearSets[0] = { name = "Gear: DPS", enabled = { [0] = true }, priority = 1 }
+      dbGearSets[1] = { name = "Gear: Tank", enabled = { [0] = true }, priority = 2 }
+      categories:SyncGearSets(ctx, { { id = 0, name = "Tank" } })
+      assert.are.same({ { { "Gear: DPS", "Gear: Tank", false } } }, batches, "B: the new name is set 1's")
+      categories:Init()
+      batches = {}
+      categories:SyncGearSets(ctx, { { id = 0, name = "DPS" }, { id = 1, name = "Tank" } })
+      assert.are.same({ { { "Gear: Tank", "Gear: DPS", false } } }, batches, "A: the old name is set 1's")
+      categories:Init()
+      batches = {}
+      dbGearSets[2] = { name = "Gear: Solo", enabled = { [0] = true }, priority = 3 }
+      categories:SyncGearSets(ctx, { { id = 2, name = "Duo" } })
+      assert.are.same({ { { "Gear: Solo", "Gear: Duo", true } } }, batches, "no other set's: they move")
+    end)
+
+    -- A chain across two characters (A: "A", "B"; B: "B", "C"): one set takes the name another leaves. Checked only as
+    -- the records were, a pin was stranded under a name no set has.
+    it("leaves pins and tabs with the names in a chain, checking the names the sets will have", function()
+      dbGearSets[0] = { name = "Gear: A", enabled = { [0] = true }, priority = 1 }
+      dbGearSets[1] = { name = "Gear: B", enabled = { [0] = true }, priority = 2 }
+      categories:SyncGearSets(ctx, { { id = 0, name = "B" }, { id = 1, name = "C" } })
+      table.sort(batches[1], function(a, b) return a[1] < b[1] end)
+      assert.are.same({ { "Gear: A", "Gear: B", false }, { "Gear: B", "Gear: C", false } }, batches[1])
+    end)
+
+    it("leaves a deleted set's pins and tabs with its name when another set's saved settings use it", function()
+      dbGearSets[1] = { name = "Gear: Tank", enabled = { [0] = true }, priority = 2 }
+      dbGearSets[0] = { name = "Gear: Tank", enabled = { [0] = true }, priority = 1 }
+      categories:SyncGearSets(ctx, { { id = 0, name = "Tank" } })
+      categories:ForgetGearSets(ctx, { 0 })
+      assert.are.same({ false }, deletedBags, "set 1's name too")
+      dbGearSets[4] = { name = "Gear: Solo", enabled = { [0] = true }, priority = 3 }
+      categories:SyncGearSets(ctx, { { id = 4, name = "Solo" } })
+      categories:ForgetGearSets(ctx, { 4 })
+      assert.are.same({ false, true }, deletedBags)
     end)
 
     -- Found by the second bug review: no test had another category in memory holding a record's old name.

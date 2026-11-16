@@ -1696,6 +1696,7 @@ describe("Database", function()
     end)
 
     it("is saved by its set's ID", function()
+      assert.are.equal(p.gearSets, DB:GetGearSets(), "every set's, by ID")
       assert.is_nil(DB:GetGearSet(3))
       DB:SetGearSet(3, { name = "Gear: Tank", priority = 2 })
       assert.are.same({ name = "Gear: Tank", priority = 2 }, p.gearSets[3])

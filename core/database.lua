@@ -1868,6 +1868,12 @@ function DB:GetGearSet(id)
   return DB.data.profile.gearSets[id]
 end
 
+-- GetGearSets returns every set's record, by set ID: every character's of the profile.
+---@return table<number, GearSetRecord>
+function DB:GetGearSets()
+  return DB.data.profile.gearSets
+end
+
 ---@param id number
 ---@param record GearSetRecord
 function DB:SetGearSet(id, record)
@@ -1889,9 +1895,9 @@ function DB:UpdateGearSet(id, fields)
 end
 
 -- RenameGearSets gives sets' categories their sets' new names (renames: { id, name, bags }), moving each bag's pins and
--- tabs for a rename that says so (bags: what was saved under the old name is the set's, no other category having it).
--- They move together: two sets can take each other's names (two characters of the profile whose sets' IDs are in the
--- other order), so every old name's settings are taken before any is saved under its new name.
+-- tabs for a rename that says so (bags: what was saved under the old name is the set's alone, no other category or set
+-- using either name: categories:renameGearSets). They move together, every old name's settings taken before any is
+-- saved under its new name.
 ---@param renames {id: number, name: string, bags: boolean}[]
 function DB:RenameGearSets(renames)
   local taken = {}
