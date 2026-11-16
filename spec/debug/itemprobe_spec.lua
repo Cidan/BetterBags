@@ -323,6 +323,55 @@ describe("ItemProbe", function()
     assert.are.equal(1, asked)
   end)
 
+  -- Issue #1333: gear set categories are to be saved by set ID, so a dump must show whether a set keeps its ID across
+  -- relogs, other sets' deletions and characters: every set the client lists, with every value each API answered.
+  it("records every equipment set the client lists, with what each API answered and BetterBags' set map", function()
+    override(_G, "C_EquipmentSet", {
+      GetNumEquipmentSets = function() return 2 end,
+      GetEquipmentSetIDs = function() return { 3, 0 } end,
+      GetEquipmentSetInfo = function(id)
+        if id == 3 then return "Tank", 132341, 3, false, 2, 1, 1, 0, 0 end
+        return "Heal", 132342, 0, true, 1, 1, 0, 0, 0
+      end,
+      GetEquipmentSetID = function(name) return name == "Tank" and 3 or 0 end,
+      GetItemIDs = function(id) return id == 3 and { [1] = 100, [12] = 200 } or { [5] = 300 } end,
+      GetItemLocations = function(id) return id == 3 and { [1] = 1048577, [12] = 1 } or { [5] = 2 } end,
+      GetEquipmentSetAssignedSpec = function(id) if id == 3 then return 1 end return nil end,
+    })
+    override(_G, "EquipmentManager_UnpackLocation", nil)
+    override(_G, "EquipmentManager_GetLocationData", function(location)
+      return { isBags = location == 1048577, bag = 0, slot = 4 }
+    end)
+    local eq, created = StubBetterBagsModule("EquipmentSets")
+    override(eq, "bagAndSlotToSet", { [0] = { [4] = { "Tank" } } })
+    local ok, err = pcall(function()
+      local sets = itemProbe:EquipmentSets()
+      assert.are.same({ n = 1, 2 }, sets.count)
+      assert.are.same({ n = 1, { 3, 0 } }, sets.ids)
+      local tank = sets.sets[3]
+      assert.are.equal(1, tank.order, "where the client lists it")
+      assert.are.same({ n = 9, "Tank", 132341, 3, false, 2, 1, 1, 0, 0 }, tank.info)
+      assert.are.same({ n = 1, 3 }, tank.idOfName, "the ID the client gives its name")
+      assert.are.same({ n = 1, { [1] = 100, [12] = 200 } }, tank.itemIDs)
+      assert.are.same({ n = 1, { [1] = 1048577, [12] = 1 } }, tank.locations)
+      assert.are.same({ n = 1, 1 }, tank.spec)
+      assert.are.same({ n = 1, { isBags = true, bag = 0, slot = 4 } }, tank.unpacked[1].data)
+      assert.is_nil(tank.unpacked[1].unpack, "a client without EquipmentManager_UnpackLocation")
+      assert.are.equal(2, sets.sets[0].order)
+      assert.are.same({ n = 1 }, sets.sets[0].spec, "answered nil")
+      assert.are.same({ [0] = { [4] = { "Tank" } } }, sets.map)
+    end)
+    if created then ResetModuleStub("EquipmentSets") end
+    assert(ok, err)
+  end)
+
+  it("records no sets on a client without the Equipment Manager", function()
+    override(_G, "C_EquipmentSet", nil)
+    local sets = itemProbe:EquipmentSets()
+    assert.is_nil(sets.ids)
+    assert.are.same({}, sets.sets)
+  end)
+
   it("describes the client the probes were taken on", function()
     local client = itemProbe:Client()
     assert.are.same({ version = "10.0.0", build = "12345", date = "Jan 1 2024", interface = 100000 },

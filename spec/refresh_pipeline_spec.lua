@@ -52,6 +52,17 @@ local itemNames = {
 local const, database, categories, searchText
 local mockContainer, newSlots, removedNewItems, mockStats, mockPrices
 
+-- gearSetCategory stands in for Categories:GetCustomCategory giving an item in a gear set its set's category, a
+-- category BetterBags makes (categories_spec.lua, "gear sets"; category-lifecycle.md §12), at priority 10.
+local function gearSetCategory(_, _, _, data)
+  local sets = data.itemInfo.equipmentSets
+  if sets == nil or sets[1] == nil then
+    return nil, nil
+  end
+  local name = "Gear: " .. sets[1]
+  return name, 10, { name = name, priority = 10, gearSet = 1, enabled = { [0] = true, [1] = true } }
+end
+
 local function stubModules()
   local debug = stubModule("Debug")
   override(debug, "Log", function() end)
@@ -5969,6 +5980,7 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       override(database, "GetCategoryFilter", function(_, _, filter)
         return filter == "GearSet"
       end)
+      override(categories, "GetCustomCategory", gearSetCategory)
     end)
 
     it("keeps inset current when a kept item leaves its set", function()
@@ -6060,6 +6072,48 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
 
       assert.equal("Gear: Aff", slotInfo.itemsBySlotKey["0_1"].itemInfo.category)
       assert.equal("Gear: Aff", slotInfo.itemsBySlotKey["0_2"].itemInfo.category)
+    end)
+
+    -- Issue #1333: gear sets came before every category, so an item in one stayed in its set whatever it was added to
+    -- or matched by. A set's category now takes its items as any category does (category-lifecycle.md §12).
+    it("keeps an item in a set that was added by hand to a category of yours there", function()
+      pendingSets[0] = { [1] = { "Tank" }, [2] = { "Tank" } }
+      local trinket = { name = "Trinket", save = true, priority = 20, enabled = { [const.BAG_KIND.BACKPACK] = true } }
+      override(categories, "GetCustomCategory", function(_, _, _, data)
+        if data.itemInfo.itemID == 101 then return trinket.name, trinket.priority, trinket end
+        return gearSetCategory(nil, nil, nil, data)
+      end)
+      mockContainer[0] = { { itemID = 101, guid = "gear-a", count = 1 }, { itemID = 202, guid = "gear-b", count = 1 } }
+      local slotInfo = refreshBackpack()
+      assert.equal("Trinket", slotInfo.itemsBySlotKey["0_1"].itemInfo.category)
+      assert.equal("Gear: Tank", slotInfo.itemsBySlotKey["0_2"].itemInfo.category)
+    end)
+
+    it("gives an item in a set to a rule above its set, and keeps it from one below", function()
+      pendingSets[0] = { [1] = { "Tank" } }
+      local rule = { name = "Trinkets", enabled = { [const.BAG_KIND.BACKPACK] = true }, priority = 1,
+        searchCategory = { query = "alpha" } }
+      override(categories, "GetSortedSearchCategories", function() return { rule } end)
+      mockContainer[0] = { { itemID = 101, guid = "gear-a", count = 1 } }
+      local slotInfo = refreshBackpack()
+      assert.equal("Trinkets", slotInfo.itemsBySlotKey["0_1"].itemInfo.category)
+      rule.priority = 20
+      slotInfo = refreshBackpack({ derive = true })
+      assert.equal("Gear: Tank", slotInfo.itemsBySlotKey["0_1"].itemInfo.category)
+    end)
+
+    -- A rule sees an item in a set as its set's (README: category = "Gear: MW DPS"), as the Discord thread's rule
+    -- `category = 'gear:'` expects.
+    it("matches a rule's category against the item's set", function()
+      pendingSets[0] = { [1] = { "Tank" } }
+      override(categories, "GetSortedSearchCategories", function()
+        return { { name = "Set Pieces", enabled = { [const.BAG_KIND.BACKPACK] = true }, priority = 1,
+          searchCategory = { query = "category = 'gear:'" } } }
+      end)
+      mockContainer[0] = { { itemID = 101, guid = "gear-a", count = 1 }, { itemID = 202, guid = "plain", count = 1 } }
+      local slotInfo = refreshBackpack()
+      assert.equal("Set Pieces", slotInfo.itemsBySlotKey["0_1"].itemInfo.category)
+      assert.are_not.equal("Set Pieces", slotInfo.itemsBySlotKey["0_2"].itemInfo.category)
     end)
   end)
 
@@ -6236,6 +6290,7 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
 
     it("applies a gear set change", function()
       override(database, "GetCategoryFilter", function(_, _, filter) return filter == "GearSet" end)
+      override(categories, "GetCustomCategory", gearSetCategory)
       local sets
       local equipmentSets = addon:GetModule("EquipmentSets")
       override(equipmentSets, "GetItemSets", function(_, bagid, slotid)

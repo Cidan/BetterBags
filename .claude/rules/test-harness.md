@@ -240,7 +240,8 @@ values, or `{ error = ... }`). Older dumps have no `apiProbe`.
   calls it. A new capture becomes a fixture the same way: extract it, add a block calling
   `clientAnswers`, and write its expectations from the raw answers.
 - **Who the player is never goes in a fixture.** Dumps record the player's name and realm
-  (`debugDumpExtras.player.fullName`) and sessions record them in `meta`; an extracted fixture leaves
+  (`debugDumpExtras.player.fullName`, and `character` and `realm` in each entry of the account-wide
+  `global.debugEquipmentSets`, data-driven.md) and sessions record them in `meta`; an extracted fixture leaves
   them out.
 
 ### 5b. Blizzard's Own Code Over the Mocks (`spec/helpers/uipanels.lua`)

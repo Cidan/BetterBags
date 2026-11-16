@@ -1794,6 +1794,146 @@ function DB:RenameGroup(kind, groupID, name)
   end
 end
 
+-- takeBagSettings returns what each bag saved for a category (its tab, the retail bank's tab of each bank type, its pin)
+-- and forgets it there.
+---@param name string
+---@return table
+local function takeBagSettings(name)
+  local taken = { tabs = {}, bankTabs = {}, pins = {} }
+  for _, kind in pairs(const.BAG_KIND) do
+    local groups = DB.data.profile.categoryToGroup[kind]
+    if groups then
+      taken.tabs[kind], groups[name] = groups[name], nil
+      if addon.isRetail and kind == const.BAG_KIND.BANK then
+        for bankType, tbl in pairs(groups) do
+          if type(tbl) == "table" then
+            taken.bankTabs[bankType], tbl[name] = tbl[name], nil
+          end
+        end
+      end
+    end
+    local pins = DB.data.profile.customSectionSort[kind]
+    if pins then
+      taken.pins[kind], pins[name] = pins[name], nil
+    end
+  end
+  return taken
+end
+
+-- putBagSettings saves under a category's name what takeBagSettings took, where it had something.
+---@param name string
+---@param taken table
+local function putBagSettings(name, taken)
+  for kind, groupID in pairs(taken.tabs) do
+    DB.data.profile.categoryToGroup[kind][name] = groupID
+  end
+  for bankType, groupID in pairs(taken.bankTabs) do
+    DB.data.profile.categoryToGroup[const.BAG_KIND.BANK][bankType][name] = groupID
+  end
+  for kind, index in pairs(taken.pins) do
+    DB.data.profile.customSectionSort[kind][name] = index
+  end
+end
+
+-- moveBagSettings moves what each bag saved for a category (its tab, its pin) to a new name.
+---@param oldName string
+---@param newName string
+local function moveBagSettings(oldName, newName)
+  putBagSettings(newName, takeBagSettings(oldName))
+end
+
+-- An equipment set's category, saved in the profile by the set's ID (category-lifecycle.md §12): what the player set for
+-- it, and the name it last had ("Gear: " and the set's name), which its pins and tabs are saved under.
+---@class (exact) GearSetRecord
+---@field name string
+---@field older? string The older entry (ephemeralCategoryFilters) the record was copied from, deleted with the set.
+---@field enabled? table<BagKind, boolean>
+---@field color? number[]
+---@field priority? number
+---@field automation? string
+---@field confirmSale? boolean
+---@field deposit? string
+---@field skipRecent? boolean
+---@field ignoredItems? table<number, boolean>
+---@field hidden? table<BagKind, boolean>
+---@field itemOrder? ItemOrderKey[]
+
+-- What the player sets for a gear set's category (UpdateGearSet).
+local GEAR_SET_FIELDS = { "enabled", "color", "priority", "automation", "confirmSale", "deposit", "skipRecent",
+  "ignoredItems", "hidden", "itemOrder" }
+
+---@param id number
+---@return GearSetRecord?
+function DB:GetGearSet(id)
+  return DB.data.profile.gearSets[id]
+end
+
+-- GetGearSets returns every set's record, by set ID: every character's of the profile.
+---@return table<number, GearSetRecord>
+function DB:GetGearSets()
+  return DB.data.profile.gearSets
+end
+
+---@param id number
+---@param record GearSetRecord
+function DB:SetGearSet(id, record)
+  DB.data.profile.gearSets[id] = record
+end
+
+-- UpdateGearSet saves what the player set for a set's category (each field as given, none clearing it), keeping its
+-- name. Nothing for a set with no record.
+---@param id number
+---@param fields table
+function DB:UpdateGearSet(id, fields)
+  local record = DB.data.profile.gearSets[id]
+  if record == nil then
+    return
+  end
+  for _, key in ipairs(GEAR_SET_FIELDS) do
+    record[key] = fields[key]
+  end
+end
+
+-- RenameGearSets gives sets' categories their sets' new names (renames: { id, name, bags }), moving each bag's pins and
+-- tabs for a rename that says so (bags: what was saved under the old name is the set's alone, no other category or set
+-- using either name: categories:renameGearSets). They move together, every old name's settings taken before any is
+-- saved under its new name.
+---@param renames {id: number, name: string, bags: boolean}[]
+function DB:RenameGearSets(renames)
+  local taken = {}
+  for i, rename in ipairs(renames) do
+    if rename.bags then
+      taken[i] = takeBagSettings(DB.data.profile.gearSets[rename.id].name)
+    end
+  end
+  for i, rename in ipairs(renames) do
+    if taken[i] then
+      putBagSettings(rename.name, taken[i])
+    end
+    DB.data.profile.gearSets[rename.id].name = rename.name
+  end
+end
+
+-- DeleteGearSet forgets what was saved for a deleted set's category: with bags (no other category having its name), each
+-- bag's pin and tab for it; with older, the older entry it copied (newGearSetRecord), so a set made again under that
+-- name starts fresh (asked: "deleted should mean deleted"). An entry the set never copied is left alone.
+---@param id number
+---@param bags boolean
+---@param older? string
+function DB:DeleteGearSet(id, bags, older)
+  local record = DB.data.profile.gearSets[id]
+  if record == nil then
+    return
+  end
+  if bags then
+    takeBagSettings(record.name)
+  end
+  if older ~= nil then
+    DB.data.profile.ephemeralCategoryFilters[older] = nil
+  end
+  DB.data.profile.gearSets[id] = nil
+end
+
 -- RenameCategory renames a category by updating all data structures that use the category name as a key.
 ---@param oldName string
 ---@param newName string
@@ -1825,23 +1965,8 @@ function DB:RenameCategory(oldName, newName)
     end
   end
 
-  -- 3. Update group mapping
-  for _, kind in pairs(const.BAG_KIND) do
-    if DB.data.profile.categoryToGroup[kind] then
-      if DB.data.profile.categoryToGroup[kind][oldName] then
-        DB.data.profile.categoryToGroup[kind][newName] = DB.data.profile.categoryToGroup[kind][oldName]
-        DB.data.profile.categoryToGroup[kind][oldName] = nil
-      end
-      if addon.isRetail and kind == const.BAG_KIND.BANK then
-        for _, tbl in pairs(DB.data.profile.categoryToGroup[kind]) do
-          if type(tbl) == "table" and tbl[oldName] then
-            tbl[newName] = tbl[oldName]
-            tbl[oldName] = nil
-          end
-        end
-      end
-    end
-  end
+  -- 3. Update group mapping and custom section sort (pinned position) for all bag kinds
+  moveBagSettings(oldName, newName)
 
   -- 4. Update ephemeral filters
   if DB.data.profile.ephemeralCategoryFilters[oldName] then
@@ -1858,14 +1983,8 @@ function DB:RenameCategory(oldName, newName)
     end
   end
 
-  -- 5. Update custom section sort (pinned position) for all bag kinds
+  -- 5. Delete grouped sub-categories from custom section sort
   for _, kind in pairs(const.BAG_KIND) do
-    if DB.data.profile.customSectionSort[kind] and DB.data.profile.customSectionSort[kind][oldName] ~= nil then
-      DB.data.profile.customSectionSort[kind][newName] = DB.data.profile.customSectionSort[kind][oldName]
-      DB.data.profile.customSectionSort[kind][oldName] = nil
-    end
-
-    -- Delete grouped sub-categories from custom section sort
     if DB.data.profile.customSectionSort[kind] then
       for categoryName, _ in pairs(DB.data.profile.customSectionSort[kind]) do
         if categoryName:sub(1, #groupedPrefix) == groupedPrefix then
@@ -2865,6 +2984,30 @@ function DB:SetDebugBackpackDump(dump, client, extras)
   -- What else the dump recorded: the player values, the worn gear, every bag's name, the open
   -- bank's items (frames/debug.lua).
   DB.data.profile.debugDumpExtras = extras
+end
+
+-- How many dumps' equipment sets are kept (AddDebugEquipmentSets): the oldest go first.
+DB.DEBUG_EQUIPMENT_SETS_KEPT = 50
+
+-- AddDebugEquipmentSets keeps what a dump read of the character's equipment sets (frames/debug.lua), account wide, after
+-- those of earlier dumps, so dumps across a relog, a set deleted and another character can be compared (issue #1333:
+-- whether a set keeps its ID).
+---@param entry table
+function DB:AddDebugEquipmentSets(entry)
+  local kept = DB.data.global.debugEquipmentSets
+  table.insert(kept, entry)
+  while #kept > DB.DEBUG_EQUIPMENT_SETS_KEPT do
+    table.remove(kept, 1)
+  end
+end
+
+---@return table[]
+function DB:GetDebugEquipmentSets()
+  return DB.data.global.debugEquipmentSets
+end
+
+function DB:ClearDebugEquipmentSets()
+  DB.data.global.debugEquipmentSets = {}
 end
 
 DB:Enable()

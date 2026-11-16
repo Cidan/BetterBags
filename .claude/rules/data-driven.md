@@ -107,3 +107,18 @@ reasoning about it can suggest a cause; it does not establish one.
   `Sonata:newTextFonts` return how many font objects their set made and how many roles they drew with objects made
   before. Added with reusing font objects by look, so a capture of ElvUI's font size dragged in its options can show the
   objects made per size, and none on a second pass. Not captured yet: no game client here.
+- **Equipment sets and their IDs** (`ItemProbe:EquipmentSets()`, issue #1333): the dump's
+  `debugDumpExtras.equipmentSets` records every set the client lists for the character: the count, the IDs in
+  `GetEquipmentSetIDs`' order, and per set (by ID) its place in that order, every value `GetEquipmentSetInfo`,
+  `GetItemIDs`, `GetItemLocations` and `GetEquipmentSetAssignedSpec` returned, the ID `GetEquipmentSetID` gives its
+  name, each location unpacked by `EquipmentManager_UnpackLocation` and `EquipmentManager_GetLocationData` (whichever
+  the client has), and the bag/slot map BetterBags built (`EquipmentSets.bagAndSlotToSet`). Each dump also adds
+  `{ time, loaded, character, realm, profile, client, sets }` (`loaded`: when the addon loaded, so a relog between two
+  dumps shows) to an account-wide list (`global.debugEquipmentSets`,
+  `DB:AddDebugEquipmentSets`, the newest 50 kept; Clear Dumped Data clears it), so dumps across a relog, a set deleted
+  and another character, in one saved variables file, show whether a set keeps its ID. Added before saving gear set
+  categories by set ID. Coverage: `spec/debug/itemprobe_spec.lua` ("records every equipment set"),
+  `spec/frames/debug_window_spec.lua` ("keeps each dump's equipment sets"), `spec/database_spec.lua`, and
+  `spec/debug_dump_harness_spec.lua` (the real defaults, over saved variables from before the list). A review found
+  the default untested, as every other spec replaces the defaults; fixed test-first. Not acted on: a client whose set
+  IDs are secret values would merge its sets into one entry, which `ids` still shows; not seen on any client.

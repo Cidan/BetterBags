@@ -160,6 +160,10 @@ dumped backpack item as `apiProbe`), so one dump from the game settles what an A
   guild bank to dim what it refuses (`.claude/rules/guild-bank.md` §3a).
 - `ItemProbe:Player()`, `ItemProbe:BagNames()`, `ItemProbe:Sample()`, `ItemProbe:Client()`: the player's values, every
   container's name and size, what follows the character for the backpack's items, and the client the dump came from.
+- `ItemProbe:EquipmentSets()`: every equipment set the client lists for the character, by ID, with every value each
+  `C_EquipmentSet` API answered, its locations unpacked, and BetterBags' bag/slot map. Each dump also keeps it, with
+  who took it, where and when, in an account-wide list (`DB:AddDebugEquipmentSets`), so several dumps compare in one
+  saved variables file.
 
 ### Analytics Integration (`analytics.lua`)
 

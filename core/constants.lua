@@ -1113,6 +1113,10 @@ const.DATABASE_DEFAULTS = {
     customCategoryFilters = {},
     ---@type table<string, CustomCategoryFilter>
     ephemeralCategoryFilters = {},
+    -- Each equipment set's category, by the set's ID: what the player set for it and the name it last had (DB:GetGearSet,
+    -- category-lifecycle.md §12).
+    ---@type table<number, GearSetRecord>
+    gearSets = {},
     ---@type table<number, string>
     customCategoryIndex = {},
     categoryFilters = {
@@ -1209,6 +1213,9 @@ const.DATABASE_DEFAULTS = {
     -- The newest changelog release the player has seen (its id), and whether the changelog
     -- opens by itself on login when there is a release they have not seen.
     changelog = { lastSeen = 0, autoOpen = true },
+    -- What each /bbdb dump read of the character's equipment sets, kept across dumps, characters and profiles
+    -- (DB:AddDebugEquipmentSets).
+    debugEquipmentSets = {},
   },
   char = {}
 }

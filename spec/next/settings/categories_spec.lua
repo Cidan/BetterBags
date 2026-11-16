@@ -752,6 +752,32 @@ describe("NextSettingsCategories", function()
       assert.are.equal("Openable", editor.selected)
       assert.are.equal(1, reselected)
     end)
+
+    -- Found by the bug review: a gear set renamed in the Equipment Manager renames its category while the page shows
+    -- (Categories:SyncGearSets says it as RenameCategory does), which chose the first category instead.
+    it("keeps a renamed category chosen", function()
+      list.frame:GetParent():Show()
+      list.frame:Show()
+      editor.selected = "Mats"
+      filters.Minerals, filters.Mats = filters.Mats, nil
+      handlers["categories/Changed"][1](ctx(), "Minerals", "Mats")
+      assert.are.equal("Minerals", editor.selected)
+      assert.are.equal(1, reselected)
+      editor.selected = "Ores"
+      handlers["categories/Changed"][1](ctx(), "Minerals", "Mats")
+      assert.are.equal("Ores", editor.selected, "another category's rename")
+    end)
+
+    -- Found by the second bug review: a set is renamed in the character pane, while the page is usually not showing; the
+    -- category chosen is kept for when it shows again.
+    it("keeps a category renamed while the page is not showing chosen for when it shows", function()
+      list.frame:Hide()
+      editor.selected = "Mats"
+      filters.Minerals, filters.Mats = filters.Mats, nil
+      handlers["categories/Changed"][1](ctx(), "Minerals", "Mats")
+      assert.are.equal("Minerals", editor.selected)
+      assert.are.equal(0, reselected, "nothing shown")
+    end)
   end)
 
   describe("its heading and buttons", function()
@@ -783,6 +809,31 @@ describe("NextSettingsCategories", function()
       filters.Mats.deposit = "warbank"
       editor.selected = "Mats"
       assert.are.same({ "Mats", "2 added items · Deposits in the bank" }, { editor:Heading() })
+    end)
+
+    -- Issue #1333: a gear set's category is its set's (asked: "so long as we can't rename the category in BetterBags"),
+    -- its items come from the set, and nothing in it is ever sold, destroyed or deposited (Automation:BlockedReason).
+    it("shows a gear set's category as made by the Equipment Manager, with no Added Items, Rename or Delete", function()
+      filters["Gear: Tank"] = { name = "Gear: Tank", priority = 0, itemList = {}, gearSet = 3,
+        enabled = { [BACKPACK] = true, [BANK] = true, [GUILD] = true } }
+      editor.selected = "Gear: Tank"
+      assert.are.same({ "Gear: Tank", "Made by the Equipment Manager" }, { editor:Heading() })
+      assert.is_true(editor:GearSetChosen())
+      assert.is_false(editor:AddedItemsTabShown())
+      assert.is_true(editor:ItemsTabShown(), "its Ignored Items")
+      assert.is_false(editor:RuleTabShown())
+      assert.is_true(editor:AutomationTabShown(), "Skip Recent Items")
+      local actions = editor:CreateActions(CreateFrame("Frame"), owner)
+      actions:Refresh(ctx())
+      assert.is_false(actions.export.frame:IsShown() or actions.rename.frame:IsShown() or actions.delete.frame:IsShown())
+      editor.selected = "Mats"
+      assert.is_false(editor:GearSetChosen())
+      assert.is_true(editor:AddedItemsTabShown())
+      editor.selected = "Openable"
+      assert.is_true(editor:AddedItemsTabShown(), "a plugin's, read-only")
+      editor.selected = nil
+      assert.is_false(editor:AddedItemsTabShown())
+      assert.is_false(editor:GearSetChosen())
     end)
 
     it("says which tabs show: Rule for yours and a plugin's with a rule; Added Items while one is chosen", function()

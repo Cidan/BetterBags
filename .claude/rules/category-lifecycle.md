@@ -2,6 +2,7 @@
 paths:
   - "data/categories.lua"
   - "data/items.lua"
+  - "data/equipmentsets.lua"
   - "core/database.lua"
   - "views/views.lua"
   - "frames/section.lua"
@@ -9,6 +10,7 @@ paths:
   - "next/settings/bagcategories.lua"
   - "next/settings/content.lua"
   - "spec/categories_spec.lua"
+  - "spec/equipmentsets_spec.lua"
   - "spec/database_migration_spec.lua"
   - "spec/next/settings/categories_spec.lua"
   - "spec/next/settings/bagcategories_spec.lua"
@@ -30,7 +32,8 @@ A custom category's name is a key in **multiple** independent profile tables (`c
   `isGroupBySubcategory = true`) and the color, priority and automation a player set
   (automation.md: `automation`, `confirmSale`, `deposit`, `skipRecent`), and its own item order (`itemOrder`,
   item-sort.md §5). `itemList` is empty here: the
-  plugin gives its items again each session.
+  plugin gives its items again each session. A gear set's category is not saved here but by its set's ID
+  (`gearSets[setID]`, §12).
 - `customCategoryIndex[itemID] = name` — the item's home: the persistent category it was placed
   in by hand. Rebuilt from the item lists at every load (§6).
 - `categoryToGroup[kind][name]` (and, on retail bank, `categoryToGroup[kind][groupID][name]`)
@@ -284,19 +287,19 @@ it should." docs/next-batch-2.md §8.
   category on both sides:
   - lands there naturally: the category it was added to by hand is forgotten (`RemoveItemFromCategory`),
     nothing is added: `"natural"`;
+  - else a gear set's category (§12): nothing: `"gear set"` (its items are its set's);
   - else a plugin's category: nothing: `"plugin"` (a plugin fills it; adding would make a category of
     yours with its name, hiding the plugin's);
   - else: added to the category's Added Items (`AddPermanentItemToCategory`, which takes it from the
     category it was in), the category no longer ignoring it (§8): `"added"`. A Blizzard category's name
     (one no saved category has) is made yours first (`Convert`, §11), so it shows in the same section; the
     classic title's Shift drop does the same (`sectionFrame:OnTitleClickOrDrop`).
-- **The panel** (`panelProto:FileCursorItem`, `next/panel.lua`): a gear set's section ("Gear: ", no
-  category of that name) takes nothing ("Gear sets are made in the Equipment Manager."); a plugin's
-  says "A plugin fills X: items can't be added to it."; in both the item stays on the cursor.
-  Otherwise the item goes back to its slot (`ClearCursor`) and the bags are recalculated
-  (`bags/Rederive { resetLayout, buttons }`).
-- **Known limit:** an item in a gear set shows in its gear set whatever it is added to: gear sets come
-  first in `GetCategory`, before any category (as on the classic bags).
+- **The panel** (`panelProto:FileCursorItem`, `next/panel.lua`): for `"gear set"` it says "Gear sets are made in the
+  Equipment Manager."; for `"plugin"`, "A plugin fills X: items can't be added to it."; in both the item stays on the
+  cursor. Otherwise the item goes back to its slot (`ClearCursor`) and the bags are recalculated
+  (`bags/Rederive { resetLayout, buttons }`). So an item of a set added by hand elsewhere, dropped on its set's header,
+  goes back to its set (`"natural"`). The classic title's Shift drop (`sectionFrame:OnTitleClickOrDrop`) refuses a gear
+  set's title the same way (`categories:IsGearSet`); before §12 it made a category of yours of the set's name.
 - Coverage: `spec/categories_spec.lua` ("filing an item dropped on a category's header", "GetCustomCategory
   without the item's Added Items"), `spec/refresh_pipeline_spec.lua` ("an item's natural category"),
   `spec/next/drag_spec.lua` ("the header").
@@ -420,3 +423,149 @@ turns it into a category of the player's, whose Blizzard items keep landing in i
   hides listed, Everything never listed, and unconverted Blizzard rows counting longer names. All fixed test-first.
   New Category, the picker's new category and renaming onto a Blizzard category's name used to make an unmarked
   category; the user chose converting them (above).
+
+## 12. Gear sets are categories (issue #1333)
+
+The issue: `items:GetCategory` returned `"Gear: " .. equipmentSets[1]` right after Recent Items, before every category,
+so an item in an equipment set stayed in its set whatever it was added to by hand (its Added Items row faded, "Shows in
+Gear: X instead.") or matched by a rule, even a rule at the top of the order (a rule `category = 'gear:'` matched set
+items and still lost). Reproduced against the real Items and Search modules before the fix. Asked (2026-11-15): "gear
+categories are treated as special hard coded things, it's time we undo the hard coding and make them function like
+other categories correctly"; the bag's Equipment Set switch stays; a set's category follows a rename of its set, "so
+long as we can't rename the category in BetterBags"; no Auto Sell or Auto Deposit rows for one. How it is saved, asked
+after two rejected designs (settings per character, pointers to categories): "no pointers, everything goes in the global
+profile. it's keyed by the id of the gear set ... if the user renames or moves something on one character, it affects
+the other -- the user should make individual profiles. sloppy, but for now it's the right thing"; and a set this
+character deletes is forgotten: "we just watch the event".
+
+- **What the client does with set IDs** (measured on WoW: Forever 1.60.1, five `/bbdb` captures, data-driven.md
+  "Equipment sets and their IDs"): IDs start at 0 and stay the same across reloads; a rename keeps the ID; deleting set 0
+  did not renumber 1 and 2; the next new set reused the freed 0; `GetEquipmentSetIDs` lists sets in the order they were
+  made, not by ID ([1, 2, 0] after the reuse). Retail and other characters were not captured.
+- **Saved in the profile, by set ID** (`profile.gearSets[setID]`, a `GearSetRecord`: `DB:GetGearSet`, `SetGearSet`,
+  `UpdateGearSet`, `RenameGearSet`, `DeleteGearSet`). A record holds what the player set for the set's category (Used
+  In, color, place in the order, Hide In, Ignored Items, item order, Skip Recent Items, and the automation fields, which
+  nothing sets for one) and the name it last had, `"Gear: " .. setName`. Its pins and tabs are saved under that name, as
+  every category's are (`customSectionSort`, `categoryToGroup`). Every character of the profile shares a set ID's
+  record: character B's set 0 takes the category character A gave its set 0. Separate profiles keep characters apart.
+  Nothing is saved as a plugin's (`ephemeralCategoryFilters`): `saveState` writes a gear set's settings to its record.
+- **In memory** (`categories:SyncGearSets(ctx, sets)`, called by `EquipmentSets:Update(ctx)` after it reads the sets,
+  so at the start of every sweep, before the items get their categories, data-loader.md §14, and at its `OnEnable`):
+  for each of this character's sets, a category named `"Gear: " .. setName`, marked with its set's ID (`gearSet`), made
+  from its record (`gearSetsByID`). `EquipmentSets:GetSets()` lists `{ id, name }` per set in the client's order, leaving
+  out a set the client gives no name (`GetEquipmentSetInfo` may return nothing: `MayReturnNothing`,
+  EquipmentManagerDocumentation.lua); none on Vanilla and Anniversary, whose `Update` returns early.
+  `categories:IsGearSet(name)` says whether a name is one (a category of yours of that name is not). Nothing changes,
+  and no generation starts, when the sets are the same; otherwise a new generation and one `categories/Changed`.
+- **A set with no record is new**: its record is made (`newGearSetRecord`), used in every bag, and its category goes on
+  top of the order (§7), so after the update gear sets still come before every rule until the player moves one. They are
+  made from the client's last set to its first, so the first ends on top and an item in two sets still shows in the
+  first by default, as it always did.
+- **Renamed** (in the Equipment Manager, or on another character of the profile whose set has the ID; Blizzard's rename
+  keeps the set's ID: `C_EquipmentSet.ModifyEquipmentSet(setID, name, icon)`, `PaperDollFrame.lua`): a set whose name
+  differs from its record's. Its settings stay with the ID; its pins and tabs move to the new name only when they are
+  its own: no other category has the old name (`gearSetOwns`; a category of yours of that name, made since on another
+  character, keeps its own), and no other set's saved settings use the old or the new name, as the records are or as
+  this sweep's renames leave them (`sharedName`; asked: a rename moves them "only when no other set's saved settings use
+  either name"; "messy, but do it"). Pins and tabs are kept by name, so a name two sets use (sets of one name under
+  different IDs on two characters) keeps its own: moved on every login, A's (0 "DPS", 1 "Tank") Tank pin was written
+  over by B's (0 "Tank") rename DPS to Tank and taken away again by A's rename back. In that case they do not follow the
+  rename. Renames are worked out together (`categories:renameGearSets`, `DB:RenameGearSets`): two
+  characters of the profile whose sets have each other's names under their IDs swap them at every switch, so a name
+  another set is leaving this sweep is free (their pins and tabs stay with the names). A category in memory
+  is renamed in place, and `categories/Changed` names both, as `RenameCategory` does, so the Categories page keeps it
+  chosen, shown or not (next-settings-categories.md §5). A rename made while BetterBags was not loaded is found the same
+  way. A set renamed onto a name another category has gets no category and its record stays as it was, until the name
+  is free.
+- **Deleted on this character** (`EquipmentSets:SetsChanged`, from `EQUIPMENT_SETS_CHANGED`; asked: "we just watch the
+  event"): once the client says its sets changed, the next `Update` takes a set the last one read and this one does not
+  for one this character deleted, and `categories:ForgetGearSets(ctx, ids)` forgets it before the sync: its record; its
+  pins and tabs when its name is its own (`gearSetOwns`) and no other set's saved settings use it (`sharedName`, as for
+  a rename: another character's set of the name keeps its pin); the older entry its record was copied from (`older`, kept
+  through renames) unless a category of yours or a plugin's now has that name (another gear set's never reads the
+  entry under its name); and its category in memory (asked: "deleted should mean
+  deleted"; `DB:DeleteGearSet(id, bags, older)`). An entry the set never copied is left alone. So a set the client later
+  gives the freed ID, or one made again under either name, starts fresh, on top. On a shared profile this also clears
+  that ID's settings for other characters, and the older entry for another character's set of that name that has no
+  record yet (older versions' entries hold only Used In).
+- **Skipped, never deleted:** a record of a set this character does not have (another character's), and a set no longer
+  listed without the client saying its sets changed: its category leaves memory, its record stays. One case the reads
+  cannot tell apart: a set deleted and another made that the client gives its ID, both before the next sweep, reads as a
+  rename (the new set takes the old one's settings).
+- **Older profiles.** Older versions saved gear sets' sections as dynamic categories by name (`test.lua`: `"Gear: Tank"`,
+  `"Gear: Ret"` with `dynamic = true` and no place), and the build before this one saved gear set categories by name as
+  plugins' (`ephemeralCategoryFilters`). A set with no record copies what was saved under its category's name into its
+  record (`newGearSetRecord`, which names the entry it copied: `older`; asked: "the first time the set has no record"),
+  on top unless it had a place. Those entries
+  are left alone: not loaded (`categories:OnEnable` skips a dynamic `"Gear: "` entry but a group by's sections:
+  `isOlderGearSet`), not changed (the record holds copies), and deleted only with their set, by the player (above), so a
+  set made again under the name starts fresh.
+- **A set another category is named after** (yours, or a plugin's) gets no category and no record; the set's items go
+  where they would without one.
+- **Plugins' older calls** (`IsCategoryEnabled`, `ToggleCategory`, `EnableCategory`, `DisableCategory`,
+  `SetCategoryState`) answer a gear set's Used In from its category and save it to its record (`setEphemeralEnabled`),
+  never to an older entry of its name.
+- **Open, the user's to decide** (found by the review of the shared-name rule, reproduced on the real modules over
+  `test.lua`): a pin or tab can still be written over. A rename held back leaves the set's pins under its old name, which
+  no record has any more (another character's login renamed that set's record), so `sharedName` cannot see it; a later
+  rename onto that name moves its pins over them (A: 0 "A", 1 "B"; B: 0 "B", 1 "C"; B renames "C" to "A": A's set 0
+  pin is replaced for good). Closing it means not moving pins and tabs onto a name that already has some, which narrows
+  when they follow a rename further, so it was asked, not built.
+- **Follows from the rule as asked:** a record of a set no character has any more (a character left the profile, a set
+  deleted while BetterBags was not loaded) keeps its name in use, so renames from or onto it never move pins and tabs;
+  and two renames of one character's sets in one sweep that rotate names (only while BetterBags was not loaded) leave
+  the pins with the names, not the sets.
+- **Not built for:** two or more renames of sets in memory in one sweep (a swap, a chain) send one `categories/Changed`
+  per rename, and the Categories page, following each in turn, ends on the other set's category. Each rename fires its
+  own `EQUIPMENT_SETS_CHANGED` and a sweep follows it, so this needs an order not seen.
+- **Where its items go** (`categories:GetCustomCategory`): an item added by hand to a category of yours is in it,
+  whatever the order (§7). Else its gear set's category (`gearSetOf`: the bag's Equipment Set switch on, the category
+  used in the bag, not ignoring the item; for an item in several sets, the one higher in the order, where before it was
+  always the first set) and a plugin's (`pluginCategoryOf`: its list, else a category function) compete by the order
+  (`before`). The winner competes with rules in `items:GetCategory` as a plugin's list does (§6): the lower priority
+  number wins, the list on a tie. So a gear set is part of the item's own category, which rules are matched against
+  (data-loader.md §8): README's `category = "gear:"` keeps working, and a rule above the set takes its items.
+- **The bag's Equipment Set switch** (`filterGearSet`, `GetCategoryFilter(kind, "GearSet")`) still turns gear sets off
+  in a bag; each set's Used In narrows it (asked: "this is fine for now").
+- **Never renamed here.** `categories:RenameCategory` returns false for one; the Categories page shows no Export, Rename
+  or Delete for it (as for a plugin's). Nothing is added to it by hand: `FileItem` returns `"gear set"` (§9), the
+  picker lists it disabled, "Made by the Equipment Manager" (next-category-picker.md), and the page has no Added Items
+  tab for it.
+- **No automation rows.** `Automation:BlockedReason` never sells, destroys or deposits an item in a set
+  (`data/automation.lua`), so the Automation tab hides its Merchants and Bank sections for one; Skip Recent Items stays
+  (next-settings-categories.md §5). This is also why the old priority is no longer needed: #586 (2024) asked for gear
+  sets to beat rules after a player nearly sold set weapons a rule put in a sell category.
+- **Not exported.** Export Categories (`DB:ExportSettings`) takes the profile's category tables; `gearSets` is not among
+  them.
+- **Coverage:** `spec/categories_spec.lua` ("gear sets": made, on top, saved by ID, the same sets, an item's set, Added
+  Items winning, a plugin's list and a category function by the order, two sets and the first by default, ignored, Used
+  In and the switch, the next session, renamed in game, a record of another name for the ID, deleted, a set this
+  character does not have, older entries copied once and left alone, a group by's sections, a category of yours of the
+  name, a rename onto it, no rename, header drops), `spec/equipmentsets_spec.lua` ("the sets' categories": the list, a
+  set with no name, deletions only after the event, an ID reused before the next read),
+  `spec/debug_dump_harness_spec.lua` (the real Default profile: its older entries, two characters sharing set 0, a
+  deletion through the event, the freed ID fresh), `spec/database_spec.lua` ("a gear set's category"),
+  `spec/refresh_pipeline_spec.lua` ("gear set labeling": Added Items, a rule above and below, a rule's `category`),
+  `spec/next/settings/categories_spec.lua` (the heading and tabs, a renamed category kept chosen),
+  `spec/next/settings/content_spec.lua`, `spec/next/categorypicker_spec.lua`, `spec/next/drag_spec.lua` (the header)
+  and `spec/frames/bag_draw_ownership_spec.lua` (the classic Shift drop).
+- **Review of this design** (CLAUDE.md, Prime Directive #2), reproduced on the real modules over `test.lua`: renames
+  applied one at a time wiped one set's pins and tabs when two sets took each other's names; a delete or rename cleared
+  or moved the pins and tabs of a category of yours that had the record's name; the older plugin calls read and wrote a
+  gear set's Used In in an older entry; the remaking of a category deleted another way had no test. All fixed
+  test-first. The older entry copied again after a deletion: the user chose "deleted should mean deleted" (above); its
+  review found a set renamed after copying leaving the copied entry behind, and deleting by the current name taking an
+  entry the set never copied, fixed test-first by naming the copied entry in the record; and the one after it, the
+  copied entry kept when another gear set had taken its name (after a swap, in one order of deletion), fixed
+  test-first. Records made by the build before `older` existed (only a developer's saved variables) delete no older
+  entry. The second, aimed at those
+  fixes, found `DB:RenameCategory` unchanged (the old move fuzzed against take-then-put over 200,000 states), two sets
+  of one name under different IDs on two characters losing a pin (the user chose: pins move only when no other set uses
+  either name, above), the page after several
+  renames in one sweep (not built for, above), and three untested branches (another category in memory holding a
+  record's old name, a name left by another set, the retail bank's per-bank-type tabs), now each caught by a test.
+- **Reviews** (CLAUDE.md, Prime Directive #2), of the build before this design (by name, renames followed in memory):
+  an item in two sets showing in the client's last; the Categories page losing a renamed set's category (hidden or not);
+  a group by's section named "Gear: ..." taken for an older gear set category; a set with no name failing every sweep;
+  older categories taken over at no place falling below rules. All fixed test-first and kept. Its cross-character
+  finding (a saved set ID taken for another character's set) led to the user's choice above: a set ID is the profile's.

@@ -203,6 +203,15 @@ describe("NextCategoryPicker", function()
     assert.is_nil(lit(), "nothing lit before anything is typed")
   end)
 
+  -- Issue #1333: a gear set's items come from its set, so nothing is put in one by hand.
+  it("lists a gear set's category not to be picked, made by the Equipment Manager", function()
+    filters["Gear: Tank"] = { name = "Gear: Tank", gearSet = 3 }
+    open()
+    local gear = row("Gear: Tank")
+    assert.is_true(gear.item.disabled)
+    assert.are.equal("Made by the Equipment Manager", gear.item.note)
+  end)
+
   it("offers a new category named what is typed when no category has that name, lit when nothing else matches", function()
     open()
     typeText("Hearth")

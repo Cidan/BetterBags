@@ -1660,4 +1660,487 @@ describe("Categories", function()
       assertRecalculated()
     end)
   end)
+
+  -- Issue #1333: gear sets were hard coded ahead of every category, so nothing added by hand or matched by a rule could
+  -- take an item in one (asked: "it's time we undo the hard coding and make them function like other categories
+  -- correctly"). Each equipment set is a category BetterBags makes, in the order of the Categories list, and what the
+  -- player sets for it is saved in the profile by the set's ID (asked: "everything goes in the global profile. it's
+  -- keyed by the id of the gear set"; category-lifecycle.md §12).
+  describe("gear sets", function()
+    local ctx, gearSetFilter, sent, dbGearSets, renamed, deleted, batches, deletedBags
+    local saved = {}
+    local FIELDS = { "enabled", "color", "priority", "automation", "confirmSale", "deposit", "skipRecent",
+      "ignoredItems", "hidden", "itemOrder" }
+
+    local function setItem(itemID, ...)
+      return { itemInfo = { itemID = itemID, equipmentSets = { ... } } }
+    end
+
+    before_each(function()
+      ctx = context:New("Test")
+      gearSetFilter, sent, dbGearSets, renamed, deleted, batches, deletedBags = true, {}, {}, {}, {}, {}, {}
+      for _, key in ipairs({ "GetCategoryFilter", "GetGearSet", "GetGearSets", "SetGearSet", "UpdateGearSet",
+        "RenameGearSets", "DeleteGearSet", "SetEphemeralItemCategoryEnabled" }) do
+        saved[key] = rawget(database, key)
+      end
+      saved.SendMessage = events.SendMessage
+      database.GetCategoryFilter = function(_, _, filter) return filter == "GearSet" and gearSetFilter end
+      -- As the real ones (core/database.lua): the profile's gearSets, by set ID. Which bag settings move or go is
+      -- recorded (`bags`); spec/database_spec.lua moves them.
+      database.GetGearSet = function(_, id) return dbGearSets[id] end
+      database.GetGearSets = function() return dbGearSets end
+      database.SetGearSet = function(_, id, record) dbGearSets[id] = record end
+      database.UpdateGearSet = function(_, id, fields)
+        local record = dbGearSets[id]
+        if record == nil then return end
+        for _, key in ipairs(FIELDS) do record[key] = fields[key] end
+      end
+      database.RenameGearSets = function(_, renames)
+        local batch = {}
+        for _, rename in ipairs(renames) do
+          table.insert(renamed, { dbGearSets[rename.id].name, rename.name })
+          table.insert(batch, { dbGearSets[rename.id].name, rename.name, rename.bags })
+        end
+        table.insert(batches, batch)
+        for _, rename in ipairs(renames) do dbGearSets[rename.id].name = rename.name end
+      end
+      database.DeleteGearSet = function(_, id, bags, older)
+        table.insert(deleted, dbGearSets[id] and dbGearSets[id].name or id)
+        table.insert(deletedBags, bags)
+        if older then
+          dbEphemeralCategories[older] = nil
+        end
+        dbGearSets[id] = nil
+      end
+      database.SetEphemeralItemCategoryEnabled = function(_, kind, name, enabled)
+        if dbEphemeralCategories[name] then
+          dbEphemeralCategories[name].enabled = dbEphemeralCategories[name].enabled or {}
+          dbEphemeralCategories[name].enabled[kind] = enabled
+        end
+      end
+      events.SendMessage = function(_, _, message, ...) table.insert(sent, { message, ... }) end
+    end)
+
+    after_each(function()
+      for key, fn in pairs(saved) do
+        if key == "SendMessage" then events.SendMessage = fn else database[key] = fn end
+      end
+    end)
+
+    it("makes a category for each set, named after it, on top of the order, used in every bag, saved by its ID", function()
+      categories:CreateCategory(ctx, { name = "Mats", itemList = {}, save = true, priority = 1 })
+      sent = {}
+      local before = categories:GetGeneration()
+      assert.is_true(categories:SyncGearSets(ctx, { { id = 3, name = "Tank" } }))
+      local tank = categories:GetCategoryByName("Gear: Tank")
+      assert.are.equal(3, tank.gearSet)
+      assert.are.same({ "Gear: Tank", "Mats" }, categories:GetOrder())
+      assert.are.same({ [0] = true, [1] = true, [2] = true }, tank.enabled)
+      assert.are.equal("Gear: Tank", dbGearSets[3].name)
+      assert.are.equal(tank.priority, dbGearSets[3].priority, "its place saved")
+      assert.is_nil(dbEphemeralCategories["Gear: Tank"], "not saved as a plugin's")
+      assert.is_nil(dbCategories["Gear: Tank"], "not one of yours")
+      assert.is_true(categories:IsGearSet("Gear: Tank"))
+      assert.is_false(categories:IsGearSet("Mats"))
+      assert.is_false(categories:IsGearSet("Gear: Heal"))
+      assert.is_true(categories:GetGeneration() > before)
+      assert.are.same({ "categories/Changed" }, sent[#sent])
+    end)
+
+    it("changes nothing when the sets are the same", function()
+      categories:SyncGearSets(ctx, { { id = 3, name = "Tank" } })
+      local before = categories:GetGeneration()
+      sent = {}
+      assert.is_false(categories:SyncGearSets(ctx, { { id = 3, name = "Tank" } }))
+      assert.are.equal(before, categories:GetGeneration())
+      assert.are.same({}, sent)
+    end)
+
+    it("gives an item in a set its set's category, with its place in the order", function()
+      categories:SyncGearSets(ctx, { { id = 3, name = "Tank" } })
+      local name, priority, filter = categories:GetCustomCategory(ctx, 0, setItem(101, "Tank"))
+      assert.are.equal("Gear: Tank", name)
+      assert.are.equal(categories:GetCategoryByName("Gear: Tank").priority, priority)
+      assert.are.equal(3, filter.gearSet)
+      assert.is_nil((categories:GetCustomCategory(ctx, 0, { itemInfo = { itemID = 102 } })), "an item in no set")
+    end)
+
+    it("keeps an item added by hand to a category of yours there, whatever the order", function()
+      categories:CreateCategory(ctx, { name = "Trinket", itemList = {}, save = true })
+      categories:AddPermanentItemToCategory(ctx, 101, "Trinket")
+      categories:SyncGearSets(ctx, { { id = 3, name = "Tank" } })
+      assert.are.equal("Gear: Tank", categories:GetOrder()[1], "the set is on top")
+      assert.are.equal("Trinket", (categories:GetCustomCategory(ctx, 0, setItem(101, "Tank"))))
+      assert.are.equal("Gear: Tank", (categories:GetCustomCategory(ctx, 0, setItem(101, "Tank"), true)),
+        "where it lands without it")
+    end)
+
+    it("competes with a plugin's list by the order", function()
+      categories:CreateCategory(ctx, { name = "Openable", itemList = { [101] = true } })
+      categories:SyncGearSets(ctx, { { id = 3, name = "Tank" } })
+      assert.are.equal("Gear: Tank", (categories:GetCustomCategory(ctx, 0, setItem(101, "Tank"))))
+      categories:MoveCategory(ctx, "Openable")
+      assert.are.equal("Openable", (categories:GetCustomCategory(ctx, 0, setItem(101, "Tank"))))
+      assert.are.equal("Openable", (categories:GetCustomCategory(ctx, 0, { itemInfo = { itemID = 101 } })), "out of a set")
+    end)
+
+    it("competes with what a category function names by the order", function()
+      categories:SyncGearSets(ctx, { { id = 3, name = "Tank" } })
+      categories:RegisterCategoryFunction("fish", function() return "Fish" end)
+      assert.are.equal("Fish", (categories:GetCustomCategory(ctx, 0, setItem(101, "Tank"))), "a new category, on top")
+      categories:MoveCategory(ctx, "Gear: Tank")
+      assert.are.equal("Gear: Tank", (categories:GetCustomCategory(ctx, 0, setItem(101, "Tank"))))
+    end)
+
+    -- Found by the first bug review: each new set was made on top in turn, so the client's last set came first, where an
+    -- item in two sets used to show in the first.
+    it("puts an item in two sets in the one higher in the order, the client's first set at first", function()
+      categories:SyncGearSets(ctx, { { id = 1, name = "Tank" }, { id = 2, name = "Heal" } })
+      assert.are.same({ "Gear: Tank", "Gear: Heal" }, categories:GetOrder())
+      assert.are.equal("Gear: Tank", (categories:GetCustomCategory(ctx, 0, setItem(101, "Heal", "Tank"))))
+      categories:MoveCategory(ctx, "Gear: Heal")
+      assert.are.equal("Gear: Heal", (categories:GetCustomCategory(ctx, 0, setItem(101, "Heal", "Tank"))))
+    end)
+
+    it("passes over a set's category that ignores the item, is not used in the bag, or with the bag's switch off", function()
+      categories:SyncGearSets(ctx, { { id = 3, name = "Tank" } })
+      local item = setItem(101, "Tank")
+      categories:IgnoreItem(ctx, 101, "Gear: Tank")
+      assert.is_nil((categories:GetCustomCategory(ctx, 0, item)))
+      assert.is_true(dbGearSets[3].ignoredItems[101], "saved by the set's ID")
+      categories:UnignoreItem(ctx, 101, "Gear: Tank")
+      categories:UpdateCategory(ctx, "Gear: Tank", { enabled = { [1] = false } })
+      assert.is_false(dbGearSets[3].enabled[1])
+      assert.is_nil((categories:GetCustomCategory(ctx, 1, item)), "not used in the bank")
+      assert.are.equal("Gear: Tank", (categories:GetCustomCategory(ctx, 0, item)))
+      gearSetFilter = false
+      assert.is_nil((categories:GetCustomCategory(ctx, 0, item)), "the bag's Equipment Set off")
+      assert.is_nil(dbEphemeralCategories["Gear: Tank"], "nothing saved as a plugin's")
+    end)
+
+    it("keeps what the player set for a set's category in the next session", function()
+      categories:SyncGearSets(ctx, { { id = 3, name = "Tank" } })
+      categories:CreateCategory(ctx, { name = "Mats", itemList = {}, save = true })
+      categories:MoveCategory(ctx, "Mats")
+      categories:UpdateCategory(ctx, "Gear: Tank", { color = { 1, 0, 0 } })
+      categories:Init()
+      categories:SyncGearSets(ctx, { { id = 3, name = "Tank" } })
+      assert.are.same({ "Mats", "Gear: Tank" }, categories:GetOrder(), "where it was, not on top")
+      assert.are.same({ 1, 0, 0 }, categories:GetCategoryByName("Gear: Tank").color)
+    end)
+
+    it("follows a set renamed in the Equipment Manager: its settings by ID, its pins and tabs by name", function()
+      categories:SyncGearSets(ctx, { { id = 3, name = "Tank" } })
+      categories:UpdateCategory(ctx, "Gear: Tank", { color = { 1, 0, 0 } })
+      sent = {}
+      local before = categories:GetGeneration()
+      assert.is_true(categories:SyncGearSets(ctx, { { id = 3, name = "Prot" } }))
+      assert.is_true(categories:GetGeneration() > before, "the bags work its items' categories out again")
+      assert.is_nil(categories:GetCategoryByName("Gear: Tank"))
+      local prot = categories:GetCategoryByName("Gear: Prot")
+      assert.are.equal(3, prot.gearSet)
+      assert.are.same({ 1, 0, 0 }, prot.color)
+      assert.are.same({ { "Gear: Tank", "Gear: Prot" } }, renamed, "its pins and tabs move with it")
+      assert.are.equal("Gear: Prot", dbGearSets[3].name)
+      -- As RenameCategory says it, so the Categories page keeps it chosen.
+      assert.are.same({ "categories/Changed", "Gear: Prot", "Gear: Tank" }, sent[1])
+    end)
+
+    -- Asked: a set's ID is the set on every character of the profile ("if the user renames or moves something on one
+    -- character, it affects the other -- the user should make individual profiles"); a rename made while BetterBags was
+    -- not loaded is found the same way.
+    it("takes the settings saved for its ID, whatever the set was called when they were saved", function()
+      categories:SyncGearSets(ctx, { { id = 0, name = "Tank" } })
+      categories:UpdateCategory(ctx, "Gear: Tank", { color = { 1, 0, 0 } })
+      categories:Init()
+      categories:SyncGearSets(ctx, { { id = 0, name = "Healer" } })
+      assert.are.same({ 1, 0, 0 }, categories:GetCategoryByName("Gear: Healer").color)
+      assert.are.same({ { "Gear: Tank", "Gear: Healer" } }, renamed)
+    end)
+
+    -- Asked: "deleted should mean deleted". A set deleted and made again under its name starts fresh, not from the older
+    -- entry of its name again.
+    it("starts a set deleted and made again under its name fresh, its older entry gone with it", function()
+      dbEphemeralCategories["Gear: Tank"] = { name = "Gear: Tank", enabled = { [0] = true }, itemList = {}, dynamic = true,
+        color = { 0, 1, 0 }, priority = 30 }
+      categories:SyncGearSets(ctx, { { id = 3, name = "Tank" } })
+      assert.are.same({ 0, 1, 0 }, categories:GetCategoryByName("Gear: Tank").color, "copied the first time")
+      categories:ForgetGearSets(ctx, { 3 })
+      assert.is_nil(dbEphemeralCategories["Gear: Tank"])
+      categories:SyncGearSets(ctx, { { id = 3, name = "Tank" } })
+      local tank = categories:GetCategoryByName("Gear: Tank")
+      assert.is_nil(tank.color)
+      assert.are.same({ [0] = true, [1] = true, [2] = true }, tank.enabled)
+      assert.are.equal("Gear: Tank", categories:GetOrder()[1], "on top")
+    end)
+
+    -- Found by the bug review: a set that copied the older entry of its first name, renamed and then deleted, left that
+    -- entry behind, so a set made again under the first name took its settings back.
+    it("deletes the older entry a set copied, even under the name it had before a rename", function()
+      dbEphemeralCategories["Gear: Tank"] = { name = "Gear: Tank", enabled = { [0] = true }, itemList = {}, dynamic = true,
+        color = { 0, 1, 0 } }
+      categories:SyncGearSets(ctx, { { id = 3, name = "Tank" } })
+      assert.are.equal("Gear: Tank", dbGearSets[3].older, "the entry it copied")
+      categories:SyncGearSets(ctx, { { id = 3, name = "Ret" } })
+      assert.are.equal("Gear: Tank", dbGearSets[3].older, "kept through a rename")
+      categories:ForgetGearSets(ctx, { 3 })
+      assert.is_nil(dbEphemeralCategories["Gear: Tank"])
+      categories:SyncGearSets(ctx, { { id = 3, name = "Tank" } })
+      assert.is_nil(categories:GetCategoryByName("Gear: Tank").color)
+      assert.is_nil(dbGearSets[3].older, "nothing to copy")
+    end)
+
+    it("keeps the older entry a set copied when another category now has its name", function()
+      dbEphemeralCategories["Gear: Tank"] = { name = "Gear: Tank", enabled = { [0] = true }, itemList = {}, dynamic = true }
+      categories:SyncGearSets(ctx, { { id = 3, name = "Tank" } })
+      categories:SyncGearSets(ctx, { { id = 3, name = "Ret" } })
+      categories:CreateCategory(ctx, { name = "Gear: Tank", itemList = {} })
+      categories:ForgetGearSets(ctx, { 3 })
+      assert.is_not_nil(dbEphemeralCategories["Gear: Tank"], "the plugin's now")
+    end)
+
+    -- Found by the bug review: another gear set holding the name of the entry a set copied kept that entry when the set
+    -- was deleted (and only in one order of deletion), though a gear set's category never reads the entry of its name.
+    it("deletes the older entry a set copied when another gear set has taken its name", function()
+      dbEphemeralCategories["Gear: Tank"] = { name = "Gear: Tank", enabled = { [0] = true }, itemList = {}, dynamic = true,
+        color = { 0, 1, 0 } }
+      categories:SyncGearSets(ctx, { { id = 3, name = "Tank" }, { id = 5, name = "Heal" } })
+      categories:SyncGearSets(ctx, { { id = 3, name = "Ret" }, { id = 5, name = "Tank" } })
+      assert.are.equal(5, categories:GetCategoryByName("Gear: Tank").gearSet)
+      categories:ForgetGearSets(ctx, { 3, 5 })
+      assert.is_nil(dbEphemeralCategories["Gear: Tank"])
+      categories:SyncGearSets(ctx, { { id = 3, name = "Tank" } })
+      assert.is_nil(categories:GetCategoryByName("Gear: Tank").color, "made again, fresh")
+    end)
+
+    -- Asked (option 2, "we just watch the event"): a set this character deletes is forgotten, so a set the client later
+    -- gives its ID (Forever reuses a freed ID) starts fresh.
+    it("forgets what was saved for a set this character deleted, its pins and tabs too", function()
+      categories:SyncGearSets(ctx, { { id = 0, name = "first" }, { id = 1, name = "second" } })
+      categories:UpdateCategory(ctx, "Gear: first", { color = { 1, 0, 0 } })
+      sent = {}
+      local before = categories:GetGeneration()
+      categories:ForgetGearSets(ctx, { 0 })
+      assert.is_true(categories:GetGeneration() > before)
+      assert.are.same({ { "categories/Changed" } }, sent)
+      assert.are.same({ "Gear: first" }, deleted, "the record and its pins and tabs")
+      assert.is_nil(dbGearSets[0])
+      assert.is_nil(categories:GetCategoryByName("Gear: first"))
+      assert.is_false(categories:IsGearSet("Gear: first"))
+      assert.is_not_nil(categories:GetCategoryByName("Gear: second"))
+      categories:SyncGearSets(ctx, { { id = 1, name = "second" }, { id = 0, name = "new fourth after" } })
+      local fresh = categories:GetCategoryByName("Gear: new fourth after")
+      assert.is_nil(fresh.color)
+      assert.are.equal("Gear: new fourth after", categories:GetOrder()[1], "on top, as a new one")
+      assert.are.same({}, renamed, "not taken for a rename")
+    end)
+
+    -- Asked: a set another character has, or one gone without the event, is skipped, never deleted.
+    it("keeps, untouched, what was saved for a set this character does not have", function()
+      dbGearSets[7] = { name = "Gear: Alt", color = { 0, 0, 1 }, priority = 4, enabled = { [0] = true } }
+      categories:SyncGearSets(ctx, { { id = 3, name = "Tank" } })
+      assert.is_nil(categories:GetCategoryByName("Gear: Alt"))
+      assert.are.same({ name = "Gear: Alt", color = { 0, 0, 1 }, priority = 4, enabled = { [0] = true } }, dbGearSets[7])
+      categories:SyncGearSets(ctx, {})
+      assert.is_nil(categories:GetCategoryByName("Gear: Tank"), "a set no longer listed leaves the list")
+      assert.is_not_nil(dbGearSets[3], "without the event it is kept")
+      assert.are.same({}, deleted)
+    end)
+
+    -- Profiles saved by older versions (test.lua: "Gear: Tank", "Gear: Ret", dynamic, no place), and by the build before
+    -- this one, hold gear sets' saved state by name (asked: copy it "the first time the set has no record ... After that
+    -- leave those entries alone: not loaded, not deleted").
+    it("copies what an older version saved by name into a set's record once, leaving it alone", function()
+      dbCategories["Armor"] = { name = "Armor", save = true, priority = 3, itemList = {},
+        enabled = { [0] = true, [1] = true, [2] = true }, searchCategory = { query = "type = armor" } }
+      dbEphemeralCategories["Gear: Tank"] = { name = "Gear: Tank", enabled = { [0] = true, [1] = false }, itemList = {},
+        dynamic = true, color = { 0, 1, 0 }, ignoredItems = { [5] = true } }
+      dbEphemeralCategories["Gear: Pvp"] = { name = "Gear: Pvp", enabled = { [0] = true }, itemList = {}, priority = 20 }
+      dbEphemeralCategories["Gear: Ret"] = { name = "Gear: Ret", enabled = { [0] = true }, itemList = {}, dynamic = true }
+      categories:OnEnable()
+      assert.is_nil(categories:GetCategoryByName("Gear: Tank"), "not loaded at login")
+      assert.is_nil(categories:GetCategoryByName("Gear: Ret"))
+      categories:SyncGearSets(ctx, { { id = 1, name = "Tank" }, { id = 4, name = "Pvp" } })
+      local tank = categories:GetCategoryByName("Gear: Tank")
+      assert.are.same({ 0, 1, 0 }, tank.color)
+      assert.are.same({ [0] = true, [1] = false }, tank.enabled)
+      assert.are.same({ [5] = true }, tank.ignoredItems)
+      assert.are.same({ "Gear: Tank", "Armor", "Gear: Pvp" }, categories:GetOrder(), "on top unless it had a place")
+      assert.are.same({ 0, 1, 0 }, dbGearSets[1].color, "copied into the record")
+      categories:UpdateCategory(ctx, "Gear: Tank", { color = { 1, 1, 1 }, enabled = { [1] = true } })
+      local old = dbEphemeralCategories["Gear: Tank"]
+      assert.are.same({ 0, 1, 0 }, old.color, "left alone")
+      assert.are.same({ [0] = true, [1] = false }, old.enabled)
+      assert.is_true(old.dynamic)
+      assert.is_not_nil(dbEphemeralCategories["Gear: Ret"], "not deleted")
+      categories:Init()
+      dbEphemeralCategories["Gear: Tank"].color = { 0, 0, 1 }
+      categories:SyncGearSets(ctx, { { id = 1, name = "Tank" } })
+      assert.are.same({ 1, 1, 1 }, categories:GetCategoryByName("Gear: Tank").color, "copied once")
+    end)
+
+    it("still loads a category's group by sections named like a gear set", function()
+      dbEphemeralCategories["Gear: BoE - Plate"] = { name = "Gear: BoE - Plate", enabled = { [0] = true }, itemList = {},
+        dynamic = true, isGroupBySubcategory = true, groupByParent = "Gear: BoE" }
+      categories:OnEnable()
+      assert.is_false(categories:SyncGearSets(ctx, {}))
+      assert.is_not_nil(categories:GetCategoryByName("Gear: BoE - Plate"))
+    end)
+
+    it("makes none for a set another category is named after", function()
+      categories:CreateCategory(ctx, { name = "Gear: Tank", itemList = {}, save = true })
+      assert.is_false(categories:SyncGearSets(ctx, { { id = 3, name = "Tank" } }))
+      assert.is_false(categories:IsGearSet("Gear: Tank"))
+      assert.is_true(categories:GetCategoryByName("Gear: Tank").save)
+      assert.is_nil(dbGearSets[3])
+    end)
+
+    it("leaves a set renamed onto another category's name without one, its record as it was", function()
+      categories:SyncGearSets(ctx, { { id = 3, name = "Tank" } })
+      categories:CreateCategory(ctx, { name = "Gear: Mine", itemList = {}, save = true })
+      categories:SyncGearSets(ctx, { { id = 3, name = "Mine" } })
+      assert.is_nil(categories:GetCategoryByName("Gear: Tank"))
+      assert.is_true(categories:GetCategoryByName("Gear: Mine").save, "yours")
+      assert.are.same({}, renamed)
+      assert.are.equal("Gear: Tank", dbGearSets[3].name)
+    end)
+
+    -- Two characters of the profile whose sets have each other's names under their IDs: each name is another set's too,
+    -- so its pins and tabs stay with the name (asked: a rename moves them only when no other set's saved settings use
+    -- either name; "messy, but do it").
+    it("renames sets that take each other's names together, their pins and tabs staying with the names", function()
+      dbGearSets[0] = { name = "Gear: Tank", enabled = { [0] = true }, priority = 1 }
+      dbGearSets[1] = { name = "Gear: Heal", enabled = { [0] = true }, priority = 2 }
+      categories:SyncGearSets(ctx, { { id = 0, name = "Heal" }, { id = 1, name = "Tank" } })
+      assert.are.equal(1, #batches, "in one go")
+      table.sort(batches[1], function(a, b) return a[1] < b[1] end)
+      assert.are.same({ { "Gear: Heal", "Gear: Tank", false }, { "Gear: Tank", "Gear: Heal", false } }, batches[1])
+      assert.are.equal(0, categories:GetCategoryByName("Gear: Heal").gearSet)
+      assert.are.equal(1, categories:GetCategoryByName("Gear: Tank").gearSet)
+    end)
+
+    it("swaps two sets' names in memory in one sweep", function()
+      categories:SyncGearSets(ctx, { { id = 0, name = "Tank" }, { id = 1, name = "Heal" } })
+      categories:UpdateCategory(ctx, "Gear: Tank", { color = { 1, 0, 0 } })
+      sent = {}
+      categories:SyncGearSets(ctx, { { id = 0, name = "Heal" }, { id = 1, name = "Tank" } })
+      assert.are.same({ 1, 0, 0 }, categories:GetCategoryByName("Gear: Heal").color, "set 0's settings")
+      assert.are.equal(1, categories:GetCategoryByName("Gear: Tank").gearSet)
+      assert.are.equal(1, #batches)
+      table.sort(batches[1], function(a, b) return a[1] < b[1] end)
+      assert.are.same({ { "Gear: Heal", "Gear: Tank", false }, { "Gear: Tank", "Gear: Heal", false } }, batches[1],
+        "each name a set leaves free for the other, its pins and tabs staying with the name")
+      assert.are.equal("Gear: Heal", categories:GetCategoryByName("Gear: Heal").name)
+      assert.are.equal("Gear: Tank", categories:GetCategoryByName("Gear: Tank").name)
+    end)
+
+    -- Asked: a rename moves pins and tabs only when no other set's saved settings use either name ("messy, but do it").
+    -- A: set 0 "DPS", set 1 "Tank"; B, on the same profile: set 0 "Tank". Moving them on each login, B's rename wrote
+    -- set 0's pin over A's Tank's, and A's took it away again.
+    it("leaves pins and tabs with the name when another set's saved settings use the old or the new one", function()
+      dbGearSets[0] = { name = "Gear: DPS", enabled = { [0] = true }, priority = 1 }
+      dbGearSets[1] = { name = "Gear: Tank", enabled = { [0] = true }, priority = 2 }
+      categories:SyncGearSets(ctx, { { id = 0, name = "Tank" } })
+      assert.are.same({ { { "Gear: DPS", "Gear: Tank", false } } }, batches, "B: the new name is set 1's")
+      categories:Init()
+      batches = {}
+      categories:SyncGearSets(ctx, { { id = 0, name = "DPS" }, { id = 1, name = "Tank" } })
+      assert.are.same({ { { "Gear: Tank", "Gear: DPS", false } } }, batches, "A: the old name is set 1's")
+      categories:Init()
+      batches = {}
+      dbGearSets[2] = { name = "Gear: Solo", enabled = { [0] = true }, priority = 3 }
+      categories:SyncGearSets(ctx, { { id = 2, name = "Duo" } })
+      assert.are.same({ { { "Gear: Solo", "Gear: Duo", true } } }, batches, "no other set's: they move")
+    end)
+
+    -- A chain across two characters (A: "A", "B"; B: "B", "C"): one set takes the name another leaves. Checked only as
+    -- the records were, a pin was stranded under a name no set has.
+    it("leaves pins and tabs with the names in a chain, checking the names the sets will have", function()
+      dbGearSets[0] = { name = "Gear: A", enabled = { [0] = true }, priority = 1 }
+      dbGearSets[1] = { name = "Gear: B", enabled = { [0] = true }, priority = 2 }
+      categories:SyncGearSets(ctx, { { id = 0, name = "B" }, { id = 1, name = "C" } })
+      table.sort(batches[1], function(a, b) return a[1] < b[1] end)
+      assert.are.same({ { "Gear: A", "Gear: B", false }, { "Gear: B", "Gear: C", false } }, batches[1])
+    end)
+
+    it("leaves a deleted set's pins and tabs with its name when another set's saved settings use it", function()
+      dbGearSets[1] = { name = "Gear: Tank", enabled = { [0] = true }, priority = 2 }
+      dbGearSets[0] = { name = "Gear: Tank", enabled = { [0] = true }, priority = 1 }
+      categories:SyncGearSets(ctx, { { id = 0, name = "Tank" } })
+      categories:ForgetGearSets(ctx, { 0 })
+      assert.are.same({ false }, deletedBags, "set 1's name too")
+      dbGearSets[4] = { name = "Gear: Solo", enabled = { [0] = true }, priority = 3 }
+      categories:SyncGearSets(ctx, { { id = 4, name = "Solo" } })
+      categories:ForgetGearSets(ctx, { 4 })
+      assert.are.same({ false, true }, deletedBags)
+    end)
+
+    -- Found by the second bug review: no test had another category in memory holding a record's old name.
+    it("leaves the pins and tabs of a plugin's category of the record's name alone", function()
+      dbGearSets[3] = { name = "Gear: Old", enabled = { [0] = true }, priority = 1 }
+      categories:CreateCategory(ctx, { name = "Gear: Old", itemList = {} })
+      categories:SyncGearSets(ctx, { { id = 3, name = "New" } })
+      assert.are.same({ { { "Gear: Old", "Gear: New", false } } }, batches)
+    end)
+
+    -- Found by the bug review: what each bag saved under a record's name is the set's only while no other category has
+    -- the name (a category of yours made since, on another character of the profile).
+    it("leaves the pins and tabs of another category of the record's name alone, deleted or renamed", function()
+      dbGearSets[3] = { name = "Gear: Tank", enabled = { [0] = true }, priority = 1 }
+      categories:CreateCategory(ctx, { name = "Gear: Tank", itemList = {}, save = true })
+      categories:SyncGearSets(ctx, { { id = 3, name = "Prot" } })
+      assert.are.same({ { { "Gear: Tank", "Gear: Prot", false } } }, batches, "renamed, the bags' settings yours")
+      dbGearSets[4] = { name = "Gear: Mine", enabled = { [0] = true }, priority = 2 }
+      categories:CreateCategory(ctx, { name = "Gear: Mine", itemList = {}, save = true })
+      categories:ForgetGearSets(ctx, { 4 })
+      assert.are.same({ false }, deletedBags, "deleted, the bags' settings yours")
+      categories:SyncGearSets(ctx, { { id = 3, name = "Prot" } })
+      categories:ForgetGearSets(ctx, { 3 })
+      assert.are.same({ false, true }, deletedBags, "the set's own")
+    end)
+
+    -- Found by the bug review: no test covered a gear set's category taken out of memory another way.
+    it("makes a set's category again when it was deleted another way", function()
+      categories:SyncGearSets(ctx, { { id = 3, name = "Tank" } })
+      categories:UpdateCategory(ctx, "Gear: Tank", { color = { 1, 0, 0 } })
+      categories:DeleteCategory(ctx, "Gear: Tank")
+      assert.is_nil(categories:GetCategoryByName("Gear: Tank"))
+      assert.is_true(categories:SyncGearSets(ctx, { { id = 3, name = "Tank" } }))
+      assert.are.same({ 1, 0, 0 }, categories:GetCategoryByName("Gear: Tank").color, "from its record")
+    end)
+
+    -- Found by the bug review: plugins' older calls read and saved a category's bags as a plugin's.
+    it("answers and saves a gear set's bags through the older plugin calls, the older entry left alone", function()
+      dbEphemeralCategories["Gear: Tank"] = { name = "Gear: Tank", enabled = { [0] = true, [1] = true }, itemList = {} }
+      categories:SyncGearSets(ctx, { { id = 3, name = "Tank" } })
+      assert.is_true(categories:IsCategoryEnabled(1, "Gear: Tank"))
+      categories:DisableCategory(1, "Gear: Tank")
+      assert.is_false(categories:IsCategoryEnabled(1, "Gear: Tank"))
+      assert.is_false(dbGearSets[3].enabled[1])
+      categories:ToggleCategory(1, "Gear: Tank")
+      categories:EnableCategory(0, "Gear: Tank")
+      categories:SetCategoryState(2, "Gear: Tank", false)
+      assert.are.same({ [0] = true, [1] = true, [2] = false }, dbGearSets[3].enabled)
+      assert.are.same({ [0] = true, [1] = true }, dbEphemeralCategories["Gear: Tank"].enabled, "left alone")
+    end)
+
+    -- Asked: "so long as we can't rename the category in BetterBags".
+    it("cannot be renamed in BetterBags", function()
+      categories:SyncGearSets(ctx, { { id = 3, name = "Tank" } })
+      assert.is_false(categories:RenameCategory(ctx, "Gear: Tank", "Tanky"))
+      assert.is_not_nil(categories:GetCategoryByName("Gear: Tank"))
+      assert.is_nil(categories:GetCategoryByName("Tanky"))
+    end)
+
+    it("takes nothing dropped on its header, unless the item lands there anyway", function()
+      categories:CreateCategory(ctx, { name = "Mats", itemList = {}, save = true })
+      categories:AddPermanentItemToCategory(ctx, 101, "Mats")
+      categories:SyncGearSets(ctx, { { id = 3, name = "Tank" } })
+      assert.are.equal("gear set", categories:FileItem(ctx, 102, "Gear: Tank", "Junk"))
+      assert.is_nil(dbCategories["Gear: Tank"], "no category of yours made in its name")
+      assert.are.equal("Mats", database:GetItemCategoryByItemID(101).name)
+      assert.are.equal("natural", categories:FileItem(ctx, 101, "Gear: Tank", "Gear: Tank"))
+      assert.is_nil(database:GetItemCategoryByItemID(101).name, "back to its set")
+    end)
+  end)
 end)
