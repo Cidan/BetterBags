@@ -829,6 +829,21 @@ describe("NextDropdown", function()
     assert.are.same({ 20, 20 }, { d.chevron:GetSize() })
   end)
 
+  -- ElvUI draws a dropdown's arrow with its up arrow turned down (Modules/Skins/Skins.lua, HandleDropDownBox): a
+  -- chevron's TexCoords crop or flip its art, a state's own art its own.
+  it("draws its chevron's art in its TexCoords, a state's own art in its own", function()
+    UseNextTheme({ Controls = { Dropdown = { Chevron = { Texture = "Interface\\Spec\\ArrowUp", TexCoords = { 0, 1, 1, 0 },
+      Color = "White", Size = 14, Hover = { Texture = "Interface\\Spec\\ArrowLit" } } } } })
+    local d = make()
+    assert.are.equal("Interface\\Spec\\ArrowUp", d.chevron:GetTexture())
+    assert.are.same({ 0, 1, 1, 0 }, d.chevron._texCoords)
+    d.frame:GetScript("OnEnter")(d.frame)
+    assert.are.equal("Interface\\Spec\\ArrowLit", d.chevron:GetTexture())
+    assert.are.same({ 0, 1, 0, 1 }, d.chevron._texCoords, "its own art, uncropped")
+    d.frame:GetScript("OnLeave")(d.frame)
+    assert.are.same({ 0, 1, 1, 0 }, d.chevron._texCoords)
+  end)
+
   it("draws its fill past it where its theme says", function()
     UseNextTheme({ Controls = { Dropdown = { Fill = { Atlas = "common-dropdown-classic-textholder", Color = "White", Alpha = 1,
       Inset = { Left = -9, Top = -8, Right = -8, Bottom = -9 } } } } })

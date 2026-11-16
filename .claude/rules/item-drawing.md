@@ -38,6 +38,8 @@ While Blizzard backported the `ContainerFrameItemButtonTemplate` XML to Classic/
   ```lua
   if decoration.UpdateQuestItem then decoration:UpdateQuestItem(false, nil, nil) end
   ```
+  A free or reset slot then calls `SonataElements:DrawItemQuest(decoration, nil)`, so a theme's quest art comes off
+  where the guard does nothing (sonata.md §3a).
 - **Texture Setting:** Classic does not have `decoration:SetItemButtonTexture(tex)`. You must fallback to the global function:
   ```lua
   if decoration.SetItemButtonTexture then

@@ -42,7 +42,7 @@ local DEFAULT_WIDTH = 200
 ---@class (exact) NextInputOptions
 ---@field text? string
 ---@field help? string Shown while it is empty and not focused.
----@field width? number
+---@field width? number|fun(): number A function is read again every time it restyles (a width a theme gives).
 ---@field numeric? boolean Digits only (EditBox:SetNumeric).
 ---@field maxLetters? number
 ---@field onChange? fun(ctx: Context, text: string, userInput: boolean)
@@ -100,7 +100,7 @@ function nextInput:Create(parent, opts)
   opts = opts or {}
   local frame = CreateFrame("EditBox", nil, parent)
   frame:SetAutoFocus(false)
-  pixel:Width(frame, opts.width or DEFAULT_WIDTH)
+  pixel:Width(frame, type(opts.width) == "function" and opts.width() or opts.width or DEFAULT_WIDTH)
   if opts.numeric then
     frame:SetNumeric(true)
   end
@@ -151,7 +151,7 @@ function inputProto:Style()
   local I = controls:Theme("Input")
   local frame = self.frame
   pixel:Height(frame, I.Height)
-  pixel:Width(frame, frame:GetWidth())
+  pixel:Width(frame, type(self.opts.width) == "function" and self.opts.width() or frame:GetWidth())
   -- Its text and help start after its icon, when it has one: it lays out its own room for it, so no
   -- restyle of another widget can put its text over the icon.
   local pad = pixel:Length(frame, I.Padding)

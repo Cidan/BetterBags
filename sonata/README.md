@@ -80,6 +80,23 @@ A string that is exactly `"$Name"` becomes a copy of the variable. Functions run
 theme is applied, so a theme can follow another addon's settings (the ElvUI theme reads ElvUI's
 colors and textures this way). A child theme can override a parent's variables.
 
+A variable can also **name** another addon's value instead of computing it: a reference,
+`{ Global, Path, Fallback, Alpha, Map, Scale, Add }`. It is read every time the theme resolves, raw
+(nothing of the other addon runs), and the `Fallback` is used while the value is not there or is another
+kind (a color comes back as `{ r, g, b, a }`; a number times `Scale` plus `Add`). A `Path` key that is
+`"$Name"` is another variable's value, so one reference can read what another names. BetterBags Next's themes, which cannot hold functions, follow
+another addon this way, and may `Watch` that addon's methods to be drawn again when it changes them
+(the ElvUI Next theme, `themes/next/elvui.lua`):
+
+```lua
+Variables = {
+  Border = { Global = "ElvUI", Path = { 1, "media", "bordercolor" }, Fallback = { 0, 0, 0, 1 }, Alpha = 1 },
+},
+Watch = { { Global = "ElvUI", Path = { 1 }, Method = "UpdateMedia" } }, -- BetterBags Next themes only
+```
+
+The rules are in `.claude/rules/next-themes-references.md`.
+
 ### Per-client overrides
 
 `Clients` holds partial themes merged on top on some clients, general before specific:
@@ -149,7 +166,7 @@ bag.
 
 | Kind | Element | Style keys |
 |---|---|---|
-| `ItemButton` | every item button | `Icon` (`Inset`, `TexCoords`), `Highlight`, `Pushed`, `Backdrop` (`Color`, `Inset`, `BorderColor`, `EdgeSize`, `BorderInset`), `QualityBorder = "Backdrop"` (draw item quality on the backdrop's edge), `QualityColors` (`{ [quality] = color }`), `UpgradeIcon` (`Atlas` or `Texture`, `Scale`), `Count` (`Font`, `Points`), `ItemLevel` (`Font`), `Countdown` (`Font`, `Locales`), `EmptySlot`, `FamilyIcon` (`Color`: a specialized bag's glyph in its empty slots, white art drawn in this color at its alpha; white at 0.4 when left out, so a theme with light empty slots sets a dark one), `QuestIcon`, `QuestStarterIcon`, `QuestBorderColor`. A `Count` or `ItemLevel` font with a `Path` is drawn through a font object made for it, so the next theme's font replaces it whole; one naming no `Object` starts from `NumberFontNormal` |
+| `ItemButton` | every item button | `Icon` (`Inset`, `TexCoords`; an `Inset` of `"Edge"` puts it just inside the backdrop's border and every outline inside it, from the same rounded lines, as a `Highlight` or `Pushed` inset `"Edge"` is), `Highlight`, `Pushed`, `Backdrop` (`Color`, `Inset`, `BorderColor`, `EdgeSize`, `BorderInset`, `Outlines` as a window backdrop's), `QualityBorder = "Backdrop"` (draw item quality on the backdrop's edge), `QualityColors` (`{ [quality] = color }`), `UpgradeIcon` (`Atlas` or `Texture`, `Scale`), `Count` (`Font`, `Points`), `ItemLevel` (`Font`), `Countdown` (`Font`, `Locales`), `EmptySlot`, `FamilyIcon` (`Color`: a specialized bag's glyph in its empty slots, white art drawn in this color at its alpha; white at 0.4 when left out, so a theme with light empty slots sets a dark one), `QuestIcon`, `QuestStarterIcon`, `QuestBorderColor`, `QuestActiveBorderColor` (its quest active), `QuestStarterBorderColor` (it starts one not yet taken). A `Count` or `ItemLevel` font with a `Path` is drawn through a font object made for it, so the next theme's font replaces it whole; one naming no `Object` starts from `NumberFontNormal` |
 | `Tab` | the tabs below a bag | `Art = "Flat"` (hide Blizzard's tab art) with `Background`, `Border`, `Hover`, `Selected = { Background, Bar, Border }` (`Bar` with `Height` and `Points`; `Border = { Color }` while selected); `Height`, `Font`, `HighlightFont`, `SelectedFont`, `TextOffset`, `SelectedTextOffset` |
 | `SectionHeader` | section titles | `Font` |
 | `SearchBox` | the in-bag search box | `Strip` (hide its art), `HideCaps`, `Middle` (texture spec, `Points`, `Height`), `SearchIcon` (texture spec and `Points`, `Width`, `Height`; `false` hides it), `ClearButton = { Icon }`, `Background`, `Border`, `Font`, `Instructions`, `InstructionsPoints`, `TextInsets` |

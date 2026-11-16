@@ -62,8 +62,8 @@ function resolve.IsList(value)
   return type(value) == "table" and value[1] ~= nil
 end
 
--- Merge folds from into into. Tables merge key by key, lists replace, and false replacing a table
--- removes it (a theme turns off something it inherited).
+-- Merge folds from into into. Tables merge key by key, lists and references (one value each) replace, and false
+-- replacing a table removes it (a theme turns off something it inherited).
 ---@param into table
 ---@param from table
 function resolve.Merge(into, from)
@@ -72,7 +72,7 @@ function resolve.Merge(into, from)
     local existing = into[k]
     if v == false and type(existing) == "table" then
       into[k] = nil
-    elseif type(v) == "table" and not isList(v) and not isObject(v)
+    elseif type(v) == "table" and not isList(v) and not isObject(v) and not resolve.IsReference(v)
       and type(existing) == "table" and not isList(existing) and not isObject(existing) then
       resolve.Merge(existing, v)
     else
@@ -94,6 +94,16 @@ function resolve.StyleOf(theme)
   return style
 end
 
+-- VariableName returns the name a whole-string "$Name" names (spaces around it allowed), or nil.
+---@param value any
+---@return string?
+function resolve.VariableName(value)
+  if type(value) ~= "string" then
+    return nil
+  end
+  return value:match("^%s*%$([%a_][%w_]*)%s*$")
+end
+
 -- Substitute replaces every "$Name" string in value (a whole string, spaces around the name
 -- allowed) with a copy of lookup(name).
 ---@param value any
@@ -101,7 +111,7 @@ end
 ---@return any
 function resolve.Substitute(value, lookup)
   if type(value) == "string" then
-    local name = value:match("^%s*%$([%a_][%w_]*)%s*$")
+    local name = resolve.VariableName(value)
     if name then
       return resolve.DeepCopy(lookup(name))
     end
@@ -115,8 +125,163 @@ function resolve.Substitute(value, lookup)
   return value
 end
 
--- ResolveVariables evaluates a theme's variables: functions are called, and variables that refer
--- to other variables are filled in.
+-- IsReference says whether a variable names a value in another addon's tables ({ Global, Path, Fallback, Alpha, Map }:
+-- next-themes-references.md §2a), read when the theme resolves (ReadReference): a table with a Global and a Fallback. A
+-- theme stays data: nothing of the addon is called. A Global without a Fallback is data, as it always was (a client
+-- color a palette names, next/style.lua).
+---@param value any
+---@return boolean
+function resolve.IsReference(value)
+  return type(value) == "table" and not resolve.IsObject(value) and value.Global ~= nil and value.Fallback ~= nil
+end
+
+-- ReferenceProblem returns what is wrong with a reference, or nil: Global names a global, Path is a list of keys
+-- (strings or numbers), Alpha a number and Map a table when given.
+---@param ref table
+---@return string?
+function resolve.ReferenceProblem(ref)
+  if type(ref.Global) ~= "string" or ref.Global == "" then
+    return "Global names a global"
+  end
+  if ref.Path ~= nil then
+    if type(ref.Path) ~= "table" then
+      return "Path is a list of keys"
+    end
+    for _, key in ipairs(ref.Path) do
+      if type(key) ~= "string" and type(key) ~= "number" then
+        return "Path is a list of keys"
+      end
+    end
+  end
+  if ref.Alpha ~= nil and type(ref.Alpha) ~= "number" then
+    return "Alpha is a number"
+  end
+  if ref.Map ~= nil and type(ref.Map) ~= "table" then
+    return "Map is a table"
+  end
+  if ref.Scale ~= nil and type(ref.Scale) ~= "number" then
+    return "Scale is a number"
+  end
+  if ref.Add ~= nil and type(ref.Add) ~= "number" then
+    return "Add is a number"
+  end
+  return nil
+end
+
+-- ResolvePath returns a reference whose Path keys that name a variable ("$Name") are that variable's value (lookup): a
+-- string or a number is the key, anything else a key that reads nothing (the Fallback drawn). The reference is
+-- returned as it is when no key names one.
+---@param ref table
+---@param lookup fun(name: string): any
+---@return table
+function resolve.ResolvePath(ref, lookup)
+  local path, changed = {}, false
+  for i, key in ipairs(ref.Path or {}) do
+    local name = resolve.VariableName(key)
+    if name ~= nil then
+      local value = lookup(name)
+      if type(value) ~= "string" and type(value) ~= "number" then
+        value = {}
+      end
+      path[i] = value
+      changed = true
+    else
+      path[i] = key
+    end
+  end
+  if not changed then
+    return ref
+  end
+  local copy = {}
+  for k, v in pairs(ref) do
+    copy[k] = v
+  end
+  copy.Path = path
+  return copy
+end
+
+-- Walk returns the value at path under the global named name, reading every table raw (no metamethod runs), or nil
+-- where a key is missing or a value on the way is not a table.
+---@param name string
+---@param path? (string|number)[]
+---@return any
+function resolve.Walk(name, path)
+  local value = rawget(_G, name)
+  for _, key in ipairs(path or {}) do
+    if type(value) ~= "table" then
+      return nil
+    end
+    value = rawget(value, key)
+  end
+  return value
+end
+
+-- isColor says whether a table is a color the way ElvUI and Blizzard keep them: numbers at r, g and b.
+---@param value any
+---@return boolean
+local function isColor(value)
+  return type(value) == "table" and type(rawget(value, "r")) == "number" and type(rawget(value, "g")) == "number"
+    and type(rawget(value, "b")) == "number"
+end
+
+-- ReadReference reads a reference: the value at its Path (Walk). A value Map names is mapped to what Map says, the
+-- theme's own data, taken as it is (a list of tables, false, anything). Any other value is taken when it is the
+-- Fallback's kind, else the Fallback: a Fallback of three or four numbers takes a color (r, g, b and a, read as
+-- { r, g, b, a }, opaque without an a) or a list of as many numbers; any other list of numbers a list of as many; a
+-- string, a number or a boolean the same kind; false any string, number or boolean. Alpha replaces a color's alpha (a
+-- list of numbers), the fallback's too; a number is read times Scale plus Add, the fallback too. What is read is a
+-- copy. It also returns whether the value was taken. A path key naming a variable must be resolved first (ResolvePath).
+---@param ref table
+---@return any value, boolean read
+function resolve.ReadReference(ref)
+  local value = resolve.Walk(ref.Global, ref.Path)
+  local mapped
+  if ref.Map ~= nil and value ~= nil then
+    mapped = ref.Map[value]
+  end
+  local fallback = ref.Fallback
+  local read
+  if mapped ~= nil then
+    read = resolve.DeepCopy(mapped)
+  elseif type(fallback) == "table" then
+    local n = #fallback
+    if (n == 3 or n == 4) and isColor(value) then
+      local a = rawget(value, "a")
+      read = { rawget(value, "r"), rawget(value, "g"), rawget(value, "b"), type(a) == "number" and a or 1 }
+    elseif type(value) == "table" then
+      read = {}
+      for i = 1, n do
+        local v = rawget(value, i)
+        if type(v) ~= "number" then
+          read = nil
+          break
+        end
+        read[i] = v
+      end
+    end
+  elseif fallback == false then
+    local kind = type(value)
+    if kind == "string" or kind == "number" or kind == "boolean" then
+      read = value
+    end
+  elseif type(value) == type(fallback) then
+    read = value
+  end
+  local taken = read ~= nil
+  if not taken then
+    read = resolve.DeepCopy(fallback)
+  end
+  if ref.Alpha ~= nil and type(read) == "table" and #read >= 3 and type(read[1]) == "number" then
+    read[4] = ref.Alpha
+  end
+  if type(read) == "number" and (ref.Scale ~= nil or ref.Add ~= nil) then
+    read = read * (ref.Scale or 1) + (ref.Add or 0)
+  end
+  return read, taken
+end
+
+-- ResolveVariables evaluates a theme's variables: functions are called, references read (ReadReference), and variables
+-- that refer to other variables are filled in.
 ---@param raw table<string, any>
 ---@return table<string, any> vars, fun(name: string): any lookup
 function resolve.ResolveVariables(raw)
@@ -140,7 +305,12 @@ function resolve.ResolveVariables(raw)
         error("theme variable $" .. name .. " returned nothing")
       end
     end
-    value = resolve.Substitute(resolve.DeepCopy(value), lookup)
+    -- What another addon holds is its own: read, never filled in. A path key naming a variable is read first.
+    if resolve.IsReference(value) then
+      value = resolve.ReadReference(resolve.ResolvePath(value, lookup))
+    else
+      value = resolve.Substitute(resolve.DeepCopy(value), lookup)
+    end
     vars[name] = value
     state[name] = "done"
     return value

@@ -440,6 +440,240 @@ describe("SonataNext", function()
     end)
   end)
 
+  -- Asked (issue #1326): an ElvUI theme for BetterBags Next that keeps the player's ElvUI colors, nothing of ElvUI's
+  -- called (docs/next-elvui-theme.md). A variable names a value in another addon's tables, read when the theme
+  -- resolves, the fallback drawn when it is not there.
+  describe("references to another addon's values", function()
+    local savedAddon
+
+    before_each(function()
+      savedAddon = rawget(_G, "SpecAddon")
+      _G.SpecAddon = { {
+        media = {
+          -- ElvUI's colors hold r, g, b, a and [1] to [4] (E:VerifyColorTable).
+          border = { r = 0.2, g = 0.3, b = 0.4, a = 0.5, 0.2, 0.3, 0.4, 0.5 },
+          -- A ColorMixin without an alpha.
+          plain = { r = 0.6, g = 0.7, b = 0.8 },
+          font = "Interface\\AddOns\\SpecAddon\\font.ttf",
+          size = 14,
+          pixel = true,
+          style = "SHADOWOUTLINE",
+        },
+        crop = { 0.08, 0.92, 0.08, 0.92 },
+      } }
+    end)
+
+    after_each(function()
+      _G.SpecAddon = savedAddon
+    end)
+
+    local function ref(path, fallback, extra)
+      local r = { Global = "SpecAddon", Path = path, Fallback = fallback }
+      for k, v in pairs(extra or {}) do r[k] = v end
+      return r
+    end
+
+    it("reads a color, a list of numbers, a string, a number and a boolean by path when the theme resolves", function()
+      sonataNext:RegisterTheme({ Name = "Elvish", Variables = {
+        Border = ref({ 1, "media", "border" }, { 0, 0, 0, 1 }),
+        Plain = ref({ 1, "media", "plain" }, { 0, 0, 0, 1 }),
+        Crop = ref({ 1, "crop" }, { 0, 1, 0, 1 }),
+        Font = ref({ 1, "media", "font" }, false),
+        Size = ref({ 1, "media", "size" }, 12),
+        Pixel = ref({ 1, "media", "pixel" }, false),
+      }, Palette = { Border = "$Border", Plain = "$Plain" }, Fonts = { Title = { File = "$Font", Size = "$Size" } } })
+      local t = sonataNext:Resolve("Elvish")
+      assert.are.same({ 0.2, 0.3, 0.4, 0.5 }, t.Palette.Border)
+      assert.are.same({ 0.6, 0.7, 0.8, 1 }, t.Palette.Plain, "a color without an alpha is opaque")
+      assert.are.same({ 0.08, 0.92, 0.08, 0.92 }, t.Variables.Crop)
+      assert.are.equal("Interface\\AddOns\\SpecAddon\\font.ttf", t.Fonts.Title.File)
+      assert.are.equal(14, t.Fonts.Title.Size)
+      assert.is_true(t.Variables.Pixel)
+    end)
+
+    -- ElvUI's font size drives every role's size, each keeping its difference from ElvUI's 12, and the rows around the
+    -- text grow with it (next-themes-elvui.md §27): a number read is read times Scale, plus Add, the fallback too.
+    it("reads a number times its Scale plus its Add, the fallback too, and leaves anything else as it is", function()
+      sonataNext:RegisterTheme({ Name = "Elvish", Variables = {
+        Title = ref({ 1, "media", "size" }, 12, { Add = 4 }),
+        Rows = ref({ 1, "media", "size" }, 12, { Scale = 2, Add = 52 }),
+        Gone = ref({ 1, "media", "nope" }, 12, { Add = -2 }),
+        Mapped = ref({ 1, "media", "style" }, 1, { Map = { SHADOWOUTLINE = 3 }, Add = 1 }),
+        Text = ref({ 1, "media", "font" }, false, { Add = 3 }),
+      } })
+      local V = sonataNext:Resolve("Elvish").Variables
+      assert.are.same({ 18, 80, 10, 4 }, { V.Title, V.Rows, V.Gone, V.Mapped })
+      assert.are.equal("Interface\\AddOns\\SpecAddon\\font.ttf", V.Text, "not a number: as it is")
+    end)
+
+    -- LibSharedMedia keeps a font's file by its name (LibSharedMedia-3.0.lua: MediaTable.font[name]), and ElvUI keeps the
+    -- name the player picked (E.db.bags.countFont): a path key naming another variable ("$Name") reads that variable
+    -- first, so one reference reads the file of the name another reads.
+    it("reads a path key that names another variable as that variable's value", function()
+      _G.SpecAddon.libs = { media = { font = { Homespun = "Interface\\Spec\\Homespun.ttf" } } }
+      _G.SpecAddon[1].bags = { countFont = "Homespun", bad = {} }
+      sonataNext:RegisterTheme({ Name = "Elvish", Variables = {
+        CountName = ref({ 1, "bags", "countFont" }, "Homespun"),
+        CountFile = ref({ "libs", "media", "font", "$CountName" }, "Interface\\Spec\\Fallback.ttf"),
+        BadName = ref({ 1, "bags", "bad" }, false),
+        BadFile = ref({ "libs", "media", "font", " $BadName " }, "Interface\\Spec\\Fallback.ttf"),
+      } })
+      local V = sonataNext:Resolve("Elvish").Variables
+      assert.are.equal("Interface\\Spec\\Homespun.ttf", V.CountFile)
+      assert.are.equal("Interface\\Spec\\Fallback.ttf", V.BadFile, "a name that reads nothing: the fallback")
+      _G.SpecAddon[1].bags.countFont = "Missing"
+      assert.are.equal("Interface\\Spec\\Fallback.ttf", sonataNext:Resolve("Elvish").Variables.CountFile)
+      -- Check reads it the same way: nothing to report while the name is there.
+      _G.SpecAddon[1].bags.countFont = "Homespun"
+      for _, problem in ipairs(sonataNext:Check("Elvish")) do
+        assert.is_nil(problem:find("CountFile", 1, true), problem)
+      end
+      _G.SpecAddon[1].bags.countFont = "Missing"
+      local found = false
+      for _, problem in ipairs(sonataNext:Check("Elvish")) do
+        found = found or problem:find("Variables.CountFile: SpecAddon.libs.media.font.Missing", 1, true) ~= nil
+      end
+      assert.is_true(found, "Check names the key it read")
+    end)
+
+    it("refuses a Scale or an Add that is not a number", function()
+      for _, extra in ipairs({ { Scale = "2" }, { Add = {} } }) do
+        sonataNext.themes.Bad = nil
+        assert.has_error(function()
+          sonataNext:RegisterTheme({ Name = "Bad", Variables = { Size = ref({ 1, "media", "size" }, 12, extra) } })
+        end)
+      end
+    end)
+
+    it("reads them again every time it resolves, and copies what it reads", function()
+      sonataNext:RegisterTheme({ Name = "Elvish", Variables = { Border = ref({ 1, "media", "border" }, { 0, 0, 0, 1 }) },
+        Palette = { Border = "$Border" } })
+      local first = sonataNext:Resolve("Elvish")
+      first.Palette.Border[1] = 9
+      assert.are.equal(0.2, SpecAddon[1].media.border.r, "the addon's table is not touched")
+      SpecAddon[1].media.border = { r = 1, g = 0, b = 0, a = 1 }
+      assert.are.same({ 1, 0, 0, 1 }, sonataNext:Resolve("Elvish").Palette.Border)
+    end)
+
+    it("draws the fallback when the addon, a key or the value's kind is not there", function()
+      sonataNext:RegisterTheme({ Name = "Elvish", Variables = {
+        NoAddon = { Global = "NoSuchAddon", Path = { 1 }, Fallback = { 0.1, 0.1, 0.1, 1 } },
+        NoKey = ref({ 1, "media", "nope" }, "Fallback"),
+        Through = ref({ 1, "media", "font", "deeper" }, 3),
+        Kind = ref({ 1, "media", "font" }, { 0, 0, 0, 1 }),
+        Short = ref({ 1, "media", "plain" }, { 0, 1, 0, 1, 0, 1 }),
+        Number = ref({ 1, "media", "font" }, 12),
+        AnyTable = ref({ 1, "media" }, false),
+      } })
+      local v = sonataNext:Resolve("Elvish").Variables
+      assert.are.same({ 0.1, 0.1, 0.1, 1 }, v.NoAddon)
+      assert.are.equal("Fallback", v.NoKey)
+      assert.are.equal(3, v.Through, "a key below a string")
+      assert.are.same({ 0, 0, 0, 1 }, v.Kind, "a string where a color goes")
+      assert.are.same({ 0, 1, 0, 1, 0, 1 }, v.Short, "a color is three or four numbers")
+      assert.are.equal(12, v.Number, "a string where a number goes")
+      assert.is_false(v.AnyTable, "false takes a string, a number or a boolean")
+    end)
+
+    it("replaces a color's alpha, its fallback's too, and maps a value", function()
+      sonataNext:RegisterTheme({ Name = "Elvish", Variables = {
+        Border = ref({ 1, "media", "border" }, { 0, 0, 0, 1 }, { Alpha = 1 }),
+        Gone = ref({ 1, "media", "nope" }, { 0, 0, 0, 0.5 }, { Alpha = 1 }),
+        Flags = ref({ 1, "media", "style" }, "OUTLINE", { Map = { SHADOWOUTLINE = "OUTLINE", NONE = "" } }),
+        Shadow = ref({ 1, "media", "style" }, false, { Map = { OUTLINE = false, SHADOWOUTLINE = true } }),
+        Pass = ref({ 1, "media", "size" }, 12, { Map = { [12] = 10 } }),
+      } })
+      local v = sonataNext:Resolve("Elvish").Variables
+      assert.are.same({ 0.2, 0.3, 0.4, 1 }, v.Border)
+      assert.are.same({ 0, 0, 0, 1 }, v.Gone)
+      assert.are.equal("OUTLINE", v.Flags)
+      assert.is_true(v.Shadow)
+      assert.are.equal(14, v.Pass, "a value Map does not name is read as it is")
+      SpecAddon[1].media.style = "NONE"
+      assert.are.equal("", sonataNext:Resolve("Elvish").Variables.Flags)
+    end)
+
+    -- What Map names is the theme's own data: ElvUI's pixel mode (a boolean) turns its outlines (a list of rings) on or
+    -- off (next-themes-elvui.md §27). Only a value read straight from the addon must be the Fallback's kind.
+    it("takes what Map names as it is, the theme's own values: a list of tables, or false", function()
+      local rings = { { Offset = 1, Color = "Black" }, { Offset = -1, Color = "Black" } }
+      sonataNext:RegisterTheme({ Name = "Elvish", Variables = {
+        Outlines = ref({ 1, "media", "pixel" }, false, { Map = { [true] = false, [false] = rings } }),
+      } })
+      assert.is_false(sonataNext:Resolve("Elvish").Variables.Outlines, "pixel mode: none")
+      SpecAddon[1].media.pixel = false
+      local read = sonataNext:Resolve("Elvish").Variables.Outlines
+      assert.are.same(rings, read)
+      read[1].Offset = 9
+      assert.are.equal(1, rings[1].Offset, "a copy")
+      SpecAddon[1].media.pixel = {}
+      assert.is_false(sonataNext:Resolve("Elvish").Variables.Outlines, "a value Map does not name, of another kind")
+    end)
+
+    it("reads tables raw: nothing of the addon runs", function()
+      local ran = false
+      SpecAddon[1].media = setmetatable({}, { __index = function() ran = true return { r = 1, g = 1, b = 1 } end })
+      _G.SpecAddon[1].crop = nil
+      sonataNext:RegisterTheme({ Name = "Elvish", Variables = { Border = ref({ 1, "media", "border" }, { 0, 0, 0, 1 }) } })
+      assert.are.same({ 0, 0, 0, 1 }, sonataNext:Resolve("Elvish").Variables.Border)
+      assert.is_false(ran)
+    end)
+
+    -- A table with a Global and no Fallback is data, as it was before references: a client color named through a
+    -- variable is read by NextStyle when the theme applies (next/style.lua, palette).
+    it("keeps a variable with a Global and no Fallback as data: a client color named through a variable", function()
+      sonataNext:RegisterTheme({ Name = "Named", Variables = { Gold = { Global = "NORMAL_FONT_COLOR", Alpha = 0.5 } },
+        Palette = { Gold = "$Gold" } })
+      assert.are.same({ Global = "NORMAL_FONT_COLOR", Alpha = 0.5 }, sonataNext:Resolve("Named").Palette.Gold)
+    end)
+
+    -- A reference is one value: a client's override of it replaces it whole, nothing of the base's kept.
+    it("replaces a reference whole with a client's override of it", function()
+      sonataNext:RegisterTheme({ Name = "Elvish",
+        Variables = { Border = ref({ 1, "media", "border" }, { 0, 0, 0, 1 }, { Alpha = 1, Map = { x = 1 } }) },
+        Clients = { Retail = { Variables = { Border = ref({ 1, "media", "border" }, { 1, 1, 1, 1 }) } } } })
+      assert.are.same({ 0.2, 0.3, 0.4, 0.5 }, sonataNext:Resolve("Elvish").Variables.Border, "the base's Alpha not kept")
+    end)
+
+    it("refuses a reference without a Global name or a Path of keys, or with an Alpha or Map of another kind", function()
+      local bad = {
+        { Global = 3, Fallback = 1 },
+        { Global = "SpecAddon", Path = "media", Fallback = 1 },
+        { Global = "SpecAddon", Path = { {} }, Fallback = 1 },
+        { Global = "SpecAddon", Fallback = 1, Alpha = "half" },
+        { Global = "SpecAddon", Fallback = 1, Map = "x" },
+      }
+      for i, reference in ipairs(bad) do
+        local ok, err = pcall(function()
+          sonataNext:RegisterTheme({ Name = "Bad" .. i, Variables = { Border = reference } })
+        end)
+        assert.is_false(ok, "reference " .. i)
+        assert.is_truthy(tostring(err):find("Variables.Border", 1, true), tostring(err))
+        assert.is_nil(sonataNext:GetTheme("Bad" .. i))
+      end
+      local ok, err = pcall(function()
+        sonataNext:RegisterTheme({ Name = "BadClient",
+          Clients = { Classic = { Variables = { Edge = { Global = 1, Fallback = 1 } } } } })
+      end)
+      assert.is_false(ok)
+      assert.is_truthy(tostring(err):find("Clients.Classic.Variables.Edge", 1, true), tostring(err))
+    end)
+
+    it("is checked: a reference whose addon is there but whose value is not is named", function()
+      sonataNext:RegisterTheme({ Name = "Elvish", Variables = {
+        Border = ref({ 1, "media", "border" }, { 0, 0, 0, 1 }),
+        Moved = ref({ 1, "media", "moved" }, { 0, 0, 0, 1 }),
+        Absent = { Global = "NoSuchAddon", Path = { 1 }, Fallback = 1 },
+      } })
+      local found = {}
+      for _, problem in ipairs(sonataNext:Check("Elvish")) do
+        if problem:find("Variables.", 1, true) then table.insert(found, problem) end
+      end
+      assert.are.equal(1, #found, table.concat(found, "; "))
+      assert.is_truthy(found[1]:find("Variables.Moved: SpecAddon.1.media.moved", 1, true), found[1])
+    end)
+  end)
+
   describe("applying", function()
     it("hands the saved theme to Next's style when it starts, without saving or sending anything", function()
       sonataNext:RegisterTheme({ Name = "Ember", Palette = { Body = { 0.1, 0, 0, 1 } } })
@@ -1569,6 +1803,174 @@ describe("SonataNext", function()
       sonataNext:WatchClientFonts()
       sonataNext:WatchClientFonts()
       assert.are.equal(1, #handlers.PLAYER_ENTERING_WORLD)
+    end)
+  end)
+
+  -- Asked (issue #1326): "i do think we should hook UpdateMedia". ElvUI fires nothing when a player changes a color: its
+  -- options write the setting and call E:UpdateMedia() (once per step while a color is dragged), so a theme watches the
+  -- method, and after a call the theme is read again on the next frame and drawn again if what it reads changed.
+  describe("watching another addon's methods", function()
+    local savedAddon, savedAfter, frames, calls
+
+    local function run()
+      local queued = frames
+      frames = {}
+      for _, fn in ipairs(queued) do fn() end
+    end
+
+    local WATCH = { { Global = "SpecAddon", Path = { 1 }, Method = "UpdateMedia" } }
+
+    local function elvish(extra)
+      local theme = { Name = "Elvish", Watch = WATCH,
+        Variables = {
+          Border = { Global = "SpecAddon", Path = { 1, "media", "border" }, Fallback = { 0, 0, 0, 1 } },
+          Font = { Global = "SpecAddon", Path = { 1, "media", "font" }, Fallback = false },
+        },
+        Palette = { Border = "$Border" },
+        Fonts = { Title = { Size = 20, Color = "Gold", File = "$Font" } },
+      }
+      for k, v in pairs(extra or {}) do theme[k] = v end
+      return theme
+    end
+
+    before_each(function()
+      savedAddon, savedAfter = rawget(_G, "SpecAddon"), C_Timer.After
+      frames, calls = {}, 0
+      C_Timer.After = function(_, fn) table.insert(frames, fn) end
+      _G.SpecAddon = { {
+        media = { border = { r = 0, g = 0, b = 0, a = 1 }, font = "Interface\\AddOns\\SpecAddon\\a.ttf" },
+      } }
+      SpecAddon[1].UpdateMedia = function()
+        calls = calls + 1
+        return "updated", calls
+      end
+    end)
+
+    after_each(function()
+      _G.SpecAddon, C_Timer.After = savedAddon, savedAfter
+    end)
+
+    it("takes Watch as a list of methods by Global, Path and Method, and nothing else", function()
+      sonataNext:RegisterTheme({ Name = "Fine", Watch = WATCH })
+      local bad = { "UpdateMedia", { { Global = 1, Method = "UpdateMedia" } }, { { Global = "SpecAddon" } },
+        { { Global = "SpecAddon", Path = "x", Method = "UpdateMedia" } },
+        -- A map would register and hook nothing: the hooks walk it as a list.
+        { media = { Global = "SpecAddon", Path = { 1 }, Method = "UpdateMedia" } } }
+      for i, watch in ipairs(bad) do
+        local ok, err = pcall(function() sonataNext:RegisterTheme({ Name = "Bad" .. i, Watch = watch }) end)
+        assert.is_false(ok, "watch " .. i)
+        assert.is_truthy(tostring(err):find("Watch", 1, true), tostring(err))
+      end
+    end)
+
+    it("hooks each watched method once when it starts, the method still doing what it did", function()
+      sonataNext:RegisterTheme(elvish())
+      sonataNext:RegisterTheme({ Name = "Twin", Watch = WATCH })
+      sonataNext:Init()
+      sonataNext:Init()
+      local seen = 0
+      local real = sonataNext.OnWatchedCall
+      sonataNext.OnWatchedCall = function(self, ...) seen = seen + 1 return real(self, ...) end
+      local a, b = SpecAddon[1]:UpdateMedia()
+      sonataNext.OnWatchedCall = real
+      assert.are.same({ "updated", 1 }, { a, b })
+      assert.are.equal(1, seen, "one hook however many themes watch it, however often Next starts")
+    end)
+
+    it("hooks the methods of a theme registered after it started", function()
+      sonataNext:RegisterTheme(elvish())
+      sonataNext:ApplyTheme(ctx(), "Elvish", false)
+      assert.are.equal("scheduled", (function()
+        local result
+        local real = sonataNext.OnWatchedCall
+        sonataNext.OnWatchedCall = function(self, ...) result = real(self, ...) return result end
+        SpecAddon[1]:UpdateMedia()
+        sonataNext.OnWatchedCall = real
+        return result
+      end)())
+    end)
+
+    it("reads the theme again on the next frame after a call, once for any number of calls", function()
+      sonataNext:Init()
+      sonataNext:RegisterTheme(elvish())
+      sonataNext:ApplyTheme(ctx(), "Elvish", false)
+      local applied = #used
+      SpecAddon[1]:UpdateMedia()
+      SpecAddon[1]:UpdateMedia()
+      assert.are.equal(1, #frames, "one read waits for the next frame")
+      assert.are.equal(applied, #used, "nothing drawn inside the addon's call")
+      SpecAddon[1].media.border = { r = 1, g = 0, b = 0, a = 1 }
+      run()
+      assert.are.equal(applied + 1, #used)
+      assert.are.same({ 1, 0, 0, 1 }, used[#used].Palette.Border)
+      SpecAddon[1]:UpdateMedia()
+      assert.are.equal(1, #frames, "a call after the read waits for a read of its own")
+    end)
+
+    it("draws nothing when what the theme reads is as it was", function()
+      sonataNext:RegisterTheme(elvish())
+      sonataNext:ApplyTheme(ctx(), "Elvish", false)
+      local applied, said = #used, #sent
+      local styled = 0
+      sonataNext:RegisterWidget({ ApplyStyle = function() styled = styled + 1 end })
+      assert.are.equal("unchanged", sonataNext:RefreshWatched(ctx()))
+      assert.are.equal(applied, #used)
+      assert.are.equal(said, #sent)
+      assert.are.equal(0, styled)
+    end)
+
+    -- A color dragged in ElvUI's options calls UpdateMedia on every step; font objects can never be freed, so a step that
+    -- changes no font keeps them.
+    it("restyles with the font objects kept when no font changed, unsaved, and says so", function()
+      sonataNext:RegisterTheme(elvish())
+      sonataNext:ApplyTheme(ctx(), "Elvish", false)
+      local applied, generation = #used, sonataNext:GetGeneration()
+      local styled = 0
+      sonataNext:RegisterWidget({ ApplyStyle = function() styled = styled + 1 end })
+      SpecAddon[1].media.border = { r = 1, g = 0, b = 0, a = 1 }
+      sent = {}
+      assert.are.equal("restyled", sonataNext:RefreshWatched(ctx()))
+      assert.are.equal(applied + 1, #used)
+      assert.is_true(keeps[#used], "font objects kept")
+      assert.are.same({ 1, 0, 0, 1 }, sonataNext:GetCurrentTheme().Palette.Border)
+      assert.are.equal(1, styled)
+      assert.are.equal(generation + 1, sonataNext:GetGeneration())
+      assert.are.same({ { "sonata/NextThemeChanged", "Elvish" } }, sent)
+      assert.are.equal("Default", saved, "not saved")
+      assert.are.equal("unchanged", sonataNext:RefreshWatched(ctx()))
+    end)
+
+    it("applies the theme again, new font objects and all, when a font's look changed", function()
+      sonataNext:RegisterTheme(elvish())
+      sonataNext:ApplyTheme(ctx(), "Elvish", false)
+      local applied = #used
+      SpecAddon[1].media.font = "Interface\\AddOns\\SpecAddon\\b.ttf"
+      assert.are.equal("applied", sonataNext:RefreshWatched(ctx()))
+      assert.are.equal(applied + 1, #used)
+      assert.is_false(keeps[#used])
+      assert.are.equal("Interface\\AddOns\\SpecAddon\\b.ttf", used[#used].Fonts.Title.File)
+      assert.are.equal("Default", saved, "not saved")
+    end)
+
+    it("applies it again when a color a font role is drawn in changed", function()
+      sonataNext:RegisterTheme(elvish({ Fonts = { Title = { Size = 20, Color = "Border" } } }))
+      sonataNext:ApplyTheme(ctx(), "Elvish", false)
+      SpecAddon[1].media.border = { r = 0, g = 1, b = 0, a = 1 }
+      assert.are.equal("applied", sonataNext:RefreshWatched(ctx()))
+      assert.is_false(keeps[#used])
+    end)
+
+    it("does nothing for a theme that does not watch the method, or before it started", function()
+      sonataNext:RegisterTheme(elvish())
+      sonataNext:Init()
+      assert.are.equal("not watched", sonataNext:OnWatchedCall(SpecAddon[1], "UpdateMedia"))
+      sonataNext:ApplyTheme(ctx(), "Elvish", false)
+      assert.are.equal("not watched", sonataNext:OnWatchedCall(SpecAddon[1], "Other"))
+      assert.are.same({}, frames)
+      sonataNext.started = false
+      assert.are.equal("not started", sonataNext:OnWatchedCall(SpecAddon[1], "UpdateMedia"))
+      assert.are.equal("no theme", sonataNext:RefreshWatched(ctx()))
+      sonataNext.started = true
     end)
   end)
 

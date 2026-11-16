@@ -57,6 +57,12 @@ if [ ! -d ".libraries/GW2_UI" ]; then
   git clone --depth 1 https://github.com/Mortalknight/GW2_UI .libraries/GW2_UI
 fi
 
+# Clone ElvUI: the ElvUI Next theme draws its art from its own files (docs/next-elvui-theme.md), and a spec checks
+# every file the theme names is there.
+if [ ! -d ".libraries/ElvUI" ]; then
+  git clone --depth 1 https://github.com/tukui-org/ElvUI .libraries/ElvUI
+fi
+
 # Clone wow-ui-source for Blizzard UI source code: every branch (one per client: live, forever, classic_era,
 # classic_anniversary, classic), shallow, kept a git clone, so a spec reads the files each client loads
 # (spec/helpers/ui_source.lua, docs/next-plain-theme.md). A copy this script made before, without .git, is cloned again.

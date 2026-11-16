@@ -288,7 +288,9 @@ function gridProto:Draw(cell, entry)
   cell.count:SetShown(count > 1)
   local color = entry.quality ~= nil and entry.quality >= 2 and const.ITEM_QUALITY_COLOR[entry.quality] or nil
   if color then
-    controls:PaintEdge(cell.edge, { Color = { color[1], color[2], color[3] }, Size = K.CommonEdge.Size }, 1)
+    -- In its quality's color, the common edge's look kept (its outlines).
+    controls:PaintEdge(cell.edge, { Color = { color[1], color[2], color[3] }, Size = K.CommonEdge.Size,
+      Outlines = K.CommonEdge.Outlines }, 1)
   else
     controls:PaintEdge(cell.edge, K.CommonEdge)
   end

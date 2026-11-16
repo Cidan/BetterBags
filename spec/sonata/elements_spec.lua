@@ -173,6 +173,67 @@ describe("SonataElements", function()
       assert.are.same({}, problems)
     end)
 
+    -- Found in review: under BetterBags Next's rounding a ring's offset rounded to nothing on a coarse grid (all three
+    -- lines on one row), and an icon inset by 2 units, rounded once, missed the border and its inner ring, each rounded:
+    -- a pixel's gap or overlap at some bag scales. Rings are placed by lengths, and an Inset of "Edge" (the icon, the hover
+    -- and pushed fills) is just inside the border and its inner rings, from the same rounded lines.
+    it("keeps its outlines apart and its insides just inside them, on whole pixels, on any grid", function()
+      local layout = dofile("spec/helpers/layout.lua")
+      local pixel = addon:GetModule("NextPixel")
+      local BLACK = { 0, 0, 0, 1 }
+      for _, setup in ipairs({ { 1920, 1080, 0.64, 0.5 }, { 1920, 1080, 768 / 1080, 1.25 }, { 1920, 1080, 768 / 1080, 1.5 },
+        { 2560, 1440, 1, 1.6 }, { 3396, 1362, 0.65, 2.6 } }) do
+        local undo = layout.UseScreen(setup[1], setup[2], setup[3])
+        elements.itemSnap = {
+          Offset = function(region, units) return pixel:Snap(region, units) end,
+          Length = function(region, units) return pixel:Length(region, units) end,
+          Unit = function(region) return pixel:Unit(region) end,
+          Text = function(region) return pixel:TextOffset(region) end,
+        }
+        local window = CreateFrame("Frame", nil, UIParent)
+        window:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 0, 0)
+        window:SetSize(300, 300)
+        window:SetScale(setup[4])
+        local b = itemDecoration()
+        b:SetParent(window)
+        b:ClearAllPoints()
+        b:SetPoint("TOPLEFT", window, "TOPLEFT", pixel:Snap(window, 30), -pixel:Snap(window, 30))
+        local size = pixel:Length(window, 36)
+        b:SetSize(size, size)
+        elements:StyleItemButton(b, { Icon = { Inset = "Edge" },
+          Highlight = { Color = { 1, 1, 1, 0.3 }, BlendMode = "ADD", Inset = "Edge" },
+          Pushed = { Color = { 1, 1, 0, 0.3 }, BlendMode = "ADD", Inset = "Edge" },
+          Backdrop = { Color = { 0.1, 0.1, 0.1, 1 }, BorderColor = { 0.5, 0.5, 0.5, 1 }, EdgeSize = 1,
+            Outlines = { { Offset = 1, EdgeSize = 1, Color = BLACK }, { Offset = -1, EdgeSize = 1, Color = BLACK } } } })
+        local line = pixel:Length(b, 1)
+        local outer, inner, border = b.sonataSkin.outlines[1], b.sonataSkin.outlines[2], b.sonataSkin.edges
+        local where = table.concat(setup, " ")
+        local _, _, _, ox, oy = outer[1]:GetPoint(1)
+        local _, _, _, bx = border[1]:GetPoint(1)
+        local _, _, _, ix = inner[3]:GetPoint(1)
+        -- The outer ring a line's width outside the border and that thick: against it, no gap.
+        assert.are.same({ -line, line }, { ox, oy }, where .. ": the outer ring just outside the border")
+        assert.are.equal(line, outer[1]:GetHeight(), where)
+        assert.are.equal(0, bx, where)
+        assert.are.equal(border[3]:GetWidth(), ix, where .. ": the inner ring just inside the border")
+        local depth = ix + inner[3]:GetWidth()
+        local _, _, _, rx = inner[4]:GetPoint(1)
+        assert.are.equal(-depth + inner[4]:GetWidth(), rx, where .. ": the inner ring's right line as deep as its left")
+        -- Every side of the icon and the state fills just inside the inner ring.
+        local icon = b.icon or b.IconTexture
+        for _, region in ipairs({ icon, b:GetHighlightTexture(), b:GetPushedTexture() }) do
+          assert.are.same({ "TOPLEFT", b, "TOPLEFT", depth, -depth }, { region:GetPoint(1) }, where)
+          assert.are.same({ "BOTTOMRIGHT", b, "BOTTOMRIGHT", -depth, depth }, { region:GetPoint(2) }, where)
+        end
+        b:GetHighlightTexture():Show()
+        b:GetPushedTexture():Show()
+        local problems = layout.PixelCheck(window)
+        elements.itemSnap = nil
+        undo()
+        assert.are.same({}, problems, where)
+      end
+    end)
+
     it("sets and clears BetterBags Next's rounding, restyling every item button", function()
       local restyled = {}
       local saved = sonata.restyleKind
@@ -424,6 +485,8 @@ describe("SonataElements", function()
 
     it("swaps a quest item's icon art after Blizzard draws it, and leaves Blizzard's otherwise", function()
       local b = itemDecoration()
+      -- Retail's: Blizzard draws its quest art (ContainerFrameItemButtonMixin:UpdateQuestItem).
+      b.UpdateQuestItem = function() end
       elements:StyleItemButton(b, { QuestIcon = { Texture = "elv-quest.tga" }, QuestBorderColor = { 1, 0.8, 0, 1 } })
       b.IconQuestTexture:SetTexture("Interface\\ContainerFrame\\UI-Icon-QuestBorder")
       b.IconBorder:SetTexture("Interface\\Buttons\\UI-ActionButton-Border")
@@ -438,8 +501,10 @@ describe("SonataElements", function()
       assert.is_true(b.IconBorder:IsShown())
       elements:StyleItemButton(b, {})
       b.IconQuestTexture:SetTexture("Interface\\ContainerFrame\\UI-Icon-QuestBorder")
+      b.IconQuestTexture:Show()
       elements:DrawItemQuest(b, { isQuestItem = true, isActive = false })
       assert.are.equal("Interface\\ContainerFrame\\UI-Icon-QuestBorder", b.IconQuestTexture:GetTexture())
+      assert.is_true(b.IconQuestTexture:IsShown())
     end)
 
     it("uses the quest starter art for an item that starts a quest", function()
@@ -459,6 +524,114 @@ describe("SonataElements", function()
       elements:DrawItemQuest(b, { isQuestItem = false, isActive = false })
       assert.is_nil(b.IconQuestTexture:GetTexture())
       assert.is_false(b.IconBorder:IsShown())
+    end)
+
+    -- The Classic clients' buttons have no UpdateQuestItem and their quest texture is shown on every one
+    -- (Classic/ContainerFrame.xml): a style's quest art stayed on a button after its quest item went, over the next
+    -- item or an empty slot (found in review of the ElvUI Next theme, docs/next-elvui-theme.md). A style with quest
+    -- art owns the texture: off for a button with no quest item (no quest data: an empty slot), shown with its art.
+    it("takes its quest art off a button that no longer holds a quest item, and leaves Blizzard's art to Blizzard", function()
+      local b = itemDecoration()
+      b.UpdateQuestItem = function() end
+      elements:StyleItemButton(b, { QuestIcon = { Texture = "quest.tga" }, QuestStarterIcon = { Texture = "bang.tga" } })
+      b.IconQuestTexture:Hide()
+      elements:DrawItemQuest(b, { isQuestItem = false, questID = 123, isActive = false })
+      assert.are.equal("bang.tga", b.IconQuestTexture:GetTexture())
+      assert.is_true(b.IconQuestTexture:IsShown(), "shown with its art")
+      elements:DrawItemQuest(b, { isQuestItem = false, isActive = false })
+      assert.is_false(b.IconQuestTexture:IsShown(), "off over an item that is not a quest item")
+      elements:DrawItemQuest(b, { isQuestItem = true, isActive = false })
+      assert.is_true(b.IconQuestTexture:IsShown())
+      elements:DrawItemQuest(b, nil)
+      assert.is_false(b.IconQuestTexture:IsShown(), "off over an empty slot")
+      elements:StyleItemButton(b, { QuestStarterIcon = { Texture = "bang.tga" } })
+      b.IconQuestTexture:Show()
+      elements:DrawItemQuest(b, nil)
+      assert.is_false(b.IconQuestTexture:IsShown(), "starter art alone owns it too")
+      elements:StyleItemButton(b, {})
+      b.IconQuestTexture:Show()
+      elements:DrawItemQuest(b, nil)
+      elements:DrawItemQuest(b, { isQuestItem = false, isActive = false })
+      assert.is_true(b.IconQuestTexture:IsShown(), "a style without quest art leaves the texture to Blizzard")
+    end)
+
+    -- The Classic clients' buttons have no UpdateQuestItem, so Blizzard draws no quest art on them (its
+    -- ContainerFrame_UpdateQuestItem is for its own bags' buttons): their quest texture only ever shows a style's art.
+    -- Found in a third review: switching from a theme with quest art to one without left the last quest item's art.
+    it("shows only a style's quest art on a Classic button, taking it off under a style without", function()
+      local b = itemDecoration()
+      assert.is_nil(b.UpdateQuestItem)
+      elements:StyleItemButton(b, { QuestStarterIcon = { Texture = "bang.tga" } })
+      elements:DrawItemQuest(b, { questID = 5, isActive = false })
+      assert.are.equal("bang.tga", b.IconQuestTexture:GetTexture())
+      assert.is_true(b.IconQuestTexture:IsShown())
+      elements:DrawItemQuest(b, { isQuestItem = true, isActive = false })
+      assert.is_false(b.IconQuestTexture:IsShown(), "no art for a quest item that starts nothing: the starter's not left")
+      elements:DrawItemQuest(b, { questID = 5, isActive = false })
+      assert.is_true(b.IconQuestTexture:IsShown())
+      elements:StyleItemButton(b, {})
+      elements:DrawItemQuest(b, { questID = 5, isActive = false })
+      assert.is_false(b.IconQuestTexture:IsShown(), "a style without quest art")
+      b.IconQuestTexture:Show()
+      elements:DrawItemQuest(b, nil)
+      assert.is_false(b.IconQuestTexture:IsShown(), "an empty slot under a style without quest art")
+    end)
+
+    -- ElvUI edges a quest item in its Quest Starter color while the quest is not active and in its quest item color once
+    -- it is (Modules/Bags/Bags.lua:615-617); on Era it sets only quest starters apart (its tooltip scan, :661-685).
+    it("draws a quest item's border in the active quest's color, a starter's, or the quest color", function()
+      local b = itemDecoration()
+      local function border() return { b.IconBorder:GetVertexColor() } end
+      elements:StyleItemButton(b, { QualityBorder = { Texture = "edge.tga", Alpha = 1 }, QuestBorderColor = { 1, 1, 0, 1 },
+        QuestActiveBorderColor = { 1, 0, 0, 1 }, QuestStarterBorderColor = { 0, 1, 0, 1 } })
+      elements:DrawItemQuest(b, { isQuestItem = true, isActive = false })
+      assert.are.same({ 1, 1, 0, 1 }, border(), "a quest's item")
+      elements:DrawItemQuest(b, { isQuestItem = true, questID = 3, isActive = true })
+      assert.are.same({ 1, 0, 0, 1 }, border(), "its quest active")
+      elements:DrawItemQuest(b, { isQuestItem = false, questID = 3, isActive = false })
+      assert.are.same({ 0, 1, 0, 1 }, border(), "it starts a quest")
+      -- Without them, the quest color for every one, as before.
+      elements:StyleItemButton(b, { QualityBorder = { Texture = "edge.tga", Alpha = 1 }, QuestBorderColor = { 1, 1, 0, 1 } })
+      elements:DrawItemQuest(b, { isQuestItem = true, questID = 3, isActive = true })
+      assert.are.same({ 1, 1, 0, 1 }, border())
+      elements:DrawItemQuest(b, { isQuestItem = false, questID = 3, isActive = false })
+      assert.are.same({ 1, 1, 0, 1 }, border())
+      -- On the button's own edge too (QualityBorder = "Backdrop").
+      elements:StyleItemButton(b, { Backdrop = { BorderColor = { 0, 0, 0, 1 }, EdgeSize = 1 }, QualityBorder = "Backdrop",
+        QuestBorderColor = { 1, 1, 0, 1 }, QuestActiveBorderColor = { 1, 0, 0, 1 } })
+      elements:DrawItemQuest(b, { isQuestItem = true, questID = 3, isActive = true })
+      assert.are.same({ r = 1, g = 0, b = 0, a = 1 }, b.sonataSkin.edges[1]._colorTexture)
+    end)
+
+    -- ElvUI outside its pixel mode draws a black line inside and one outside every edge (General/Toolkit.lua,
+    -- SetTemplate): a backdrop's Outlines are rings, each Offset outside its border (inside for less than 0), EdgeSize
+    -- thick, in its Color, as a window backdrop's are (sonata/decoration.lua).
+    it("draws its backdrop's outlines round its border, and none without them", function()
+      local b = itemDecoration()
+      local BLACK = { 0, 0, 0, 1 }
+      elements:StyleItemButton(b, { Backdrop = { Color = { 0.1, 0.1, 0.1, 1 }, BorderColor = { 0.5, 0.5, 0.5, 1 },
+        EdgeSize = 1, Outlines = { { Offset = 1, EdgeSize = 1, Color = BLACK }, { Offset = -1, EdgeSize = 1, Color = BLACK } } } })
+      local rings = b.sonataSkin.outlines
+      assert.are.equal(2, #rings)
+      local outer, inner = rings[1], rings[2]
+      assert.are.same({ "TOPLEFT", b, "TOPLEFT", -1, 1 }, { outer[1]:GetPoint(1) })
+      assert.are.same({ "TOPRIGHT", b, "TOPRIGHT", 1, 1 }, { outer[1]:GetPoint(2) })
+      assert.are.equal(1, outer[1]:GetHeight())
+      assert.are.same({ "TOPLEFT", b, "TOPLEFT", 1, -1 }, { inner[1]:GetPoint(1) })
+      assert.are.same({ "BOTTOMRIGHT", b, "BOTTOMRIGHT", -1, 1 }, { inner[4]:GetPoint(2) })
+      for _, ring in ipairs(rings) do
+        for i = 1, 4 do
+          assert.is_true(ring[i]:IsShown())
+          assert.are.same({ r = 0, g = 0, b = 0, a = 1 }, ring[i]._colorTexture)
+        end
+      end
+      assert.are.same({ r = 0.5, g = 0.5, b = 0.5, a = 1 }, b.sonataSkin.edges[1]._colorTexture, "the border its own")
+      elements:StyleItemButton(b, { Backdrop = { Color = { 0.1, 0.1, 0.1, 1 }, BorderColor = { 0.5, 0.5, 0.5, 1 }, EdgeSize = 1 } })
+      for _, ring in ipairs(rings) do
+        for i = 1, 4 do
+          assert.is_false(ring[i]:IsShown())
+        end
+      end
     end)
 
     it("leaves the upgrade arrow's art when a style only scales it", function()

@@ -42,6 +42,7 @@ local nextSlider = addon:NewModule('NextSlider')
 ---@field track Button The pressed and dragged area.
 ---@field bar Texture The empty track.
 ---@field barFrame Frame Where the bar goes (its fill's region).
+---@field edge NextEdge Round the bar, for a theme that edges it (Slider.Edge).
 ---@field fill Texture The track up to the thumb.
 ---@field thumb Texture
 ---@field value NextInputFrame
@@ -93,6 +94,9 @@ function nextSlider:Create(parent, opts)
   local s = setmetatable({
     frame = frame, track = track, bar = bar, barFrame = barFrame, fill = fill, thumb = thumb, hovered = false, dragging = false,
     current = opts.value, opts = opts,
+    -- Round the bar, for a theme that edges it (Slider.Edge: ElvUI's box): over the fill, under the thumb, as ElvUI
+    -- draws its thumb over its border.
+    edge = controls:CreateEdge(track, "OVERLAY", -1, barFrame),
   }, { __index = sliderProto })
   s.value = nextInput:Create(frame, {
     numeric = opts.min >= 0 and opts.step >= 1,
@@ -174,6 +178,7 @@ function sliderProto:Style()
   pixel:Height(barFrame, S.TrackSize)
   controls:Paint(self.bar, S.Track)
   controls:Paint(self.fill, S.Fill)
+  controls:PaintEdge(self.edge, S.Edge)
   local box = self.value.frame
   box:SetShown(not written)
   self.valueText:SetShown(written)

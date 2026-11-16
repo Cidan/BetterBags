@@ -190,6 +190,31 @@ local function hasEdges(frame)
   return skin ~= nil and skin.edges ~= nil and skin.edges[1]:IsShown()
 end
 
+-- placeLines lays four lines (top, bottom, left, right) round frame, inset per side (negative is outside), size thick.
+---@param frame Frame
+---@param lines Texture[]
+---@param size number
+---@param i {Left: number, Right: number, Top: number, Bottom: number}
+local function placeLines(frame, lines, size, i)
+  local top, bottom, left, right = lines[1], lines[2], lines[3], lines[4]
+  top:ClearAllPoints()
+  top:SetPoint("TOPLEFT", frame, "TOPLEFT", i.Left, -i.Top)
+  top:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -i.Right, -i.Top)
+  top:SetHeight(size)
+  bottom:ClearAllPoints()
+  bottom:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", i.Left, i.Bottom)
+  bottom:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -i.Right, i.Bottom)
+  bottom:SetHeight(size)
+  left:ClearAllPoints()
+  left:SetPoint("TOPLEFT", frame, "TOPLEFT", i.Left, -i.Top)
+  left:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", i.Left, i.Bottom)
+  left:SetWidth(size)
+  right:ClearAllPoints()
+  right:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -i.Right, -i.Top)
+  right:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -i.Right, i.Bottom)
+  right:SetWidth(size)
+end
+
 -- edges draws a pixel border of four textures around frame (inset per side; negative is
 -- outside), or hides it.
 ---@param frame Frame
@@ -211,30 +236,106 @@ local function edges(frame, spec)
       skin.edges[i] = frame:CreateTexture(nil, "BORDER", nil, 7)
     end
   end
-  local size = spec.EdgeSize or 1
-  local i = insetOf(spec.Inset)
-  local top, bottom, left, right = skin.edges[1], skin.edges[2], skin.edges[3], skin.edges[4]
-  top:ClearAllPoints()
-  top:SetPoint("TOPLEFT", frame, "TOPLEFT", i.Left, -i.Top)
-  top:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -i.Right, -i.Top)
-  top:SetHeight(size)
-  bottom:ClearAllPoints()
-  bottom:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", i.Left, i.Bottom)
-  bottom:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -i.Right, i.Bottom)
-  bottom:SetHeight(size)
-  left:ClearAllPoints()
-  left:SetPoint("TOPLEFT", frame, "TOPLEFT", i.Left, -i.Top)
-  left:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", i.Left, i.Bottom)
-  left:SetWidth(size)
-  right:ClearAllPoints()
-  right:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -i.Right, -i.Top)
-  right:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -i.Right, i.Bottom)
-  right:SetWidth(size)
+  placeLines(frame, skin.edges, spec.EdgeSize or 1, insetOf(spec.Inset))
   for _, edge in ipairs(skin.edges) do
     edge:Show()
   end
   setEdgeColor(frame, spec.Color)
 end
+
+-- lengthOf rounds a length (a line's thickness) with BetterBags Next's rounding when it is in use (whole pixels, never
+-- fewer than one); signedLengthOf rounds a ring's offset the same way, its sign kept: rounded as an offset it fell to
+-- nothing on a coarse grid while its line kept its pixel, all three lines on one row (found in review).
+---@param region ScriptRegion
+---@param units number
+---@param snap? SonataItemSnap
+---@return number
+local function lengthOf(region, units, snap)
+  return snap ~= nil and snap.Length(region, units) or units
+end
+
+---@param region ScriptRegion
+---@param units number
+---@param snap? SonataItemSnap
+---@return number
+local function signedLengthOf(region, units, snap)
+  if units == 0 then
+    return 0
+  end
+  local n = lengthOf(region, math.abs(units), snap)
+  return units < 0 and -n or n
+end
+
+-- insideEdge is how far in from a decoration's sides its backdrop's border and every ring inside it reach (an Inset of
+-- "Edge": the icon, the hover and pushed fills just inside them, as ElvUI's SetInside puts them), from the same rounded
+-- lines the border and its outlines are drawn with, so no pixel's gap or overlap shows at any pixel ratio. No border: 0.
+---@param decoration Frame
+---@param backdrop? table
+---@param snap? SonataItemSnap
+---@return {Left: number, Right: number, Top: number, Bottom: number}
+local function insideEdge(decoration, backdrop, snap)
+  if backdrop == nil or (backdrop.BorderColor == nil and backdrop.EdgeSize == nil) then
+    return insetOf(0)
+  end
+  local depth = lengthOf(decoration, backdrop.EdgeSize or 1, snap)
+  for _, outline in ipairs(type(backdrop.Outlines) == "table" and backdrop.Outlines or {}) do
+    local off = outline.Offset or 0
+    if off < 0 then
+      depth = math.max(depth, -signedLengthOf(decoration, off, snap) + lengthOf(decoration, outline.EdgeSize or 1, snap))
+    end
+  end
+  local base = insetOf(backdrop.BorderInset)
+  local function at(units)
+    return (snap ~= nil and snap.Offset(decoration, units) or units) + depth
+  end
+  return { Left = at(base.Left), Right = at(base.Right), Top = at(base.Top), Bottom = at(base.Bottom) }
+end
+
+-- outlines draws a backdrop's Outlines round its border: for each, a ring of four lines, its outer side Offset outside
+-- the border (inside for less than 0), EdgeSize thick, in its Color (black unless given), as a window backdrop's
+-- (sonata/decoration.lua); the rings a style no longer has are hidden. ElvUI's black lines inside and outside every edge
+-- outside its pixel mode (General/Toolkit.lua, SetTemplate).
+---@param frame Frame
+---@param list? table[]
+---@param borderInset? number|table The border's own Inset, which the rings are measured from.
+---@param snap? SonataItemSnap BetterBags Next's rounding: offsets and sizes rounded as lengths, the base as an offset.
+local function outlines(frame, list, borderInset, snap)
+  local skin = frame.sonataSkin
+  local count = type(list) == "table" and #list or 0
+  if count == 0 and (skin == nil or skin.outlines == nil) then
+    return
+  end
+  skin = skinOf(frame)
+  skin.outlines = skin.outlines or {}
+  local base = insetOf(borderInset)
+  for n = 1, count do
+    local outline = list[n]
+    local ring = skin.outlines[n]
+    if ring == nil then
+      ring = {}
+      for i = 1, 4 do
+        ring[i] = frame:CreateTexture(nil, "BORDER", nil, 7)
+      end
+      skin.outlines[n] = ring
+    end
+    local off = signedLengthOf(frame, outline.Offset or 0, snap)
+    local function at(units)
+      return (snap ~= nil and snap.Offset(frame, units) or units) - off
+    end
+    placeLines(frame, ring, lengthOf(frame, outline.EdgeSize or 1, snap),
+      { Left = at(base.Left), Right = at(base.Right), Top = at(base.Top), Bottom = at(base.Bottom) })
+    for _, line in ipairs(ring) do
+      line:SetColorTexture(apply:Color(outline.Color, { 0, 0, 0, 1 }))
+      line:Show()
+    end
+  end
+  for n = count + 1, #skin.outlines do
+    for _, line in ipairs(skin.outlines[n]) do
+      line:Hide()
+    end
+  end
+end
+
 
 -- captureRegion records everything a style can change on a template region.
 ---@param region Texture
@@ -478,30 +579,45 @@ function elements:StyleItemButton(decoration, style)
   decoration.sonataItemStyle = style
   local snap = self.itemSnap
   decoration.sonataSnapUnit = snap ~= nil and snap.Unit(decoration) or nil
+  local backdrop = type(style.Backdrop) == "table" and style.Backdrop or nil
   local icon = decoration.icon or decoration.IconTexture
   if icon ~= nil then
     local iconStyle = withDefaults(style.Icon, ITEM_ICON)
-    local inset = iconStyle.Inset or 0
-    if snap ~= nil then
-      inset = snap.Offset(icon, inset)
-    end
     icon:ClearAllPoints()
-    if inset == 0 then
-      icon:SetAllPoints(decoration)
+    if iconStyle.Inset == "Edge" then
+      local i = insideEdge(decoration, backdrop, snap)
+      icon:SetPoint("TOPLEFT", decoration, "TOPLEFT", i.Left, -i.Top)
+      icon:SetPoint("BOTTOMRIGHT", decoration, "BOTTOMRIGHT", -i.Right, i.Bottom)
     else
-      icon:SetPoint("TOPLEFT", decoration, "TOPLEFT", inset, -inset)
-      icon:SetPoint("BOTTOMRIGHT", decoration, "BOTTOMRIGHT", -inset, inset)
+      local inset = iconStyle.Inset or 0
+      if snap ~= nil then
+        inset = snap.Offset(icon, inset)
+      end
+      if inset == 0 then
+        icon:SetAllPoints(decoration)
+      else
+        icon:SetPoint("TOPLEFT", decoration, "TOPLEFT", inset, -inset)
+        icon:SetPoint("BOTTOMRIGHT", decoration, "BOTTOMRIGHT", -inset, inset)
+      end
     end
     local coords = iconStyle.TexCoords
     icon:SetTexCoord(coords[1], coords[2], coords[3], coords[4])
   end
 
-  apply:ButtonStates(decoration, {
-    Highlight = withDefaults(style.Highlight, ITEM_HIGHLIGHT),
-    Pushed = withDefaults(style.Pushed, ITEM_PUSHED),
-  })
+  -- A state fill inset "Edge" sits just inside the border and its inner rings, as the icon does.
+  local states = { Highlight = withDefaults(style.Highlight, ITEM_HIGHLIGHT), Pushed = withDefaults(style.Pushed, ITEM_PUSHED) }
+  for key, state in pairs(states) do
+    if type(state) == "table" and state.Inset == "Edge" then
+      local copy = {}
+      for k, v in pairs(state) do
+        copy[k] = v
+      end
+      copy.Inset = insideEdge(decoration, backdrop, snap)
+      states[key] = copy
+    end
+  end
+  apply:ButtonStates(decoration, states)
 
-  local backdrop = type(style.Backdrop) == "table" and style.Backdrop or nil
   -- A fill of a color, or of art (an atlas or a file, tinted by VertexColor).
   local drawn = backdrop ~= nil and (backdrop.Color ~= nil or backdrop.Texture ~= nil or backdrop.Atlas ~= nil)
   fill(decoration, drawn and { Color = backdrop.Color, Texture = backdrop.Texture, Atlas = backdrop.Atlas,
@@ -509,6 +625,7 @@ function elements:StyleItemButton(decoration, style)
     BlendMode = backdrop.BlendMode, Inset = backdrop.Inset } or nil, "fill", "BACKGROUND", -8)
   local bordered = backdrop ~= nil and (backdrop.BorderColor ~= nil or backdrop.EdgeSize ~= nil)
   edges(decoration, bordered and { Color = backdrop.BorderColor, EdgeSize = backdrop.EdgeSize, Inset = backdrop.BorderInset } or nil)
+  outlines(decoration, bordered and backdrop.Outlines or nil, bordered and backdrop.BorderInset or nil, snap)
   -- What its last draw put on the edge is its draw's: a style applied without a draw must leave it (BetterBags Next styles
   -- a button again on a new pixel grid, right after its first draw).
   if style.QualityBorder == "Backdrop" and decoration.sonataEdgeDrawn ~= nil then
@@ -519,15 +636,21 @@ function elements:StyleItemButton(decoration, style)
     if skin.fill ~= nil and skin.fill:IsShown() then
       snapAnchors(skin.fill)
     end
-    for i, edge in ipairs(skin.edges or {}) do
-      if edge:IsShown() then
-        snapAnchors(edge)
-        if i <= 2 then
-          edge:SetHeight(snap.Length(edge, edge:GetHeight()))
-        else
-          edge:SetWidth(snap.Length(edge, edge:GetWidth()))
+    local function snapLines(lines)
+      for i, edge in ipairs(lines) do
+        if edge:IsShown() then
+          snapAnchors(edge)
+          if i <= 2 then
+            edge:SetHeight(snap.Length(edge, edge:GetHeight()))
+          else
+            edge:SetWidth(snap.Length(edge, edge:GetWidth()))
+          end
         end
       end
+    end
+    snapLines(skin.edges or {})
+    for _, ring in ipairs(skin.outlines or {}) do
+      snapLines(ring)
     end
   end
 
@@ -659,21 +782,31 @@ function elements:DrawItemQuality(decoration, color, quality)
 end
 
 -- DrawItemQuest swaps the art of the quest icon Blizzard just drew for a quest item for the
--- style's, and colors the border. It goes by the item's quest data: on Classic the quest
--- texture is shown on every button (ContainerFrame.xml gives it no hidden attribute).
+-- style's, and colors the border. It goes by the item's quest data (none: an empty slot). Blizzard
+-- draws the quest texture only on a button with UpdateQuestItem (Retail's): there a style with quest
+-- art owns it, shown with its art over a quest item and off over anything else, and one without leaves
+-- it to Blizzard. On the Classic clients' buttons nothing of Blizzard's draws or hides it
+-- (ContainerFrame.xml shows it on every button; Masque paints its own quest art on it as it skins, and
+-- shows or hides nothing), so it shows a style's art over a quest item and nothing else, or the art of
+-- the last quest item, of the theme before, or Masque's, stays on every slot.
 ---@param decoration ItemButton
 ---@param questInfo? {isQuestItem?: boolean, questID?: number, isActive?: boolean}
 function elements:DrawItemQuest(decoration, questInfo)
   local style = decoration.sonataItemStyle
-  if style == nil or questInfo == nil then
+  if style == nil then
     return
   end
-  local isQuest = questInfo.questID ~= nil or questInfo.isQuestItem == true
+  local quest = decoration.IconQuestTexture
+  local blizzard = decoration.UpdateQuestItem ~= nil
+  local owned = not blizzard or type(style.QuestIcon) == "table" or type(style.QuestStarterIcon) == "table"
+  local isQuest = questInfo ~= nil and (questInfo.questID ~= nil or questInfo.isQuestItem == true)
   if not isQuest then
+    if quest ~= nil and owned then
+      quest:Hide()
+    end
     return
   end
   local starter = questInfo.questID ~= nil and not questInfo.isActive
-  local quest = decoration.IconQuestTexture
   local art = (starter and style.QuestStarterIcon) or style.QuestIcon
   if quest ~= nil and type(art) == "table" then
     if art.Atlas ~= nil then
@@ -681,19 +814,27 @@ function elements:DrawItemQuest(decoration, questInfo)
     else
       quest:SetTexture(art.Texture)
     end
+    quest:Show()
+  elseif quest ~= nil and not blizzard then
+    quest:Hide()
   end
-  if style.QuestBorderColor ~= nil then
+  -- The border in the color for its quest's state: active (QuestActiveBorderColor), an item that starts one not yet
+  -- taken (QuestStarterBorderColor), else QuestBorderColor, which stands in for either a style does not give (ElvUI's
+  -- Quest Starter and quest item colors, Modules/Bags/Bags.lua:615-617).
+  local color = (questInfo.isActive and style.QuestActiveBorderColor) or (starter and style.QuestStarterBorderColor)
+    or style.QuestBorderColor
+  if color ~= nil then
     if type(style.QualityBorder) == "table" and decoration.IconBorder ~= nil then
-      artBorder(decoration.IconBorder, style.QualityBorder, style.QuestBorderColor)
+      artBorder(decoration.IconBorder, style.QualityBorder, color)
     elseif style.QualityBorder == "Backdrop" and hasEdges(decoration) then
-      decoration.sonataEdgeDrawn = style.QuestBorderColor
-      setEdgeColor(decoration, style.QuestBorderColor)
+      decoration.sonataEdgeDrawn = color
+      setEdgeColor(decoration, color)
     elseif decoration.IconBorder ~= nil then
       local border = decoration.IconBorder
       border:SetTexture(QUEST_BORDER)
       border:SetBlendMode("BLEND")
       border:SetTexCoord(0, 1, 0, 1)
-      border:SetVertexColor(apply:Color(style.QuestBorderColor))
+      border:SetVertexColor(apply:Color(color))
       border:Show()
     end
   end

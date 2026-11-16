@@ -157,9 +157,11 @@ function dropdownProto:paintChevron()
   else
     pixel:Row(self.chevron, "TOPRIGHT", frame, pixel:Length(frame, D.Padding), frame:GetHeight())
   end
-  -- A glyph, or an atlas (Blizzard's dropdown arrow).
+  -- A glyph, or an atlas (Blizzard's dropdown arrow), in its TexCoords (ElvUI's up arrow turned down): a state's own
+  -- art in its own, a state without art in the chevron's.
+  local own = art.Texture ~= nil or art.Atlas ~= nil
   controls:Paint(self.chevron, { Texture = art.Texture or (not art.Atlas and C.Texture) or nil, Atlas = art.Atlas,
-    Color = art.Color or C.Color })
+    Color = art.Color or C.Color, TexCoords = art.TexCoords or (not own and C.TexCoords) or nil })
   self.chevron:SetShown(not C.HoverOnly or (self.hovered and frame:IsEnabled()))
 end
 

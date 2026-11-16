@@ -150,6 +150,31 @@ alone and its room given back, search skipping them; a theme), `spec/config/conf
 the window for either design, a switch shown to it), `spec/core/init_spec.lua` (the init order).
 Mutation-tested (26 mutations; the one that first survived led to a test).
 
+### 3x. A theme of another size, and rows laid out by their controls
+
+- **Restyled while on the screen** (`settings:ApplyStyle`; shown, or sliding out as it closes: the theme page puts the
+  saved theme back as it is left, after `ended` says the window is closed): a theme of another `Settings.Width`/`Height`
+  (the theme page's preview; the ElvUI theme, whose window grows with ElvUI's font size, next-themes-elvui.md §27) fits
+  the window to the screen again (`fitScale`), centers it again, keeping a slide under way, and when its scale changed
+  restyles every widget again for the new grid, as opening does (`RestyleWidgets` takes a list first, so the second
+  pass is safe; it ends there, the scale now fitted). Found in reviews: it resized in place, off the bottom of a 1080p
+  screen from ElvUI's 13, and back from 40 a small box in a corner; and, gated on being shown, closing from a preview
+  slid it out as that small box. A window the player moved is centered again only when its theme's size changes
+  (`sizedFor`, recorded by `Style`: a new grid re-snaps the frame's own size, which must not move it) or its scale.
+- **Not measured in game:** a theme that changes the window's scale restyles every widget twice (every Next bag panel
+  redraws its content each time), and a page render restyles each row's control once more.
+- **A row restyles its control before laying out by its width** (`rowProto:Measure`): widgets restyle in no set order,
+  and the window renders as it restyles, so a row measured its name beside its control's old width and the name ran
+  under the control (found in review, with the ElvUI theme's controls widening with ElvUI's font size; patterns-ui-themes.md,
+  "Restyle a Control Before Laying Out by Its Size"). A settings row's text field is as wide as the theme's dropdowns,
+  read again as it restyles (`NextInput`'s `width` function).
+
+Coverage: `spec/next/shipped_themes_spec.lua` ("fits the window to the screen and centers it again", "fits the window
+again when the saved theme comes back as it closes from a preview", "centers the window again for a theme of another
+size that needs no new scale", "keeps a slide under way", "lays every widget out again for the new grid", "leaves a window the player moved where
+it is", "lays a settings row's name beside its control whatever order", "keeps every control on the settings page");
+each branch fails its spec when taken out.
+
 ## 4. The pages (`next/settings/content.lua`, `NextSettingsContent`)
 
 `Init` (from `core/init.lua`, after `NextSettings:Init`) defines the pages in the sidebar's order;

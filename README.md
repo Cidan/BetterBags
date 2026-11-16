@@ -69,7 +69,7 @@ Classic (Era, MoP Classic, SoD, BC Anniversary, etc.)
 - Powerful recent items support with customizable duration (mark all new items as recent, flash all recent items).
 - Right-click category header to move or vendor all items currently in the category.
 - Comprehensive Search that allows you to find an item most properties of an item (`Type`, `Subtype`, `iLvl`, and many more).
-- Multiple built-in themes (Default, Simple Dark, Slate, Dark, Parchment, and ElvUI and GW2 UI themes when those are installed), with a declarative theme API for creating more.
+- Multiple built-in themes (Default, Simple Dark, Slate, Dark, Parchment, and ElvUI and GW2 UI themes when those are installed, for the classic bags and for BetterBags Next), with a declarative theme API for creating more.
 - Bags that size themselves to their items, or windows you resize by dragging their corner (Settings > Resizable Window).
 - Profiles to allow easy swapping of layouts and categories between characters.
 - Category import and export strings to easily share your categories between friends.
@@ -572,7 +572,7 @@ Automation never sells, destroys or deposits an item in an equipment set or a pu
 
 ## Themes
 BetterBags offers built-in themes, chosen in Settings > Theme: Default (Blizzard's look), Simple Dark, and Slate, Dark and Parchment, from BetterBags' sister addon Moonlight.  
-BetterBags will detect if you have ElvUI or GW2 UI installed and offer an addon specific theme that follows your ElvUI or GW2 UI settings.
+BetterBags will detect if you have ElvUI or GW2 UI installed and offer an addon specific theme that follows your ElvUI or GW2 UI settings. BetterBags Next has its own ElvUI theme too: ElvUI's look in your ElvUI colors, textures and font, drawn again when you change them in ElvUI's options.
 
 Themes are data: a theme describes how each kind of window and element looks, and BetterBags applies it to every bag, bank, dialog, panel, item button, tab, section title, search box and button. Addon authors can write their own; see [`sonata/README.md`](sonata/README.md).
 

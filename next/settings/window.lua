@@ -543,16 +543,40 @@ function settings:buildFooter()
   })
 end
 
--- ApplyStyle restyles the window and lays it out again (SonataNext applied a theme).
+-- ApplyStyle restyles the window and lays it out again (SonataNext applied a theme). On the screen (shown, or sliding
+-- out as it closes: the theme page puts the saved theme back as it is left, after the window says it is closed), a
+-- theme of another size (a preview, ElvUI's font size changed) fits it to the screen again and centers it again, as
+-- opening does, and a new scale lays every widget out again for its grid: it resized it in place, off the screen or as
+-- a small box in a corner (found in review). A theme of the same size leaves it where it is, a window the player moved
+-- too, though a new grid re-snaps its size.
 ---@param ctx? Context
 function settings:ApplyStyle(ctx)
   if self.frame == nil then
     return
   end
+  local frame = self.frame
+  local onScreen = frame:IsShown()
+  local before = self.sizedFor
+  local rescaled = onScreen and self:fitScale()
   self:Style()
   self:buildNav()
+  local after = self.sizedFor
+  local resized = before ~= nil and (before[1] ~= after[1] or before[2] ~= after[2])
+  if onScreen then
+    if rescaled or resized then
+      local offset = self.offset or 0
+      frame:ClearAllPoints()
+      self:center()
+      self.offset = 0
+      self:anchorSlide()
+      self:setOffset(offset)
+    end
+  end
   if self.shown then
     render:RenderNow(self.root, { ctx = ctx or context:New('NextSettings_Theme') })
+  end
+  if rescaled then
+    sonataNext:RestyleWidgets(ctx or context:New('NextSettings_Scale'))
   end
 end
 
@@ -591,6 +615,8 @@ end
 function settings:Style()
   local T = style.Theme.Settings
   local frame = self.frame
+  -- The size its theme gave it, which ApplyStyle compares: a new grid re-snaps the frame's own.
+  self.sizedFor = { T.Width, T.Height }
   local m = self:Metrics()
   frame:SetSize(m.width, m.height)
   controls:Paint(self.fill, T.Fill)

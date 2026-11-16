@@ -156,8 +156,9 @@ function rows:Create(parent, option, owner)
     row.control = nextSwatch:Create(frame, { color = get(nil), hasOpacity = option.hasOpacity, onChange = write })
     mouseFrames = { row.control.frame }
   elseif kind == "input" then
-    row.control = nextInput:Create(frame, { text = get(nil) or "", width = controls:Theme("Dropdown").Width,
-      onEnter = write })
+    -- As wide as the dropdowns, read again as the theme changes (a theme may widen them with its text).
+    row.control = nextInput:Create(frame, { text = get(nil) or "",
+      width = function() return controls:Theme("Dropdown").Width end, onEnter = write })
     mouseFrames = { row.control.frame }
   else
     error("a settings row has no control for " .. tostring(kind))
@@ -267,6 +268,11 @@ function rowProto:Measure(width)
   local frame = self.frame
   local pad = pixel:Snap(frame, C.RowPad)
   if self.control then
+    -- Its control restyled first: widgets restyle in no set order, and a theme can change its width
+    -- (patterns-ui-themes.md, "Restyle a Control Before Laying Out by Its Size").
+    if self.control.Style then
+      self.control:Style()
+    end
     self.label:SetWidth(pixel:Floor(frame, math.max(1, width - self.control.frame:GetWidth() - 3 * pad)))
     return math.max(pixel:Length(frame, C.RowHeight), pixel:Ceil(frame, self.label:GetStringHeight()) + pad)
   end

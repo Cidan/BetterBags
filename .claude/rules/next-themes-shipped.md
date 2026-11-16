@@ -20,6 +20,9 @@ paths:
   fainter small border. Its first version drew the border on full panels too; asked: a full panel
   docked at its edge should have none, so it no longer sets `Panel.Edge.Full`.
 
+- **ElvUI** (`ElvUI`, `sonata/themes/next/elvui.lua`, offered while ElvUI is loaded): ElvUI's look from its own files,
+  in the player's ElvUI colors, textures, font and icon crop, read from ElvUI's tables and drawn again when ElvUI
+  changes them (next-themes-elvui.md §27).
 - **Guild Wars 2** (`GW2`, `sonata/themes/next/gw2.lua`, offered while GW2_UI is loaded, `Requires = { "GW2_UI" }`;
   the plan and what GW2_UI's source says: `docs/next-gw2-theme.md`): GW2_UI's look from its own files, calling
   nothing of it. Asked (round two): "we need to use those icons, that bag frame style, that icon" of the original

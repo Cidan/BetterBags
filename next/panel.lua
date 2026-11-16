@@ -45,6 +45,9 @@ local scrollbox = addon:GetModule('Scrollbox')
 ---@class NextScrollBar: AceModule
 local nextScrollBar = addon:GetModule('NextScrollBar')
 
+---@class NextControls: AceModule
+local controls = addon:GetModule('NextControls')
+
 ---@class NextStyle: AceModule
 local style = addon:GetModule('NextStyle')
 
@@ -1789,6 +1792,9 @@ function panelProto:BuildPanel(name)
     edge:Hide()
     table.insert(self.edges, edge)
   end
+  -- Rings outlining the border (Panel.Edge.Outlines: ElvUI's black lines inside and outside it outside its pixel mode),
+  -- shown, faded and masked with it.
+  self.edgeOutlines = controls:CreateOutlines(frame, "BORDER", 1, body)
 
   local glow = frame:CreateTexture(nil, "BORDER")
   glow:SetAllPoints(self.body)
@@ -1836,6 +1842,14 @@ function panelProto:styleBody()
         pixel:Height(edge, E.Size)
       else
         pixel:Width(edge, E.Size)
+      end
+    end
+  end
+  -- A ring made now takes the corner masks already on the edges (shapeCorners puts each on only once).
+  for _, line in ipairs(controls:PlaceOutlines(self.edgeOutlines, E and E.Outlines)) do
+    for _, mask in pairs(self.cornerMasks or {}) do
+      if mask.applied then
+        line:AddMaskTexture(mask)
       end
     end
   end
@@ -1908,6 +1922,11 @@ function panelProto:shapeCorners()
   for _, edge in ipairs(self.edges) do
     table.insert(parts, edge)
   end
+  for _, ring in ipairs(self.edgeOutlines.rings) do
+    for _, side in ipairs({ "Top", "Bottom", "Left", "Right" }) do
+      table.insert(parts, ring[side])
+    end
+  end
   local rounded, count = {}, 0
   for _, side in ipairs(CORNER_ORDER) do
     local radius = small and C and C[side] or 0
@@ -1968,6 +1987,7 @@ function panelProto:paintEdges(strength)
   for _, edge in ipairs(self.edges) do
     edge:SetVertexColor(r, g, b, a * strength)
   end
+  controls:ColorOutlines(self.edgeOutlines, strength)
 end
 
 -- EdgeAlphaFor is how strong the border is at a size: 1 where the theme draws it (a small panel's,
@@ -2767,6 +2787,7 @@ function panelProto:ApplyGeometry()
   for _, edge in ipairs(self.edges) do
     edge:SetShown(edgeShown)
   end
+  controls:ShowOutlines(self.edgeOutlines, edgeShown)
   self.ribbonLength = pixel:LengthIn(unit, self:RibbonBase())
   for _, line in ipairs(self.ribbonLines) do
     line:SetWidth(self.ribbonLength)
@@ -3014,6 +3035,7 @@ function panelProto:Morph()
   for _, edge in ipairs(edges) do
     edge:SetShown(bordered)
   end
+  controls:ShowOutlines(self.edgeOutlines, bordered)
   -- The frame is the body plus the feather at full size: only the body's width glides.
   local bodyLeft, extra = self:BodyLeft(), self:Width() - self:BodyWidth()
   local at = { x = from.x, y = from.y, h = from.h, w = from.w, scale = from.scale, ribbon = from.ribbon,
@@ -4426,6 +4448,11 @@ function panelProto:headerButton(spec)
   local button = CreateFrame("Button", nil, self.frame)
   -- Above a small panel's mover, which lies over the title row, and the overlay, whose frame art they sit on.
   button:SetFrameLevel(self.overlay:GetFrameLevel() + 3)
+  -- Its backdrop, for a theme that draws one (Header.Buttons.Backdrop: ElvUI's square buttons), under its icon.
+  button.fill = button:CreateTexture(nil, "BACKGROUND")
+  button.fill:SetAllPoints(button)
+  button.fill:Hide()
+  button.edge = controls:CreateEdge(button)
   local icon = button:CreateTexture(nil, "ARTWORK")
   button.icon = icon
   -- Drawn over the icon while hovered (an icon's Highlight).
@@ -4561,6 +4588,14 @@ function panelProto:PaintHeaderIcon(button)
   if H ~= nil then
     button.highlight:SetVertexColor(1, 1, 1, H.Alpha or 1)
   end
+  -- Its backdrop (Backdrop, false in Default; its icon's own Backdrop wins, false for none), the edge lit under the
+  -- pointer while enabled, as ElvUI lights its buttons.
+  local F = own.Backdrop
+  if F == nil then
+    F = B.Backdrop
+  end
+  controls:Paint(button.fill, F and F.Fill or false)
+  controls:PaintEdge(button.edge, F and ((button.hover and enabled and F.HoverEdge) or F.Edge) or false)
 end
 
 -- SetHeaderButtonEnabled enables or disables a header button, its icon drawn for it (PaintHeaderIcon).
@@ -5577,6 +5612,8 @@ function panelProto:BuildSearch()
     end
     table.insert(self.searchEdges, edge)
   end
+  -- Rings outlining its edge (Search.Edge.Outlines), at their own alpha.
+  self.searchOutlines = controls:CreateOutlines(sf.frame, "BORDER")
   local help = t.Instructions
   help:SetJustifyH("LEFT")
   self.searchBox = sf
@@ -5644,6 +5681,7 @@ function panelProto:styleSearch()
     end
   end
   self.searchEdgeAlpha = E and E.Idle or 0
+  controls:PaintOutlines(self.searchOutlines, E and E.Outlines)
   style:SetTemplateFont(t.Instructions, S.HelpFont)
   -- A theme may keep the template's own color for its help (HelpColor: InputBoxInstructionsTemplate's 0.35 gray).
   if S.HelpColor then
@@ -5930,9 +5968,9 @@ function panelProto:styleFooter()
     end
     m.frame:ClearAllPoints()
     if left then
-      pixel:Point(m.frame, "BOTTOMLEFT", body, "BOTTOMLEFT", style.PAD, style.FOOTER_MONEY)
+      pixel:Point(m.frame, "BOTTOMLEFT", body, "BOTTOMLEFT", style.PAD, style.FOOTER_COINS)
     else
-      pixel:Point(m.frame, "BOTTOMRIGHT", body, "BOTTOMRIGHT", -style.PAD, style.FOOTER_MONEY)
+      pixel:Point(m.frame, "BOTTOMRIGHT", body, "BOTTOMRIGHT", -style.PAD, style.FOOTER_COINS)
     end
   end
 end

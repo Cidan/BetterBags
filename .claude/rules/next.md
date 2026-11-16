@@ -295,7 +295,8 @@ section dragged out of a panel returns to the panel's strata (next-drag.md §7).
   at once while shown, else when it opens), then places the panels (`Update`, snapping: an open small one
   refitted at its Bag Scale, its size gliding or not, so one its draw set gliding for its names is refitted at
   its new scale; one a grip holds is left alone, next-small-mode.md §14h). It never
-  re-applies the theme: that makes new font objects, which cannot be freed, one set per slider step.
+  re-applies the theme: nothing of the theme changes, and a theme applied restyles every widget on every slider step
+  (font objects are reused by look, next-themes.md §4, so it would make none, but the restyle is wasted work).
   Coverage: `spec/next/style_spec.lua` ("NextStyle Icon Scale"), `spec/next/small_spec.lua` ("the Size
   tab's scales" → "Icon Scale"), `spec/next/content_spec.lua`, `spec/next/vendorbutton_spec.lua`,
   `spec/sonata/next_engine_spec.lua`.

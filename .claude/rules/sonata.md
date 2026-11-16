@@ -30,7 +30,7 @@ register as they load, before `Init`, which never clears `sonata.themes`.
 | `Hidden` | never listed or applied (`Base`) |
 | `Available` | boolean, or a function (an addon the theme depends on is loaded) |
 | `Masque` | `false`: item buttons are not handed to Masque |
-| `Variables` | values or functions, used as `"$Name"` |
+| `Variables` | values, functions, or references to another addon's values (next-themes-references.md §2a), used as `"$Name"` |
 | `Windows` | window styles by window kind: `Bag`, `Panel`, `Flat`, `Dialog`, `Slots`, `Search` (§3, §3b) |
 | `Elements` | element styles by element kind (item buttons, tabs, ...) |
 | `Clients` | partial themes applied on a client (below) |
@@ -46,13 +46,16 @@ registers one there (the "other registration path"):
    `Retail`, `Forever` on WoW: Forever; `Classic` plus `Era`, `TBC`, `Mists`, `Cata`, or
    `TBC`, `Anniversary` on Anniversary (which also sets `isBCC`). An unknown client key is an
    error at registration.
-3. Merge rules: tables merge key by key; **lists replace** (a table with `[1]`); **`false`
+3. Merge rules: tables merge key by key; **lists replace** (a table with `[1]`), and so do references
+   (next-themes-references.md §2a); **`false`
    replacing a table removes it** (a theme turns off something it inherited; a `false` with no
    table under it stays `false`, e.g. `Masque = false`); objects (a table with a metatable, or
    a frame) are kept by reference, never copied or merged.
 4. `Variables` merge like everything else; then every value is evaluated (a function is called
-   and must return something) and variables referring to other variables are filled in (a
-   cycle is an error). Every whole-string `"$Name"` (spaces around the name allowed) becomes a
+   and must return something; a reference, `{ Global, Path, Fallback }`, is read raw from another
+   addon's tables, its Fallback when the value is not there, next-themes-references.md §2a, which only
+   BetterBags Next's engine validates at registration) and variables referring to other variables are
+   filled in (a cycle is an error). Every whole-string `"$Name"` (spaces around the name allowed) becomes a
    copy of the variable. An unknown variable is an error; a string that only contains `$` stays.
 5. `Name`, `DisplayName`, `Description`, `Hidden` describe the result; `Parent`, `Available`,
    `Clients` are not part of it. `Windows` and `Elements` always exist.
@@ -223,7 +226,7 @@ registered window that has `UpdateOpacity` to apply its opacity again (the Opaci
 
 | Kind | Element | Style keys (defaults are Blizzard's) |
 |---|---|---|
-| `ItemButton` | an item button's visual decoration | `Icon` (`Inset`, `TexCoords`), `Highlight`, `Pushed` (button states), `Backdrop` (a `Color` fill, or art: `Texture` or `Atlas`, tinted by `VertexColor`, with `TexCoords`, `Alpha`, `BlendMode`; `Inset`; `BorderColor`/`EdgeSize` draw a 4-texture edge, `BorderInset` a number or per side), `QualityBorder = "Backdrop"` or art (`{ Texture or Atlas, Alpha, BlendMode }`: the icon's border drawn in it, tinted the quality's color at `Alpha`), `QualityColors` (per quality index), `UpgradeIcon` (`Atlas`/`Texture`, `Scale`), `Count` (`Font`, `Points`), `ItemLevel` (`Font`: the item level text, its color the draw's; both fonts through a font object, below), `Countdown` (`Font`, `Locales`: a cooldown's numbers; none, the client's own font, recorded by value and put back), `EmptySlot` (a texture spec: an empty slot's art; Classic draws it as its icon), `FamilyIcon` (`Color`: a specialized bag's glyph in its empty slots, below), `QuestIcon`, `QuestStarterIcon`, `QuestBorderColor` |
+| `ItemButton` | an item button's visual decoration | `Icon` (`Inset`, `TexCoords`; an `Inset` of `"Edge"` puts it just inside the backdrop's border and every outline inside it, from the same rounded lines, as a `Highlight` or `Pushed` inset `"Edge"` is), `Highlight`, `Pushed` (button states), `Backdrop` (a `Color` fill, or art: `Texture` or `Atlas`, tinted by `VertexColor`, with `TexCoords`, `Alpha`, `BlendMode`; `Inset`; `BorderColor`/`EdgeSize` draw a 4-texture edge, `BorderInset` a number or per side), `QualityBorder = "Backdrop"` or art (`{ Texture or Atlas, Alpha, BlendMode }`: the icon's border drawn in it, tinted the quality's color at `Alpha`), `QualityColors` (per quality index), `UpgradeIcon` (`Atlas`/`Texture`, `Scale`), `Count` (`Font`, `Points`), `ItemLevel` (`Font`: the item level text, its color the draw's; both fonts through a font object, below), `Countdown` (`Font`, `Locales`: a cooldown's numbers; none, the client's own font, recorded by value and put back), `EmptySlot` (a texture spec: an empty slot's art; Classic draws it as its icon), `FamilyIcon` (`Color`: a specialized bag's glyph in its empty slots, below), `QuestIcon`, `QuestStarterIcon`, `QuestBorderColor` |
 | `Tab` | a bottom tab | `Art = "Flat"` (template art hidden; `Background`, `Border`, `Hover` (HIGHLIGHT layer), `Selected = { Background, Bar, Border }`: `Bar` is a texture spec with `Height` and `Points` (default along the top), `Border = { Color }` recolors the tab's border while it is selected or a drop target), `Height` (default 32), `Font`, `HighlightFont`, `SelectedFont`, `TextOffset`, `SelectedTextOffset` |
 | `SectionHeader` | a section title font string | `Font` (default `GameFontNormal`) |
 | `SearchBox` | the in-bag `BagSearchBoxTemplate` box | `Strip`, `HideCaps`, `Middle` (texture spec + `Points`, `Height`), `SearchIcon` (`false` hides; a texture spec restyles), `ClearButton = { Icon }`, `Background`, `Border`, `Font` (default `GameFontHighlightSmall`), `Instructions` (default `GameFontDisableSmall`, 0.35 gray), `InstructionsPoints`, `TextInsets` (default 16, 20, 0, 0) |
@@ -238,7 +241,7 @@ Details:
   tinted the quality's color or its `QualityColors` entry, Common included, at its `Alpha`; hidden for
   no color); otherwise BetterBags' quality glow draws it (item-drawing.md §5). BetterBags' glow sets
   its own art, blend, coordinates and color on every draw, so a theme switch away from an art border
-  needs no reset. `DrawItemQuest` frames a quest item in the same art, in `QuestBorderColor`. Added for
+  needs no reset. `DrawItemQuest` frames a quest item in the same art, in `QuestBorderColor`, or `QuestActiveBorderColor` while its quest is active and `QuestStarterBorderColor` for an item that starts one not yet taken, when the style gives them (ElvUI's Quest Starter and quest item colors, `Modules/Bags/Bags.lua:615-617`; coverage `spec/sonata/elements_spec.lua`, "in the active quest's color"). A `Backdrop`'s `Outlines` (`{ Offset, EdgeSize, Color }`, as a window backdrop's) draw rings round its border, laid out by its border's own lines (`placeLines`), on whole pixels under BetterBags Next (coverage "its backdrop's outlines"). Added for
   GW2_UI's item buttons (docs/next-gw2-theme.md); coverage `spec/sonata/elements_spec.lua` ("in art").
 - `FamilyIcon` colors a specialized bag's glyph in its empty slots (`decoration.BetterBagsFamilyIcon`, item-drawing.md
   §11: BetterBags makes it on the decoration, as it does the item level text this styler also styles). The glyph files
@@ -264,6 +267,19 @@ Details:
   texture is shown: Classic's `IconQuestTexture` has no hidden attribute and is shown on every
   button. A quest border without a backdrop edge sets the icon border's texture
   (`WhiteIconFrame`), blend, coordinates and color itself, so no quality halo stays on it.
+  **Who draws the quest texture.** Blizzard draws it only on a button with `UpdateQuestItem`
+  (Retail's and Forever's): there a style with quest art (`QuestIcon` or `QuestStarterIcon`) owns it,
+  shown with its art over a quest item and hidden over anything else, and a style without leaves it to
+  Blizzard. On the Classic clients' buttons nothing of Blizzard's draws or hides it (no `UpdateQuestItem`;
+  `ContainerFrame_UpdateQuestItem` is for Blizzard's own bags), so it shows a style's art over a quest
+  item and is hidden otherwise, whatever the style. Masque paints its own quest art on it as it skins
+  (by name on Classic, never showing or hiding it), which showed its quest mark on every slot until
+  this (read from Masque's source in a review, not seen in game). A free or reset slot calls it with no quest data
+  (`frames/item.lua`). Before, the last quest item's art stayed over the next item or an empty slot,
+  and a theme without quest art after one with it left it (found in reviews of the ElvUI Next theme,
+  next-themes-elvui.md §27; the classic ElvUI theme's quest art had it on Classic clients too).
+  Coverage `spec/sonata/elements_spec.lua` ("takes its quest art off a button", "shows only a style's
+  quest art on a Classic button"), `spec/frames/item_spec.lua` ("no quest data for a free slot").
 - `SetTabState(tab, "normal"|"selected"|"drop")` replaces toggling the template's art by hand
   (`frames/tabs.lua` `SelectTab`/`DeselectTab`, the drag highlight): `drop` (a section dragged
   over the tab) shows the active art without moving the text, and keeps the selected tab's
@@ -522,28 +538,32 @@ the empty-group hint) is drawn with **text roles**: named fonts in the theme's `
 each a font spec (§3). Before roles every such text hard-coded a client font and white, gold or
 gray, so no theme could change it, and on Parchment's light paper it was white on parchment.
 
-- **A font object is made once and never changed.** `Sonata:GetTextFont(role)` makes the
-  current theme's font object for a role the first time it is asked for (`CreateFont`, named
-  `BetterBagsText<Role><n>`, unique), styles it right away, and never touches it again.
+- **A font object is made once per look and never changed.** `Sonata:GetTextFont(role)` gives a
+  role the font object made for its look (`madeTextFonts`, by `textFontKey`: the role's spec, and
+  the client font it copies as that font draws now), making it the first time any role of any theme
+  draws that look (`CreateFont`, named `BetterBagsText<Role><n>`, unique), styled right away and
+  never touched again (asked: "reuse by look for every theme").
   `Sonata:CreateText(parent, role, layer?)` makes a font string drawn with a role,
   `Sonata:SetTextRole(text, role)` switches a font string or edit box to a role, and
   `Sonata:SetButtonTextRole(button, role)` sets a button's normal font object; all three record
   the role (weak tables `texts`, `buttonTexts`). An unknown role errors. `Sonata:ClearButtonTextRole(button)` forgets a
   button's role, so a theme no longer moves it (BetterBags Next's money under a Next theme's `Footer.CoinFont`,
   next-themes-papercraft.md §25).
-- **A theme makes new font objects and moves the text.** `ApplyTheme` (before windows and
-  elements) and every rescale of the client's fonts call `newTextFonts`: it starts an empty set
-  of role font objects and points every recorded text and button at its role's new one. Text
-  whose role the theme does not define keeps its font object. Old font objects stay as they
-  were (font objects cannot be destroyed; a theme switch leaves at most one unused object per
-  role behind). **Failure mode (fixed):** role font objects used to be restyled in place on
+- **A theme finds each role's font object and moves the text.** `ApplyTheme` (before windows and
+  elements) and every rescale of the client's fonts call `newTextFonts`: it starts the theme's set
+  of role font objects (each the one made for its look) and points every recorded text and button
+  at its role's. Text whose role the theme does not define keeps its font object. Old font objects
+  stay as they were (font objects cannot be destroyed: a look drawn before is drawn with its
+  object, so switching back and forth makes none). It returns how many it made and how many roles
+  it drew with ones made before, for profiler traces. **Failure mode (fixed):** role font objects used to be restyled in place on
   every theme switch, relying on a font object passing its changes to the text set to it. The
   settings window is built before Sonata applies the saved theme, so its font objects were
   changed while its text used them, and a text that then switched font objects (hovering a
   settings entry: `Nav`, `NavHover`, back to `Nav`) came back out of step: the entry changed
   size until a theme switch restyled everything together. Restyling only at a different moment
   (re-copying on the client's rescale) did not fix it in game. The rule now: never change a font
-  object after it is made; make a new one. `Sonata:Init` starts empty registries.
+  object after it is made; draw another look with another one. `Sonata:Init` starts empty
+  registries; the font objects made are kept through it, as font objects are.
 - **Text sized to its content refits after every font change** (`Sonata:WatchTextFont(text,
   fn)`, weak table `textWatchers`): `fn(text)` runs after `SetTextRole` and after `newTextFonts`
   moves the text (a theme, a client rescale). A button's own font string is sized when the
@@ -599,7 +619,8 @@ gray, so no theme could change it, and on Parchment's light paper it was white o
 
 Coverage: `spec/sonata/text_spec.lua` (one named font per role, every role's Base look, a
 theme's palette reaching roles and the text set to them, switching roles, one role restyled,
-Classic money, new font objects per theme with text and buttons moved to them and the old ones
+Classic money, font objects found by look per theme (a look drawn before drawn with its object,
+every input of a look its own, how many a set made) with text and buttons moved to them and the old ones
 unchanged, no font object changed after it is made (through theme switches and rescales), text
 on a role the new theme lacks, new role fonts at the client's sizes after a rescale, copies rather
 than inheriting fonts, one text-size callback across `Init`s, unknown roles),

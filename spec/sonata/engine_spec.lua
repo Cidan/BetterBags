@@ -305,6 +305,21 @@ describe("Sonata engine", function()
       assert.are.same({ 1, 1, 1, 1 }, sonata:Resolve("Spaced").Windows.Bag.CloseButton.Color)
     end)
 
+    -- The resolver is both engines' (sonata/resolve.lua): a variable naming another addon's value is read for the
+    -- classic bags' themes too (next-themes-references.md §2a).
+    it("reads a variable that names another addon's value, or its fallback", function()
+      local savedAddon = rawget(_G, "SpecAddon")
+      _G.SpecAddon = { { media = { border = { r = 0.5, g = 0.25, b = 0, a = 1 } } } }
+      sonata:RegisterTheme({ Name = "Referred", Variables = {
+        Edge = { Global = "SpecAddon", Path = { 1, "media", "border" }, Fallback = { 0, 0, 0, 1 } },
+        Gone = { Global = "SpecAddon", Path = { 1, "media", "gone" }, Fallback = 4 },
+      }, Windows = { Bag = { CloseButton = { Color = "$Edge" }, Insets = { Top = "$Gone" } } } })
+      local theme = sonata:Resolve("Referred")
+      _G.SpecAddon = savedAddon
+      assert.are.same({ 0.5, 0.25, 0, 1 }, theme.Windows.Bag.CloseButton.Color)
+      assert.are.equal(4, theme.Windows.Bag.Insets.Top)
+    end)
+
     it("keeps values with a metatable, such as frames, by reference", function()
       local frame = CreateFrame("Frame")
       setmetatable(frame, { __index = {} })

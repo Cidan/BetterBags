@@ -467,6 +467,8 @@ files["spec/**/*.lua"] = {
 		"UseNineSliceLayouts",
 		"UseRealAtlasSizes",
 		"MockUnits",
+		-- Another addon's tables, which a theme's references read and its Watch hooks (next-themes.md §2a, §2b).
+		"SpecAddon",
 	},
 	ignore = {
 		"212", -- unused argument (common in mock functions)

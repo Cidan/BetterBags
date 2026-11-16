@@ -231,4 +231,31 @@ describe("NextSlider", function()
     assert.are.equal(200, slider.track:GetWidth())
     assert.are.equal(math.floor((200 - S().ThumbSize) * 0.6 + 0.5), thumbX(slider))
   end)
+
+  -- ElvUI draws a slider as a box on its default template, its border round it (Modules/Skins/Skins.lua,
+  -- HandleSliderFrame; docs/next-elvui-theme.md): a theme may edge the track (Controls.Slider.Edge), Default does not.
+  it("draws an edge round its track when the theme gives one, and none in Default", function()
+    local slider = make()
+    assert.is_false(slider.edge.Top:IsShown())
+    UseNextTheme({ Controls = { Slider = { TrackSize = 12, Edge = { Color = "Black", Alpha = 1, Size = 1 } } } })
+    nextSlider:ApplyStyle()
+    for _, side in ipairs({ "Top", "Bottom", "Left", "Right" }) do
+      assert.is_true(slider.edge[side]:IsShown(), side)
+      local c = slider.edge[side]._colorTexture
+      assert.are.same({ 0, 0, 0, 1 }, { c.r, c.g, c.b, c.a }, side)
+    end
+    assert.are.equal(slider.barFrame, slider.edge.frame, "round the bar")
+    -- Under the thumb, as ElvUI draws its thumb over its border, and over the fill.
+    for _, side in ipairs({ "Top", "Bottom", "Left", "Right" }) do
+      local line = slider.edge[side]
+      assert.are.equal(slider.track, line:GetParent(), side .. " on the thumb's frame")
+      local layer, sub = line:GetDrawLayer()
+      local thumbLayer, thumbSub = slider.thumb:GetDrawLayer()
+      assert.are.same({ "OVERLAY", "OVERLAY" }, { layer, thumbLayer }, side)
+      assert.is_true(sub < thumbSub, side .. " under the thumb")
+    end
+    UseNextTheme(nil)
+    nextSlider:ApplyStyle()
+    assert.is_false(slider.edge.Left:IsShown())
+  end)
 end)

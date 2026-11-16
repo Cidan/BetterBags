@@ -13,8 +13,8 @@ local pixel = addon:GetModule('NextPixel')
 -- SonataNext hands it every theme it applies (Use). Its long-standing fields (ICON, PAD, Color,
 -- Time, Small, Chain, Cloud, ...) are views of the theme, so Next's code reads them as it always
 -- has; the theme's widget specs are on style.Theme. Read them when drawing, never into a value kept
--- at load: a theme can change them at any time. Font objects are made per theme application and
--- never changed (text).
+-- at load: a theme can change them at any time. Font objects are made once per look, kept and never
+-- changed (text).
 ---@class NextStyle: AceModule
 ---@field Theme table The current Next theme, resolved.
 ---@field Color table<string, number[]> The theme's palette.
@@ -131,6 +131,9 @@ function style:Use(theme, keepFonts)
   self.EMPTY_TOP = L.EmptyTop
   self.FOOTER_TEXT = L.FooterText
   self.FOOTER_MONEY = L.FooterMoney
+  -- The money frame's (a box of its own size) when a theme sets it apart from the currency strip's (whose rows hold
+  -- text and may grow with it): FooterMoney unless it does.
+  self.FOOTER_COINS = L.FooterCoins or L.FooterMoney
 
   local edge, icon = theme.Search.Edge or { Idle = 0, Hover = 0, Focus = 0 }, theme.Search.Icon
   self.SearchEdge = { Idle = edge.Idle, Hover = edge.Hover, Focus = edge.Focus }
@@ -199,11 +202,12 @@ function style:TexturePath(ref)
   return named or ref
 end
 
--- Text. Every theme application makes a new font object for each role asked for, and moves every
--- text drawn with a role to its role's new one: a font object is never changed after it is made
--- (asked: "don't re-use text objects across themes, make whole new ones"; Sonata's lesson, sonata.md
--- 3c: a font object changed while text used it left that text out of step). Text drawn with a role
--- must not set its own color or shadow: a state that looks different is another role.
+-- Text. Every theme application draws each role asked for with the font object made for its look, and moves every
+-- text drawn with a role to it: a font object is never changed after it is made (asked: "don't re-use text objects
+-- across themes, make whole new ones"; Sonata's lesson, sonata.md 3c: a font object changed while text used it left
+-- that text out of step), and can never be freed, so a look drawn before is drawn with the object made for it (asked:
+-- "reuse by look for every theme"). Text drawn with a role must not set its own color or shadow: a state that looks
+-- different is another role.
 
 style.fonts = {} ---@type table<string, Font>
 style.texts = setmetatable({}, { __mode = "k" }) ---@type table<FontString|EditBox, string>
@@ -212,6 +216,9 @@ style.templated = setmetatable({}, { __mode = "k" }) ---@type table<FontString|E
 
 -- The number of font objects made: their names must be unique.
 local fontCount = 0
+
+-- Every font object made, by the look it draws (lookKey): kept for good, as font objects are.
+style.made = {} ---@type table<string, Font>
 
 -- shadowFont gives a font object a role's shadow: true for the theme's, a table, or none.
 ---@private
@@ -230,7 +237,7 @@ function style:shadowFont(font, shadow)
   end
 end
 
--- lookOf names what a font object draws: its file, size, flags, color and shadow.
+-- lookOf names what a font object draws: its file, size, flags, color, shadow and justification.
 ---@param font Font
 ---@return string
 local function lookOf(font)
@@ -239,7 +246,8 @@ local function lookOf(font)
   local sr, sg, sb, sa = font:GetShadowColor()
   local sx, sy = font:GetShadowOffset()
   return table.concat({ tostring(path), tostring(size), tostring(flags), tostring(r), tostring(g), tostring(b),
-    tostring(a), tostring(sr), tostring(sg), tostring(sb), tostring(sa), tostring(sx), tostring(sy) }, "|")
+    tostring(a), tostring(sr), tostring(sg), tostring(sb), tostring(sa), tostring(sx), tostring(sy),
+    tostring(font:GetJustifyH()), tostring(font:GetJustifyV()) }, "|")
 end
 
 -- CopiesStale says whether a client font one of the roles copied (Object) no longer draws what it drew when it
@@ -283,27 +291,32 @@ end
 ---@param spec table
 ---@return Font
 function style:makeFont(role, spec)
+  local name = spec.Copy or spec.Object
+  local base
+  if name ~= nil then
+    base = _G[name]
+    if type(base) ~= "table" or base.GetFont == nil then
+      error("BetterBags Next's font role " .. role .. " copies no client font named " .. tostring(name))
+    end
+    self.copies[role] = { base = base, look = lookOf(base) }
+  end
+  local key = self:lookKey(spec, base)
+  local font = self.made[key]
+  if font ~= nil then
+    self.reusedNow = (self.reusedNow or 0) + 1
+    return font
+  end
+  self.madeNow = (self.madeNow or 0) + 1
   fontCount = fontCount + 1
-  local font = CreateFont("BetterBagsNextFont" .. role .. fontCount)
+  font = CreateFont("BetterBagsNextFont" .. role .. fontCount)
   -- Copy: a client font as it is (the Plain theme), nothing the role inherits changing it but its Size (Default's, unless
   -- the role says false: the client's own), its height on whole pixels and its own Justify.
-  local copy = spec.Copy
-  if copy ~= nil then
-    local base = _G[copy]
-    if type(base) ~= "table" or base.GetFont == nil then
-      error("BetterBags Next's font role " .. role .. " copies no client font named " .. tostring(copy))
-    end
+  if spec.Copy ~= nil then
     font:CopyFontObject(base)
-    self.copies[role] = { base = base, look = lookOf(base) }
     local path, size, flags = font:GetFont()
     font:SetFont(path, pixel:FontHeight(spec.Size or size), flags)
   elseif spec.Object ~= nil then
-    local base = _G[spec.Object]
-    if type(base) ~= "table" or base.GetFont == nil then
-      error("BetterBags Next's font role " .. role .. " copies no client font named " .. tostring(spec.Object))
-    end
     font:CopyFontObject(base)
-    self.copies[role] = { base = base, look = lookOf(base) }
     local path, size, flags = font:GetFont()
     font:SetFont(fileOf(spec) or path, pixel:FontHeight(spec.Size or size), spec.Flags or flags)
     if spec.Color ~= nil then
@@ -320,7 +333,54 @@ function style:makeFont(role, spec)
   if spec.Justify ~= nil then
     font:SetJustifyH(spec.Justify)
   end
+  self.made[key] = font
   return font
+end
+
+-- lookKey names the look makeFont gives a role's spec, from every value it draws with: the client font it copies as
+-- that font draws now (lookOf: one rewritten is another look), the file for this locale, the height on this grid
+-- (NextPixel:FontHeight), the flags, the color and shadow as this theme's palette and FontShadow give them, and the
+-- justification. Two specs with the same key make the same font object.
+---@param spec table
+---@param base? Font The client font it copies (Copy, Object).
+---@return string
+function style:lookKey(spec, base)
+  local parts = {}
+  local function add(...)
+    for i = 1, select("#", ...) do
+      table.insert(parts, tostring((select(i, ...))))
+    end
+  end
+  local function shadow(s)
+    if s == true then
+      s = self.Theme.FontShadow
+    end
+    if type(s) == "table" then
+      add("shadow", self:RGBA(s.Color or "Black"))
+      add(s.X or 0, s.Y or 0)
+    else
+      add("no shadow")
+    end
+  end
+  if spec.Copy ~= nil then
+    local _, size = base:GetFont()
+    add("copy", spec.Copy, lookOf(base), pixel:FontHeight(spec.Size or size))
+  elseif spec.Object ~= nil then
+    local path, size, flags = base:GetFont()
+    add("object", spec.Object, lookOf(base), fileOf(spec) or path, pixel:FontHeight(spec.Size or size), spec.Flags or flags)
+    if spec.Color ~= nil then
+      add("color", self:RGBA(spec.Color))
+    end
+    if spec.Shadow ~= nil then
+      shadow(spec.Shadow)
+    end
+  else
+    add("plain", fileOf(spec) or GameFontNormal:GetFont(), pixel:FontHeight(spec.Size), spec.Flags or "")
+    add("color", self:RGBA(spec.Color or "White"))
+    shadow(spec.Shadow)
+  end
+  add("justify", spec.Justify)
+  return table.concat(parts, "|")
 end
 
 -- Font returns the current theme's font object of a role, made the first time it is asked for.
@@ -455,13 +515,16 @@ function style:CreateText(parent, role, layer)
   return text
 end
 
--- newFonts starts a new set of font objects and moves every text to its role's new one. Text whose
--- role the theme does not define (another theme's own role) keeps its font object: its widget gives
--- it one of this theme's roles as it restyles.
+-- newFonts starts the theme's set of font objects (each the one made for its look, made now if none was) and moves
+-- every text to its role's. Text whose role the theme does not define (another theme's own role) keeps its font
+-- object: its widget gives it one of this theme's roles as it restyles. It returns how many font objects it made and
+-- how many roles it drew with ones made before, for profiler traces (data-driven.md).
 ---@private
+---@return number made, number reused
 function style:newFonts()
   self.fonts = {}
   self.copies = {}
+  self.madeNow, self.reusedNow = 0, 0
   local roles = self.Theme.Fonts
   for text, role in pairs(self.texts) do
     if roles[role] ~= nil then
@@ -471,6 +534,7 @@ function style:newFonts()
       end
     end
   end
+  return self.madeNow, self.reusedNow
 end
 
 -- Until SonataNext starts (with the saved theme), and for specs, the look is the Default theme.

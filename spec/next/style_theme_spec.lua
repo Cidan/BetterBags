@@ -312,7 +312,7 @@ describe("NextStyle", function()
   end)
 
   describe("text", function()
-    it("moves text to a new font object with every theme, never changing one it made", function()
+    it("moves text to a new font object for a theme that draws it otherwise, never changing one it made", function()
       local parent = CreateFrame("Frame")
       local title = style:CreateText(parent, "Title")
       local before = title:GetFontObject()
@@ -326,11 +326,158 @@ describe("NextStyle", function()
       assert.are.same({ 1, 1, 1, 1 }, { before:GetTextColor() })
     end)
 
-    it("makes new font objects even when the theme applied again is the same", function()
+    -- Asked: "reuse by look for every theme". A font object is never changed once made and can never be freed, so a look
+    -- drawn before is drawn with the object made for it: the same theme applied again, a theme switched back to, or
+    -- another role drawing the same makes none.
+    it("draws a look it drew before with the font object it made for it", function()
       local text = style:CreateText(CreateFrame("Frame"), "Section")
       local before = text:GetFontObject()
       style:Use(resolved("Default"))
-      assert.are_not.equal(before, text:GetFontObject())
+      assert.are.equal(before, text:GetFontObject(), "the same theme applied again")
+      sonataNext:RegisterTheme({ Name = "Spec", Fonts = { Section = { Size = 30, Color = "Gold" } } })
+      style:Use(resolved("Spec"))
+      local other = text:GetFontObject()
+      assert.are_not.equal(before, other)
+      style:Use(resolved("Default"))
+      assert.are.equal(before, text:GetFontObject(), "switched back")
+      assert.are.equal(30, select(2, other:GetFont()), "the other look's object untouched")
+      style:Use(resolved("Spec"))
+      assert.are.equal(other, text:GetFontObject())
+    end)
+
+    -- For profiler traces (data-driven.md): a capture of ElvUI's font size dragged shows how many objects each set made.
+    it("says how many font objects a theme's set made and how many roles it drew with ones made before", function()
+      style:CreateText(CreateFrame("Frame"), "Section")
+      style:CreateText(CreateFrame("Frame"), "Title")
+      style:Use(resolved("Default"))
+      local made, reused = style:newFonts()
+      assert.are.equal(0, made, "the same theme again")
+      assert.is_true(reused >= 2, tostring(reused))
+      sonataNext:RegisterTheme({ Name = "Spec", Fonts = { Section = { Size = 33 } } })
+      style.Theme = resolved("Spec")
+      made = style:newFonts()
+      assert.are.equal(1, made, "only the look it had not drawn")
+    end)
+
+    it("gives roles that draw the same one font object", function()
+      sonataNext:RegisterTheme({ Name = "Spec", Fonts = { A = { Size = 13, Color = "Gold" }, B = { Size = 13, Color = "Gold" } } })
+      style:Use(resolved("Spec"))
+      assert.are.equal(style:Font("A"), style:Font("B"))
+    end)
+
+    -- A look is everything a font object draws: a role that differs in any of it is drawn with an object of its own.
+    it("makes a font object of its own for a look that differs in anything it draws", function()
+      local base = { Size = 13, Color = "Gold", Flags = "", Shadow = { Color = "Black", X = 1, Y = -1 } }
+      local function with(key, value)
+        local spec = {}
+        for k, v in pairs(base) do spec[k] = v end
+        spec[key] = value
+        return spec
+      end
+      local fonts = {
+        Base = base, Again = with("Size", 13), File = with("File", "Interface\\Spec\\font.ttf"), Size = with("Size", 14),
+        Flags = with("Flags", "OUTLINE"), Color = with("Color", "White"),
+        ShadowColor = with("Shadow", { Color = "Gold", X = 1, Y = -1 }),
+        ShadowOffset = with("Shadow", { Color = "Black", X = 2, Y = -2 }), NoShadow = with("Shadow", nil),
+        Justify = with("Justify", "RIGHT"), ThemeShadow = with("Shadow", true),
+      }
+      sonataNext:RegisterTheme({ Name = "Spec", FontShadow = { Color = "Black", X = 3, Y = -3 }, Fonts = fonts })
+      style:Use(resolved("Spec"))
+      local seen = {}
+      for role in pairs(fonts) do
+        if role ~= "Again" then
+          local font = style:Font(role)
+          assert.is_nil(seen[font], role .. " shares " .. tostring(seen[font]))
+          seen[font] = role
+        end
+      end
+      assert.are.equal(style:Font("Base"), style:Font("Again"))
+      -- The theme's shadow (Shadow = true) is the theme's FontShadow: another theme's is another look.
+      local shadowed = style:Font("ThemeShadow")
+      sonataNext.themes.Spec = nil
+      sonataNext:RegisterTheme({ Name = "Spec", FontShadow = { Color = "Black", X = 4, Y = -4 }, Fonts = fonts })
+      style:Use(resolved("Spec"))
+      assert.are_not.equal(shadowed, style:Font("ThemeShadow"))
+      assert.are.equal(style:Font("Base"), style:Font("Again"), "the other theme's same look")
+    end)
+
+    -- Found in review: no spec failed with an Object role's client-font look, color, shadow or flags, a plain role's
+    -- GameFontNormal file, or color values (rather than palette names) left out of the key. A role is keyed by what it
+    -- draws: the font it copies as that font draws now, and colors by value.
+    it("keys a role by what it draws: the font it copies as it draws now, its color by value, not by name", function()
+      local client = CreateFont("SpecKeyFont")
+      client:SetFont("Fonts\\FRIZQT__.TTF", 12, "")
+      client:SetTextColor(1, 1, 1, 1)
+      client:SetShadowColor(0, 0, 0, 0)
+      client:SetShadowOffset(0, 0)
+      local fonts = {
+        O = { Object = "SpecKeyFont" }, OColor = { Object = "SpecKeyFont", Color = "Gold" },
+        OShadow = { Object = "SpecKeyFont", Shadow = { Color = "Black", X = 1, Y = -1 } },
+        OFlags = { Object = "SpecKeyFont", Flags = "OUTLINE" },
+        RedA = { Size = 13, Color = "RedA" }, RedB = { Size = 13, Color = "RedB" },
+      }
+      sonataNext:RegisterTheme({ Name = "Spec", Palette = { RedA = { 1, 0, 0, 1 }, RedB = { 1, 0, 0, 1 } }, Fonts = fonts })
+      style:Use(resolved("Spec"))
+      local seen = {}
+      for _, role in ipairs({ "O", "OColor", "OShadow", "OFlags" }) do
+        local font = style:Font(role)
+        assert.is_nil(seen[font], role .. " shares " .. tostring(seen[font]))
+        seen[font] = role
+      end
+      assert.are.equal(style:Font("RedA"), style:Font("RedB"), "one color by two names")
+      local o = style:Font("O")
+      client:SetTextColor(0.5, 0.5, 0.5, 1)
+      style:Use(resolved("Spec"))
+      assert.are_not.equal(o, style:Font("O"), "its client font draws otherwise now")
+      local red = style:Font("RedA")
+      sonataNext.themes.Spec = nil
+      sonataNext:RegisterTheme({ Name = "Spec", Palette = { RedA = { 0, 0, 1, 1 }, RedB = { 1, 0, 0, 1 } }, Fonts = fonts })
+      style:Use(resolved("Spec"))
+      assert.are_not.equal(red, style:Font("RedA"), "a name drawn in another color")
+      assert.are.same({ 0, 0, 1, 1 }, { style:Font("RedA"):GetTextColor() })
+      local plain = style:Font("RedB")
+      local path, size, flags = GameFontNormal:GetFont()
+      GameFontNormal:SetFont("Interface\\Spec\\other.ttf", size, flags)
+      style:Use(resolved("Spec"))
+      local other = style:Font("RedB")
+      GameFontNormal:SetFont(path, size, flags)
+      _G.SpecKeyFont = nil
+      assert.are_not.equal(plain, other, "the client's own font rewritten")
+    end)
+
+    it("makes a font object of its own for a grid that draws a role copied outright at another height", function()
+      sonataNext:RegisterTheme({ Name = "Spec", Fonts = { Plainly = { Copy = "GameFontNormalLarge" } } })
+      local layout = dofile("spec/helpers/layout.lua")
+      local undo = layout.UseScreen(1536, 768, 1)
+      style:Use(resolved("Spec"))
+      local whole = style:Font("Plainly")
+      undo()
+      undo = layout.UseScreen(1920, 1080, 0.65)
+      style:Use(resolved("Spec"))
+      local scaled = style:Font("Plainly")
+      undo()
+      assert.are_not.equal(select(2, whole:GetFont()), select(2, scaled:GetFont()), "drawn at another height")
+      assert.are_not.equal(whole, scaled)
+    end)
+
+    -- A font's height is a whole number of screen pixels of the grid it is drawn on (docs/next-pixel-perfect.md): a grid
+    -- that draws it at another height is another look, and one that draws it at the same height the same.
+    it("makes a font object of its own for a grid that draws a role at another height, and none for one that does not", function()
+      local layout = dofile("spec/helpers/layout.lua")
+      local undo = layout.UseScreen(1536, 768, 1)
+      style:Use(resolved("Default"))
+      local whole = style:Font("Title")
+      undo()
+      undo = layout.UseScreen(1920, 1080, 0.65)
+      style:Use(resolved("Default"))
+      local scaled = style:Font("Title")
+      assert.are_not.equal(select(2, whole:GetFont()), select(2, scaled:GetFont()), "drawn at another height")
+      assert.are_not.equal(whole, scaled)
+      undo()
+      undo = layout.UseScreen(1536, 768, 1)
+      style:Use(resolved("Default"))
+      assert.are.equal(whole, style:Font("Title"))
+      undo()
     end)
 
     -- The Animation switches (next-themes.md §20) lay themselves over the theme in use again without a new theme: they
@@ -357,9 +504,10 @@ describe("NextStyle", function()
       assert.are.equal(style:Font("TabSelected"), tab:GetFontObject())
     end)
 
-    it("names every font object it makes uniquely, after its role", function()
+    it("names every font object it makes uniquely, after the role it was made for", function()
       local a = style:Font("Count")
-      style:Use(resolved("Default"))
+      sonataNext:RegisterTheme({ Name = "Spec", Fonts = { Count = { Size = 31 } } })
+      style:Use(resolved("Spec"))
       local b = style:Font("Count")
       assert.are_not.equal(a:GetName(), b:GetName())
       assert.is_truthy(a:GetName():find("BetterBagsNextFontCount", 1, true))
@@ -426,12 +574,14 @@ describe("NextStyle", function()
         function() client:SetTextColor(1, 0.9, 0.8, 1) end,
         function() client:SetShadowColor(0, 0, 0, 1) end,
         function() client:SetShadowOffset(1, -1) end,
+        function() client:SetJustifyH("RIGHT") end,
       }
       for i, change in ipairs(changes) do
         client:SetFont("Fonts\\FRIZQT__.TTF", 12, "")
         client:SetTextColor(1, 1, 1, 1)
         client:SetShadowColor(0, 0, 0, 0)
         client:SetShadowOffset(0, 0)
+        client:SetJustifyH("CENTER")
         style:Use(resolved("Spec"))
         style:Font("Copy")
         assert.is_false(style:CopiesStale(), i)
@@ -450,6 +600,23 @@ describe("NextStyle", function()
       assert.is_false(style:CopiesStale())
       style:Font("Copy")
       assert.are.same({ "Fonts\\FRIZQT__.TTF", 14, "" }, { style:Font("Copy"):GetFont() }, "the new copy is of the font now")
+    end)
+
+    -- What a role copies is part of its look: a client font changed is copied into an object of its own, and once it is
+    -- as it was the old copy is drawn again, and checked again.
+    it("copies a client font changed into an object of its own, and draws the old copy once it is back", function()
+      local first = style:Font("Copy")
+      client:SetFont("Fonts\\FRIZQT__.TTF", 13, "OUTLINE")
+      style:Use(resolved("Spec"))
+      local second = style:Font("Copy")
+      assert.are_not.equal(first, second)
+      assert.are.same({ "Fonts\\FRIZQT__.TTF", 14, "OUTLINE" }, { second:GetFont() })
+      client:SetFont("Fonts\\FRIZQT__.TTF", 12, "")
+      style:Use(resolved("Spec"))
+      assert.are.equal(first, style:Font("Copy"))
+      assert.is_false(style:CopiesStale())
+      client:SetFont("Fonts\\FRIZQT__.TTF", 12, "OUTLINE")
+      assert.is_true(style:CopiesStale(), "a copy drawn again is checked too")
     end)
   end)
 end)

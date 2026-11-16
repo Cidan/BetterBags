@@ -522,16 +522,60 @@ function sonata:UsesMasque()
 end
 
 -- Text roles. BetterBags' own text (settings, dialogs, editors, the debug window, the bag's
--- footer and hints) is drawn with one font object per role of the theme's Text table, made
+-- footer and hints) is drawn with one font object per role of the theme's Text table, found
 -- when first asked for. A font object is styled once, when it is made, and never changed:
 -- a font object changed while text used it left that text out of step once the text switched
 -- to another font object (hovering a settings entry changed its size). So every theme
--- application, and every rescale of the client's fonts, makes a new font object per role, and
--- Sonata moves each text and button drawn with a role to it. Such text must not set its own
--- color or shadow, which would override its font object.
+-- application, and every rescale of the client's fonts, finds each role the font object made
+-- for its look, and Sonata moves each text and button drawn with a role to it. Font objects can
+-- never be freed: a look drawn before is drawn with the object made for it (asked: "reuse by
+-- look for every theme"). Such text must not set its own color or shadow, which would override
+-- its font object.
 
 -- The number of role font objects made: their names must be unique.
 local textFontCount = 0
+
+-- Every role font object made, by the look it draws (textFontKey): kept for good, as font objects are.
+local madeTextFonts = {} ---@type table<string, Font>
+
+-- keyOf writes a value as text, a table's keys in order, so two specs alike give the same text.
+---@param value any
+---@return string
+local function keyOf(value)
+  if type(value) ~= "table" then
+    return type(value) .. ":" .. tostring(value)
+  end
+  local keys = {}
+  for k in pairs(value) do
+    table.insert(keys, k)
+  end
+  table.sort(keys, function(a, b) return tostring(a) < tostring(b) end)
+  local parts = {}
+  for _, k in ipairs(keys) do
+    table.insert(parts, tostring(k) .. "=" .. keyOf(value[k]))
+  end
+  return "{" .. table.concat(parts, ",") .. "}"
+end
+
+-- textFontKey names the look a role's spec gives its font object: the client font it copies as that font draws now
+-- (a rescale of the client's fonts is another look), and everything the role sets on it.
+---@param spec SonataFont
+---@return string
+local function textFontKey(spec)
+  local parts = { keyOf(spec) }
+  if spec.Object ~= nil then
+    local base = addon:GetModule('SonataApply'):FontObject(spec.Object)
+    local path, size, flags = base:GetFont()
+    local r, g, b, a = base:GetTextColor()
+    local sr, sg, sb, sa = base:GetShadowColor()
+    local sx, sy = base:GetShadowOffset()
+    for _, v in ipairs({ tostring(base), path, size, flags, r, g, b, a, sr, sg, sb, sa, sx, sy, base:GetJustifyH(),
+      base:GetJustifyV() }) do
+      table.insert(parts, tostring(v))
+    end
+  end
+  return table.concat(parts, "|")
+end
 
 -- styleTextFont makes font a copy of its role's client font, then applies what the role sets.
 -- A copy, never a font that inherits from it (Font:SetFontObject): Blizzard makes its own
@@ -552,8 +596,8 @@ local function styleTextFont(font, spec)
   apply:Font(font, rest)
 end
 
--- GetTextFont returns the current theme's font object for a role, made the first time it is
--- asked for.
+-- GetTextFont returns the current theme's font object for a role: the one made for its look, made
+-- the first time that look is asked for.
 ---@param role string
 ---@return Font
 function sonata:GetTextFont(role)
@@ -563,9 +607,17 @@ function sonata:GetTextFont(role)
     if spec == nil then
       error("unknown text role: " .. tostring(role))
     end
-    textFontCount = textFontCount + 1
-    font = CreateFont("BetterBagsText" .. role .. textFontCount)
-    styleTextFont(font, spec)
+    local key = textFontKey(spec)
+    font = madeTextFonts[key]
+    if font ~= nil then
+      self.textFontsReused = (self.textFontsReused or 0) + 1
+    else
+      self.textFontsMade = (self.textFontsMade or 0) + 1
+      textFontCount = textFontCount + 1
+      font = CreateFont("BetterBagsText" .. role .. textFontCount)
+      styleTextFont(font, spec)
+      madeTextFonts[key] = font
+    end
     self.textFonts[role] = font
   end
   return font
@@ -639,14 +691,17 @@ function sonata:ClearButtonTextRole(button)
   self.buttonTexts[button] = nil
 end
 
--- newTextFonts starts a new set of role font objects for the current theme and moves every
--- text and button drawn with a role to its role's new font object. Text whose role the theme
+-- newTextFonts starts the current theme's set of role font objects (each the one made for its
+-- look) and moves every text and button drawn with a role to its role's. It returns how many font
+-- objects it made and how many roles it drew with ones made before, for profiler traces (data-driven.md). Text whose role the theme
 -- does not define keeps its font object.
 ---@private
+---@return number made, number reused
 function sonata:newTextFonts()
   self.textFonts = {}
+  self.textFontsMade, self.textFontsReused = 0, 0
   if next(self.texts) == nil and next(self.buttonTexts) == nil then
-    return
+    return 0, 0
   end
   local roles = self:GetCurrentTheme().Text
   for text, role in pairs(self.texts) do
@@ -660,4 +715,5 @@ function sonata:newTextFonts()
       button:SetNormalFontObject(self:GetTextFont(role))
     end
   end
+  return self.textFontsMade, self.textFontsReused
 end

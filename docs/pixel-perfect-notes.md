@@ -1321,8 +1321,9 @@ The style remembers the grid its fonts were made for (`self.gridKey = pixel:Key(
 again (section 5.8). Checked for every role of every shipped theme on the reporter's screen.
 
 One consequence shaped another feature: the Icon Scale slider must never re-apply the theme to resize things, because
-applying a theme makes new font objects, and font objects can never be freed. A slider dragged through twenty steps
-would leave twenty sets behind. The slider sets the style's scale and redraws instead.
+applying a theme made new font objects, and font objects can never be freed. A slider dragged through twenty steps
+would have left twenty sets behind. The slider sets the style's scale and redraws instead. (Since issue #1326 a theme
+reuses the font object made for a look it drew before, next-themes.md §4; the slider still redraws.)
 
 ### 9.2 A font object is made once and never changed
 
@@ -1337,7 +1338,8 @@ together. Restyling at a different moment did not fix it in game.
 
 The rule since: **never change a font object after it is made; make a new one.** A theme switch (or the client
 rescaling its fonts for its Text Size setting) starts a new set of font objects and moves every recorded text to its
-role's new one; the old objects are left as they were:
+role's new one; the old objects are left as they were (since issue #1326 the "new one" is the object made for its look
+when that look was drawn before, so switching back and forth makes none):
 
 ```lua
 -- sonata/engine.lua

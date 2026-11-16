@@ -51,6 +51,9 @@ local sonataNext = addon:NewModule('SonataNext')
 sonataNext.themes = {}
 sonataNext.widgets = setmetatable({}, { __mode = "k" })
 sonataNext.generation = 0
+-- The other addons' methods hooked for the themes that watch them (Watch), by their table: a method is hooked once for
+-- good (a hook cannot be taken off), however many themes watch it and however often Next starts.
+sonataNext.hooked = setmetatable({}, { __mode = "k" }) ---@type table<table, table<string, boolean>>
 
 -- The theme every Next theme inherits from, and the one used while the saved one cannot be.
 local BASE = "Default"
@@ -74,7 +77,9 @@ local ITEM_DROP_TARGETS = { Title = true, Menu = true }
 ---@field Parent? string The theme this one inherits from (Default when unset).
 ---@field Hidden? boolean
 ---@field Requires? string[] Addons that must be loaded for the theme to be picked.
----@field Variables? table<string, any>
+---@field Variables? table<string, any> Values, or references to another addon's (next-themes-references.md §2a).
+---@field Watch? {Global: string, Path?: (string|number)[], Method: string}[] Methods of other addons that change what
+---the theme's references read (next-themes-references.md §2b).
 ---@field ItemButton? table Item buttons while Next is in use: a Sonata ItemButton element style (sonata.md 3a).
 ---@field Clients? table<string, table> Partial themes applied on a client (Retail, Forever, Classic, ...).
 
@@ -88,7 +93,11 @@ function sonataNext:Init()
   self.started = true
   self.active = false
   self.itemButtonStyle = nil
+  self.watchQueued = false
   self:use(self:GetSavedThemeKey())
+  for _, theme in pairs(self.themes) do
+    self:HookWatches(theme)
+  end
 end
 
 -- itemSnap is BetterBags Next's rounding for Sonata's item button styler (SonataElements:SetItemButtonSnap):
@@ -163,6 +172,53 @@ local function checkData(value, path)
   end
 end
 
+-- checkReferences errors when a variable that names another addon's value (a reference, next-themes-references.md §2a)
+-- is not well formed, naming it.
+---@param name string The theme's.
+---@param where string
+---@param variables? table
+local function checkReferences(name, where, variables)
+  for key, value in pairs(type(variables) == "table" and variables or {}) do
+    if resolve.IsReference(value) then
+      local problem = resolve.ReferenceProblem(value)
+      if problem ~= nil then
+        error("Next theme " .. name .. ": " .. where .. "." .. tostring(key) .. ": " .. problem, 0)
+      end
+    end
+  end
+end
+
+-- checkWatch errors when a theme's Watch (next-themes-references.md §2b) is not a list of methods, each a Global name,
+-- a Path of keys and a Method name.
+---@param theme NextTheme
+local function checkWatch(theme)
+  if theme.Watch == nil then
+    return
+  end
+  local function bad()
+    error("Next theme " .. theme.Name .. ": Watch is a list of { Global, Path, Method }", 0)
+  end
+  if type(theme.Watch) ~= "table" then
+    bad()
+  end
+  local count = 0
+  for _ in pairs(theme.Watch) do
+    count = count + 1
+  end
+  if count ~= #theme.Watch then
+    bad()
+  end
+  for _, watch in pairs(theme.Watch) do
+    if type(watch) ~= "table" or type(watch.Method) ~= "string" then
+      bad()
+    end
+    local probe = { Global = watch.Global, Path = watch.Path, Fallback = false }
+    if resolve.ReferenceProblem(probe) ~= nil then
+      bad()
+    end
+  end
+end
+
 ---@param theme NextTheme
 function sonataNext:RegisterTheme(theme)
   if type(theme) ~= "table" or type(theme.Name) ~= "string" or theme.Name == "" then
@@ -182,8 +238,18 @@ function sonataNext:RegisterTheme(theme)
       end
     end
   end
+  checkReferences(theme.Name, "Variables", theme.Variables)
+  for clientKey, override in pairs(type(theme.Clients) == "table" and theme.Clients or {}) do
+    if type(override) == "table" then
+      checkReferences(theme.Name, "Clients." .. tostring(clientKey) .. ".Variables", override.Variables)
+    end
+  end
+  checkWatch(theme)
   resolve:CheckClients(theme)
   self.themes[theme.Name] = theme
+  if self.started then
+    self:HookWatches(theme)
+  end
   -- A theme from another addon registers when that addon loads, after Next started with Default in
   -- place of the saved theme; the saved theme is applied as soon as it can be.
   if self.started and self.current ~= theme.Name and db():GetNextTheme() == theme.Name
@@ -469,6 +535,158 @@ function sonataNext:OnClientFontsChanged(ctx)
   return true
 end
 
+-- HookWatches hooks the methods a theme watches (Watch, next-themes-references.md §2b) that are there now, each once
+-- for good (hooksecurefunc: the method runs as it did, then the hook), so a call after them says so (OnWatchedCall). A
+-- method not there is left; nothing of the other addon runs to find it. It returns how many it hooked, for profiler
+-- traces.
+---@param theme NextTheme
+---@return number
+function sonataNext:HookWatches(theme)
+  local count = 0
+  for _, watch in ipairs(theme.Watch or {}) do
+    local target = resolve.Walk(watch.Global, watch.Path)
+    local method = watch.Method
+    if type(target) == "table" and type(rawget(target, method)) == "function" then
+      local methods = self.hooked[target]
+      if methods == nil then
+        methods = {}
+        self.hooked[target] = methods
+      end
+      if not methods[method] then
+        methods[method] = true
+        hooksecurefunc(target, method, function()
+          self:OnWatchedCall(target, method)
+        end)
+        count = count + 1
+      end
+    end
+  end
+  return count
+end
+
+-- watches says whether the theme in use watches method of target.
+---@private
+---@param target table
+---@param method string
+---@return boolean
+function sonataNext:watches(target, method)
+  for _, watch in ipairs(self.resolved and self.resolved.Watch or {}) do
+    if watch.Method == method and resolve.Walk(watch.Global, watch.Path) == target then
+      return true
+    end
+  end
+  return false
+end
+
+-- OnWatchedCall runs right after a watched method (HookWatches), inside the other addon's call: when the theme in use
+-- watches it, it reads the theme again on the next frame (RefreshWatched), once for any number of calls before then (a
+-- color dragged in ElvUI's options calls E:UpdateMedia on every step). It returns what it did, for profiler traces:
+-- "scheduled", "queued" (a read already waits), "not watched" or "not started".
+---@param target table
+---@param method string
+---@return string
+function sonataNext:OnWatchedCall(target, method)
+  if not self.started then
+    return "not started"
+  end
+  if not self:watches(target, method) then
+    return "not watched"
+  end
+  if self.watchQueued then
+    return "queued"
+  end
+  self.watchQueued = true
+  C_Timer.After(0, function()
+    self.watchQueued = false
+    self:RefreshWatched(context():New('SonataNext_Watched'))
+  end)
+  return "scheduled"
+end
+
+-- same says whether two values are equal, tables key by key.
+---@param a any
+---@param b any
+---@return boolean
+local function same(a, b)
+  if a == b then
+    return true
+  end
+  if type(a) ~= "table" or type(b) ~= "table" then
+    return false
+  end
+  for k, v in pairs(a) do
+    if not same(v, b[k]) then
+      return false
+    end
+  end
+  for k in pairs(b) do
+    if a[k] == nil then
+      return false
+    end
+  end
+  return true
+end
+
+-- fontsAlike says whether every text role draws the same in two resolutions of a theme: the roles, the shadow and every
+-- palette color a role or a shadow is drawn in (NextStyle:makeFont).
+---@param a NextTheme
+---@param b NextTheme
+---@return boolean
+local function fontsAlike(a, b)
+  if not same(a.Fonts, b.Fonts) or not same(a.FontShadow, b.FontShadow) then
+    return false
+  end
+  local colors = { Black = true }
+  local shadow = b.FontShadow
+  if type(shadow) == "table" and type(shadow.Color) == "string" then
+    colors[shadow.Color] = true
+  end
+  for _, spec in pairs(b.Fonts or {}) do
+    if type(spec.Color) == "string" then
+      colors[spec.Color] = true
+    end
+    if type(spec.Shadow) == "table" and type(spec.Shadow.Color) == "string" then
+      colors[spec.Shadow.Color] = true
+    end
+  end
+  local pa, pb = a.Palette or {}, b.Palette or {}
+  for name in pairs(colors) do
+    if not same(pa[name], pb[name]) then
+      return false
+    end
+  end
+  return true
+end
+
+-- RefreshWatched reads the theme in use again after a watched call and draws it again only when its variables read
+-- otherwise: restyled with its font objects kept when every role draws the same (font objects can never be freed),
+-- applied again otherwise; unsaved either way (it may be a preview). It returns what it did, for profiler traces:
+-- "unchanged", "restyled", "applied" or "no theme".
+---@param ctx Context
+---@return string
+function sonataNext:RefreshWatched(ctx)
+  local key = self.started and self.current or nil
+  if key == nil or self.resolved == nil then
+    return "no theme"
+  end
+  local theme = self:effective(key)
+  local old = self.resolved
+  if same(theme.Variables, old.Variables) then
+    return "unchanged"
+  end
+  if not fontsAlike(old, theme) then
+    self:ApplyTheme(ctx, key, false)
+    return "applied"
+  end
+  self.resolved = theme
+  self.generation = self.generation + 1
+  nextStyle():Use(theme, true)
+  self:syncItemButtons()
+  self:RestyleWidgets(ctx)
+  events():SendMessage(ctx, 'sonata/NextThemeChanged', key)
+  return "restyled"
+end
+
 -- ApplyAnimation lays the Animation switches over the current theme again (a switch changed: next/AnimationChanged)
 -- and restyles every widget, as a theme applied does, keeping the font objects: the switches touch no font, and font
 -- objects can never be freed (a theme applied on every click would leave a set behind each time). Nothing is saved
@@ -571,6 +789,31 @@ function sonataNext:Check(key)
   local theme = self:Resolve(key)
   local problems = {}
   local palette, fonts, textures = theme.Palette or {}, theme.Fonts or {}, theme.Textures or {}
+  -- A reference to another addon's value (next-themes-references.md §2a) that reads nothing while the addon is there:
+  -- the addon keeps it elsewhere now, and the fallback is drawn. One whose addon is not loaded is not checked.
+  local function references(variables, where)
+    for name, ref in pairs(type(variables) == "table" and variables or {}) do
+      if resolve.IsReference(ref) and type(rawget(_G, ref.Global)) == "table" then
+        -- A path key naming a variable is that variable as the theme resolved it.
+        ref = resolve.ResolvePath(ref, function(n) return theme.Variables[n] end)
+        local _, read = resolve.ReadReference(ref)
+        if not read then
+          local path = { ref.Global }
+          for _, k in ipairs(ref.Path or {}) do
+            table.insert(path, tostring(k))
+          end
+          table.insert(problems, where .. tostring(name) .. ": " .. table.concat(path, ".")
+            .. " reads nothing of its kind (its Fallback is drawn)")
+        end
+      end
+    end
+  end
+  for _, level in ipairs(resolve:Chain(self.themes, key, BASE)) do
+    references(level.Variables, "Variables.")
+    for clientKey, override in pairs(level.Clients or {}) do
+      references(override.Variables, "Clients." .. tostring(clientKey) .. ".Variables.")
+    end
+  end
   -- A palette color naming one of the client's named colors (NextStyle: Color.lua makes each a global ColorMixin).
   for name, value in pairs(palette) do
     if type(value) == "table" and value.Global ~= nil then
