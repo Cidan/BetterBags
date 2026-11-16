@@ -310,6 +310,9 @@ function debugWindow:CreateDumpFrame()
         equipped = itemProbe:ProbeEquipment(),
         bagNames = itemProbe:BagNames(),
         equipmentSets = itemProbe:EquipmentSets(),
+        -- WoW: Forever's gamepad interface: its style, Blizzard's window list and cursor, each bag window's state
+        -- (integrations/gamepad.lua, which loads after this file).
+        gamepad = addon:GetModule('Gamepad'):Dump(),
       }
       -- The bank's items exist only while it is open.
       local bankInfo = itemsModule.slotInfo[const.BAG_KIND.BANK]

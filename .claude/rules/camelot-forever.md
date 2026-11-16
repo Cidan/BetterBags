@@ -543,7 +543,8 @@ Coverage: `spec/sonata/elements_spec.lua` ("an icon's crop after a draw (DrawIte
 - **Gamepad interface style:** with `InputUtil.IsGamepadUIEnabled()`, 70790's `ContainerFrameItemButtonMixin:OnLoad`
   gives every container button normal, pushed, disabled and highlight atlases (`ItemSlotFrame_*`). BetterBags clears the
   normal and pushed art only, so the disabled art may show on a free-space button with no count and the highlight over
-  BetterBags' own.
+  BetterBags' own. The gamepad interface itself (Blizzard's window list, cursor, X, B, the radial menu) is supported:
+  `.claude/rules/gamepad.md` (`integrations/gamepad.lua`, issue #1180).
 - **An icon mask:** 70790 masks every `ItemButton`'s icon, normal and pushed textures with `common-iconmask`
   (`Shared/ItemButtonTemplate.xml`, `PostOnLoad`); its shape is not in the source. It may clip an inset or cropped icon's
   corners, or a Masque skin's.

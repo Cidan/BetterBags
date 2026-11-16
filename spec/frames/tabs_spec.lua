@@ -116,6 +116,16 @@ describe("Tabs", function()
     assert.is_true(decoration:IsShown())
   end)
 
+  -- WoW: Forever's gamepad interface (gamepad.md §5): the decoration takes the tab's clicks, so the cursor lands on it.
+  it("leaves the gamepad cursor a tab's decoration, not the tab under it", function()
+    local bar = newBar()
+    bar:AddTab(context:New("spec"), "Bags", 1)
+    local tab = bar.tabIndex[1]
+    local decoration = tabs:GetDecoration(context:New("spec"), tab)
+    assert.are.equal("tab", decoration.bbGamepad)
+    assert.is_nil(tab.bbGamepad)
+  end)
+
   it("draws the reorder marker as tall as the tab it sits beside", function()
     withTheme("Short", { Art = "Flat", Height = 26, Background = { Color = { 0, 0, 0, 1 } } })
     local bar = newBar()

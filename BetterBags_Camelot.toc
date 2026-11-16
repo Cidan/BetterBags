@@ -256,6 +256,7 @@ next\settings\currencies.lua
 next\settings\content.lua
 
 integrations\consoleport.lua
+integrations\gamepad.lua
 integrations\pawn.lua
 integrations\professionshoppinglist.lua
 integrations\masque.lua

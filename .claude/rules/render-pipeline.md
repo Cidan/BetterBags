@@ -117,6 +117,11 @@ one for its lifetime (no pool).
   the box's own size, which the window sets after the render. The scroll box never calls
   Show/Hide on it (Blizzard's bar overrides those whenever it updates). It sets the bar's
   `nodeignore` attribute (ConsolePort's cursor skips such nodes) to `not Scrollable`.
+- **WoW: Forever's gamepad interface** (gamepad.md §3): `SetGamepad(true)` puts a native `ScrollFrame` (`navFrame`, made
+  once, `SetAllPoints` on the scroll child) between the scroll child and the child, and `SetGamepad(false)` takes it out
+  again (the child keeps its anchor to the scroll child; `SetChild` parents a new child through it while it is on). It
+  never scrolls; Blizzard's cursor scrolls the scroll frame closest above a button, so it never touches the box.
+  `ScrollIntoView(region)` scrolls the box by as little as shows the region whole, measured in the box's scale.
 
 ## 4a. Anchoring: both offsets or neither
 

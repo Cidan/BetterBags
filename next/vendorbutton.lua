@@ -237,7 +237,28 @@ local function newButton()
     addon.SetScript(target, "OnClick", function(_, _, mouse) b:OnClick(mouse) end)
     addon.SetScript(target, "OnReceiveDrag", function() b:OnReceiveDrag() end)
   end
+  -- WoW: Forever's gamepad cursor lands on the icon (integrations/gamepad.lua). A presses it as Blizzard's merchant
+  -- gamepad prompt presses its buttons (MerchantFrame_SetupGamepad: A buys, a right click), a left click while an item
+  -- is held (a sale); the legend says which (GamepadLabel).
+  button.bbGamepad = "vendor"
+  button.OnSmartNavClick = function()
+    b:OnClick(CursorHasItem() and "LeftButton" or "RightButton")
+    return true
+  end
+  button.bbGamepadLabel = function()
+    return b:GamepadLabel()
+  end
   return b
+end
+
+-- GamepadLabel says what A on the button does (integrations/gamepad.lua names it): "sell" while an item is held,
+-- "buy" on an item for sale, else "select" (a buyback, a repair, a log entry: any click).
+---@return "sell"|"buy"|"select"
+function buttonProto:GamepadLabel()
+  if CursorHasItem() then
+    return "sell"
+  end
+  return self.mode == "buy" and "buy" or "select"
 end
 
 -- Style draws the button from the Next theme (Layout, Vendor): its card's size (VendorColumns across

@@ -618,6 +618,86 @@ end
 function WidgetMethods:RegisterForClicks(...)
   self._registeredClicks = {...}
 end
+-- Button:Click(button, isDown) (SimpleButtonAPIDocumentation): runs the button's PreClick, OnClick and PostClick with
+-- the mouse button (LeftButton when none is given), whatever it is registered for.
+function WidgetMethods:Click(button, isDown)
+  button = button or "LeftButton"
+  for _, script in ipairs({ "PreClick", "OnClick", "PostClick" }) do
+    local handler = self._scripts[script]
+    if handler then
+      handler(self, button, isDown and true or false)
+    end
+  end
+end
+-- clickRegistered says whether a release of the mouse button clicks the button: the clicks it is registered for
+-- (RegisterForClicks, "AnyUp" for any), LeftButtonUp when it never registered (a Button's default).
+local function clickRegistered(self, button)
+  local registered = self._registeredClicks
+  if registered == nil then
+    return button == "LeftButton"
+  end
+  for _, click in ipairs(registered) do
+    if click == button .. "Up" or click == "AnyUp" then
+      return true
+    end
+  end
+  return false
+end
+-- ScriptRegion:MouseDown(button) and MouseUp(button) (SimpleScriptRegionAPIDocumentation, Forever and live: protected,
+-- Blizzard's smart navigation presses its selection with them, SmartNavigation.lua PerformClick): the region gets the
+-- press as from the mouse: OnMouseDown, then OnMouseUp, and an enabled button registered for that release clicks.
+function WidgetMethods:MouseDown(button)
+  button = button or "LeftButton"
+  local handler = self._scripts.OnMouseDown
+  if handler then
+    handler(self, button)
+  end
+end
+function WidgetMethods:MouseUp(button)
+  button = button or "LeftButton"
+  local handler = self._scripts.OnMouseUp
+  if handler then
+    handler(self, button)
+  end
+  if self:IsObjectType("Button") and self:IsEnabled() and clickRegistered(self, button) then
+    self:Click(button)
+  end
+end
+-- ScriptRegion:FocusEnter(fromMouseMotion) and FocusExit(fromMouseMotion) (SimpleScriptRegionAPIDocumentation:
+-- fromMouseMotion defaults to true): the region's OnEnter or OnLeave, as the pointer would run them. Blizzard's smart
+-- navigation runs them on the button it selects and the one it leaves (RunCurrentButtonEnterScript).
+function WidgetMethods:FocusEnter(fromMouseMotion)
+  local handler = self._scripts.OnEnter
+  if handler then
+    handler(self, fromMouseMotion ~= false)
+  end
+end
+function WidgetMethods:FocusExit(fromMouseMotion)
+  local handler = self._scripts.OnLeave
+  if handler then
+    handler(self, fromMouseMotion ~= false)
+  end
+end
+-- Frame:SetHighlightLocked(locked) (SimpleFrameAPIDocumentation).
+function WidgetMethods:SetHighlightLocked(locked)
+  self._highlightLocked = locked
+end
+-- ScrollFrame:GetVerticalScroll(), GetVerticalScrollRange() and SetVerticalScroll(offset)
+-- (SimpleScrollFrameAPIDocumentation): the offset it is scrolled to, and how far its scroll child reaches past it (none
+-- without a scroll child; specs may set _verticalScrollRange).
+function WidgetMethods:GetVerticalScroll()
+  return self._verticalScroll or 0
+end
+function WidgetMethods:GetVerticalScrollRange()
+  return self._verticalScrollRange or 0
+end
+function WidgetMethods:SetVerticalScroll(offset)
+  self._verticalScroll = offset
+  local handler = self._scripts.OnVerticalScroll
+  if handler then
+    handler(self, offset)
+  end
+end
 function WidgetMethods:RegisterForDrag(...)
   self._registeredDrags = {...}
 end
@@ -2807,6 +2887,84 @@ end
 
 -- Combat and gameplay state
 _G.InCombatLockdown = function() return false end
+
+-- SetOverrideBindingClick(owner, isPriority, key, buttonName, mouseClick?) and ClearOverrideBindings(owner)
+-- (warcraft.wiki.gg API_SetOverrideBindingClick, API_ClearOverrideBindings; both protected in combat, where the client
+-- blocks them): an owner keeps one override per key; a key pressed runs the override set last among the priority ones,
+-- else the last set. The mock raises for a call in combat, and keeps the overrides in __mockOverrideBindings, in the
+-- order they were set. __mockPressBindingKey(key) presses a key: it clicks the bound button by its global name with the
+-- override's mouse button, and returns the override it ran (nil when none).
+_G.__mockOverrideBindings = {}
+_G.SetOverrideBindingClick = function(owner, isPriority, key, buttonName, mouseClick)
+  if _G.InCombatLockdown() then
+    error("Interface action blocked: SetOverrideBindingClick in combat", 2)
+  end
+  local list = _G.__mockOverrideBindings
+  for i = #list, 1, -1 do
+    if list[i].owner == owner and list[i].key == key then
+      table.remove(list, i)
+    end
+  end
+  table.insert(list, { owner = owner, priority = isPriority and true or false, key = key, button = buttonName,
+    mouse = mouseClick })
+end
+_G.ClearOverrideBindings = function(owner)
+  if _G.InCombatLockdown() then
+    error("Interface action blocked: ClearOverrideBindings in combat", 2)
+  end
+  local list = _G.__mockOverrideBindings
+  for i = #list, 1, -1 do
+    if list[i].owner == owner then
+      table.remove(list, i)
+    end
+  end
+end
+_G.__mockPressBindingKey = function(key)
+  local found
+  for _, binding in ipairs(_G.__mockOverrideBindings) do
+    if binding.key == key and (found == nil or binding.priority or not found.priority) then
+      found = binding
+    end
+  end
+  if found and found.button then
+    _G[found.button]:Click(found.mouse or "LeftButton")
+  end
+  return found
+end
+
+-- SecureActionButtonTemplate (Blizzard_FrameXML/SecureTemplates.lua, SecureActionButton_OnClick): a click runs the
+-- action its "type" attribute names, read for the mouse button (SecureButton_GetModifiedAttribute: the attribute with
+-- the button's number, "type2" for the right button, then the plain one). Only the click action is ported
+-- (SECURE_ACTIONS.click): it clicks the button its "clickbutton" attribute holds with the same mouse button.
+local MOUSE_BUTTON_SUFFIX = { LeftButton = "1", RightButton = "2", MiddleButton = "3", Button4 = "4", Button5 = "5" }
+local function modifiedAttribute(frame, name, button)
+  local suffix = MOUSE_BUTTON_SUFFIX[button]
+  local value = suffix and frame:GetAttribute(name .. suffix)
+  if value == nil then
+    value = frame:GetAttribute("*" .. name .. (suffix or ""))
+  end
+  if value == nil then
+    value = frame:GetAttribute(name)
+  end
+  return value
+end
+_G.__mockTemplates.SecureActionButtonTemplate = function(frame)
+  frame:SetScript("OnClick", function(self, button)
+    if modifiedAttribute(self, "type", button) == "click" then
+      local delegate = modifiedAttribute(self, "clickbutton", button)
+      if delegate then
+        delegate:Click(button)
+      end
+    end
+  end)
+end
+
+-- C_PlayerInteractionManager.IsInteractingWithNpcOfType(type) -> interacting (PlayerInteractionManagerDocumentation):
+-- specs mark the interactions under way with _G.__mockInteractions[type] = true.
+_G.C_PlayerInteractionManager = _G.C_PlayerInteractionManager or {}
+_G.C_PlayerInteractionManager.IsInteractingWithNpcOfType = function(interactionType)
+  return (_G.__mockInteractions or {})[interactionType] == true
+end
 _G.GetFramerate = function() return 60 end
 
 -- String utilities (WoW-specific)

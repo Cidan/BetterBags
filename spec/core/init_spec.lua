@@ -45,7 +45,7 @@ describe("Core Init and Enable flow", function()
     local modules = {
       "Localization", "Database", "BagFrame", "Constants", "Items", "ItemFrame",
       "Events", "Masque", "SectionFrame", "Categories", "ContextMenu", "Config",
-      "Currency", "Search", "ConsolePort", "Pawn", "Question", "SimpleItemLevel",
+      "Currency", "Search", "ConsolePort", "Gamepad", "Pawn", "Question", "SimpleItemLevel",
       "QuickFind", "Refresh", "ItemLoader", "Views",
       "Async", "Context", "Debug", "Form", "Bucket", "TooltipScanner", "Groups",
       "EquipmentSets", "BagButton", "ItemRowFrame", "Perf", "PerfSessions", "RenderRecorder", "Simulator", "Render", "Window", "Sonata", "NextSettings", "NextSettingsContent", "Tabs", "ChangelogWindow", "NextBag", "NextBank", "NextVendor",
@@ -59,6 +59,9 @@ describe("Core Init and Enable flow", function()
       stub.Init = stub.Init or spy.new(function() end)
       stub.Enable = stub.Enable or spy.new(function() end)
     end
+    -- BagSystem hands every bag window it makes to the gamepad support.
+    local gamepadStub = addon:GetModule("Gamepad")
+    gamepadStub.Add = gamepadStub.Add or function() end
     -- SonataNext is real in every spec (spec/setup.lua) and its Init reads the saved Next theme.
     local sonataNext = addon:GetModule("SonataNext")
     savedNextInit = sonataNext.Init
@@ -229,6 +232,27 @@ describe("Core Init and Enable flow", function()
     addon:OnEnable()
     assert.spy(automation.Init).was.called(1)
     assert.spy(automation.Enable).was.called(1)
+  end)
+
+  -- WoW: Forever's gamepad interface (integrations/gamepad.lua): started before the bags are made (they are handed to
+  -- it as they are), enabled with the rest.
+  it("starts the gamepad support before the bags are made, and enables it", function()
+    local gamepad = addon:GetModule("Gamepad")
+    local order = {}
+    gamepad.Init = spy.new(function() table.insert(order, "gamepad") end)
+    gamepad.Enable = spy.new(function() end)
+    local bagSystem = addon:GetModule("BagSystem")
+    local create = bagSystem.CreateBackpack
+    bagSystem.CreateBackpack = function(...)
+      table.insert(order, "backpack")
+      return create(...)
+    end
+    addon:OnInitialize()
+    bagSystem.CreateBackpack = create
+    addon:OnEnable()
+    assert.spy(gamepad.Init).was.called(1)
+    assert.spy(gamepad.Enable).was.called(1)
+    assert.are.same({ "gamepad", "backpack" }, { order[1], order[2] })
   end)
 
   -- BetterBags Next's tracked currencies (currency.md) read what changes from their OnEnable.

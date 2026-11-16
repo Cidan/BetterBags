@@ -92,6 +92,8 @@ local function newButton()
   end
   button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   button:RegisterForDrag("LeftButton")
+  -- WoW: Forever's gamepad cursor lands on it (integrations/gamepad.lua).
+  button.bbGamepad = "guild"
   local itemLevel = button:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
   itemLevel:SetPoint("BOTTOMLEFT", 2, 2)
   itemLevel:Hide()

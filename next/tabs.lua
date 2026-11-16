@@ -369,6 +369,8 @@ function railProto:newTab(secure)
     button = CreateFrame("Button", nil, self.frame)
     button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   end
+  -- WoW: Forever's gamepad cursor lands on it (integrations/gamepad.lua).
+  button.bbGamepad = "tab"
   local bg = button:CreateTexture(nil, "BACKGROUND")
   bg:SetAllPoints()
   bg:SetColorTexture(1, 1, 1, 1)

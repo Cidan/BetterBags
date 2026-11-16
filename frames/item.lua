@@ -1356,6 +1356,8 @@ function itemFrame:_DoCreate(_, bagID)
 
 	---@class ItemButton
 	local button = CreateFrame("ItemButton", name, parent, "ContainerFrameItemButtonTemplate")
+	-- WoW: Forever's gamepad cursor lands on this button, X right-clicks it (integrations/gamepad.lua).
+	button.bbGamepad = "item"
 
 	-- Install special handlers for themed interaction textures.
 	-- Use plain HookScript (not addon.HookScript) to avoid creating contexts during

@@ -88,6 +88,11 @@ quantity: one purchase's worth to start, `-` and `+` a purchase's worth at a tim
 at once, the currencies held counted too where the client lists the merchant's (`NextMerchant:MaxPurchasable`,
 `.claude/rules/next-vendor.md` §10d).
 
+On WoW: Forever's gamepad interface every panel is in Blizzard's window list while it is open
+(`integrations/gamepad.lua`, `.claude/rules/gamepad.md`). Its cursor lands on what a panel marks (`bbGamepad`): the
+item buttons, a vendor card's icon (`vendorbutton.lua`: A buys, or sells an item held, as Blizzard's merchant gamepad
+prompt does), the guild bank's buttons (`guildbutton.lua`) and the rail's tabs (`tabs.lua`).
+
 The guild bank's rail has three views at its foot (`NextTabEntry.foot`, `tabs.lua`), under its tabs and chosen as any
 tab is: Blizzard's Log, Money Log and Info. A log is the vendor's cards (`NextVendorButton:SetLog`) in sections by how
 long ago, each with a glyph for which way it went, tinted (`Vendor.LogIcons`), and who did it;

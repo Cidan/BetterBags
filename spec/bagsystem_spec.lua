@@ -28,6 +28,7 @@ local stubs = {
   nextVendor = trackStub("NextVendor"),
   nextGuildBank = trackStub("NextGuildBank"),
   consoleport = trackStub("ConsolePort"),
+  gamepad = trackStub("Gamepad"),
 }
 
 local replaced = {}
@@ -137,6 +138,8 @@ describe("BagSystem", function()
     override(stubs.nextVendor, "TakeOver", function(_, hidden) table.insert(calls.takeOver, hidden) end)
     override(stubs.nextVendor, "GiveBack", function() calls.giveBack = calls.giveBack + 1 end)
     override(stubs.consoleport, "Add", function(_, frame) table.insert(calls.consoleport, frame) end)
+    calls.gamepad = {}
+    override(stubs.gamepad, "Add", function(_, window) table.insert(calls.gamepad, window) end)
     override(addon, "WatchBackpackFrame", function(_, frame) table.insert(calls.watched, frame) end)
     override(addon, "UpdateButtonHighlight", function() calls.highlight = (calls.highlight or 0) + 1 end)
     override(_G, "InCombatLockdown", function() return false end)
@@ -198,6 +201,34 @@ describe("BagSystem", function()
       assert.are.equal("guild", addon.Bags.GuildBank.kind)
       assert.are.same({ _G.BetterBagsSneakyFrame }, calls.guildTakeOver)
       assert.is_true(special()["BagSystemSpecnextguild"])
+    end)
+
+    -- WoW: Forever's gamepad interface (integrations/gamepad.lua): every bag window it makes is handed over as it is made.
+    it("hands every window it makes to the gamepad support", function()
+      start()
+      assert.are.same({ made[1], made[2] }, calls.gamepad)
+      bagSystem:Init()
+      calls.gamepad = {}
+      nextOn = true
+      start()
+      assert.are.same({ addon.Bags.Backpack, made[4], made[5], made[6] }, calls.gamepad)
+      assert.are.same({ "next", "next", "next", "next" }, { made[3].design, made[4].design, made[5].design,
+        made[6].design })
+    end)
+
+    it("hands over the windows made later: the other design's, and a vendor switched on", function()
+      start()
+      calls.gamepad = {}
+      assert.is_true(bagSystem:Switch(ctx(), "next"))
+      assert.are.equal(4, #calls.gamepad)
+      assert.are.equal(addon.Bags.Backpack, calls.gamepad[1])
+      bagSystem:Init()
+      vendorOn = false
+      nextOn = true
+      start()
+      calls.gamepad = {}
+      assert.is_true(bagSystem:SetVendorEnabled(ctx(), true))
+      assert.are.same({ addon.Vendor }, calls.gamepad)
     end)
 
     it("makes no guild bank for the classic bags, nor on a client without one (Classic Era)", function()

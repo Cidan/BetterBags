@@ -36,6 +36,9 @@ local nextGuildBank = addon:GetModule('NextGuildBank')
 ---@class ConsolePort: AceModule
 local consoleport = addon:GetModule('ConsolePort')
 
+---@class Gamepad: AceModule
+local gamepad = addon:GetModule('Gamepad')
+
 -- BagSystem makes BetterBags' bags in one of its two designs, the classic bags or BetterBags Next,
 -- and switches between them without a reload (next.md §11). Each design is made once, the first
 -- time it is used, in an event scope of its own (events:InScope), so everything it registers can be
@@ -99,6 +102,8 @@ function bagSystem:CreateBackpack(ctx, design)
       s.backpack = bagFrame:Create(ctx, const.BAG_KIND.BACKPACK)
     end
   end)
+  -- WoW: Forever's gamepad interface reaches every bag window while it is open (integrations/gamepad.lua).
+  gamepad:Add(s.backpack)
   return s.backpack
 end
 
@@ -140,6 +145,11 @@ function bagSystem:CreateRest(ctx, design)
       end
     end
   end)
+  for _, bag in ipairs({ s.bank or false, s.vendor or false, s.guild or false }) do
+    if bag then
+      gamepad:Add(bag)
+    end
+  end
   if design == "next" then
     self:takeOver(s)
   end
@@ -202,6 +212,7 @@ function bagSystem:make(ctx, s, key)
   if key == "guild" then
     consoleport:Add(s.guild.frame)
   end
+  gamepad:Add(s[key])
 end
 
 -- makeMissing makes the vendor and guild bank switched on that BetterBags Next was made without.

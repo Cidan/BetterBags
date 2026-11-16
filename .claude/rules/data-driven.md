@@ -122,3 +122,8 @@ reasoning about it can suggest a cause; it does not establish one.
   `spec/debug_dump_harness_spec.lua` (the real defaults, over saved variables from before the list). A review found
   the default untested, as every other spec replaces the defaults; fixed test-first. Not acted on: a client whose set
   IDs are secret values would merge its sets into one entry, which `ids` still shows; not seen on any client.
+- **WoW: Forever's gamepad interface** (gamepad.md §8): the `/bbdb` dump stores `debugDumpExtras.gamepad`
+  (`Gamepad:Dump()`: the interface style, the combat restriction, Blizzard's window list and focused window, the button
+  its cursor is on and its kind, the item X uses, each bag window's state), and the module's methods return what they did
+  for the call trace. Added with the gamepad support (issue #1180), built with no Forever client here, so a player's dump
+  can show where Blizzard's cursor and window list stand. Not captured yet.

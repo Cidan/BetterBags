@@ -30,6 +30,8 @@ local simulatePane = stubModule("SimulatePane")
 local pixelPane = stubModule("PixelPane")
 local itemsModule = stubModule("Items")
 local perfSessions = stubModule("PerfSessions")
+local gamepad = stubModule("Gamepad")
+gamepad.Dump = gamepad.Dump or function() return { available = false } end
 perfSessions.GetArmedLoads = perfSessions.GetArmedLoads or function() return 0 end
 perfSessions.ArmDiagnostics = perfSessions.ArmDiagnostics or function() end
 ResetModuleStub("ItemProbe", "debug/itemprobe.lua")
@@ -232,8 +234,11 @@ describe("DebugWindow", function()
     override(addon, "atBank", false)
     override(itemProbe, "Probe", function(_, bag, slot) return { asked = bag .. "_" .. slot } end)
     override(itemProbe, "Client", function() return { version = "12.1.5" } end)
+    override(gamepad, "Dump", function() return { available = true, on = true, shown = { "BetterBagsNextBackpack" } } end)
     local dump = debugWindow.contentFrames[3]
     dump.dumpButton:GetScript("OnClick")(dump.dumpButton)
+    -- WoW: Forever's gamepad interface (integrations/gamepad.lua): what the gamepad support knows.
+    assert.are.same({ available = true, on = true, shown = { "BetterBagsNextBackpack" } }, extras.gamepad)
     assert.are.same({ asked = "0_1" }, stored["0_1"].apiProbe)
     assert.are.equal(42, stored["0_1"].itemInfo.itemID, "the item as BetterBags read it, as before")
     assert.is_nil(stored["0_2"].apiProbe, "an empty slot has nothing to ask about")
