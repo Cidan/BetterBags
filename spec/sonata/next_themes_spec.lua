@@ -560,13 +560,21 @@ describe("BetterBags Next's shipped themes", function()
           glossTex = "Interface\\AddOns\\SharedMedia\\gloss.tga",
           normFont = "Interface\\AddOns\\SharedMedia\\font.ttf",
         },
-        db = { general = { fontStyle = style or "SHADOWOUTLINE" },
+        db = { general = { fontStyle = style or "SHADOWOUTLINE", fontSize = 12 },
           bags = { colors = { items = { questStarter = { r = 0.9, g = 0.9, b = 0.2, a = 1 },
-            questItem = { r = 0.8, g = 0.1, b = 0.1, a = 1 } } } } },
+            questItem = { r = 0.8, g = 0.1, b = 0.1, a = 1 } } },
+            countFont = "Expressway", countFontSize = 13, countFontOutline = "SHADOWOUTLINE",
+            itemLevelFont = "PT Sans Narrow", itemLevelFontSize = 11, itemLevelFontOutline = "MONOCHROMEOUTLINE" } },
+        -- LibSharedMedia's fonts by name (E.Libs.LSM, General/Initialize.lua:198; LibSharedMedia-3.0.lua: MediaTable).
+        Libs = { LSM = { MediaTable = { font = {
+          Expressway = "Interface\\AddOns\\ElvUI\\Game\\Shared\\Media\\Fonts\\Expressway.ttf",
+          ["PT Sans Narrow"] = "Interface\\AddOns\\ElvUI\\Game\\Shared\\Media\\Fonts\\PTSansNarrow.ttf",
+          Homespun = "Interface\\AddOns\\ElvUI\\Game\\Shared\\Media\\Fonts\\Homespun.ttf",
+        } } } },
         TexCoords = { 0.1, 0.9, 0.1, 0.9 },
         PixelMode = pixelMode,
         Border = pixelMode and 1 or 2,
-        Bags = { UpdateBagColors = function() end },
+        Bags = { UpdateBagColors = function() end, UpdateItemDisplay = function() end },
         UpdateMedia = function() end,
         UpdateTexCoords = function() end,
       }
@@ -638,8 +646,21 @@ describe("BetterBags Next's shipped themes", function()
         if key == "media" then
           assert.is_truthy(core:find("E.media." .. ref.Path[3] .. " = ", 1, true), name .. ": E.media." .. ref.Path[3])
         elseif key == "db" and ref.Path[3] == "general" then
-          assert.are.same({ 1, "db", "general", "fontStyle" }, ref.Path, name)
-          assert.is_truthy(profile:find("fontStyle = 'OUTLINE'", 1, true), name)
+          assert.are.equal(4, #ref.Path, name)
+          assert.is_truthy(({ fontStyle = true, fontSize = true })[ref.Path[4]], name)
+          assert.is_truthy(profile:find(ref.Path[4] .. " = ", 1, true), name)
+        elseif key == "db" and ref.Path[4] ~= "colors" then
+          -- The bags' text settings (Defaults/Profile.lua, P.bags), read by B:UpdateItemDisplay (Bags.lua).
+          assert.are.same({ 1, "db", "bags" }, { ref.Path[1], ref.Path[2], ref.Path[3] }, name)
+          assert.are.equal(4, #ref.Path, name)
+          assert.is_truthy(profile:find("\n\t" .. ref.Path[4] .. " = ", 1, true), name .. ": P.bags." .. ref.Path[4])
+          assert.is_truthy(bags:find("db." .. ref.Path[4], 1, true), name)
+        elseif key == "Libs" then
+          -- A font by the name another variable reads: LibSharedMedia's table, as LSM:Fetch reads it.
+          assert.are.same({ 1, "Libs", "LSM", "MediaTable", "font" },
+            { ref.Path[1], ref.Path[2], ref.Path[3], ref.Path[4], ref.Path[5] }, name)
+          assert.is_truthy(ref.Path[6]:match("^%$%a+$"), name)
+          assert.is_truthy(init:find("E:AddLib('LSM', 'LibSharedMedia-3.0')", 1, true), name)
         elseif key == "db" then
           -- The bags' quest colors (Defaults/Profile.lua: bags.colors.items), read by B.QuestColors (Bags.lua).
           assert.are.same({ "bags", "colors", "items" }, { ref.Path[3], ref.Path[4], ref.Path[5] }, name)
@@ -656,7 +677,7 @@ describe("BetterBags Next's shipped themes", function()
       local methods = {}
       for _, watch in ipairs(sonataNext.themes.ElvUI.Watch) do
         assert.are.equal("ElvUI", watch.Global)
-        if watch.Method == "UpdateBagColors" then
+        if watch.Method == "UpdateBagColors" or watch.Method == "UpdateItemDisplay" then
           -- Its bags module (E.Bags, General/Initialize.lua), whose color options call it (ElvUI_Options Bags.lua).
           assert.are.same({ 1, "Bags" }, watch.Path)
         else
@@ -665,10 +686,11 @@ describe("BetterBags Next's shipped themes", function()
         table.insert(methods, watch.Method)
       end
       table.sort(methods)
-      assert.are.same({ "UpdateBagColors", "UpdateMedia", "UpdateTexCoords" }, methods)
+      assert.are.same({ "UpdateBagColors", "UpdateItemDisplay", "UpdateMedia", "UpdateTexCoords" }, methods)
       assert.is_truthy(core:find("function E:UpdateMedia()", 1, true))
       assert.is_truthy(toolkit:find("function E:UpdateTexCoords()", 1, true))
       assert.is_truthy(bags:find("function B:UpdateBagColors(", 1, true))
+      assert.is_truthy(bags:find("function B:UpdateItemDisplay()", 1, true))
       assert.is_truthy(init:find("E.Bags = E:NewModule('Bags'", 1, true))
     end)
 
@@ -853,7 +875,8 @@ describe("BetterBags Next's shipped themes", function()
       assert.are.same({ TEX .. "BagUpgradeIcon.tga", 1.2 }, { b.UpgradeIcon.Texture, b.UpgradeIcon.Scale })
       assert.are.same({ { 1, 1, 1, 0.3 }, "ADD" }, { b.Highlight.Color, b.Highlight.BlendMode }, "StyleButton")
       assert.are.same({ { 0.9, 0.8, 0.1, 0.3 }, "ADD" }, { b.Pushed.Color, b.Pushed.BlendMode }, "StyleButton")
-      assert.are.same({ MEDIA .. "Fonts\\Homespun.ttf", 10, "MONOCHROMEOUTLINE" },
+      -- The player's count font (the stand-in's: Expressway 13, SHADOWOUTLINE).
+      assert.are.same({ MEDIA .. "Fonts\\Expressway.ttf", 13, "OUTLINE" },
         { b.Count.Font.Path, b.Count.Font.Size, b.Count.Font.Flags })
     end)
 
@@ -915,6 +938,101 @@ describe("BetterBags Next's shipped themes", function()
       assert.is_false(pixel.ItemButton.Backdrop.Outlines)
       _G.ElvUI = nil
       assert.is_false(t().Panel.Edge.Outlines, "pixel mode, ElvUI's default, while it is not there")
+    end)
+
+    -- Asked: follow ElvUI's font size (E.db.general.fontSize, 12 by default; its options call E:UpdateMedia). Every role
+    -- keeps its difference from ElvUI's 12, but the vendor's card text (sized to sit beside its icon) and the counts
+    -- (ElvUI's bag fonts' own size). The rows around the text grow with it by the lines of text each holds, an offset to
+    -- stay centered by half, and a width that holds text as text widens (next-themes-elvui.md §27).
+    local ROWS = {
+      { "Layout.SearchTop", 1 }, { "Layout.SearchHeight", 1 }, { "Layout.ContentTop", 2 }, { "Layout.Footer", 1 },
+      { "Layout.FooterText", 0 }, { "Layout.FooterMoney", 0 }, { "Layout.FooterCoins", 0.5 },
+      { "Layout.SectionHeader", 1 },
+      { "Layout.TabHeight", 1 }, { "Layout.HeaderButtonTop", 0.5 }, { "Dock.TitleHeight", 1 }, { "Dock.LineHeight", 1 },
+      { "Currency.Icon", 1 }, { "Controls.Button.Height", 1 }, { "Controls.Input.Height", 1 },
+      { "Controls.Dropdown.Height", 1 }, { "Controls.Menu.ItemHeight", 1 }, { "Controls.Menu.Picker.IconSize", 2 },
+      { "Controls.TopTabs.Height", 1 }, { "Settings.Brand.Height", 1 }, { "Settings.Nav.ItemHeight", 1 },
+      { "Settings.Nav.GroupHeight", 1 }, { "Settings.Version.Bottom", 1 }, { "Settings.Header.Height", 2 },
+      { "Settings.Content.TitleHeight", 1 }, { "Settings.Content.RowHeight", 1 }, { "Settings.Footer.Height", 1 },
+      { "Settings.Categories.RowHeight", 2 }, { "Settings.Categories.GroupHeight", 1 },
+      { "Settings.BagCategories.RowHeight", 1 }, { "Settings.BagCategories.GroupHeight", 1 },
+      { "Settings.Currency.HeaderHeight", 1 }, { "Settings.Currency.RowHeight", 1 }, { "Settings.Cards.Height", 3 },
+    }
+    local WIDTHS = { "Settings.Categories.LabelWidth", "Settings.Categories.FilterWidth", "Controls.Slider.ValueWidth",
+      "Controls.Dropdown.Width", "Layout.TabMaxWidth", "Settings.Sidebar.Width", "Currency.Tracker.ListWidth",
+      "Settings.Width", "Settings.Height" }
+    local VENDOR = { Price = true, PriceUnaffordable = true, VendorName = true }
+
+    local function at(theme, path)
+      local node = theme
+      for key in path:gmatch("[^.]+") do node = node[key] end
+      return node
+    end
+
+    it("follows ElvUI's font size: every role but the vendor's and the counts, the rows around them growing with it", function()
+      local base = t()
+      for _, size in ipairs({ 20, 9 }) do
+        local d = size - 12
+        elvui().db.general.fontSize = size
+        local theme = t()
+        for role, spec in pairs(theme.Fonts) do
+          if VENDOR[role] then
+            assert.are.equal(base.Fonts[role].Size, spec.Size, role .. " at " .. size)
+          elseif role ~= "Stack" then
+            assert.are.equal(base.Fonts[role].Size + d, spec.Size, role .. " at " .. size)
+          end
+        end
+        assert.are.equal(13, theme.Fonts.Stack.Size, "the bags' count size")
+        for _, row in ipairs(ROWS) do
+          assert.are.equal(at(base, row[1]) + row[2] * d, at(theme, row[1]), row[1] .. " at " .. size)
+        end
+        for _, path in ipairs(WIDTHS) do
+          local want = at(base, path) * size / 12
+          assert.is_true(math.abs(want - at(theme, path)) < 1e-9, path .. " at " .. size .. ": " .. at(theme, path))
+        end
+        assert.are.same({}, sonataNext:Check("ElvUI"), "at " .. size)
+      end
+      -- At ElvUI's 12 the theme is as it is drawn without ElvUI.
+      elvui()
+      local at12 = t()
+      for _, row in ipairs(ROWS) do
+        assert.are.equal(at(base, row[1]), at(at12, row[1]), row[1])
+      end
+      assert.are.equal(base.Fonts.Title.Size, at12.Fonts.Title.Size)
+      assert.are.same({ 16, 46, 76, 20, 30 }, { base.Fonts.Title.Size, base.Layout.SearchTop, base.Layout.ContentTop,
+        base.Layout.SectionHeader, base.Layout.Footer }, "ElvUI's look at its default size")
+    end)
+
+    -- ElvUI's bags draw counts and item levels in fonts of their own, picked by name (B:UpdateItemDisplay: FontTemplate,
+    -- LSM:Fetch; Defaults/Profile.lua: Homespun 10 MONOCHROMEOUTLINE), a SHADOW style a black shadow 1 down and right,
+    -- 0.6 with an outline (E:SetFontShadow). The vendor's stack counts are the bags' counts (Stack). Not their color: a
+    -- color dragged in ElvUI's options would make a font object on every step (next-themes-references.md §2b).
+    it("draws counts and item levels in ElvUI's bag fonts, sizes and outlines, by the names the player picked", function()
+      local FONTS = "Interface\\AddOns\\ElvUI\\Game\\Shared\\Media\\Fonts\\"
+      local NONE = { Color = { 0, 0, 0, 0 }, X = 0, Y = 0 }
+      elvui()
+      local theme = t()
+      local b = theme.ItemButton
+      assert.are.same({ Path = FONTS .. "Expressway.ttf", Size = 13, Flags = "OUTLINE",
+        Shadow = { Color = { 0, 0, 0, 0.6 }, X = 1, Y = -1 } }, b.Count.Font)
+      assert.are.same({ Path = FONTS .. "PTSansNarrow.ttf", Size = 11, Flags = "MONOCHROMEOUTLINE", Shadow = NONE },
+        b.ItemLevel.Font)
+      local stack = theme.Fonts.Stack
+      assert.are.same({ FONTS .. "Expressway.ttf", 13, "OUTLINE" }, { stack.File, stack.Size, stack.Flags })
+      assert.are.same({ Color = { 0, 0, 0, 0.6 }, X = 1, Y = -1 }, stack.Shadow)
+      assert.are.same({}, sonataNext:Check("ElvUI"))
+      -- A name LibSharedMedia does not have (a font not registered for this locale): ElvUI's default, Homespun.
+      ElvUI[1].db.bags.countFont = "Missing"
+      ElvUI[1].db.bags.countFontOutline = "SHADOW"
+      b = t().ItemButton
+      assert.are.equal(FONTS .. "Homespun.ttf", b.Count.Font.Path)
+      assert.are.same({ Color = { 0, 0, 0, 1 }, X = 1, Y = -1 }, b.Count.Font.Shadow, "SHADOW alone: at 1")
+      assert.are.equal("", b.Count.Font.Flags)
+      -- ElvUI not there: its defaults.
+      _G.ElvUI = nil
+      b = t().ItemButton
+      assert.are.same({ Path = FONTS .. "Homespun.ttf", Size = 10, Flags = "MONOCHROMEOUTLINE", Shadow = NONE }, b.Count.Font)
+      assert.are.same({ Path = FONTS .. "Homespun.ttf", Size = 10, Flags = "MONOCHROMEOUTLINE", Shadow = NONE }, b.ItemLevel.Font)
     end)
 
     it("draws the settings window on ElvUI's templates, its lists lit as ElvUI lights them", function()

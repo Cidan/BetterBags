@@ -491,6 +491,60 @@ describe("SonataNext", function()
       assert.is_true(t.Variables.Pixel)
     end)
 
+    -- ElvUI's font size drives every role's size, each keeping its difference from ElvUI's 12, and the rows around the
+    -- text grow with it (next-themes-elvui.md §27): a number read is read times Scale, plus Add, the fallback too.
+    it("reads a number times its Scale plus its Add, the fallback too, and leaves anything else as it is", function()
+      sonataNext:RegisterTheme({ Name = "Elvish", Variables = {
+        Title = ref({ 1, "media", "size" }, 12, { Add = 4 }),
+        Rows = ref({ 1, "media", "size" }, 12, { Scale = 2, Add = 52 }),
+        Gone = ref({ 1, "media", "nope" }, 12, { Add = -2 }),
+        Mapped = ref({ 1, "media", "style" }, 1, { Map = { SHADOWOUTLINE = 3 }, Add = 1 }),
+        Text = ref({ 1, "media", "font" }, false, { Add = 3 }),
+      } })
+      local V = sonataNext:Resolve("Elvish").Variables
+      assert.are.same({ 18, 80, 10, 4 }, { V.Title, V.Rows, V.Gone, V.Mapped })
+      assert.are.equal("Interface\\AddOns\\SpecAddon\\font.ttf", V.Text, "not a number: as it is")
+    end)
+
+    -- LibSharedMedia keeps a font's file by its name (LibSharedMedia-3.0.lua: MediaTable.font[name]), and ElvUI keeps the
+    -- name the player picked (E.db.bags.countFont): a path key naming another variable ("$Name") reads that variable
+    -- first, so one reference reads the file of the name another reads.
+    it("reads a path key that names another variable as that variable's value", function()
+      _G.SpecAddon.libs = { media = { font = { Homespun = "Interface\\Spec\\Homespun.ttf" } } }
+      _G.SpecAddon[1].bags = { countFont = "Homespun", bad = {} }
+      sonataNext:RegisterTheme({ Name = "Elvish", Variables = {
+        CountName = ref({ 1, "bags", "countFont" }, "Homespun"),
+        CountFile = ref({ "libs", "media", "font", "$CountName" }, "Interface\\Spec\\Fallback.ttf"),
+        BadName = ref({ 1, "bags", "bad" }, false),
+        BadFile = ref({ "libs", "media", "font", " $BadName " }, "Interface\\Spec\\Fallback.ttf"),
+      } })
+      local V = sonataNext:Resolve("Elvish").Variables
+      assert.are.equal("Interface\\Spec\\Homespun.ttf", V.CountFile)
+      assert.are.equal("Interface\\Spec\\Fallback.ttf", V.BadFile, "a name that reads nothing: the fallback")
+      _G.SpecAddon[1].bags.countFont = "Missing"
+      assert.are.equal("Interface\\Spec\\Fallback.ttf", sonataNext:Resolve("Elvish").Variables.CountFile)
+      -- Check reads it the same way: nothing to report while the name is there.
+      _G.SpecAddon[1].bags.countFont = "Homespun"
+      for _, problem in ipairs(sonataNext:Check("Elvish")) do
+        assert.is_nil(problem:find("CountFile", 1, true), problem)
+      end
+      _G.SpecAddon[1].bags.countFont = "Missing"
+      local found = false
+      for _, problem in ipairs(sonataNext:Check("Elvish")) do
+        found = found or problem:find("Variables.CountFile: SpecAddon.libs.media.font.Missing", 1, true) ~= nil
+      end
+      assert.is_true(found, "Check names the key it read")
+    end)
+
+    it("refuses a Scale or an Add that is not a number", function()
+      for _, extra in ipairs({ { Scale = "2" }, { Add = {} } }) do
+        sonataNext.themes.Bad = nil
+        assert.has_error(function()
+          sonataNext:RegisterTheme({ Name = "Bad", Variables = { Size = ref({ 1, "media", "size" }, 12, extra) } })
+        end)
+      end
+    end)
+
     it("reads them again every time it resolves, and copies what it reads", function()
       sonataNext:RegisterTheme({ Name = "Elvish", Variables = { Border = ref({ 1, "media", "border" }, { 0, 0, 0, 1 }) },
         Palette = { Border = "$Border" } })

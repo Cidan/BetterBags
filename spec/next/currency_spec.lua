@@ -1557,10 +1557,12 @@ describe("BetterBags Next's currencies", function()
       local t = tracker.instance
       t:Draw(ctx())
       local before = strip(bag).entries["currency:1"].count:GetFontObject()
-      UseNextTheme({ Parent = "Default", Currency = { Tracker = { Edge = false } } })
+      -- A font drawn otherwise: the entries move to the object made for it (a look drawn before keeps its object).
+      UseNextTheme({ Parent = "Default", Fonts = { Footer = { Size = 19 } }, Currency = { Tracker = { Edge = false } } })
       strip(bag):ApplyStyle(ctx())
       t:ApplyStyle(ctx())
       assert.are_not.equal(before, strip(bag).entries["currency:1"].count:GetFontObject())
+      assert.are.equal(style:Font("Footer"), strip(bag).entries["currency:1"].count:GetFontObject())
       assert.is_false(t.edge.Top:IsShown())
       UseNextTheme(nil)
     end)

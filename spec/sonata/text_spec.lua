@@ -157,6 +157,58 @@ describe("Sonata text roles", function()
     assert.are.same({ 0.1, 0.2, 0.3, 1 }, color(paperBody))
   end)
 
+  -- Asked: "reuse by look for every theme". A font object can never be freed: a look drawn before is drawn with the
+  -- object made for it, so applying the same theme again, or switching back, makes none.
+  it("draws a look it drew before with the font object it made for it", function()
+    local text = sonata:CreateText(UIParent, "Body")
+    local before = text:GetFontObject()
+    apply("Default")
+    assert.are.equal(before, text:GetFontObject(), "the same theme applied again")
+    sonata:RegisterTheme({ Name = "Paper", Variables = { TextColor = { 0.1, 0.2, 0.3, 1 } } })
+    apply("Paper")
+    local paper = text:GetFontObject()
+    assert.are_not.equal(before, paper)
+    apply("Default")
+    assert.are.equal(before, text:GetFontObject(), "switched back")
+    apply("Paper")
+    assert.are.equal(paper, text:GetFontObject())
+  end)
+
+  -- For profiler traces (data-driven.md).
+  it("says how many font objects a theme's set made and how many roles it drew with ones made before", function()
+    sonata:CreateText(UIParent, "Body")
+    sonata:CreateText(UIParent, "Heading")
+    local made, reused = sonata:newTextFonts()
+    assert.are.equal(0, made, "the same theme again")
+    assert.is_true(reused >= 2, tostring(reused))
+    sonata:RegisterTheme({ Name = "Paper", Variables = { TextColor = { 0.1, 0.2, 0.3, 1 } } })
+    apply("Paper")
+    made = sonata:newTextFonts()
+    assert.are.equal(0, made, "Paper's looks made as it applied")
+  end)
+
+  it("makes a font object of its own for a role that differs in anything it draws", function()
+    sonata:RegisterTheme({ Name = "Looks", Text = {
+      A = { Object = "GameFontHighlight", Color = { 1, 1, 1, 1 } },
+      Same = { Object = "GameFontHighlight", Color = { 1, 1, 1, 1 } },
+      Object = { Object = "GameFontNormal", Color = { 1, 1, 1, 1 } },
+      Color = { Object = "GameFontHighlight", Color = { 1, 0, 0, 1 } },
+      Path = { Object = "GameFontHighlight", Path = "Fonts\\ARIALN.TTF", Size = 14, Color = { 1, 1, 1, 1 } },
+      Size = { Object = "GameFontHighlight", Path = "Fonts\\ARIALN.TTF", Size = 15, Color = { 1, 1, 1, 1 } },
+      Flags = { Object = "GameFontHighlight", Path = "Fonts\\ARIALN.TTF", Size = 14, Flags = "OUTLINE", Color = { 1, 1, 1, 1 } },
+      Shadow = { Object = "GameFontHighlight", Color = { 1, 1, 1, 1 }, Shadow = { Color = { 0, 0, 0, 1 }, X = 2, Y = -2 } },
+      Justify = { Object = "GameFontHighlight", Color = { 1, 1, 1, 1 }, Justify = "RIGHT" },
+    } })
+    apply("Looks")
+    assert.are.equal(sonata:GetTextFont("A"), sonata:GetTextFont("Same"))
+    local seen = {}
+    for _, role in ipairs({ "A", "Object", "Color", "Path", "Size", "Flags", "Shadow", "Justify" }) do
+      local font = sonata:GetTextFont(role)
+      assert.is_nil(seen[font], role .. " shares " .. tostring(seen[font]))
+      seen[font] = role
+    end
+  end)
+
   it("never changes a font object once it is made, through theme switches and text rescales", function()
     local originalCreateFont = _G.CreateFont
     local made = {}
@@ -276,6 +328,7 @@ describe("Sonata text roles", function()
     assert.are.equal(20, select(2, hover:GetFont()))
     assert.are.equal(height, select(2, before:GetFont()))
     assert.are.equal(height, select(2, text:GetFontObject():GetFont()))
+    assert.are.equal(before, text:GetFontObject(), "the client's fonts as they were: the object made for them")
   end)
 
   -- A role font is a copy of its client font (CopyFontObject), as Blizzard makes its own runtime

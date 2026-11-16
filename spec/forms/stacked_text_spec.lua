@@ -108,7 +108,7 @@ describe("stacked layout text", function()
 
   -- The settings window is built before Sonata applies the saved theme, and a font object
   -- changed while its text used it left that text out of step: hovering an entry changed its
-  -- size until a theme switch. Font objects are now made per theme and never changed.
+  -- size until a theme switch. Font objects are now never changed, each made once for its look.
   it("leaves a hovered entry on the same font object as the entries never hovered", function()
     local layout = newLayout(true, true)
     layout:AddSection({ title = "General", description = "" })
@@ -122,7 +122,7 @@ describe("stacked layout text", function()
     sonata:ApplyTheme(addon:GetModule("Context"):New("spec"), "Default", false)
     events.SendMessage = originalSend
     local nav = sonata:GetTextFont("Nav")
-    assert.are_not.equal(before, nav)
+    assert.are.equal(before, nav, "the same look: the object made for it")
     assert.are.equal(nav, items:GetFontString():GetFontObject())
     local height = select(2, nav:GetFont())
     bags:GetScript("OnEnter")(bags)

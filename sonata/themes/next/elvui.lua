@@ -16,8 +16,9 @@ local sonataNext = addon:GetModule('SonataNext')
 --     transparent one (the fade color), cards, fields, tabs, buttons and the search box on its default one (the
 --     backdrop color), each with its one-pixel edge in the border color. Its value color where ElvUI lights things.
 --   Its controls as its skins draw them (Modules/Skins/Skins.lua); its bags' buttons and slots (Modules/Bags/Bags.lua).
---   Text in ElvUI's font and style; sizes fixed per role (a theme drawn again at other sizes makes new font objects,
---     which can never be freed).
+--   Text in ElvUI's font, style and size: every role but the vendor card's keeps its difference from ElvUI's 12, and the
+--     rows, offsets and widths round it grow with it (grow, widen); the bags' counts and item levels in ElvUI's bag
+--     fonts. Font objects are reused by look, so a size passed once makes its set once (next-themes.md §4).
 -- Paths below are under ElvUI/Game/Shared/.
 local MEDIA = "Interface\\AddOns\\ElvUI\\Game\\Shared\\Media\\"
 local TEX = MEDIA .. "Textures\\"
@@ -45,18 +46,54 @@ local SHADOWED = {
   NONE = false, OUTLINE = false, THICKOUTLINE = false, MONOCHROME = false, MONOCHROMEOUTLINE = false,
   MONOCHROMETHICKOUTLINE = false, SHADOW = true, SHADOWOUTLINE = true, SHADOWTHICKOUTLINE = true,
 }
+-- The same as a shadow to draw (E:SetFontShadow, General/Initialize.lua:460-463): black 1 down and right, at 1 for SHADOW
+-- alone and 0.6 with an outline; none for the rest. For the bags' own fonts (their outline settings).
+local NO_SHADOW = { Color = { 0, 0, 0, 0 }, X = 0, Y = 0 }
+local SOFT_SHADOW = { Color = { 0, 0, 0, 0.6 }, X = 1, Y = -1 }
+local BAG_SHADOWS = {
+  NONE = NO_SHADOW, OUTLINE = NO_SHADOW, THICKOUTLINE = NO_SHADOW, MONOCHROME = NO_SHADOW, MONOCHROMEOUTLINE = NO_SHADOW,
+  MONOCHROMETHICKOUTLINE = NO_SHADOW, SHADOW = { Color = { 0, 0, 0, 1 }, X = 1, Y = -1 }, SHADOWOUTLINE = SOFT_SHADOW,
+  SHADOWTHICKOUTLINE = SOFT_SHADOW,
+}
 local FAINT = { 0, 0, 0, 0.6 }
 local SHADOW_COLORS = {
   NONE = FAINT, OUTLINE = FAINT, THICKOUTLINE = FAINT, MONOCHROME = FAINT, MONOCHROMEOUTLINE = FAINT,
   MONOCHROMETHICKOUTLINE = FAINT, SHADOW = { 0, 0, 0, 1 }, SHADOWOUTLINE = FAINT, SHADOWTHICKOUTLINE = FAINT,
 }
 
--- A text role in ElvUI's font and style, size and color its own.
+-- The sizes that follow ElvUI's font size (E.db.general.fontSize, 12 by default, Defaults/Profile.lua:76; its options
+-- call E:UpdateMedia): variables gathered as the theme is written, added to its Variables below.
+local sizes = {}
+
+-- grow names a size that follows ElvUI's font size: base at its 12, n times the change past it (n lines of text in a
+-- row; 0.5 for an offset that keeps something centered on a line).
+---@param base number
+---@param n? number
+---@return string
+local function grow(base, n)
+  n = n or 1
+  local name = ("Grow%s_%s"):format((tostring(base):gsub("%.", "_")), (tostring(n):gsub("%.", "_")))
+  sizes[name] = elvui({ "db", "general", "fontSize" }, 12, { Scale = n, Add = base - 12 * n })
+  return "$" .. name
+end
+
+-- widen names a width that holds text, widening as the text does: base at ElvUI's 12, in proportion past it.
+---@param base number
+---@return string
+local function widen(base)
+  local name = ("Wide%s"):format((tostring(base):gsub("%.", "_")))
+  sizes[name] = elvui({ "db", "general", "fontSize" }, 12, { Scale = base / 12 })
+  return "$" .. name
+end
+
+-- A text role in ElvUI's font and style, size and color its own; its size following ElvUI's font size, keeping its
+-- difference from ElvUI's 12, unless it is fixed (the vendor's card text, sized to sit beside its icon).
 ---@param size number
 ---@param color string
+---@param fixed? boolean
 ---@return table
-local function text(size, color)
-  return { File = "$Font", Flags = "$FontFlags", Shadow = "$Shadowed", Size = size, Color = color }
+local function text(size, color, fixed)
+  return { File = "$Font", Flags = "$FontFlags", Shadow = "$Shadowed", Size = fixed and size or grow(size), Color = color }
 end
 
 -- ElvUI's one-pixel edge (SetTemplate: E.twoPixelsPlease is always false, General/Initialize.lua:103), and lit; with
@@ -88,7 +125,7 @@ end
 local ROW_HOVER = { Texture = "Highlight", Color = "White", Alpha = 0.3 }
 local ROW_CHOSEN = { Texture = "Highlight", Color = "Accent", Alpha = 0.5 }
 
-sonataNext:RegisterTheme({
+local theme = {
   Name = "ElvUI",
   DisplayName = "ElvUI",
   Description = "ElvUI's look, in your ElvUI colors, textures and font: flat frames, one-pixel borders, its art.",
@@ -125,14 +162,31 @@ sonataNext:RegisterTheme({
     -- (Modules/Bags/Bags.lua:615-617, B.QuestColors).
     QuestStarter = elvui({ "db", "bags", "colors", "items", "questStarter" }, { 1, 0.96, 0.41, 1 }, { Alpha = 1 }),
     QuestItem = elvui({ "db", "bags", "colors", "items", "questItem" }, { 0.9, 0.3, 0.3, 1 }, { Alpha = 1 }),
+    -- The bags' count and item level fonts (Defaults/Profile.lua, P.bags: Homespun 10 MONOCHROMEOUTLINE), by the name the
+    -- player picked, as B:UpdateItemDisplay draws them (FontTemplate: LSM:Fetch, General/Toolkit.lua): the file from
+    -- LibSharedMedia's table (E.Libs.LSM, General/Initialize.lua:198), ElvUI's Homespun for a name it does not have (a
+    -- font not registered for this client's locale). Not their color: a color dragged would make a font object a step.
+    CountName = elvui({ "db", "bags", "countFont" }, "Homespun"),
+    CountFile = elvui({ "Libs", "LSM", "MediaTable", "font", "$CountName" }, MEDIA .. "Fonts\\Homespun.ttf"),
+    CountSize = elvui({ "db", "bags", "countFontSize" }, 10),
+    CountFlags = elvui({ "db", "bags", "countFontOutline" }, "MONOCHROMEOUTLINE", { Map = FLAGS }),
+    CountShadow = elvui({ "db", "bags", "countFontOutline" }, NO_SHADOW, { Map = BAG_SHADOWS }),
+    LevelName = elvui({ "db", "bags", "itemLevelFont" }, "Homespun"),
+    LevelFile = elvui({ "Libs", "LSM", "MediaTable", "font", "$LevelName" }, MEDIA .. "Fonts\\Homespun.ttf"),
+    LevelSize = elvui({ "db", "bags", "itemLevelFontSize" }, 10),
+    LevelFlags = elvui({ "db", "bags", "itemLevelFontOutline" }, "MONOCHROMEOUTLINE", { Map = FLAGS }),
+    LevelShadow = elvui({ "db", "bags", "itemLevelFontOutline" }, NO_SHADOW, { Map = BAG_SHADOWS }),
   },
   -- ElvUI's options call E:UpdateMedia after every change (ElvUI_Options/Game/Shared/General.lua), and its start calls
   -- E:UpdateTexCoords after E:UpdateMedia (General/Core.lua:2047-2055); its bags' color options call UpdateBagColors on
-  -- its bags module (E.Bags, General/Initialize.lua:79; ElvUI_Options/Game/Shared/Bags.lua:196).
+  -- its bags module (E.Bags, General/Initialize.lua:79; ElvUI_Options/Game/Shared/Bags.lua:196), its text options
+  -- UpdateItemDisplay.
   Watch = {
     { Global = "ElvUI", Path = { 1 }, Method = "UpdateMedia" },
     { Global = "ElvUI", Path = { 1 }, Method = "UpdateTexCoords" },
     { Global = "ElvUI", Path = { 1, "Bags" }, Method = "UpdateBagColors" },
+    -- Its bags' count, item level and item info options call UpdateItemDisplay (ElvUI_Options/Game/Shared/Bags.lua:145-167).
+    { Global = "ElvUI", Path = { 1, "Bags" }, Method = "UpdateItemDisplay" },
   },
 
   Textures = {
@@ -190,11 +244,13 @@ sonataNext:RegisterTheme({
     Search = text(12, "Muted"),
     SearchText = text(12, "Text"),
     -- Two lines of a name and a price beside a vendor's 36-pixel icon.
-    Price = text(11, "White"),
-    PriceUnaffordable = text(11, "Unaffordable"),
-    VendorName = text(11, "Text"),
-    -- The bags' counts in ElvUI's: Homespun 10, MONOCHROMEOUTLINE (Defaults/Profile.lua:487-489).
-    Stack = { Object = "NumberFontNormal", File = MEDIA .. "Fonts\\Homespun.ttf", Size = 10, Flags = "MONOCHROMEOUTLINE" },
+    Price = text(11, "White", true),
+    PriceUnaffordable = text(11, "Unaffordable", true),
+    VendorName = text(11, "Text", true),
+    -- The vendor's stack counts in the bags' count font, size and outline (CountFile: the player's, Homespun 10
+    -- MONOCHROMEOUTLINE by default).
+    Stack = { Object = "NumberFontNormal", File = "$CountFile", Size = "$CountSize", Flags = "$CountFlags",
+      Shadow = "$CountShadow" },
     ControlText = text(12, "Text"),
     ControlMuted = text(12, "Muted"),
     ControlHelp = text(12, "Muted"),
@@ -242,23 +298,30 @@ sonataNext:RegisterTheme({
     PerRow = 10,
     VendorPriceRaise = 3,
     Pad = 12,
+    -- The rows round the text grow with ElvUI's font size: the search box under the title, the content under both, the
+    -- footer, the section headers and the tabs a line each; the header buttons stay centered on the title. The footer's
+    -- text and money stay where they are: anchored by their bottoms in a footer that grows as its text does, they stay
+    -- centered (found in review: moved by half a line, the free-slot text left its footer for the items from 28).
     TitleTop = 18,
     TitleInset = 2,
-    SearchTop = 46,
-    SearchHeight = 20,
-    ContentTop = 76,
-    Footer = 30,
+    SearchTop = grow(46),
+    SearchHeight = grow(20),
+    ContentTop = grow(76, 2),
+    Footer = grow(30),
     FooterText = 10,
     FooterMoney = 9,
-    SectionHeader = 20,
+    -- The gold, a box of its own size (next/coins.lua), moves by half a line to stay centered in the footer.
+    FooterCoins = grow(9, 0.5),
+    SectionHeader = grow(20),
     SectionSpacing = 10,
-    TabHeight = 24,
+    TabHeight = grow(24),
+    TabMaxWidth = widen(150),
     TabSpacing = 2,
     TabPadding = 10,
     -- Its bag buttons are 20 across (Modules/Bags/Bags.lua:2512-2543), 5 apart.
     HeaderButton = 20,
     HeaderButtonGap = 5,
-    HeaderButtonTop = 16,
+    HeaderButtonTop = grow(16, 0.5),
   },
 
   -- ElvUI's frames appear where they go: no bounce.
@@ -329,6 +392,9 @@ sonataNext:RegisterTheme({
     Card = { Color = "Card" },
     Glow = { Color = "Accent", Width = 1, Low = 0.5, High = 1, Period = 1.2 },
     Halo = false,
+    -- Its title and its two lines, each a line of text.
+    TitleHeight = grow(22),
+    LineHeight = grow(16),
   },
 
   -- The currencies' cap bars in the player's bar texture (HandleStatusBar: E.media.normTex), the tracker on the
@@ -341,7 +407,9 @@ sonataNext:RegisterTheme({
     Flash = { Color = "Accent" },
     Drop = { Color = "Accent" },
     Slot = { Color = "Accent" },
-    Tracker = { Fill = { Color = "Body" }, Edge = EDGE },
+    Tracker = { Fill = { Color = "Body" }, Edge = EDGE, ListWidth = widen(200) },
+    -- An entry's row is its icon's: it holds its count and name.
+    Icon = grow(16),
   },
 
   Vendor = {
@@ -372,34 +440,48 @@ sonataNext:RegisterTheme({
     UpgradeIcon = { Texture = TEX .. "BagUpgradeIcon.tga", Scale = 1.2 },
     Highlight = { Color = { 1, 1, 1, 0.3 }, BlendMode = "ADD", Inset = "Edge" },
     Pushed = { Color = { 0.9, 0.8, 0.1, 0.3 }, BlendMode = "ADD", Inset = "Edge" },
-    Count = { Font = { Path = MEDIA .. "Fonts\\Homespun.ttf", Size = 10, Flags = "MONOCHROMEOUTLINE" } },
+    Count = { Font = { Path = "$CountFile", Size = "$CountSize", Flags = "$CountFlags", Shadow = "$CountShadow" } },
+    ItemLevel = { Font = { Path = "$LevelFile", Size = "$LevelSize", Flags = "$LevelFlags", Shadow = "$LevelShadow" } },
   },
 
   Settings = {
+    -- The window grows as its text does (it shrinks itself to fit the screen, settings:fitScale): its sidebar and
+    -- controls widen with the text, and in a window of a fixed width they spilled off the page from 30 (found in review).
+    Width = widen(1000),
+    Height = widen(720),
     Fill = { Color = "Body" },
     Wash = false,
     Edge = EDGE,
-    Sidebar = { Fill = { Color = "Card", Alpha = 0.5 }, Line = LINE },
-    Brand = { IconColor = "Accent", Line = { Color = "Accent", From = 1, To = 0, Size = 1 } },
+    -- Every row round text grows with ElvUI's font size by the lines it holds (the header its title and description, a
+    -- category its name and note, a theme's card its name, status and description), and the sidebar widens with it.
+    Sidebar = { Fill = { Color = "Card", Alpha = 0.5 }, Line = LINE, Width = widen(232) },
+    Brand = { IconColor = "Accent", Line = { Color = "Accent", From = 1, To = 0, Size = 1 }, Height = grow(72) },
     Search = { IconColor = "Text" },
     Back = { IconColor = "Text" },
-    Nav = { Indicator = { Color = "Accent", Width = 2 }, SelectedFill = ROW_CHOSEN, HoverFill = ROW_HOVER },
-    Header = { Close = { Icon = "Close", Color = "Text", HoverColor = "Accent", Size = 12 } },
+    Nav = { Indicator = { Color = "Accent", Width = 2 }, SelectedFill = ROW_CHOSEN, HoverFill = ROW_HOVER,
+      ItemHeight = grow(28), GroupHeight = grow(24) },
+    Version = { Bottom = grow(14) },
+    Header = { Close = { Icon = "Close", Color = "Text", HoverColor = "Accent", Size = 12 }, Height = grow(100, 2) },
     Content = {
       Card = { Color = "Card", Alpha = 0.5 },
       Divider = { Color = "White", Alpha = 0.06, Size = 1 },
       Hover = { Color = "White", Alpha = 0.05 },
+      TitleHeight = grow(24),
+      RowHeight = grow(44),
     },
-    Footer = { Line = LINE },
+    Footer = { Line = LINE, Height = grow(56) },
     Cards = {
       Fill = { Color = "Card" },
       HoverFill = { Texture = "Highlight", Color = "White", Alpha = 0.15 },
       Edge = EDGE,
       SelectedEdge = LIT,
+      Height = grow(78, 3),
     },
-    Categories = { Indicator = { Color = "Accent", Width = 2 }, SelectedFill = ROW_CHOSEN, HoverFill = ROW_HOVER },
-    BagCategories = { Fill = { Color = "Card", Alpha = 0.5 }, HoverFill = ROW_HOVER },
-    Currency = { Hover = { Color = "White", Alpha = 0.05 } },
+    Categories = { Indicator = { Color = "Accent", Width = 2 }, SelectedFill = ROW_CHOSEN, HoverFill = ROW_HOVER,
+      RowHeight = grow(38, 2), GroupHeight = grow(24), LabelWidth = widen(110), FilterWidth = widen(200) },
+    BagCategories = { Fill = { Color = "Card", Alpha = 0.5 }, HoverFill = ROW_HOVER, RowHeight = grow(30),
+      GroupHeight = grow(24) },
+    Currency = { Hover = { Color = "White", Alpha = 0.05 }, HeaderHeight = grow(26), RowHeight = grow(30) },
   },
 
   Controls = {
@@ -424,20 +506,24 @@ sonataNext:RegisterTheme({
       KnobOn = { Texture = "Melli", Color = "Gold", Alpha = 0.8 },
       Hover = { Color = "White", Alpha = 0 },
     },
+    -- Every control's height grows with ElvUI's font size, a line of text each; a dropdown's and a number box's widths
+    -- widen with it.
     Button = {
+      Height = grow(26),
       Plain = button("Button", "ButtonHover"),
       Primary = button("ButtonPrimary", "ButtonHover"),
       Danger = button("ButtonDanger", "ButtonDanger"),
     },
     -- HandleEditBox: the default template; its edge does not change.
     Input = {
+      Height = grow(26),
       Fill = { Color = "ControlFill" },
       FocusFill = { Color = "ControlFill" },
       Edge = { Color = "Border", Size = 1, Idle = 1, Hover = 1, Focus = 1, Outlines = "$Outlines" },
     },
     -- HandleSliderFrame: a 12-tall box on the default template, a gold square thumb 10 across; no fill.
     Slider = {
-      Height = 12, TrackSize = 12, ThumbSize = 10,
+      Height = 12, TrackSize = 12, ThumbSize = 10, ValueWidth = widen(46),
       Track = { Color = "ControlFill" },
       Fill = false,
       Edge = EDGE,
@@ -446,6 +532,7 @@ sonataNext:RegisterTheme({
     },
     -- HandleDropDownBox: the default template, ElvUI's up arrow turned down, 14 across.
     Dropdown = {
+      Height = grow(26), Width = widen(170),
       Fill = { Color = "ControlFill" },
       HoverFill = { Color = "ControlFill" },
       OpenFill = { Color = "ControlFill" },
@@ -459,10 +546,12 @@ sonataNext:RegisterTheme({
       Edge = EDGE,
       HoverFill = ROW_HOVER,
       Check = { Texture = "$Norm", Color = "Accent", Size = 10 },
-      Picker = { NewIcon = { Color = "Accent" }, BackIcon = { Color = "Text" } },
+      ItemHeight = grow(24),
+      -- Its head: two lines of text beside the icon, which grows with them.
+      Picker = { NewIcon = { Color = "Accent" }, BackIcon = { Color = "Text" }, IconSize = grow(32, 2) },
     },
     Swatch = { Edge = EDGE, HoverEdge = LIT },
-    TopTabs = { Indicator = { Color = "Accent", Height = 2 }, Line = LINE },
+    TopTabs = { Indicator = { Color = "Accent", Height = 2 }, Line = LINE, Height = grow(34) },
     -- ElvUI's popups: the transparent template.
     Dialog = { Card = { Color = "Body" }, Edge = EDGE },
     ItemGrid = { CommonEdge = EDGE, Hover = { Color = "White", Alpha = 0.3 } },
@@ -473,4 +562,9 @@ sonataNext:RegisterTheme({
   Clients = {
     Era = { ItemButton = { QuestBorderColor = "$QuestItem", QuestStarterBorderColor = "$QuestStarter" } },
   },
-})
+}
+
+for name, ref in pairs(sizes) do
+  theme.Variables[name] = ref
+end
+sonataNext:RegisterTheme(theme)

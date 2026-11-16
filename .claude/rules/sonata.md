@@ -538,28 +538,32 @@ the empty-group hint) is drawn with **text roles**: named fonts in the theme's `
 each a font spec (§3). Before roles every such text hard-coded a client font and white, gold or
 gray, so no theme could change it, and on Parchment's light paper it was white on parchment.
 
-- **A font object is made once and never changed.** `Sonata:GetTextFont(role)` makes the
-  current theme's font object for a role the first time it is asked for (`CreateFont`, named
-  `BetterBagsText<Role><n>`, unique), styles it right away, and never touches it again.
+- **A font object is made once per look and never changed.** `Sonata:GetTextFont(role)` gives a
+  role the font object made for its look (`madeTextFonts`, by `textFontKey`: the role's spec, and
+  the client font it copies as that font draws now), making it the first time any role of any theme
+  draws that look (`CreateFont`, named `BetterBagsText<Role><n>`, unique), styled right away and
+  never touched again (asked: "reuse by look for every theme").
   `Sonata:CreateText(parent, role, layer?)` makes a font string drawn with a role,
   `Sonata:SetTextRole(text, role)` switches a font string or edit box to a role, and
   `Sonata:SetButtonTextRole(button, role)` sets a button's normal font object; all three record
   the role (weak tables `texts`, `buttonTexts`). An unknown role errors. `Sonata:ClearButtonTextRole(button)` forgets a
   button's role, so a theme no longer moves it (BetterBags Next's money under a Next theme's `Footer.CoinFont`,
   next-themes-papercraft.md §25).
-- **A theme makes new font objects and moves the text.** `ApplyTheme` (before windows and
-  elements) and every rescale of the client's fonts call `newTextFonts`: it starts an empty set
-  of role font objects and points every recorded text and button at its role's new one. Text
-  whose role the theme does not define keeps its font object. Old font objects stay as they
-  were (font objects cannot be destroyed; a theme switch leaves at most one unused object per
-  role behind). **Failure mode (fixed):** role font objects used to be restyled in place on
+- **A theme finds each role's font object and moves the text.** `ApplyTheme` (before windows and
+  elements) and every rescale of the client's fonts call `newTextFonts`: it starts the theme's set
+  of role font objects (each the one made for its look) and points every recorded text and button
+  at its role's. Text whose role the theme does not define keeps its font object. Old font objects
+  stay as they were (font objects cannot be destroyed: a look drawn before is drawn with its
+  object, so switching back and forth makes none). It returns how many it made and how many roles
+  it drew with ones made before, for profiler traces. **Failure mode (fixed):** role font objects used to be restyled in place on
   every theme switch, relying on a font object passing its changes to the text set to it. The
   settings window is built before Sonata applies the saved theme, so its font objects were
   changed while its text used them, and a text that then switched font objects (hovering a
   settings entry: `Nav`, `NavHover`, back to `Nav`) came back out of step: the entry changed
   size until a theme switch restyled everything together. Restyling only at a different moment
   (re-copying on the client's rescale) did not fix it in game. The rule now: never change a font
-  object after it is made; make a new one. `Sonata:Init` starts empty registries.
+  object after it is made; draw another look with another one. `Sonata:Init` starts empty
+  registries; the font objects made are kept through it, as font objects are.
 - **Text sized to its content refits after every font change** (`Sonata:WatchTextFont(text,
   fn)`, weak table `textWatchers`): `fn(text)` runs after `SetTextRole` and after `newTextFonts`
   moves the text (a theme, a client rescale). A button's own font string is sized when the
@@ -615,7 +619,8 @@ gray, so no theme could change it, and on Parchment's light paper it was white o
 
 Coverage: `spec/sonata/text_spec.lua` (one named font per role, every role's Base look, a
 theme's palette reaching roles and the text set to them, switching roles, one role restyled,
-Classic money, new font objects per theme with text and buttons moved to them and the old ones
+Classic money, font objects found by look per theme (a look drawn before drawn with its object,
+every input of a look its own, how many a set made) with text and buttons moved to them and the old ones
 unchanged, no font object changed after it is made (through theme switches and rescales), text
 on a role the new theme lacks, new role fonts at the client's sizes after a rescale, copies rather
 than inheriting fonts, one text-size callback across `Init`s, unknown roles),

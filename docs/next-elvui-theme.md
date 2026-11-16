@@ -82,9 +82,10 @@ One Next theme, **ElvUI** (`ElvUI`, `sonata/themes/next/elvui.lua`), `Requires =
   by its border, the border-color edge, quality on the icon's border (Blizzard's frame, Common and Poor in the border
   color: a Next theme never draws quality on the button's edge, next-themes.md §6), ElvUI's hover and pushed fills,
   its quest and upgrade icons, its count font.
-- **Text**: ElvUI's font and style in every role; sizes fixed per role (ElvUI's own bags size their text apart from
-  the general size too); no text in a color read from ElvUI (a dragged color would make font objects on every step):
-  gold where the value color would go.
+- **Text**: ElvUI's font, style and size in every role, each keeping its difference from ElvUI's 12, but the vendor's
+  card text (sized to sit beside its icon) and the counts (ElvUI's bag fonts' own settings); the rows, offsets and widths
+  round the text grow with it, and the settings window with them; no text in a color read from ElvUI (a dragged color
+  would make font objects on every step): gold where the value color would go.
 
 ## Engine work it needs (each documented in `.claude/rules/next-themes.md`, each test first)
 
@@ -104,6 +105,12 @@ One Next theme, **ElvUI** (`ElvUI`, `sonata/themes/next/elvui.lua`), `Requires =
    Alpha }`) in `NextControls` for every edge it draws and the panel's and search box's own, and on Sonata's item
    button backdrop (`{ Offset, EdgeSize, Color }`); a value a reference's `Map` names is taken as it is, so ElvUI's
    pixel mode (a boolean) turns the rings (a list) on or off.
+7. **Font objects reused by look** (asked: "reuse by look for every theme"): both engines draw a look drawn before with
+   the object made for it (next-themes.md §4, sonata.md §3c), so a size slider dragged makes a set per size, once.
+8. **ElvUI's font size**: every role but the vendor's and the counts follows it, and every row, offset and width round
+   following text grows with it (a reference's `Scale` and `Add`), mapped from the code first.
+9. **ElvUI's bag text**: counts, stack counts and item levels in the fonts, sizes and outlines the player picked, the
+   file by name from LibSharedMedia's table (a path key naming a variable).
 6. **Quest colors** (asked: "makes sense, do it"): `QuestActiveBorderColor` and `QuestStarterBorderColor` on Sonata's
    item button style, the theme reading the player's Quest Starter and quest item colors and watching
    `E.Bags:UpdateBagColors`.
@@ -121,10 +128,8 @@ The bug review found seven issues, all fixed test first; they are listed in `.cl
 
 ## Left out
 
-- **Following ElvUI's font size**: a theme drawn again with other sizes makes new font objects, and font objects can
-  never be freed; a size slider dragged would leave a set behind on every step.
-- **ElvUI's per-bag text settings** (its count, item level and info fonts are LibSharedMedia names, which only a
-  function can turn into files): the count is drawn in ElvUI's default, Homespun 10.
+- **The bags' count and item level colors**: a color dragged in ElvUI's options would make a font object on every step;
+  the item levels keep BetterBags' own colors. ElvUI's item info text: BetterBags draws none.
 
 ## Not possible from here
 

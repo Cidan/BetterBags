@@ -471,6 +471,79 @@ describe("BetterBags Next, pixel perfect", function()
     _G._loadedAddOns = nil
   end)
 
+  -- The ElvUI theme's rows grow with ElvUI's font size, its buttons and footer text moving by half a line to stay
+  -- centered (next-themes-elvui.md §27): at an odd change a half line is a fraction of a unit, still drawn on whole pixels.
+  it("puts every part on whole pixels in the ElvUI theme at ElvUI's font sizes, odd ones too, at both sizes", function()
+    useScreen(3396, 1362, 0.65)
+    _G._loadedAddOns = { ElvUI = true }
+    local savedElvUI = rawget(_G, "ElvUI")
+    local errors = {}
+    local savedHandler = _G.geterrorhandler
+    _G.geterrorhandler = function() return function(err) table.insert(errors, tostring(err)) end end
+    for _, size in ipairs({ "full", "small" }) do
+      db.size = size
+      startSonataNext()
+      local bag, bank = bags()
+      for _, fontSize in ipairs({ 9, 15, 20, 27 }) do
+        _G.ElvUI = { { db = { general = { fontSize = fontSize } } } }
+        sonataNext:ApplyTheme(ctx(), "ElvUI", false)
+        local where = "ElvUI at " .. fontSize .. ", " .. size
+        assert.are.same({}, offGrid(bag), where)
+        assert.are.same({}, offGrid(bank), where)
+        assert.are.same({}, errors, where)
+      end
+      _G.ElvUI = savedElvUI
+      sonataNext:ApplyTheme(ctx(), "Default", false)
+      bag:Hide(ctx())
+      bank:Hide(ctx())
+      finishTweens()
+      chain:Init()
+    end
+    _G.ElvUI = savedElvUI
+    _G.geterrorhandler = savedHandler
+    _G._loadedAddOns = nil
+  end)
+
+  -- Found in review: the footer's free-slot text, anchored by its bottom, drifted up out of the footer as it grew with
+  -- ElvUI's font size (FooterText moved by half a line), into the items from 28. Anchored by its bottom in a footer that
+  -- grows as the text does, it stays where it is centered.
+  it("keeps the footer's free-slot text and money inside its footer, as centered as at ElvUI's 12, at every ElvUI font size", function()
+    useScreen(1536, 768, 1)
+    _G._loadedAddOns = { ElvUI = true }
+    local savedElvUI = rawget(_G, "ElvUI")
+    db.size = "full"
+    startSonataNext()
+    local bag = bags()
+    -- The money frame is a box of its own size (next/coins.lua: 18 tall), centered as the footer grows round it.
+    bag.moneyFrame.frame:SetSize(128, 18)
+    local function at(fontSize)
+      _G.ElvUI = { { db = { general = { fontSize = fontSize } } } }
+      sonataNext:ApplyTheme(ctx(), "ElvUI", false)
+      settle()
+      local body, free, money = layout.Rect(bag.body), layout.Rect(bag.freeText), layout.Rect(bag.moneyFrame.frame)
+      local _, h = bag.freeText:GetFont()
+      local bottom = free.bottom - body.bottom
+      local coins = money.bottom - body.bottom
+      return bottom + h / 2 - style.FOOTER / 2, bottom + h, style.FOOTER, coins + 9 - style.FOOTER / 2, coins
+    end
+    local centered, _, _, coinsCentered = at(12)
+    local results = {}
+    for _, fontSize in ipairs({ 9, 16, 20, 28, 40, 64 }) do
+      local off, top, footer, coinsOff, coinsBottom = at(fontSize)
+      results[fontSize] = { off = off, top = top, footer = footer, coinsOff = coinsOff, coinsBottom = coinsBottom }
+    end
+    _G.ElvUI = savedElvUI
+    sonataNext:ApplyTheme(ctx(), "Default", false)
+    _G._loadedAddOns = nil
+    for fontSize, r in pairs(results) do
+      assert.is_true(math.abs(r.off - centered) <= 1, fontSize .. ": " .. r.off .. " off center, against " .. centered)
+      assert.is_true(r.top <= r.footer + 1e-6, fontSize .. ": its top " .. r.top .. " past the footer's " .. r.footer)
+      assert.is_true(math.abs(r.coinsOff - coinsCentered) <= 1, fontSize .. ": the money " .. r.coinsOff .. " off center, against "
+        .. coinsCentered)
+      assert.is_true(r.coinsBottom >= 0 and r.coinsBottom + 18 <= r.footer + 1e-6, fontSize .. ": the money in the footer")
+    end
+  end)
+
   -- Found by the adversarial review: a pieced bar's caps were rounded on the grid they were painted on, and a dock card
   -- draws its section on another; a theme applied while it waited there left them off in the bag too.
   it("keeps a pieced section bar on whole pixels seated in a dock card, and back in its bag", function()

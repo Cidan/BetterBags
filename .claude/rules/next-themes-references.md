@@ -16,7 +16,7 @@ Asked (issue #1326): an ElvUI theme for BetterBags Next that keeps the player's 
 classic bags' themes do; it **names** where the value is, and the engine reads it.
 
 - **The form** (a `Variables` entry, so `"$Name"` puts it anywhere: a palette color, a texture, a font's file, flags or
-  shadow, a list of numbers): `{ Global, Path, Fallback, Alpha?, Map? }`. Any variable that is a table with a `Global`
+  shadow, a list of numbers): `{ Global, Path, Fallback, Alpha?, Map?, Scale?, Add? }`. Any variable that is a table with a `Global`
   and a `Fallback` is one; a `Global` without a `Fallback` is data, as it always was (a client color named through a
   variable, which `NextStyle` reads as a palette color). A reference is one value: a client's override of it replaces
   it whole (`SonataResolve.Merge`), nothing of the base's `Alpha` or `Map` kept.
@@ -31,9 +31,18 @@ classic bags' themes do; it **names** where the value is, and the engine reads i
   string, number or boolean (a part that reads `false` treats it as unset: a font role's `File` false is the client's
   font). Otherwise the `Fallback` is drawn. `Alpha` replaces a color's alpha (a list of numbers), the fallback's too. What is read is a
   copy, never filled in with `$` variables.
+- **A number read** (or a number fallback) is read times `Scale` plus `Add` (each unset: none): ElvUI's font size, a
+  role keeping its difference from ElvUI's 12 (`Add`), a row growing by the lines of text it holds (`Scale` lines,
+  `Add` what is left at 12), a width in proportion (`Scale` its width over 12).
+- **A path key naming a variable** (`"$Name"`, a whole string) is that variable's value, read first
+  (`SonataResolve.ResolvePath`, from `ResolveVariables`' lookup; a cycle is the usual error): a string or a number is
+  the key, anything else a key that reads nothing (the `Fallback` drawn). So one reference reads what another names:
+  LibSharedMedia keeps a font's file by its name (`MediaTable.font[name]`, `LibSharedMedia-3.0.lua` `Register`), ElvUI
+  keeps the name the player picked (`E.db.bags.countFont`). `Check` reads it the same way, with the theme's resolved
+  variables, and names the key it read.
 - **Registration refuses** (`SonataNext:RegisterTheme`, the theme's `Variables` and each `Clients` override's): a
-  `Global` that is not a name, a `Path` that is not a list of keys, an `Alpha` that is not a number, a `Map` that is
-  not a table; the error names the variable (`Variables.Border: ...`,
+  `Global` that is not a name, a `Path` that is not a list of keys, an `Alpha`, `Scale` or `Add` that is not a number, a
+  `Map` that is not a table; the error names the variable (`Variables.Border: ...`,
   `Clients.Classic.Variables.Edge: ...`). The classic engine resolves references too (the resolver is shared,
   sonata.md), but only Next validates them.
 - **`Check`** names a reference whose `Global` is a table but whose value reads nothing of its kind ("its Fallback is
@@ -63,13 +72,16 @@ options write the setting and call `E:UpdateMedia()`, once per step while a colo
   font objects can never be freed. Otherwise applied again, unsaved, new font objects and all: `"applied"`. Never saved
   (the theme may be a preview). `"no theme"` before Next starts.
 - **A theme that watches should draw no text in a color it reads** from the other addon: a color dragged makes a read
-  per frame, and a text role drawn otherwise makes new font objects on each. Found in review: the ElvUI theme drew six
-  roles in its value color and made 56 font objects a frame while it was dragged (next-themes-elvui.md §27).
+  per frame, and a text role drawn otherwise needs a font object for each color it passes through, and a color can
+  be any of countless values (font objects are reused by look, next-themes.md §4, but every step of a drag is a look not drawn before).
+  Found in review: the ElvUI theme drew six roles in its value color and made 56 font objects a frame while it was
+  dragged (next-themes-elvui.md §27). A size is one of a few: a size slider dragged makes one set per size it passes,
+  once, and every pass after reuses them.
 - What each returns is for profiler traces: a capture wraps every module's methods (perf-profiler.md), so it shows each
   watched call and what each read did (data-driven.md).
 
 Coverage: `spec/sonata/next_engine_spec.lua` ("references to another addon's values": every kind, read again, copies,
-fallbacks, alpha and map, what Map names taken as it is, raw reads, a `Global` without a `Fallback` kept as data, a client's override replacing a
+fallbacks, alpha and map, what Map names taken as it is, Scale and Add, a path key naming a variable (Check too), raw reads, a `Global` without a `Fallback` kept as data, a client's override replacing a
 reference whole, registration, `Check`; "watching another addon's methods": the form (a map refused), one hook,
 late themes, one read per frame, unchanged, restyled with fonts kept, applied for a font's file and for a font's color,
 not watched and not started), `spec/sonata/engine_spec.lua` (the classic engine reads one).

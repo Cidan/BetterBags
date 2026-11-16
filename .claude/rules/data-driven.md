@@ -103,3 +103,7 @@ reasoning about it can suggest a cause; it does not establish one.
   hooked; module methods are wrapped in every capture, so their returns are in the trace. Added with the ElvUI theme's hook
   on `E:UpdateMedia` (next-themes-elvui.md §27), so a capture of a color dragged in ElvUI's options shows how many calls
   came, how many reads they made and whether any made new font objects. Not captured yet: no game client here.
+- **How many font objects a theme made** (next-themes.md §4, sonata.md §3c): `NextStyle:newFonts` and
+  `Sonata:newTextFonts` return how many font objects their set made and how many roles they drew with objects made
+  before. Added with reusing font objects by look, so a capture of ElvUI's font size dragged in its options can show the
+  objects made per size, and none on a second pass. Not captured yet: no game client here.

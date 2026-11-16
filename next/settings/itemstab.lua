@@ -181,7 +181,7 @@ function itemsTab:Create(parent, owner, source)
   tab.count = style:CreateText(frame, K.SectionFont)
   tab.count:SetJustifyH("LEFT")
   tab.filter = nextInput:Create(frame, {
-    width = K.FilterWidth, help = L:G("Find an item"),
+    width = function() return style.Theme.Settings.Categories.FilterWidth end, help = L:G("Find an item"),
     onChange = function() tab:ShowItems() end,
     icon = function()
       local SR = style.Theme.Settings.Search

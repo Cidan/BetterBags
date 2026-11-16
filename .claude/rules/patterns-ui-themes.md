@@ -217,7 +217,8 @@ button by its width) then reads the old theme's size, and the control resizes af
 Convert to Category button sat 40 units off center after a theme with wider button padding.
 
 **Rule**: A block that centers or right-aligns a control by its size restyles that control in its own `Style` before
-laying out (`blizzardTabProto:Style`, next/settings/categories.lua: `self.convert:Style()`). Anchoring by the
+laying out (`blizzardTabProto:Style`, next/settings/categories.lua: `self.convert:Style()`; a settings row restyles its
+control in `rowProto:Measure` before sizing its name beside it, next/settings/rows.lua). Anchoring by the
 control's left edge does not need it: a width change does not move it. Test it by restyling the page first and the
 controls after, then checking the position.
 

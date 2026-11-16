@@ -68,6 +68,18 @@ describe("NextInput", function()
     assert.is_false(f.frame:IsAutoFocus())
   end)
 
+  -- A field as wide as a theme says (a settings row's: Controls.Dropdown.Width) follows the theme as it restyles; found
+  -- in review: it kept the width it was made with while the dropdowns beside it widened with ElvUI's font size.
+  it("takes its width from a function read again every time it restyles, and keeps a width it was given", function()
+    local width = 150
+    local follows = nextInput:Create(CreateFrame("Frame"), { width = function() return width end })
+    local fixed = nextInput:Create(CreateFrame("Frame"), { width = 90 })
+    assert.are.same({ 150, 90 }, { follows.frame:GetWidth(), fixed.frame:GetWidth() })
+    width = 260
+    nextInput:ApplyStyle()
+    assert.are.same({ 260, 90 }, { follows.frame:GetWidth(), fixed.frame:GetWidth() })
+  end)
+
   it("shows its help while empty and not focused", function()
     local f = make({ help = "Search settings" })
     assert.are.equal("Search settings", f.help:GetText())

@@ -94,6 +94,16 @@ function resolve.StyleOf(theme)
   return style
 end
 
+-- VariableName returns the name a whole-string "$Name" names (spaces around it allowed), or nil.
+---@param value any
+---@return string?
+function resolve.VariableName(value)
+  if type(value) ~= "string" then
+    return nil
+  end
+  return value:match("^%s*%$([%a_][%w_]*)%s*$")
+end
+
 -- Substitute replaces every "$Name" string in value (a whole string, spaces around the name
 -- allowed) with a copy of lookup(name).
 ---@param value any
@@ -101,7 +111,7 @@ end
 ---@return any
 function resolve.Substitute(value, lookup)
   if type(value) == "string" then
-    local name = value:match("^%s*%$([%a_][%w_]*)%s*$")
+    local name = resolve.VariableName(value)
     if name then
       return resolve.DeepCopy(lookup(name))
     end
@@ -149,7 +159,45 @@ function resolve.ReferenceProblem(ref)
   if ref.Map ~= nil and type(ref.Map) ~= "table" then
     return "Map is a table"
   end
+  if ref.Scale ~= nil and type(ref.Scale) ~= "number" then
+    return "Scale is a number"
+  end
+  if ref.Add ~= nil and type(ref.Add) ~= "number" then
+    return "Add is a number"
+  end
   return nil
+end
+
+-- ResolvePath returns a reference whose Path keys that name a variable ("$Name") are that variable's value (lookup): a
+-- string or a number is the key, anything else a key that reads nothing (the Fallback drawn). The reference is
+-- returned as it is when no key names one.
+---@param ref table
+---@param lookup fun(name: string): any
+---@return table
+function resolve.ResolvePath(ref, lookup)
+  local path, changed = {}, false
+  for i, key in ipairs(ref.Path or {}) do
+    local name = resolve.VariableName(key)
+    if name ~= nil then
+      local value = lookup(name)
+      if type(value) ~= "string" and type(value) ~= "number" then
+        value = {}
+      end
+      path[i] = value
+      changed = true
+    else
+      path[i] = key
+    end
+  end
+  if not changed then
+    return ref
+  end
+  local copy = {}
+  for k, v in pairs(ref) do
+    copy[k] = v
+  end
+  copy.Path = path
+  return copy
 end
 
 -- Walk returns the value at path under the global named name, reading every table raw (no metamethod runs), or nil
@@ -181,7 +229,8 @@ end
 -- Fallback's kind, else the Fallback: a Fallback of three or four numbers takes a color (r, g, b and a, read as
 -- { r, g, b, a }, opaque without an a) or a list of as many numbers; any other list of numbers a list of as many; a
 -- string, a number or a boolean the same kind; false any string, number or boolean. Alpha replaces a color's alpha (a
--- list of numbers), the fallback's too. What is read is a copy. It also returns whether the value was taken.
+-- list of numbers), the fallback's too; a number is read times Scale plus Add, the fallback too. What is read is a
+-- copy. It also returns whether the value was taken. A path key naming a variable must be resolved first (ResolvePath).
 ---@param ref table
 ---@return any value, boolean read
 function resolve.ReadReference(ref)
@@ -225,6 +274,9 @@ function resolve.ReadReference(ref)
   if ref.Alpha ~= nil and type(read) == "table" and #read >= 3 and type(read[1]) == "number" then
     read[4] = ref.Alpha
   end
+  if type(read) == "number" and (ref.Scale ~= nil or ref.Add ~= nil) then
+    read = read * (ref.Scale or 1) + (ref.Add or 0)
+  end
   return read, taken
 end
 
@@ -253,9 +305,9 @@ function resolve.ResolveVariables(raw)
         error("theme variable $" .. name .. " returned nothing")
       end
     end
-    -- What another addon holds is its own: read, never filled in.
+    -- What another addon holds is its own: read, never filled in. A path key naming a variable is read first.
     if resolve.IsReference(value) then
-      value = resolve.ReadReference(value)
+      value = resolve.ReadReference(resolve.ResolvePath(value, lookup))
     else
       value = resolve.Substitute(resolve.DeepCopy(value), lookup)
     end

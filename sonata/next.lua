@@ -794,6 +794,8 @@ function sonataNext:Check(key)
   local function references(variables, where)
     for name, ref in pairs(type(variables) == "table" and variables or {}) do
       if resolve.IsReference(ref) and type(rawget(_G, ref.Global)) == "table" then
+        -- A path key naming a variable is that variable as the theme resolved it.
+        ref = resolve.ResolvePath(ref, function(n) return theme.Variables[n] end)
         local _, read = resolve.ReadReference(ref)
         if not read then
           local path = { ref.Global }

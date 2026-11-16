@@ -81,9 +81,10 @@ theme is applied, so a theme can follow another addon's settings (the ElvUI them
 colors and textures this way). A child theme can override a parent's variables.
 
 A variable can also **name** another addon's value instead of computing it: a reference,
-`{ Global, Path, Fallback, Alpha, Map }`. It is read every time the theme resolves, raw (nothing of
-the other addon runs), and the `Fallback` is used while the value is not there or is another kind (a
-color comes back as `{ r, g, b, a }`). BetterBags Next's themes, which cannot hold functions, follow
+`{ Global, Path, Fallback, Alpha, Map, Scale, Add }`. It is read every time the theme resolves, raw
+(nothing of the other addon runs), and the `Fallback` is used while the value is not there or is another
+kind (a color comes back as `{ r, g, b, a }`; a number times `Scale` plus `Add`). A `Path` key that is
+`"$Name"` is another variable's value, so one reference can read what another names. BetterBags Next's themes, which cannot hold functions, follow
 another addon this way, and may `Watch` that addon's methods to be drawn again when it changes them
 (the ElvUI Next theme, `themes/next/elvui.lua`):
 

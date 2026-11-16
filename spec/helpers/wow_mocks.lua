@@ -2212,12 +2212,16 @@ local function CreateMockFont(name)
   function font:GetFontHeight() return self._height end
   function font:SetJustifyH(justify) self._justifyH = justify end
   function font:GetJustifyH() return self._justifyH or "CENTER" end
+  -- Font:SetJustifyV(justifyV) / GetJustifyV() (SimpleFontAPIDocumentation.lua: JustifyVertical, not nilable).
+  function font:SetJustifyV(justify) self._justifyV = justify end
+  function font:GetJustifyV() return self._justifyV or "MIDDLE" end
   function font:CopyFontObject(other)
     self._path, self._height, self._flags = other:GetFont()
     self._color = { other:GetTextColor() }
     self._shadowColor = { other:GetShadowColor() }
     self._shadowOffset = { other:GetShadowOffset() }
     self._justifyH = other._justifyH
+    self._justifyV = other._justifyV
   end
   font.SetFontObject = font.CopyFontObject
   if name then _G[name] = font end

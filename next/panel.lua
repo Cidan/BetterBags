@@ -5968,9 +5968,9 @@ function panelProto:styleFooter()
     end
     m.frame:ClearAllPoints()
     if left then
-      pixel:Point(m.frame, "BOTTOMLEFT", body, "BOTTOMLEFT", style.PAD, style.FOOTER_MONEY)
+      pixel:Point(m.frame, "BOTTOMLEFT", body, "BOTTOMLEFT", style.PAD, style.FOOTER_COINS)
     else
-      pixel:Point(m.frame, "BOTTOMRIGHT", body, "BOTTOMRIGHT", -style.PAD, style.FOOTER_MONEY)
+      pixel:Point(m.frame, "BOTTOMRIGHT", body, "BOTTOMRIGHT", -style.PAD, style.FOOTER_COINS)
     end
   end
 end

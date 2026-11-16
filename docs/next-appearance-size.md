@@ -41,8 +41,8 @@ Then, on the plan:
   (name and price beside it, two to a row; changed for issue #1221, it first kept the theme's size). The
   card stays at least the theme's icon size tall, so two lines of name still fit beside a small icon.
 - A change applies at once: the icon size is recomputed and every panel lays out again. It does not
-  re-apply the theme (a theme application makes new font objects, which can never be freed: a slider
-  drag would leave one set per step).
+  re-apply the theme: nothing of the theme changes, and re-applying it restyles every widget on every
+  step (font objects are reused by look since #1326, so it would make none).
 
 ## Bag Scale
 
