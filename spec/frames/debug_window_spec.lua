@@ -107,6 +107,12 @@ describe("DebugWindow", function()
     end)
     override(_G, "CreateDataProvider", function() return {} end)
     override(database, "GetDebugMode", function() return debugMode end)
+    -- The equipment sets each dump keeps (issue #1333): none unless a test says so.
+    override(database, "GetDebugEquipmentSets", function() return {} end)
+    override(database, "AddDebugEquipmentSets", function() end)
+    override(database, "ClearDebugEquipmentSets", function() end)
+    override(database, "GetCurrentProfileName", function() return "Default" end)
+    override(itemProbe, "EquipmentSets", function() return { sets = {} } end)
     override(tabs, "Create", function(_, parent)
       local t = { frame = CreateFrame("Frame", nil, parent) }
       function t:SetClickHandler(fn) self.click = fn end
@@ -237,6 +243,51 @@ describe("DebugWindow", function()
     assert.are.same({ [15] = { equipmentSlot = 15 } }, extras.equipped)
     assert.are.same({ [0] = { name = "Backpack" } }, extras.bagNames)
     assert.is_nil(extras.bank, "the bank is not open")
+    assert.are.same({ sets = {} }, extras.equipmentSets, "the character's equipment sets (ItemProbe:EquipmentSets)")
+  end)
+
+  -- Issue #1333: each dump keeps what it read of the character's equipment sets account wide, after those kept before,
+  -- so dumps across a relog, a set deleted and another character answer whether a set keeps its ID.
+  it("keeps each dump's equipment sets account wide, with who, where and when, until cleared", function()
+    local history = {}
+    override(database, "SetDebugBackpackDump", function() end)
+    override(database, "GetDebugBackpackDump", function() return {} end)
+    override(database, "GetDebugEquipmentSets", function() return history end)
+    override(database, "AddDebugEquipmentSets", function(_, entry) table.insert(history, entry) end)
+    override(database, "ClearDebugEquipmentSets", function() history = {} end)
+    override(database, "GetCurrentProfileName", function() return "Not Max Level" end)
+    override(itemProbe, "Player", function() return { fullName = { n = 2, "Someone", "Somewhere" } } end)
+    override(itemProbe, "ProbeEquipment", function() return {} end)
+    override(itemProbe, "BagNames", function() return {} end)
+    override(itemProbe, "Client", function() return { version = "1.60.1", forever = true } end)
+    override(itemProbe, "Probe", function() return {} end)
+    local read = 0
+    override(itemProbe, "EquipmentSets", function()
+      read = read + 1
+      return { ids = { n = 1, { read } } }
+    end)
+    override(_G, "GetRealmName", function() return "Somewhere" end)
+    override(constants, "BAG_KIND", { BACKPACK = 0, BANK = 1 })
+    override(itemsModule, "slotInfo", { [0] = { itemsBySlotKey = {} } })
+    override(addon, "atBank", false)
+    local dump = debugWindow.contentFrames[3]
+    dump.dumpButton:GetScript("OnClick")(dump.dumpButton)
+    dump.dumpButton:GetScript("OnClick")(dump.dumpButton)
+    assert.are.equal(2, #history)
+    assert.are.same({ ids = { n = 1, { 1 } } }, history[1].sets)
+    assert.are.same({ ids = { n = 1, { 2 } } }, history[2].sets, "the second dump's, after the first")
+    assert.are.equal("Not Max Level", history[1].profile)
+    assert.are.same({ n = 2, "Someone", "Somewhere" }, history[1].character)
+    assert.are.equal("Somewhere", history[1].realm)
+    assert.are.same({ version = "1.60.1", forever = true }, history[1].client)
+    assert.is_number(history[1].time)
+    -- Found by the bug review: when the addon loaded tells a relog between two dumps apart.
+    assert.is_number(history[1].loaded)
+    assert.are.equal(history[1].loaded, history[2].loaded, "one load")
+    assert.is_truthy(dump.status:GetText():find("Equipment set captures: 2", 1, true))
+    dump.clearButton:GetScript("OnClick")(dump.clearButton)
+    assert.are.same({}, history)
+    assert.is_truthy(dump.status:GetText():find("Equipment set captures: 0", 1, true))
   end)
 
   it("dumps the bank's items with their answers while the bank is open", function()

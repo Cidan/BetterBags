@@ -52,6 +52,9 @@ local window = addon:GetModule('Window')
 ---@field contentFrames any[]
 local debugWindow = addon:NewModule('DebugWindow')
 
+-- When the addon loaded (this file loads with it, at every login and reload): the dumps of one session share it.
+local loadedAt = time()
+
 local function sanitizeForDump(val, seen)
   seen = seen or {}
   local t = type(val)
@@ -262,11 +265,12 @@ function debugWindow:CreateDumpFrame()
   desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -10)
   desc:SetWidth(760)
   desc:SetJustifyH("LEFT")
-  desc:SetText("Dump your current full backpack item data to saved variables, with what the game answered about each item, your worn gear, your character and every bag's name; at a bank, the bank's items too. This data will be serialized into the WTF folder configuration, which can be extracted and used as a test harness.")
+  desc:SetText("Dump your current full backpack item data to saved variables, with what the game answered about each item, your worn gear, your character, every bag's name and your equipment sets; at a bank, the bank's items too. Each dump's equipment sets are also kept beside the earlier dumps', across characters. This data will be serialized into the WTF folder configuration, which can be extracted and used as a test harness.")
 
   -- Status Label
   local status = sonata:CreateText(f, "Field")
   status:SetPoint("TOPLEFT", desc, "BOTTOMLEFT", 0, -30)
+  f.status = status
 
   -- Function to update status text
   function f.Update()
@@ -277,7 +281,8 @@ function debugWindow:CreateDumpFrame()
         count = count + 1
       end
     end
-    status:SetText(format("Current Dumped Items Count: %d", count))
+    status:SetText(format("Current Dumped Items Count: %d · Equipment set captures: %d", count,
+      #database:GetDebugEquipmentSets()))
     local loads = perfSessions:GetArmedLoads()
     if loads > 0 then
       f.diagnosticsStatus:SetText(format("Diagnostics armed: the next %d loads will be captured.", loads))
@@ -304,13 +309,25 @@ function debugWindow:CreateDumpFrame()
         player = itemProbe:Player(),
         equipped = itemProbe:ProbeEquipment(),
         bagNames = itemProbe:BagNames(),
+        equipmentSets = itemProbe:EquipmentSets(),
       }
       -- The bank's items exist only while it is open.
       local bankInfo = itemsModule.slotInfo[const.BAG_KIND.BANK]
       if addon.atBank and bankInfo and bankInfo.itemsBySlotKey then
         extras.bank = probeItems(sanitizeForDump(bankInfo.itemsBySlotKey))
       end
-      database:SetDebugBackpackDump(sanitized, itemProbe:Client(), extras)
+      local client = itemProbe:Client()
+      database:SetDebugBackpackDump(sanitized, client, extras)
+      -- Kept beside earlier dumps' sets, whoever took them (issue #1333).
+      database:AddDebugEquipmentSets({
+        time = time(),
+        loaded = loadedAt,
+        character = extras.player.fullName,
+        realm = GetRealmName(),
+        profile = database:GetCurrentProfileName(),
+        client = client,
+        sets = extras.equipmentSets,
+      })
       f.Update()
       print("BetterBags: Dumped backpack items to saved variables!")
     else
@@ -323,9 +340,11 @@ function debugWindow:CreateDumpFrame()
   clearButton:SetSize(200, 35)
   clearButton:SetPoint("LEFT", dumpButton, "RIGHT", 20, 0)
   clearButton:SetText("Clear Dumped Data")
+  f.clearButton = clearButton
 
   addon.SetScript(clearButton, "OnClick", function(_ctx)
     database:SetDebugBackpackDump({})
+    database:ClearDebugEquipmentSets()
     f.Update()
     print("BetterBags: Cleared dumped backpack items!")
   end)

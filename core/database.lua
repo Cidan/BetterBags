@@ -2891,4 +2891,28 @@ function DB:SetDebugBackpackDump(dump, client, extras)
   DB.data.profile.debugDumpExtras = extras
 end
 
+-- How many dumps' equipment sets are kept (AddDebugEquipmentSets): the oldest go first.
+DB.DEBUG_EQUIPMENT_SETS_KEPT = 50
+
+-- AddDebugEquipmentSets keeps what a dump read of the character's equipment sets (frames/debug.lua), account wide, after
+-- those of earlier dumps, so dumps across a relog, a set deleted and another character can be compared (issue #1333:
+-- whether a set keeps its ID).
+---@param entry table
+function DB:AddDebugEquipmentSets(entry)
+  local kept = DB.data.global.debugEquipmentSets
+  table.insert(kept, entry)
+  while #kept > DB.DEBUG_EQUIPMENT_SETS_KEPT do
+    table.remove(kept, 1)
+  end
+end
+
+---@return table[]
+function DB:GetDebugEquipmentSets()
+  return DB.data.global.debugEquipmentSets
+end
+
+function DB:ClearDebugEquipmentSets()
+  DB.data.global.debugEquipmentSets = {}
+end
+
 DB:Enable()

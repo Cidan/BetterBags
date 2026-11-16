@@ -303,6 +303,51 @@ function itemProbe:Sample()
   return sample
 end
 
+-- EquipmentSets records every equipment set the client lists for the character (C_EquipmentSet): their IDs in the
+-- client's order, and for each, every value each API answered, its locations unpacked by whichever of
+-- EquipmentManager_UnpackLocation and EquipmentManager_GetLocationData the client has, and the bag/slot map BetterBags
+-- built from them (EquipmentSets.bagAndSlotToSet). Issue #1333: dumps across a relog, a set deleted and another
+-- character show whether a set keeps its ID.
+---@return table
+function itemProbe:EquipmentSets()
+  local api = _G.C_EquipmentSet
+  local out = {
+    count = ask(field(api, "GetNumEquipmentSets")),
+    ids = ask(field(api, "GetEquipmentSetIDs")),
+    sets = {},
+  }
+  local ids = out.ids and out.ids[1]
+  if type(ids) == "table" then
+    for order, id in ipairs(ids) do
+      local set = {
+        order = order,
+        info = ask(field(api, "GetEquipmentSetInfo"), id),
+        itemIDs = ask(field(api, "GetItemIDs"), id),
+        locations = ask(field(api, "GetItemLocations"), id),
+        spec = ask(field(api, "GetEquipmentSetAssignedSpec"), id),
+      }
+      local name = set.info and set.info[1]
+      if type(name) == "string" then
+        set.idOfName = ask(field(api, "GetEquipmentSetID"), name)
+      end
+      local locations = set.locations and set.locations[1]
+      if type(locations) == "table" then
+        set.unpacked = {}
+        for slot, location in pairs(locations) do
+          set.unpacked[slot] = {
+            unpack = ask(_G.EquipmentManager_UnpackLocation, location),
+            data = ask(_G.EquipmentManager_GetLocationData, location),
+          }
+        end
+      end
+      out.sets[id] = set
+    end
+  end
+  local equipmentSets = addon:GetModule('EquipmentSets', true)
+  out.map = clean(equipmentSets and equipmentSets.bagAndSlotToSet)
+  return out
+end
+
 -- Client describes the client the probes are taken on.
 ---@return table
 function itemProbe:Client()

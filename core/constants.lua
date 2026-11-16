@@ -1209,6 +1209,9 @@ const.DATABASE_DEFAULTS = {
     -- The newest changelog release the player has seen (its id), and whether the changelog
     -- opens by itself on login when there is a release they have not seen.
     changelog = { lastSeen = 0, autoOpen = true },
+    -- What each /bbdb dump read of the character's equipment sets, kept across dumps, characters and profiles
+    -- (DB:AddDebugEquipmentSets).
+    debugEquipmentSets = {},
   },
   char = {}
 }

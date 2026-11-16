@@ -235,6 +235,7 @@ const.DATABASE_DEFAULTS = {
   },
   global = {
     changelog = { lastSeen = 0, autoOpen = true },
+    debugEquipmentSets = {},
   },
   char = {},
 }
@@ -2359,6 +2360,27 @@ describe("Database", function()
       DB:SetDebugBackpackDump(myDump)
       local dump = DB:GetDebugBackpackDump()
       assert.are.same(myDump, dump)
+    end)
+
+    -- Issue #1333: what each dump read of the character's equipment sets, kept account wide across dumps, characters
+    -- and profiles, the newest last, the oldest dropped past the cap.
+    it("keeps each dump's equipment sets account wide, the newest last, until cleared", function()
+      DB:ClearDebugEquipmentSets()
+      DB:AddDebugEquipmentSets({ time = 1 })
+      DB:AddDebugEquipmentSets({ time = 2 })
+      assert.are.same({ { time = 1 }, { time = 2 } }, DB:GetDebugEquipmentSets())
+      assert.are.equal(DB.data.global.debugEquipmentSets, DB:GetDebugEquipmentSets(), "account wide")
+      DB.data:ResetProfile(false, true)
+      assert.are.equal(2, #DB:GetDebugEquipmentSets(), "not the profile's")
+      for i = 3, DB.DEBUG_EQUIPMENT_SETS_KEPT + 1 do
+        DB:AddDebugEquipmentSets({ time = i })
+      end
+      local kept = DB:GetDebugEquipmentSets()
+      assert.are.equal(DB.DEBUG_EQUIPMENT_SETS_KEPT, #kept)
+      assert.are.same({ time = 2 }, kept[1], "the oldest dropped")
+      assert.are.same({ time = DB.DEBUG_EQUIPMENT_SETS_KEPT + 1 }, kept[#kept])
+      DB:ClearDebugEquipmentSets()
+      assert.are.same({}, DB:GetDebugEquipmentSets())
     end)
   end)
 end)

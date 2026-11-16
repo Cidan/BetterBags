@@ -294,6 +294,18 @@ describe("Debug Dump Harness with test.lua", function()
     assert(ok, err)
   end)
 
+  -- Issue #1333, found by the bug review: the Dump tab keeps each dump's equipment sets in an account-wide list, which
+  -- the real defaults (core/constants.lua) must give saved variables from before the list existed, as test.lua's are.
+  it("keeps equipment set captures account wide on the real defaults, in saved variables from before them", function()
+    DB:AddDebugEquipmentSets({ time = 1 })
+    DB:AddDebugEquipmentSets({ time = 2 })
+    assert.are.same({ { time = 1 }, { time = 2 } }, _G.BetterBagsDB.global.debugEquipmentSets)
+    DB.data:SetProfile("Not Max Level")
+    assert.are.equal(2, #DB:GetDebugEquipmentSets(), "every profile's")
+    DB:ClearDebugEquipmentSets()
+    assert.are.same({}, DB:GetDebugEquipmentSets())
+  end)
+
   it("should run the full items:ProcessRefresh pipeline using the dumped items", function()
     -- Set active profile to Default (where the dump resides)
     DB.data:SetProfile("Default")
