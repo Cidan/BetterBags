@@ -1,0 +1,17 @@
+{
+  "id": 1794845058,
+  "version": "v0.9.3-8-g1d1299a",
+  "channel": "alpha",
+  "date": "2026-11-16",
+  "from": "dc3c5e05a5bb452b76e7ad13d3373ab6d2368c2b",
+  "to": "1d1299a1872e2b4dc4358d9fa9a0b68ec1cd14fd",
+  "headline": "Equipment sets are now managed categories in the category order.",
+  "entries": [
+    {
+      "category": "Improved",
+      "title": "Gear sets are now managed categories in the order",
+      "details": "Each Equipment Manager set now gets a Gear category in the order instead of overriding everything, so manual categories and higher rules win. Sets support colors, Used In, Hide In, Ignored Items, and item order, keep settings on rename, delete them when removed, and reject manual item drops.",
+      "clients": []
+    }
+  ]
+}
