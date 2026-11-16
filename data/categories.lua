@@ -54,7 +54,7 @@ local context = addon:GetModule('Context')
 ---@field private categoryCount number
 ---@field private ephemeralCategories table<string, CustomCategoryFilter>
 ---@field private ephemeralCategoryByItemID table<number, CustomCategoryFilter>
----@field private gearSets table<string, boolean> The categories in memory that are, or may be, gear sets' (SyncGearSets).
+---@field private gearSetsByID table<number, CustomCategoryFilter> Each listed set's category in memory, by the set's ID (SyncGearSets).
 local categories = addon:NewModule('Categories')
 
 -- A gear set's category is named "Gear: " and its set's name.
@@ -83,8 +83,16 @@ function categories:Init()
   self.itemsWithNoCategory = {}
   self.ephemeralCategories = {}
   self.ephemeralCategoryByItemID = {}
-  self.gearSets = {}
+  self.gearSetsByID = {}
   self.categoryCount = 0
+end
+
+-- isOlderGearSet says whether a plugin's saved state is a gear set's section an older version saved as a dynamic
+-- category: gear sets' categories come from their sets now (SyncGearSets), so it is left as it is and not loaded.
+---@param category CustomCategoryFilter
+---@return boolean
+local function isOlderGearSet(category)
+  return category.name:sub(1, #GEAR_PREFIX) == GEAR_PREFIX and not category.isGroupBySubcategory
 end
 
 function categories:OnEnable()
@@ -92,12 +100,8 @@ function categories:OnEnable()
     self.categoryCount = self.categoryCount + 1
   end
   for _, category in pairs(database:GetAllEphemeralItemCategories()) do
-    if category.dynamic then
+    if category.dynamic and not isOlderGearSet(category) then
       self.ephemeralCategories[category.name] = category
-      -- Older versions saved gear sets' sections as dynamic categories: SyncGearSets takes each over or forgets it.
-      if category.name:sub(1, #GEAR_PREFIX) == GEAR_PREFIX and not category.isGroupBySubcategory then
-        self.gearSets[category.name] = true
-      end
     end
   end
 end
@@ -258,7 +262,11 @@ end
 ---@param category string The name of the custom category to check.
 ---@return boolean
 function categories:IsCategoryEnabled(kind, category)
-  if self.ephemeralCategories[category] then
+  local ephemeral = self.ephemeralCategories[category]
+  if ephemeral and ephemeral.gearSet ~= nil then
+    return ephemeral.enabled[kind] == true
+  end
+  if ephemeral then
     local filter = database:GetEphemeralItemCategory(category)
     if filter and filter.enabled then
       return filter.enabled[kind]
@@ -280,8 +288,7 @@ function categories:ToggleCategory(kind, category)
   self:changed()
   if self.ephemeralCategories[category] then
     local enabled = not self.ephemeralCategories[category].enabled[kind]
-    self.ephemeralCategories[category].enabled[kind] = enabled
-    database:SetEphemeralItemCategoryEnabled(kind, category, enabled)
+    self:setEphemeralEnabled(kind, category, enabled)
     return
   end
   local filter = database:GetItemCategory(category)
@@ -296,8 +303,7 @@ end
 function categories:EnableCategory(kind, category)
   self:changed()
   if self.ephemeralCategories[category] then
-    self.ephemeralCategories[category].enabled[kind] = true
-    database:SetEphemeralItemCategoryEnabled(kind, category, true)
+    self:setEphemeralEnabled(kind, category, true)
     return
   end
   local filter = database:GetItemCategory(category)
@@ -311,8 +317,7 @@ end
 function categories:DisableCategory(kind, category)
   self:changed()
   if self.ephemeralCategories[category] then
-    self.ephemeralCategories[category].enabled[kind] = false
-    database:SetEphemeralItemCategoryEnabled(kind, category, false)
+    self:setEphemeralEnabled(kind, category, false)
     return
   end
   local filter = database:GetItemCategory(category)
@@ -337,8 +342,7 @@ end
 function categories:SetCategoryState(kind, category, enabled)
   self:changed()
   if self.ephemeralCategories[category] then
-    self.ephemeralCategories[category].enabled[kind] = enabled
-    database:SetEphemeralItemCategoryEnabled(kind, category, enabled)
+    self:setEphemeralEnabled(kind, category, enabled)
   end
   local filter = database:GetItemCategory(category)
   if filter and filter.itemList then
@@ -507,13 +511,35 @@ function categories:GetOrder()
   return names
 end
 
--- saveState saves what a player set for a plugin's category (its saved state, category-lifecycle.md §1).
+-- saveState saves what a player set for a plugin's category (its saved state, category-lifecycle.md §1), or for a gear
+-- set's (its set's record, §12).
 ---@param filter CustomCategoryFilter
 local function saveState(filter)
-  database:UpdateEphemeralItemCategory(filter.name, { enabled = filter.enabled, color = filter.color,
+  local fields = { enabled = filter.enabled, color = filter.color,
     priority = filter.priority, automation = filter.automation, confirmSale = filter.confirmSale,
     deposit = filter.deposit, skipRecent = filter.skipRecent, ignoredItems = filter.ignoredItems, hidden = filter.hidden,
-    itemOrder = filter.itemOrder })
+    itemOrder = filter.itemOrder }
+  if filter.gearSet ~= nil then
+    database:UpdateGearSet(filter.gearSet, fields)
+  else
+    database:UpdateEphemeralItemCategory(filter.name, fields)
+  end
+end
+
+-- setEphemeralEnabled sets whether a plugin's or a gear set's category is used in a bag (the older plugin calls:
+-- ToggleCategory, EnableCategory, DisableCategory, SetCategoryState), saving a gear set's to its set's record.
+---@private
+---@param kind BagKind
+---@param name string
+---@param enabled boolean
+function categories:setEphemeralEnabled(kind, name, enabled)
+  local filter = self.ephemeralCategories[name]
+  filter.enabled[kind] = enabled
+  if filter.gearSet ~= nil then
+    saveState(filter)
+  else
+    database:SetEphemeralItemCategoryEnabled(kind, name, enabled)
+  end
 end
 
 -- setPriority sets a category's place, saving a plugin's in its saved state as UpdateCategory does.
@@ -1224,98 +1250,184 @@ function categories:IsGearSet(name)
   return filter ~= nil and filter.gearSet ~= nil and database:GetItemCategory(name) == nil
 end
 
--- moveGearSet renames a gear set's category with its set, keeping what the player set for it and each bag's pin and
--- tab, and says so as RenameCategory does (the Categories page keeps it chosen).
+-- copyOf returns a copy of a table of what a player set (a category's bags, color, Ignored Items, item order), whose
+-- values are plain.
+---@param value? table
+---@return table?
+local function copyOf(value)
+  if type(value) ~= "table" then
+    return value
+  end
+  local copy = {}
+  for k, v in pairs(value) do
+    copy[k] = v
+  end
+  return copy
+end
+
+-- newGearSetRecord makes the record of a set that has none: what an older version, or the build before this one, saved
+-- under the category's name, copied (asked: "the first time the set has no record ... After that leave those entries
+-- alone: not loaded, not deleted"), used in every bag when nothing says otherwise.
+---@param name string
+---@return GearSetRecord
+local function newGearSetRecord(name)
+  local older = database:GetEphemeralItemCategory(name) or {}
+  return {
+    name = name,
+    enabled = copyOf(older.enabled) or everyBag(),
+    color = copyOf(older.color),
+    priority = older.priority,
+    automation = older.automation,
+    confirmSale = older.confirmSale,
+    deposit = older.deposit,
+    skipRecent = older.skipRecent,
+    ignoredItems = copyOf(older.ignoredItems),
+    hidden = copyOf(older.hidden),
+    itemOrder = copyOf(older.itemOrder),
+  }
+end
+
+-- gearSetFilter returns the category in memory of a set's record: its items the set's (GetCustomCategory), what the
+-- player sets for it saved back to the record (saveState).
+---@param id number
+---@param record GearSetRecord
+---@return CustomCategoryFilter
+local function gearSetFilter(id, record)
+  return {
+    name = record.name, itemList = {}, gearSet = id,
+    enabled = record.enabled, color = record.color, priority = record.priority, automation = record.automation,
+    confirmSale = record.confirmSale, deposit = record.deposit, skipRecent = record.skipRecent,
+    ignoredItems = record.ignoredItems, hidden = record.hidden, itemOrder = record.itemOrder,
+  }
+end
+
+-- dropGearSet takes a set's category out of memory (the list, the bags), keeping what was saved for it.
+---@private
+---@param id number
+function categories:dropGearSet(id)
+  local filter = self.gearSetsByID[id]
+  if filter == nil then
+    return
+  end
+  if self.ephemeralCategories[filter.name] == filter then
+    self.ephemeralCategories[filter.name] = nil
+  end
+  self.gearSetsByID[id] = nil
+end
+
+-- gearSetOwns says whether what each bag saved under a name is a set's: no other category has the name (one of yours
+-- made since, on another character of the profile, owns it then).
+---@private
+---@param id number
+---@param name string
+---@return boolean
+function categories:gearSetOwns(id, name)
+  if database:GetItemCategory(name) ~= nil then
+    return false
+  end
+  local filter = self.ephemeralCategories[name]
+  return filter == nil or filter.gearSet == id
+end
+
+-- renameGearSets gives each listed set whose name differs from its record's (renamed in the Equipment Manager, or on
+-- another character of the profile) its new name: its settings stay with the ID; its pins and tabs move to the new name
+-- when they are its own (gearSetOwns). All at once: two sets can take each other's names (two characters whose sets'
+-- IDs are in the other order), so a name being left by another set this sweep is free, and every pin and tab moves as
+-- one (DB:RenameGearSets). A category in memory is renamed in place, said as RenameCategory says it so the Categories
+-- page keeps it chosen; a set renamed onto a name another category has gets none, its record as it was. It returns
+-- whether anything changed.
 ---@private
 ---@param ctx Context
----@param oldName string
----@param newName string
-function categories:moveGearSet(ctx, oldName, newName)
-  local filter = self.ephemeralCategories[oldName]
-  self.ephemeralCategories[oldName], self.gearSets[oldName] = nil, nil
-  filter.name = newName
-  self.ephemeralCategories[newName], self.gearSets[newName] = filter, true
-  database:RenameEphemeralCategory(oldName, newName)
-  events:SendMessage(ctx, 'categories/Changed', newName, oldName)
-end
-
--- forgetGearSet forgets the category of a set that is gone: it leaves the list, and what the player set for it stays
--- saved under its name, for a set of that name. An older version's is no longer loaded at login (it saved gear sets'
--- sections as dynamic categories).
----@private
----@param name string
-function categories:forgetGearSet(name)
-  local filter = self.ephemeralCategories[name]
-  self.ephemeralCategories[name], self.gearSets[name] = nil, nil
-  if filter.dynamic then
-    filter.dynamic = nil
-    database:CreateOrUpdateCategory(filter)
+---@param sets EquipmentSet[]
+---@return boolean
+function categories:renameGearSets(ctx, sets)
+  local leaving = {}
+  for _, set in ipairs(sets) do
+    local record = database:GetGearSet(set.id)
+    if record ~= nil and record.name ~= GEAR_PREFIX .. set.name then
+      leaving[set.id] = record.name
+    end
   end
+  local renames, changed = {}, false
+  for _, set in ipairs(sets) do
+    local id, name = set.id, GEAR_PREFIX .. set.name
+    local old = leaving[id]
+    if old ~= nil then
+      local holder = self.ephemeralCategories[name]
+      local free = database:GetItemCategory(name) == nil
+        and (holder == nil or (holder.gearSet ~= nil and leaving[holder.gearSet] ~= nil))
+      if free then
+        table.insert(renames, { id = id, name = name, old = old, bags = self:gearSetOwns(id, old) })
+      elseif self.gearSetsByID[id] ~= nil then
+        self:dropGearSet(id)
+        changed = true
+      end
+    end
+  end
+  if #renames == 0 then
+    return changed
+  end
+  database:RenameGearSets(renames)
+  local moving = {}
+  for _, rename in ipairs(renames) do
+    local filter = self.gearSetsByID[rename.id]
+    if filter ~= nil and self.ephemeralCategories[filter.name] == filter then
+      self.ephemeralCategories[filter.name] = nil
+    end
+    moving[rename] = filter
+  end
+  for _, rename in ipairs(renames) do
+    local filter = moving[rename]
+    if filter ~= nil then
+      filter.name = rename.name
+      self.ephemeralCategories[rename.name] = filter
+      events:SendMessage(ctx, 'categories/Changed', rename.name, rename.old)
+    end
+  end
+  return true
 end
 
--- SyncGearSets makes a category for each equipment set (issue #1333; asked: "it's time we undo the hard coding and
--- make them function like other categories correctly"), as a plugin makes its own: "Gear: " and the set's name, its
--- items the set's (GetCustomCategory), and what the player sets for it saved under its name (category-lifecycle.md
--- §12). A new one goes on top of the order, the client's first set made last so it ends first; so does one an older
--- version saved without a place. A set renamed in the Equipment Manager keeps its category, found by the set's ID
--- while the category is in memory (each character numbers its own sets, and the profile is every character's); the
--- category of a set that is gone leaves the list. A set another category is named after gets none. sets is what
--- EquipmentSets:Update read. It returns whether anything changed; then a new generation starts and the Categories page
--- is told.
+-- SyncGearSets makes a category for each of the character's equipment sets (issue #1333; asked: "it's time we undo the
+-- hard coding and make them function like other categories correctly"): "Gear: " and the set's name, its items the
+-- set's (GetCustomCategory), and what the player sets for it saved in the profile by the set's ID (asked: "everything
+-- goes in the global profile. it's keyed by the id of the gear set"), so every character of the profile shares a set
+-- ID's category (category-lifecycle.md §12). A set with no record is new: on top of the order, the client's first set
+-- made last so it ends first. A set whose name differs from its record's was renamed (in the Equipment Manager, or on
+-- another character of the profile): its settings stay with the ID, its pins and tabs move to the new name. A set no
+-- longer listed leaves the list, what was saved for it kept (ForgetGearSets forgets a deleted one's). A set another
+-- category is named after gets none. sets is what EquipmentSets:Update read. It returns whether anything changed; then
+-- a new generation starts and the Categories page is told.
 ---@param ctx Context
 ---@param sets EquipmentSet[]
 ---@return boolean
 function categories:SyncGearSets(ctx, sets)
-  local names, nameOf = {}, {}
+  local listed = {}
   for _, set in ipairs(sets) do
-    local name = GEAR_PREFIX .. set.name
-    names[name] = set.id
-    nameOf[set.id] = name
+    listed[set.id] = true
   end
   local changed = false
-  local unplaced = {}
-  local held = {}
-  for name in pairs(self.gearSets) do
-    table.insert(held, name)
-  end
-  table.sort(held)
-  for _, name in ipairs(held) do
-    local filter = self.ephemeralCategories[name]
-    if filter == nil or database:GetItemCategory(name) ~= nil then
-      self.gearSets[name] = nil
-    elseif names[name] ~= nil then
-      if filter.gearSet ~= names[name] then
-        filter.gearSet = names[name]
-        changed = true
-      end
-      -- An older version's: no longer loaded at login, and on top unless the player placed it.
-      if filter.dynamic then
-        filter.dynamic = nil
-        database:CreateOrUpdateCategory(filter)
-        unplaced[name] = filter.priority == nil or nil
-        changed = true
-      end
-    else
-      local renamed = filter.gearSet ~= nil and nameOf[filter.gearSet] or nil
-      if renamed ~= nil and not self:DoesCategoryExist(renamed) then
-        self:moveGearSet(ctx, name, renamed)
-      else
-        self:forgetGearSet(name)
-      end
+  for id, filter in pairs(self.gearSetsByID) do
+    -- Also one taken out of memory another way (DeleteCategory), made again below.
+    if not listed[id] or self.ephemeralCategories[filter.name] ~= filter then
+      self:dropGearSet(id)
       changed = true
     end
   end
+  changed = self:renameGearSets(ctx, sets) or changed
   for i = #sets, 1, -1 do
-    local name = nameOf[sets[i].id]
-    if not unplaced[name] and not self:DoesCategoryExist(name) then
-      self:CreateCategory(ctx, { name = name, itemList = {}, gearSet = sets[i].id })
-      self.gearSets[name] = true
+    local id, name = sets[i].id, GEAR_PREFIX .. sets[i].name
+    local record = database:GetGearSet(id)
+    if self.gearSetsByID[id] == nil and not self:DoesCategoryExist(name) then
+      if record == nil then
+        record = newGearSetRecord(name)
+        database:SetGearSet(id, record)
+      end
+      local made = gearSetFilter(id, record)
+      self.ephemeralCategories[name], self.gearSetsByID[id] = made, made
+      if made.priority == nil then
+        self:setPriority(name, self:topPriority())
+      end
       changed = true
-      -- One an older version saved, forgotten by a character without its set (the profile is every character's).
-      unplaced[name] = self.ephemeralCategories[name].priority == nil or nil
-    end
-    if unplaced[name] then
-      self:setPriority(name, self:topPriority())
     end
   end
   if changed then
@@ -1323,6 +1435,24 @@ function categories:SyncGearSets(ctx, sets)
     events:SendMessage(ctx, 'categories/Changed')
   end
   return changed
+end
+
+-- ForgetGearSets forgets the categories of sets this character deleted (EquipmentSets saw them go once the client said
+-- its sets changed; asked: "we just watch the event"): what was saved for each, its pins and tabs too when they are its
+-- own (gearSetOwns), so a set the client later gives the ID (Forever reuses a freed ID) starts fresh, on top. A new
+-- generation starts and the Categories page is told.
+---@param ctx Context
+---@param ids number[]
+function categories:ForgetGearSets(ctx, ids)
+  for _, id in ipairs(ids) do
+    local record = database:GetGearSet(id)
+    if record ~= nil then
+      database:DeleteGearSet(id, self:gearSetOwns(id, record.name))
+    end
+    self:dropGearSet(id)
+  end
+  self:changed()
+  events:SendMessage(ctx, 'categories/Changed')
 end
 
 -- GetCustomCategory returns the custom category for an item, or nil if it doesn't have one.

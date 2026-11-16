@@ -1113,6 +1113,10 @@ const.DATABASE_DEFAULTS = {
     customCategoryFilters = {},
     ---@type table<string, CustomCategoryFilter>
     ephemeralCategoryFilters = {},
+    -- Each equipment set's category, by the set's ID: what the player set for it and the name it last had (DB:GetGearSet,
+    -- category-lifecycle.md §12).
+    ---@type table<number, GearSetRecord>
+    gearSets = {},
     ---@type table<number, string>
     customCategoryIndex = {},
     categoryFilters = {

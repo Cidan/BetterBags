@@ -216,6 +216,7 @@ const.DATABASE_DEFAULTS = {
     previousViews = { [0] = 2, [1] = 2 },
     customCategoryFilters = {},
     ephemeralCategoryFilters = {},
+    gearSets = {},
     customCategoryIndex = {},
     categoryFilters = {
       [0] = { Type = true, Subtype = false, Expansion = false, TradeSkill = false, RecentItems = true, GearSet = true, EquipmentLocation = true },
@@ -1681,46 +1682,109 @@ describe("Database", function()
     end)
   end)
 
-  -- A gear set's category is saved as a plugin's is, and follows the set when the Equipment Manager renames it (issue
-  -- #1333, category-lifecycle.md §12).
+  -- A gear set's category is saved in the profile by its set's ID (issue #1333, category-lifecycle.md §12): what the player
+  -- set, and the name it last had, which its pins and tabs go by.
   describe("a gear set's category", function()
-    describe("RenameEphemeralCategory", function()
-      before_each(function()
-        DB.data.profile.ephemeralCategoryFilters["Gear: Tank"] = { name = "Gear: Tank", enabled = { [0] = true },
-          itemList = {}, color = { 1, 0, 0 } }
-        DB.data.profile.categoryToGroup[const.BAG_KIND.BACKPACK]["Gear: Tank"] = 1
-        DB.data.profile.categoryToGroup[const.BAG_KIND.BANK]["Gear: Tank"] = 2
-        DB.data.profile.customSectionSort[const.BAG_KIND.BACKPACK]["Gear: Tank"] = 5
-        DB.data.profile.customSectionSort[const.BAG_KIND.BANK]["Gear: Tank"] = 3
-      end)
+    local p
+    before_each(function()
+      p = DB.data.profile
+      p.gearSets = {}
+      p.categoryToGroup[const.BAG_KIND.BACKPACK]["Gear: Tank"] = 1
+      p.categoryToGroup[const.BAG_KIND.BANK]["Gear: Tank"] = 2
+      p.customSectionSort[const.BAG_KIND.BACKPACK]["Gear: Tank"] = 5
+      p.customSectionSort[const.BAG_KIND.BANK]["Gear: Tank"] = 3
+    end)
 
-      it("moves its saved state, pins and tabs to the new name", function()
-        assert.is_true(DB:RenameEphemeralCategory("Gear: Tank", "Gear: Prot"))
-        local p = DB.data.profile
-        assert.is_nil(p.ephemeralCategoryFilters["Gear: Tank"])
-        assert.are.equal("Gear: Prot", p.ephemeralCategoryFilters["Gear: Prot"].name)
-        assert.are.same({ 1, 0, 0 }, p.ephemeralCategoryFilters["Gear: Prot"].color)
-        assert.are.same({ 1, 2 }, { p.categoryToGroup[const.BAG_KIND.BACKPACK]["Gear: Prot"],
-          p.categoryToGroup[const.BAG_KIND.BANK]["Gear: Prot"] })
-        assert.is_nil(p.categoryToGroup[const.BAG_KIND.BACKPACK]["Gear: Tank"])
-        assert.are.same({ 5, 3 }, { p.customSectionSort[const.BAG_KIND.BACKPACK]["Gear: Prot"],
-          p.customSectionSort[const.BAG_KIND.BANK]["Gear: Prot"] })
-        assert.is_nil(p.customSectionSort[const.BAG_KIND.BANK]["Gear: Tank"])
-      end)
+    it("is saved by its set's ID", function()
+      assert.is_nil(DB:GetGearSet(3))
+      DB:SetGearSet(3, { name = "Gear: Tank", priority = 2 })
+      assert.are.same({ name = "Gear: Tank", priority = 2 }, p.gearSets[3])
+      assert.are.equal(p.gearSets[3], DB:GetGearSet(3))
+      DB:SetGearSet(0, { name = "Gear: first" })
+      assert.are.equal("Gear: first", DB:GetGearSet(0).name, "ID 0 is a set's")
+    end)
 
-      it("replaces what an older category of the new name left", function()
-        DB.data.profile.ephemeralCategoryFilters["Gear: Prot"] = { name = "Gear: Prot", itemList = {}, color = { 0, 0, 1 } }
-        assert.is_true(DB:RenameEphemeralCategory("Gear: Tank", "Gear: Prot"))
-        assert.are.same({ 1, 0, 0 }, DB.data.profile.ephemeralCategoryFilters["Gear: Prot"].color)
-      end)
+    it("saves what the player set, keeping its name", function()
+      DB:SetGearSet(3, { name = "Gear: Tank", color = { 1, 0, 0 }, priority = 2 })
+      DB:UpdateGearSet(3, { enabled = { [0] = true }, priority = 5, ignoredItems = { [7] = true }, hidden = { [1] = true },
+        itemOrder = { "count" }, skipRecent = true })
+      assert.are.same({ name = "Gear: Tank", enabled = { [0] = true }, priority = 5, ignoredItems = { [7] = true },
+        hidden = { [1] = true }, itemOrder = { "count" }, skipRecent = true }, p.gearSets[3], "the color taken off")
+      DB:UpdateGearSet(9, { priority = 1 })
+      assert.is_nil(p.gearSets[9], "nothing for a set with no record")
+    end)
 
-      it("moves nothing with no saved state of the old name, or onto a category of yours", function()
-        assert.is_false(DB:RenameEphemeralCategory("Gear: Ghost", "Gear: Prot"))
-        DB.data.profile.customCategoryFilters["Gear: Prot"] = { name = "Gear: Prot", itemList = {}, save = true }
-        assert.is_false(DB:RenameEphemeralCategory("Gear: Tank", "Gear: Prot"))
-        assert.is_not_nil(DB.data.profile.ephemeralCategoryFilters["Gear: Tank"])
-        assert.are.equal(5, DB.data.profile.customSectionSort[const.BAG_KIND.BACKPACK]["Gear: Tank"])
-      end)
+    it("moves its pins and tabs to the set's new name", function()
+      DB:SetGearSet(3, { name = "Gear: Tank" })
+      DB:RenameGearSets({ { id = 3, name = "Gear: Prot", bags = true } })
+      assert.are.equal("Gear: Prot", p.gearSets[3].name)
+      assert.are.same({ 1, 2 }, { p.categoryToGroup[const.BAG_KIND.BACKPACK]["Gear: Prot"],
+        p.categoryToGroup[const.BAG_KIND.BANK]["Gear: Prot"] })
+      assert.is_nil(p.categoryToGroup[const.BAG_KIND.BACKPACK]["Gear: Tank"])
+      assert.are.same({ 5, 3 }, { p.customSectionSort[const.BAG_KIND.BACKPACK]["Gear: Prot"],
+        p.customSectionSort[const.BAG_KIND.BANK]["Gear: Prot"] })
+      assert.is_nil(p.customSectionSort[const.BAG_KIND.BANK]["Gear: Tank"])
+    end)
+
+    -- Found by the bug review: two sets taking each other's names (two characters of the profile) move their pins and
+    -- tabs as one swap, not one over the other.
+    it("swaps the pins and tabs of two sets that take each other's names", function()
+      p.categoryToGroup[const.BAG_KIND.BACKPACK]["Gear: Heal"] = 7
+      p.customSectionSort[const.BAG_KIND.BACKPACK]["Gear: Heal"] = 9
+      DB:SetGearSet(0, { name = "Gear: Tank" })
+      DB:SetGearSet(1, { name = "Gear: Heal" })
+      DB:RenameGearSets({ { id = 0, name = "Gear: Heal", bags = true }, { id = 1, name = "Gear: Tank", bags = true } })
+      assert.are.same({ "Gear: Heal", "Gear: Tank" }, { p.gearSets[0].name, p.gearSets[1].name })
+      assert.are.same({ 1, 7 }, { p.categoryToGroup[const.BAG_KIND.BACKPACK]["Gear: Heal"],
+        p.categoryToGroup[const.BAG_KIND.BACKPACK]["Gear: Tank"] })
+      assert.are.same({ 5, 9 }, { p.customSectionSort[const.BAG_KIND.BACKPACK]["Gear: Heal"],
+        p.customSectionSort[const.BAG_KIND.BACKPACK]["Gear: Tank"] })
+      assert.is_nil(p.categoryToGroup[const.BAG_KIND.BANK]["Gear: Tank"], "the bank's tab went with it")
+      assert.are.equal(2, p.categoryToGroup[const.BAG_KIND.BANK]["Gear: Heal"])
+    end)
+
+    -- Found by the second bug review: retail's bank keeps a tab for each bank type (Character, Warbank) beside the flat one.
+    it("moves and clears the retail bank's tab of each bank type too", function()
+      local bank = p.categoryToGroup[const.BAG_KIND.BANK]
+      bank[1] = { ["Gear: Tank"] = 4 }
+      bank[2] = { ["Gear: Heal"] = 6 }
+      DB:SetGearSet(0, { name = "Gear: Tank" })
+      DB:SetGearSet(1, { name = "Gear: Heal" })
+      DB:RenameGearSets({ { id = 0, name = "Gear: Heal", bags = true }, { id = 1, name = "Gear: Tank", bags = true } })
+      assert.are.same({ ["Gear: Heal"] = 4 }, bank[1])
+      assert.are.same({ ["Gear: Tank"] = 6 }, bank[2])
+      DB:DeleteGearSet(0, true)
+      assert.are.same({}, bank[1])
+      assert.are.same({ ["Gear: Tank"] = 6 }, bank[2], "another set's kept")
+    end)
+
+    it("leaves the pins and tabs under the old name when they are another category's", function()
+      DB:SetGearSet(3, { name = "Gear: Tank" })
+      DB:RenameGearSets({ { id = 3, name = "Gear: Prot", bags = false } })
+      assert.are.equal("Gear: Prot", p.gearSets[3].name)
+      assert.are.equal(5, p.customSectionSort[const.BAG_KIND.BACKPACK]["Gear: Tank"])
+      assert.is_nil(p.customSectionSort[const.BAG_KIND.BACKPACK]["Gear: Prot"])
+    end)
+
+    it("forgets, deleted, what was saved for it, its pins and tabs too", function()
+      DB:SetGearSet(3, { name = "Gear: Tank", color = { 1, 0, 0 } })
+      p.customSectionSort[const.BAG_KIND.BACKPACK]["Mats"] = 1
+      DB:DeleteGearSet(3, true)
+      assert.is_nil(p.gearSets[3])
+      assert.is_nil(p.categoryToGroup[const.BAG_KIND.BACKPACK]["Gear: Tank"])
+      assert.is_nil(p.categoryToGroup[const.BAG_KIND.BANK]["Gear: Tank"])
+      assert.is_nil(p.customSectionSort[const.BAG_KIND.BACKPACK]["Gear: Tank"])
+      assert.is_nil(p.customSectionSort[const.BAG_KIND.BANK]["Gear: Tank"])
+      assert.are.equal(1, p.customSectionSort[const.BAG_KIND.BACKPACK]["Mats"], "another category's kept")
+      DB:DeleteGearSet(8, true)
+    end)
+
+    it("keeps, deleted, the pins and tabs under its name when they are another category's", function()
+      DB:SetGearSet(3, { name = "Gear: Tank" })
+      DB:DeleteGearSet(3, false)
+      assert.is_nil(p.gearSets[3])
+      assert.are.equal(5, p.customSectionSort[const.BAG_KIND.BACKPACK]["Gear: Tank"])
+      assert.are.equal(1, p.categoryToGroup[const.BAG_KIND.BACKPACK]["Gear: Tank"])
     end)
   end)
 

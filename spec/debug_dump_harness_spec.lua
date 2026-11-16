@@ -238,10 +238,13 @@ describe("Debug Dump Harness with test.lua", function()
   end)
 
   -- Issue #1333 (category-lifecycle.md §12), on the real Default profile, which ten characters share: it holds the
-  -- gear set categories an older version saved ("Gear: Tank" and "Gear: Ret", dynamic, no place in the order). Found
-  -- by the bug review: taken over at no place they fell below the profile's rules; and since each character numbers
-  -- its own sets, a set ID read in another session gave one character's set another's settings.
-  it("takes over the real profile's gear set categories on top, and keeps each character's sets apart", function()
+  -- gear set categories an older version saved by name ("Gear: Tank" and "Gear: Ret", dynamic, no place in the order).
+  -- A set's settings are saved in the profile by its ID (asked: "everything goes in the global profile. it's keyed by
+  -- the id of the gear set ... if the user renames or moves something on one character, it affects the other"); a set
+  -- this character deletes is forgotten ("we just watch the event").
+  -- withEquipmentSets runs fn with the client's equipment sets answered from sets (ID to name, which fn may replace
+  -- through the table it is given), as on a retail client, and puts the client back after.
+  local function withEquipmentSets(fn)
     local api = {}
     for _, key in ipairs({ "GetEquipmentSetIDs", "GetEquipmentSetInfo", "GetItemLocations" }) do
       api[key] = _G.C_EquipmentSet[key]
@@ -249,49 +252,107 @@ describe("Debug Dump Harness with test.lua", function()
     local unpackLocation, isClassic, isAnniversary = _G.EquipmentManager_UnpackLocation, addon.isClassic,
       addon.isAnniversary
     addon.isClassic, addon.isAnniversary = false, false
-    local sets = { [0] = "Tank" }
+    local client = { sets = {} }
     _G.C_EquipmentSet.GetEquipmentSetIDs = function()
       local ids = {}
-      for id in pairs(sets) do table.insert(ids, id) end
+      for id in pairs(client.sets) do table.insert(ids, id) end
       table.sort(ids)
       return ids
     end
-    _G.C_EquipmentSet.GetEquipmentSetInfo = function(id) return sets[id] end
+    _G.C_EquipmentSet.GetEquipmentSetInfo = function(id) return client.sets[id] end
     _G.C_EquipmentSet.GetItemLocations = function() return {} end
     _G.EquipmentManager_UnpackLocation = function() return 0, false, true, false, 1, 0 end
-    local ok, err = pcall(function()
-      DB.data:SetProfile("Default")
-      categories:Init()
-      categories:OnEnable()
-      assert.is_not_nil(categories:GetCategoryByName("Gear: Ret"), "loaded at login, as before")
-      equipmentSets:Update(context:New("sweep"))
-      assert.are.equal("Gear: Tank", categories:GetOrder()[1], "above the profile's rules, as gear sets were")
-      assert.is_true(categories:IsGearSet("Gear: Tank"))
-      assert.is_nil(categories:GetCategoryByName("Gear: Ret"), "a set this character does not have")
-      assert.is_nil(DB.data.profile.ephemeralCategoryFilters["Gear: Tank"].gearSet, "set IDs are a character's")
-      assert.is_falsy(DB.data.profile.ephemeralCategoryFilters["Gear: Tank"].dynamic)
-      categories:UpdateCategory(context:New("color"), "Gear: Tank", { color = { 1, 0, 0 } })
-
-      -- Another character of the profile logs in, whose first set has the same ID.
-      sets = { [0] = "Healer" }
-      categories:Init()
-      categories:OnEnable()
-      equipmentSets:Update(context:New("sweep"))
-      assert.is_nil(categories:GetCategoryByName("Gear: Healer").color)
-      assert.are.same({ 1, 0, 0 }, DB.data.profile.ephemeralCategoryFilters["Gear: Tank"].color)
-
-      -- A third has the set "Ret", whose older category the first forgot.
-      sets = { [0] = "Ret" }
-      categories:Init()
-      categories:OnEnable()
-      equipmentSets:Update(context:New("sweep"))
-      assert.are.equal("Gear: Ret", categories:GetOrder()[1], "above the profile's rules too")
-    end)
-    for key, fn in pairs(api) do
-      _G.C_EquipmentSet[key] = fn
+    local ok, err = pcall(fn, client)
+    for key, original in pairs(api) do
+      _G.C_EquipmentSet[key] = original
     end
     _G.EquipmentManager_UnpackLocation, addon.isClassic, addon.isAnniversary = unpackLocation, isClassic, isAnniversary
     assert(ok, err)
+  end
+
+  -- loginAs starts a session of a character of the profile: what is in memory made again, as at a login.
+  local function loginAs(client, sets)
+    client.sets = sets
+    categories:Init()
+    categories:OnEnable()
+    equipmentSets:Init()
+    equipmentSets:Update(context:New("sweep"))
+  end
+
+  it("saves the real profile's gear sets by ID, on top, shared by its characters, and forgets a deleted one", function()
+    withEquipmentSets(function(client)
+      client.sets = { [0] = "Tank" }
+      DB.data:SetProfile("Default")
+      local profile = DB.data.profile
+      local older = profile.ephemeralCategoryFilters["Gear: Tank"]
+      categories:Init()
+      categories:OnEnable()
+      equipmentSets:Init()
+      assert.is_nil(categories:GetCategoryByName("Gear: Ret"), "an older version's, no longer loaded at login")
+      equipmentSets:Update(context:New("sweep"))
+      assert.are.equal("Gear: Tank", categories:GetOrder()[1], "above the profile's rules, as gear sets were")
+      assert.is_true(categories:IsGearSet("Gear: Tank"))
+      assert.are.equal("Gear: Tank", profile.gearSets[0].name, "saved by the set's ID")
+      categories:UpdateCategory(context:New("color"), "Gear: Tank", { color = { 1, 0, 0 } })
+      assert.are.same({ 1, 0, 0 }, profile.gearSets[0].color)
+      assert.are.equal(older, profile.ephemeralCategoryFilters["Gear: Tank"], "the older entry left alone")
+      assert.is_nil(older.color)
+      assert.is_true(older.dynamic)
+      assert.is_not_nil(profile.ephemeralCategoryFilters["Gear: Ret"])
+
+      -- Another character of the profile logs in, whose first set has the same ID: the same category, renamed.
+      client.sets = { [0] = "Healer" }
+      categories:Init()
+      categories:OnEnable()
+      equipmentSets:Init()
+      equipmentSets:Update(context:New("sweep"))
+      assert.are.same({ 1, 0, 0 }, categories:GetCategoryByName("Gear: Healer").color)
+      assert.are.equal("Gear: Healer", profile.gearSets[0].name)
+
+      -- It deletes the set: the client says its sets changed, and the next sweep forgets it.
+      equipmentSets:SetsChanged()
+      client.sets = {}
+      equipmentSets:Update(context:New("sweep"))
+      assert.is_nil(profile.gearSets[0])
+      assert.is_nil(categories:GetCategoryByName("Gear: Healer"))
+      -- A set the client then gives the freed ID (Forever does) starts fresh.
+      client.sets = { [0] = "Fresh" }
+      equipmentSets:Update(context:New("sweep"))
+      assert.is_nil(categories:GetCategoryByName("Gear: Fresh").color)
+      assert.are.equal("Gear: Fresh", categories:GetOrder()[1])
+    end)
+  end)
+
+  -- Found by the bug review, on the real modules: two characters of the profile whose sets have each other's names under
+  -- their IDs, and a category of yours with a set's former name.
+  it("swaps the pins and tabs of sets that take each other's names, and leaves a category of yours alone", function()
+    withEquipmentSets(function(client)
+      DB.data:SetProfile("Default")
+      local profile = DB.data.profile
+      loginAs(client, { [0] = "Tank", [1] = "Heal" })
+      DB:SetCustomSectionSort(0, "Gear: Tank", 5)
+      DB:SetCustomSectionSort(0, "Gear: Heal", 7)
+      profile.categoryToGroup[0]["Gear: Tank"] = 2
+      profile.categoryToGroup[0]["Gear: Heal"] = 3
+      loginAs(client, { [0] = "Heal", [1] = "Tank" })
+      assert.are.same({ 5, 7 }, { profile.customSectionSort[0]["Gear: Heal"], profile.customSectionSort[0]["Gear: Tank"] },
+        "each set's pin went with it")
+      assert.are.same({ 2, 3 }, { profile.categoryToGroup[0]["Gear: Heal"], profile.categoryToGroup[0]["Gear: Tank"] })
+      loginAs(client, { [0] = "Tank", [1] = "Heal" })
+      assert.are.same({ 5, 7 }, { profile.customSectionSort[0]["Gear: Tank"], profile.customSectionSort[0]["Gear: Heal"] })
+
+      -- Another character, with no set 1, makes a category of its own named "Gear: Heal" and pins it.
+      loginAs(client, { [0] = "Tank" })
+      categories:CreateCategory(context:New("mine"), { name = "Gear: Heal", itemList = {}, save = true })
+      DB:SetCustomSectionSort(0, "Gear: Heal", 1)
+      -- The first character deletes set 1.
+      loginAs(client, { [0] = "Tank", [1] = "Heal" })
+      equipmentSets:SetsChanged()
+      client.sets = { [0] = "Tank" }
+      equipmentSets:Update(context:New("sweep"))
+      assert.is_nil(profile.gearSets[1])
+      assert.are.equal(1, profile.customSectionSort[0]["Gear: Heal"], "the category of yours keeps its pin")
+    end)
   end)
 
   -- Issue #1333, found by the bug review: the Dump tab keeps each dump's equipment sets in an account-wide list, which

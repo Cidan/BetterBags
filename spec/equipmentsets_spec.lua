@@ -12,13 +12,16 @@ StubBetterBagsModule("Constants")
 StubBetterBagsModule("Localization")
 LoadBetterBagsModule("core/context.lua")
 local context = addon:GetModule("Context")
+LoadBetterBagsModule("core/events.lua")
+local events = addon:GetModule("Events")
 
 LoadBetterBagsModule("data/equipmentsets.lua")
 local equipmentSets = addon:GetModule("EquipmentSets")
 
 describe("EquipmentSets", function()
-  -- Update makes the sets' categories (Categories:SyncGearSets): what it was asked, a stand-in put back after each test.
-  local categories, createdCategories, savedSync, synced
+  -- Update makes the sets' categories (Categories:SyncGearSets) and forgets the deleted ones' (ForgetGearSets): what it
+  -- asked, in order, of stand-ins put back after each test; and the client events it watches.
+  local categories, createdCategories, savedSync, savedForget, savedRegister, synced, forgotten, order, handlers
 
   before_each(function()
     addon.isClassic = false
@@ -27,12 +30,19 @@ describe("EquipmentSets", function()
     addon.isMidnight = false
 
     categories, createdCategories = StubBetterBagsModule("Categories")
-    savedSync = rawget(categories, "SyncGearSets")
-    synced = {}
+    savedSync, savedForget = rawget(categories, "SyncGearSets"), rawget(categories, "ForgetGearSets")
+    synced, forgotten, order, handlers = {}, {}, {}, {}
     categories.SyncGearSets = function(_, ctx, sets)
       table.insert(synced, { ctx = ctx, sets = sets, map = equipmentSets:GetItemSets(0, 1) })
+      table.insert(order, "sync")
       return false
     end
+    categories.ForgetGearSets = function(_, ctx, ids)
+      table.insert(forgotten, { ctx = ctx, ids = ids })
+      table.insert(order, "forget")
+    end
+    savedRegister = rawget(events, "RegisterEvent")
+    events.RegisterEvent = function(_, event, fn) handlers[event] = fn end
 
     _G.C_EquipmentSet.GetEquipmentSetIDs = function() return {} end
     _G.C_EquipmentSet.GetEquipmentSetInfo = function() return "" end
@@ -49,7 +59,8 @@ describe("EquipmentSets", function()
   end)
 
   after_each(function()
-    categories.SyncGearSets = savedSync
+    categories.SyncGearSets, categories.ForgetGearSets = savedSync, savedForget
+    events.RegisterEvent = savedRegister
     if createdCategories then
       ResetModuleStub("Categories")
     end
@@ -388,6 +399,48 @@ describe("EquipmentSets", function()
       assert.are.equal(1, #synced)
       assert.is_not_nil(synced[1].ctx)
       assert.are.same({ { id = 5, name = "Tank" }, { id = 2, name = "Heal" } }, synced[1].sets)
+    end)
+
+    -- Asked (option 2, "we just watch the event"): a set this character deletes is forgotten (Categories:ForgetGearSets),
+    -- before the sets' categories are made again, so a set the client later gives its ID starts fresh; only once the
+    -- client says its sets changed.
+    it("forgets the sets this character deleted, once the client says its sets changed", function()
+      equipmentSets:Update(context:New("sweep"))
+      equipmentSets:SetsChanged()
+      _G.C_EquipmentSet.GetEquipmentSetIDs = function() return { 5 } end
+      local ctx = context:New("sweep")
+      equipmentSets:Update(ctx)
+      assert.are.same({ { ctx = ctx, ids = { 2 } } }, forgotten)
+      assert.are.same({ "sync", "forget", "sync" }, order)
+      equipmentSets:Update(context:New("sweep"))
+      assert.are.equal(1, #forgotten, "once")
+    end)
+
+    it("forgets nothing for a set gone without the client saying its sets changed", function()
+      equipmentSets:Update(context:New("sweep"))
+      _G.C_EquipmentSet.GetEquipmentSetIDs = function() return { 5 } end
+      equipmentSets:Update(context:New("sweep"))
+      assert.are.same({}, forgotten)
+      equipmentSets:SetsChanged()
+      equipmentSets:Update(context:New("sweep"))
+      assert.are.same({}, forgotten, "gone before the client said so: not this character's deletion to see")
+    end)
+
+    it("forgets nothing for a set whose ID the client gave another set before the next read", function()
+      equipmentSets:Update(context:New("sweep"))
+      equipmentSets:SetsChanged()
+      _G.C_EquipmentSet.GetEquipmentSetInfo = function(id) return id == 5 and "Tank" or "Fresh" end
+      equipmentSets:Update(context:New("sweep"))
+      assert.are.same({}, forgotten)
+    end)
+
+    it("watches the client's EQUIPMENT_SETS_CHANGED once enabled", function()
+      equipmentSets:OnEnable()
+      assert.is_function(handlers.EQUIPMENT_SETS_CHANGED)
+      _G.C_EquipmentSet.GetEquipmentSetIDs = function() return { 5 } end
+      handlers.EQUIPMENT_SETS_CHANGED()
+      equipmentSets:Update(context:New("sweep"))
+      assert.are.same({ 2 }, forgotten[1].ids)
     end)
   end)
 
