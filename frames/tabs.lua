@@ -112,6 +112,8 @@ function tabs:GetDecoration(ctx, tab)
 	end
 	decoration:SetPoint("TOPLEFT", tab, "TOPLEFT", 0, 0)
 	decoration:RegisterForClicks("LeftButtonDown", "RightButtonDown")
+	-- WoW: Forever's gamepad cursor lands on it, the button that takes the tab's clicks (integrations/gamepad.lua).
+	decoration.bbGamepad = "tab"
 	tab.decoration = decoration
 	sonata:RegisterElement("Tab", decoration)
 	async:AfterCombat(ctx, function()

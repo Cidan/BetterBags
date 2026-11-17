@@ -7,6 +7,7 @@ The integrations module provides seamless compatibility with popular World of Wa
 - [Overview](#overview)
 - [Supported Integrations](#supported-integrations)
   - [ConsolePort](#consoleport-consoleportlua)
+  - [WoW: Forever's Gamepad Interface](#wow-forevers-gamepad-interface-gamepadlua)
   - [Masque](#masque-masquelua)
   - [Pawn](#pawn-pawnlua)
   - [SimpleItemLevel](#simpleitemlevel-simpleitemlevellua)
@@ -50,6 +51,33 @@ Provides gamepad/controller support through the ConsolePort addon.
 | `Add(frame)` | Add frame to ConsolePort | `Frame` | - |
 | `Select(frame)` | Set cursor to frame | `Frame` | - |
 | `Active()` | Check if enabled | - | `boolean` |
+
+### WoW: Forever's Gamepad Interface (`gamepad.lua`)
+
+Puts BetterBags' bag windows in Blizzard's own gamepad UI on WoW: Forever (issue #1180, `.claude/rules/gamepad.md`).
+It is not a third-party addon: it is Blizzard's `Blizzard_GamepadSmartNavigation` and `Blizzard_GamepadSharedUtility`,
+loaded on every Forever client; elsewhere the module does nothing.
+
+**Features (while the gamepad interface style is in use; the player can switch styles at any time):**
+- Every open bag window (both designs' backpack and bank, BetterBags Next's vendor and guild bank) joins Blizzard's
+  window list a frame after it opens and leaves it as it starts to close: the d-pad cursor moves over its buttons, the
+  triggers move between windows (Blizzard's trigger hints show)
+- The cursor lands only on buttons the windows mark (`bbGamepad`: item, vendor, guild, tab); a native `ScrollFrame` in
+  each window's scroll box keeps Blizzard's navigation off the addon-built box (`Scrollbox:SetGamepad`), and the box
+  scrolls to the selected button (`Scrollbox:ScrollIntoView`)
+- A presses the button, X right-clicks the selected item through a secure button (use, sell, move, place), B puts back an
+  item held or closes the window; Blizzard's input legend under the window says which
+- The radial menu's Bags toggles the backpack; its Character entry opens it (never closing one already open)
+- Blizzard's bank, merchant and guild bank frames BetterBags stands in for are taken out of Blizzard's window list
+- In combat the windows leave Blizzard's window list (as the combat restriction comes, while Blizzard still takes the
+  calls) and join again after it: no bag navigation with the gamepad in combat, and no call Blizzard would refuse
+
+**Methods:**
+| Method | Description | Parameters | Returns |
+|--------|-------------|------------|---------|
+| `Add(window)` | Take in a bag window (`frame`, `scroll`, `Show`, `Hide`, `IsShown`, `IsClosing`); `BagSystem` calls it for every window it makes | `table` | `"added"`, `"already"`, `"unavailable"` |
+| `Update()` | Bring Blizzard's window list and every window in line (run a frame after any change) | - | windows in the list |
+| `Dump()` | What it knows, for `/bbdb`'s dump (`debugDumpExtras.gamepad`) | - | `table` |
 
 ### Masque (`masque.lua`)
 

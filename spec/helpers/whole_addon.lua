@@ -123,8 +123,10 @@ end
 -- opts.globals sets globals other addons would (a theme's addon), restored afterwards.
 -- opts.install is "existing" (the default: the saved variables of an install that never changed a
 -- setting) or "new" (no saved variables at all: a new install, which starts with BetterBags Next,
--- next.md §1).
----@param opts? { client?: "retail"|"forever", next?: boolean, sizeMode?: WindowSizeMode, theme?: string, profile?: fun(defaults: table, const: table), globals?: table<string, any>, install?: "existing"|"new" }
+-- next.md §1). A WoW: Forever client has Blizzard's gamepad interface (spec/helpers/gamepad.lua, its
+-- Blizzard_GamepadSmartNavigation and Blizzard_GamepadSharedUtility load for both interface styles), the mouse
+-- interface style in use unless opts.gamepad; handle.gamepad is its mock's handle.
+---@param opts? { client?: "retail"|"forever", next?: boolean, gamepad?: boolean, sizeMode?: WindowSizeMode, theme?: string, profile?: fun(defaults: table, const: table), globals?: table<string, any>, install?: "existing"|"new" }
 ---@return WholeAddonHandle
 function WholeAddon.Load(opts)
   opts = opts or {}
@@ -262,6 +264,8 @@ function WholeAddon.Load(opts)
   for _, name in ipairs({ "ContainerFrameCombinedBags", "BagsBar", "BankFrame" }) do
     setGlobal(name, CreateFrame("Frame", name))
   end
+  -- Blizzard's combined bags start hidden (Mainline/ContainerFrame.xml: hidden="true").
+  ContainerFrameCombinedBags:Hide()
   for i = 1, 13 do setGlobal("ContainerFrame" .. i, CreateFrame("Frame", "ContainerFrame" .. i)) end
   local bagBar = { unpack(BAG_BAR_BUTTONS) }
   if forever then table.insert(bagBar, "KeyRingButton") end
@@ -329,10 +333,17 @@ function WholeAddon.Load(opts)
   setGlobal("_cursorX", -10000)
   setGlobal("_cursorY", -10000)
 
+  local gamepad
+  if forever then
+    gamepad = dofile("spec/helpers/gamepad.lua").Install({ style = opts.gamepad and "gamepad" or "mkb",
+      setGlobal = setGlobal, setField = setField })
+    table.insert(restorers, function() gamepad:Restore() end)
+  end
+
   for name, value in pairs(opts.globals or {}) do setGlobal(name, value) end
 
   ---@type WholeAddonHandle
-  local handle = { errors = {} }
+  local handle = { errors = {}, gamepad = gamepad }
   setGlobal("geterrorhandler", function()
     return function(e) table.insert(handle.errors, tostring(e)) end
   end)

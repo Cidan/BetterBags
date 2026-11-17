@@ -174,6 +174,11 @@ describe("NextGuildButton", function()
       assert.are.equal("ItemButtonTemplate", b.button._template)
     end)
 
+    it("is where the gamepad cursor lands (WoW: Forever's gamepad interface, gamepad.md §5)", function()
+      local b = guildButton:GetButton(ctx, "1002_7")
+      assert.are.equal("guild", b.button.bbGamepad)
+    end)
+
     it("is one button per slot until it is released, then reused for any slot", function()
       local b = guildButton:GetButton(ctx, "1002_7")
       assert.are.equal(b, guildButton:GetButton(ctx, "1002_7"))

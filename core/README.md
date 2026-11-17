@@ -88,7 +88,9 @@ and switches between them without a reload (`Switch`, `.claude/rules/next-bagsys
 in use, its vendor and guild bank, which stand in for Blizzard's merchant and guild bank frames, are each switched
 off and on at once (`SetVendorEnabled`, `SetGuildBankEnabled`, §11g): off, the panel answers nothing and Blizzard's
 frame shows the vendor or the guild bank. Every switch is refused in the places a frame would change hands open
-(at a vendor, at the guild bank; the design switch also in combat and at the bank).
+(at a vendor, at the guild bank; the design switch also in combat and at the bank). Every bag window it makes is handed
+to the gamepad support as it is made (`Gamepad:Add`, `integrations/gamepad.lua`, `.claude/rules/gamepad.md`), which
+`init.lua` starts before the bags are made.
 
 ### events.lua
 

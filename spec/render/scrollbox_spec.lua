@@ -460,6 +460,133 @@ describe("Scrollbox", function()
     end)
   end)
 
+  -- WoW: Forever's gamepad interface (gamepad.md §3): Blizzard's smart navigation scrolls the scroll frame closest
+  -- above the button it moves to (SmartNavigation.lua HandleScroll, Utility.FindButtons). The box is an addon's
+  -- ScrollBox, which it can only scroll through methods addon code wrote; so while the gamepad interface is on, a native
+  -- ScrollFrame that never scrolls stands between the scroll child and the child, and the box is scrolled by
+  -- ScrollIntoView.
+  describe("for the gamepad interface (SetGamepad)", function()
+    local Gamepad = dofile("spec/helpers/gamepad.lua")
+    local gp
+
+    before_each(function()
+      gp = Gamepad.Install()
+    end)
+
+    after_each(function()
+      gp:Restore()
+    end)
+
+    -- buttonChild builds a child with one button in it.
+    local function buttonChild()
+      local c = child(100, 50)
+      c.button = CreateFrame("Button", nil, c.frame)
+      c.button:SetSize(37, 37)
+      return c
+    end
+
+    -- scrollFrameOf finds the scroll frame Blizzard's navigation finds button in.
+    local function scrollFrameOf(sb, button)
+      for _, info in ipairs(gp.FindButtonGroups(sb.frame).mainGroup.scrollFrames) do
+        for _, b in ipairs(info.buttons) do
+          if b == button then
+            return info.scrollFrame
+          end
+        end
+      end
+    end
+
+    it("puts a native scroll frame between the scroll child and its child, and takes it out again", function()
+      local sb = scrollbox:Create(CreateFrame("Frame"))
+      local c = child(100, 50)
+      sb:SetChild(c)
+      assert.are.equal("on", sb:SetGamepad(true))
+      local nav = sb.navFrame
+      assert.is_true(nav:IsObjectType("ScrollFrame"))
+      assert.are.equal(sb.scrollChild, nav:GetParent())
+      assert.are.equal(nav, c.frame:GetParent())
+      assert.is_true(nav:IsShown())
+      local point, relativeTo = c.frame:GetPoint(1)
+      assert.are.same({ "TOPLEFT", sb.scrollChild }, { point, relativeTo }, "placed where it was")
+      assert.are.equal("unchanged", sb:SetGamepad(true))
+      assert.are.equal("off", sb:SetGamepad(false))
+      assert.are.equal(sb.scrollChild, c.frame:GetParent())
+      assert.is_false(nav:IsShown())
+      assert.are.equal("on", sb:SetGamepad(true))
+      assert.are.equal(nav, sb.navFrame, "made once")
+    end)
+
+    it("puts a child set while it is on in the native scroll frame", function()
+      local sb = scrollbox:Create(CreateFrame("Frame"))
+      sb:SetGamepad(true)
+      local c = child(100, 50)
+      sb:SetChild(c)
+      assert.are.equal(sb.navFrame, c.frame:GetParent())
+    end)
+
+    it("has Blizzard's navigation find the child's buttons in the native scroll frame, not in the box", function()
+      local sb = scrollbox:Create(CreateFrame("Frame"))
+      local c = buttonChild()
+      sb:SetChild(c)
+      assert.are.equal(sb.scrollBox, scrollFrameOf(sb, c.button), "the box, without it")
+      sb:SetGamepad(true)
+      assert.are.equal(sb.navFrame, scrollFrameOf(sb, c.button))
+    end)
+
+    describe("scrolling a button into view (ScrollIntoView)", function()
+      -- box shows 100 of the child's 400 units, scrolled to offset; region is a button at top..bottom on the screen.
+      local function scrolled(offset, top, bottom)
+        local sb = scrollbox:Create(CreateFrame("Frame"))
+        sb.scrollBox._extent = 400
+        sb.scrollBox:SetHeight(100)
+        sb.scrollBox:_SetRect(0, 0, 100, 100)
+        sb.scrollBox:ScrollToOffset(offset)
+        local region = CreateFrame("Button")
+        region:_SetRect(10, bottom, 37, top - bottom)
+        return sb, region
+      end
+
+      it("scrolls down by as much as hides a button below the view", function()
+        local sb, region = scrolled(50, -13, -50)
+        assert.are.equal("down", sb:ScrollIntoView(region))
+        assert.are.equal(100, sb.scrollBox:GetDerivedScrollOffset())
+      end)
+
+      it("scrolls up by as much as hides a button above the view", function()
+        local sb, region = scrolled(50, 130, 93)
+        assert.are.equal("up", sb:ScrollIntoView(region))
+        assert.are.equal(20, sb.scrollBox:GetDerivedScrollOffset())
+      end)
+
+      it("leaves a button it shows whole where it is", function()
+        local sb, region = scrolled(50, 80, 43)
+        assert.are.equal("visible", sb:ScrollIntoView(region))
+        assert.are.equal(50, sb.scrollBox:GetDerivedScrollOffset())
+      end)
+
+      it("measures a button of another scale in the box's", function()
+        local sb, region = scrolled(0, -13, -50)
+        region:SetScale(0.5)
+        assert.are.equal("down", sb:ScrollIntoView(region))
+        assert.are.equal(25, sb.scrollBox:GetDerivedScrollOffset())
+      end)
+
+      it("goes no further than the end", function()
+        local sb, region = scrolled(290, -300, -337)
+        assert.are.equal("down", sb:ScrollIntoView(region))
+        assert.are.equal(300, sb.scrollBox:GetDerivedScrollOffset())
+      end)
+
+      it("does nothing for a button not laid out", function()
+        local sb = scrollbox:Create(CreateFrame("Frame"))
+        sb.scrollBox:_SetRect(0, 0, 100, 100)
+        local region = CreateFrame("Button")
+        region._rect = nil
+        assert.are.equal("no rect", sb:ScrollIntoView(region))
+      end)
+    end)
+  end)
+
   it("errors when rendered without a child", function()
     local sb = scrollbox:Create(CreateFrame("Frame"))
     assert.has_error(function() render:NewRenderChain(root(sb, { MaxHeight = 500 }), {}) end)

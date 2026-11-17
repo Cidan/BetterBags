@@ -72,7 +72,7 @@ function scrollboxProto:SetChild(child)
   end
   self.child = child
   child.renderParent = self
-  child:SetParent(self.scrollChild)
+  child:SetParent(self:childParent())
   self:placeChild()
   child:Hide()
   self.plan = {
@@ -96,6 +96,68 @@ end
 ---@return Drawable?
 function scrollboxProto:GetChild()
   return self.child
+end
+
+-- childParent is the frame the child hangs in: the scroll child, or the gamepad's scroll frame while that is on.
+---@private
+---@return Frame
+function scrollboxProto:childParent()
+  return self.gamepad and self.navFrame or self.scrollChild
+end
+
+-- SetGamepad puts a native ScrollFrame between the scroll child and the child while WoW: Forever's gamepad interface
+-- is on, and takes it out again (gamepad.md §3). Blizzard's gamepad cursor scrolls the scroll frame closest above the
+-- button it moves to (SmartNavigation.lua HandleScroll); the box is a ScrollBox addon code made, scrolled through
+-- methods addon code wrote, and Blizzard's navigation refuses the move that touched them. Nothing reaches past this
+-- scroll frame, so it never scrolls; the box is scrolled from BetterBags' own code (ScrollIntoView). It returns what
+-- it did: "on", "off" or "unchanged".
+---@param on boolean
+---@return string
+function scrollboxProto:SetGamepad(on)
+  on = on and true or false
+  if (self.gamepad == true) == on then
+    return "unchanged"
+  end
+  self.gamepad = on
+  if on and self.navFrame == nil then
+    local nav = CreateFrame("ScrollFrame", nil, self.scrollChild)
+    nav:SetAllPoints(self.scrollChild)
+    self.navFrame = nav
+  end
+  if self.navFrame ~= nil then
+    self.navFrame:SetShown(on)
+  end
+  if self.child ~= nil then
+    self.child:SetParent(self:childParent())
+    self:placeChild()
+  end
+  return on and "on" or "off"
+end
+
+-- ScrollIntoView scrolls the box by as little as shows region whole: the gamepad cursor moved onto a button the box
+-- hides (gamepad.md §3). Region is measured in the box's scale. It returns what it did: "visible", "up", "down", or
+-- "no rect" for a region not laid out.
+---@param region ScriptRegion
+---@return string
+function scrollboxProto:ScrollIntoView(region)
+  local box = self.scrollBox
+  local boxTop, boxBottom = box:GetTop(), box:GetBottom()
+  local top, bottom = region:GetTop(), region:GetBottom()
+  if boxTop == nil or boxBottom == nil or top == nil or bottom == nil then
+    return "no rect"
+  end
+  local ratio = region:GetEffectiveScale() / box:GetEffectiveScale()
+  top, bottom = top * ratio, bottom * ratio
+  local offset = box:GetDerivedScrollOffset()
+  if top > boxTop then
+    box:ScrollToOffset(math.max(0, offset - (top - boxTop)))
+    return "up"
+  end
+  if bottom < boxBottom then
+    box:ScrollToOffset(math.min(box:GetDerivedScrollRange(), offset + (boxBottom - bottom)))
+    return "down"
+  end
+  return "visible"
 end
 
 -- GetBarWidth returns the bar's room, in whole pixels on the box's grid when it snaps (Snap).

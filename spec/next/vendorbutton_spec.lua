@@ -733,6 +733,35 @@ describe("NextVendorButton", function()
   end)
 
   describe("its clicks", function()
+    -- WoW: Forever's gamepad interface (gamepad.md §5): A presses the button as Blizzard's merchant gamepad prompt
+    -- does (MerchantFrame_SetupGamepad: A buys, a right click), a left click holding an item (a sale); the legend says
+    -- which. The icon is where the cursor lands, not the card.
+    it("on the gamepad, A buys, sells an item held, and says which", function()
+      local sold = 0
+      override(stubs.merchant, "SellCursorItem", function() sold = sold + 1 return "sold" end)
+      local b = vendorButton:Acquire()
+      b:SetBuy(item())
+      assert.are.equal("vendor", b.button.bbGamepad)
+      assert.is_nil(b.card.bbGamepad)
+      assert.are.equal("buy", b.button.bbGamepadLabel())
+      assert.is_true(b.button.OnSmartNavClick(b.button))
+      assert.are.equal(1, #calls.purchase)
+      _G._cursorHasItem = true
+      assert.are.equal("sell", b.button.bbGamepadLabel())
+      assert.is_true(b.button.OnSmartNavClick(b.button))
+      _G._cursorHasItem = false
+      assert.are.equal(1, sold)
+      assert.are.equal(1, #calls.purchase, "nothing bought holding an item")
+    end)
+
+    it("on the gamepad, A on a buyback or a repair does what any click does", function()
+      local b = vendorButton:Acquire()
+      b:SetBuyback({ index = 2, texture = 1, price = 1, quantity = 1, isUsable = true })
+      assert.are.equal("select", b.button.bbGamepadLabel())
+      b.button.OnSmartNavClick(b.button)
+      assert.are.same({ 2 }, calls.buyback)
+    end)
+
     it("buys on a right click, through NextMerchant, and does nothing on a left click", function()
       local b = vendorButton:Acquire()
       local i = item()

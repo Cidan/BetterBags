@@ -54,7 +54,7 @@ describe("Bag-bar backpack button click", function()
     local modules = {
       "Localization", "Database", "BagFrame", "Constants", "Items", "ItemFrame",
       "Events", "Masque", "SectionFrame", "Categories", "ContextMenu", "Config",
-      "Currency", "Search", "ConsolePort", "Pawn", "Question", "SimpleItemLevel",
+      "Currency", "Search", "ConsolePort", "Gamepad", "Pawn", "Question", "SimpleItemLevel",
       "QuickFind", "Refresh", "ItemLoader", "Views",
       "Async", "Context", "Debug", "Form", "Bucket", "TooltipScanner", "Groups",
       "EquipmentSets", "BagButton", "ItemRowFrame", "Perf", "PerfSessions", "RenderRecorder", "Simulator", "Render", "Window", "Sonata", "NextSettings", "NextSettingsContent", "Tabs", "ChangelogWindow", "NextBag", "NextBank", "NextVendor",
@@ -66,6 +66,9 @@ describe("Bag-bar backpack button click", function()
       stub.Init = stub.Init or function() end
       stub.Enable = stub.Enable or function() end
     end
+    -- BagSystem hands every bag window it makes to the gamepad support.
+    local gamepadStub = addon:GetModule("Gamepad")
+    gamepadStub.Add = gamepadStub.Add or function() end
     -- SonataNext is real in every spec (spec/setup.lua) and its Init reads the saved Next theme.
     local sonataNext = addon:GetModule("SonataNext")
     savedNextInit = sonataNext.Init

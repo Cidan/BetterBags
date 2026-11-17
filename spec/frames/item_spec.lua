@@ -186,6 +186,14 @@ describe("ItemFrame Static Buttons and Parent Removal Tests", function()
       return data
     end
 
+    -- WoW: Forever's gamepad interface (gamepad.md §5): the cursor lands on the button that takes the clicks; the
+    -- decoration behind it, at the same place, is passed over.
+    it("leaves the gamepad cursor the interaction button, not the decoration", function()
+      local item = itemFrame:GetButton(btnCtx, "0_9")
+      assert.are.equal("item", item.button.bbGamepad)
+      assert.is_nil(item:GetDecoration(btnCtx).bbGamepad)
+    end)
+
     it("is visible once drawn into an open bag, not while the bag is closed, and not after release", function()
       local item = itemFrame:GetButton(btnCtx, "0_9")
       local bag = CreateFrame("Frame", nil, UIParent)

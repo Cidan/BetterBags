@@ -118,6 +118,13 @@ describe("NextTabs", function()
     assert.is_false(tween:IsPlaying(rail.indicator))
   end)
 
+  it("makes each tab a button the gamepad cursor lands on (WoW: Forever, gamepad.md §5)", function()
+    rail:SetTabs(groups)
+    for _, tab in ipairs(rail.tabs) do
+      assert.are.equal("tab", tab.button.bbGamepad)
+    end
+  end)
+
   it("tells its handler which tab was clicked, and with which button", function()
     rail:SetTabs(groups)
     local button = rail.tabs[2].button

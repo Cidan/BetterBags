@@ -282,6 +282,16 @@ function bagFrame.bagProto:IsClosing()
 	return self.window:IsClosing()
 end
 
+-- GamepadFooter is what WoW: Forever's gamepad legend hangs under (integrations/gamepad.lua): the tabs, which hang
+-- below the bag (frames/tabs.lua), while they show, else the bag.
+---@return Frame
+function bagFrame.bagProto:GamepadFooter()
+	if self.tabs ~= nil and self.tabs.frame:IsShown() then
+		return self.tabs.frame
+	end
+	return self.frame
+end
+
 ---@return number x
 ---@return number y
 function bagFrame.bagProto:GetPosition()
