@@ -5,6 +5,7 @@
 -- ending the vendor visit.
 local addon = LibStub("AceAddon-3.0"):GetAddon("BetterBags")
 local blizzard = dofile("spec/helpers/uipanels.lua")
+local TSM = dofile("spec/helpers/tsm.lua")
 
 LoadBetterBagsModule("core/context.lua")
 
@@ -57,13 +58,14 @@ local modules = { { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.
   { "NextFrameArt", "next/frameart.lua" }, { "NextFill", "next/fill.lua" }, { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
   { "NextSparkles", "next/sparkles.lua" }, { "NextLift", "next/lift.lua" }, { "NextTabs", "next/tabs.lua" }, { "NextContent", "next/content.lua" },
   { "NextDockCard", "next/dockcard.lua" }, { "NextDock", "next/dock.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" }, { "NextUIPanels", "next/uipanels.lua" }, { "NextOrnaments", "next/ornaments.lua" }, { "NextMenuButton", "next/menubutton.lua" }, { "NextGlitch", "next/glitch.lua" }, { "NextRain", "next/rain.lua" }, { "NextShatter", "next/shatter.lua" }, { "NextSnow", "next/snow.lua" }, { "NextThreads", "next/threads.lua" }, { "NextSmoke", "next/smoke.lua" }, { "NextBats", "next/bats.lua" }, { "NextBeam", "next/beam.lua" }, { "NextStopMotion", "next/stopmotion.lua" }, { "NextPaper", "next/paper.lua" }, { "NextGlass", "next/glass.lua" }, { "NextSheen", "next/sheen.lua" }, { "NextPanel", "next/panel.lua" }, { "NextVendorButton", "next/vendorbutton.lua" },
-  { "NextVendor", "next/vendor.lua" } }
+  { "NextVendor", "next/vendor.lua" }, { "TradeSkillMaster", "integrations/tradeskillmaster.lua" } }
 for _, m in ipairs(modules) do
   ResetModuleStub(m[1], m[2])
   LoadBetterBagsModule(m[2])
 end
 
 local nextVendor = addon:GetModule("NextVendor")
+local tradeSkillMaster = addon:GetModule("TradeSkillMaster")
 local nextDrag = addon:GetModule("NextDrag")
 local vendorButton = addon:GetModule("NextVendorButton")
 local style = addon:GetModule("NextStyle")
@@ -326,6 +328,8 @@ describe("NextVendor", function()
   end)
 
   after_each(function()
+    tradeSkillMaster:Stop()
+    TSM.Remove()
     restore()
     ResetMockMerchant()
     ResetMockGuildBank()
@@ -437,9 +441,10 @@ describe("NextVendor", function()
       return out
     end
 
-    it("lines up close, settings, the filter, Sell Junk, Repair All and the guild's repair on retail", function()
+    -- The TradeSkillMaster button last (.claude/rules/tradeskillmaster.md), shown only with TSM loaded.
+    it("lines up close, settings, the filter, Sell Junk, Repair All, the guild's repair and TradeSkillMaster on retail", function()
       local v = nextVendor:Create(ctx())
-      assert.are.same({ "close", "settings", "filter", "selljunk", "repair", "guildrepair" }, icons(v))
+      assert.are.same({ "close", "settings", "filter", "selljunk", "repair", "guildrepair", "swap" }, icons(v))
     end)
 
     it("draws the same icons on Classic, which has no filter", function()
@@ -447,7 +452,7 @@ describe("NextVendor", function()
       override(C_MerchantFrame, "GetItemInfo", nil)
       override(_G, "SetMerchantFilter", nil)
       local v = nextVendor:Create(ctx())
-      assert.are.same({ "close", "settings", "selljunk", "repair", "guildrepair" }, icons(v))
+      assert.are.same({ "close", "settings", "selljunk", "repair", "guildrepair", "swap" }, icons(v))
       assert.are.same({ 0, 1, 0, 1 }, v.repairAllButton.icon._texCoords)
     end)
 
@@ -1468,6 +1473,49 @@ describe("NextVendor", function()
       data.destroy = { Trash = true }
     end)
 
+    -- TradeSkillMaster's window (.claude/rules/tradeskillmaster.md §3): stepping aside sends what waits back at once, as
+    -- the merchant closing does (found by the bug review: it slid out in the vendor's cards, gaps in the backpack), and
+    -- coming back docks it again.
+    describe("stepping aside for TradeSkillMaster's window", function()
+      local function look()
+        local update = tradeSkillMaster.driver:GetScript("OnUpdate")
+        if update then update(tradeSkillMaster.driver, 1 / 60) end
+      end
+
+      local function openWithTSM()
+        local tsm = TSM.Install(true)
+        local v = nextVendor:Create(ctx())
+        MerchantFrame:Show()
+        tsm:MerchantShow()
+        eventsRegistered["MERCHANT_SHOW"](ctx())
+        tsm:Frame()
+        look()
+        finishTweens()
+        send("next/PanelShown", v)
+        return tsm, v
+      end
+
+      it("sends what waits in its dock back at once", function()
+        local _, v = openWithTSM()
+        assert.are.same({ "Junk", "Trash", "Ore" }, docked(v))
+        click(v.tsmButton)
+        assert.is_true(v.frame:IsShown(), "sliding out")
+        assert.are.same({}, docked(v))
+      end)
+
+      it("docks it again as it comes back", function()
+        local tsm, v = openWithTSM()
+        click(v.tsmButton)
+        finishTweens()
+        v.frame:GetScript("OnHide")(v.frame)
+        tsm:ClickWoWUI()
+        look()
+        finishTweens()
+        send("next/PanelShown", v)
+        assert.are.same({ "Junk", "Trash", "Ore" }, docked(v))
+      end)
+    end)
+
     it("docks, once both show, each category that waits, in the backpack's order", function()
       local v = open()
       send("next/PanelShown", v)
@@ -2245,6 +2293,59 @@ describe("NextVendor", function()
       assert.is_nil(MerchantFrame:GetAttribute("UIPanelLayout-width"))
       assert.are.equal(16, blizzard.Left(CharacterFrame))
     end)
+
+    -- TradeSkillMaster writes the merchant frame's width in the layout as it switches (.claude/rules/tradeskillmaster.md):
+    -- a frame after a merchant opens with Blizzard's frame its saved choice, it gives the frame its width back
+    -- (Move.RestoreDefaultUI); as its window opens it takes it away (Move.SetDefaultUIOffScreen).
+    describe("with TradeSkillMaster", function()
+      -- nextFrame runs what NextUIPanels left for the next frame (its driver's OnUpdate).
+      local function nextFrame()
+        local update = uiPanels.driver:GetScript("OnUpdate")
+        if update then update(uiPanels.driver, 1 / 60) end
+      end
+
+      -- arrive opens a merchant as the client does: TSM's restore a frame later, while the vendor still slides in.
+      local function arrive(tsm)
+        local v = nextVendor:Create(ctx())
+        ShowUIPanel(MerchantFrame)
+        tsm:MerchantShow()
+        eventsRegistered["MERCHANT_SHOW"](ctx())
+        tsm:Frame()
+        local update = tradeSkillMaster.driver:GetScript("OnUpdate")
+        if update then update(tradeSkillMaster.driver, 1 / 60) end
+        nextFrame()
+        finishTweens()
+        nextFrame()
+        return v
+      end
+
+      it("opens the Character pane past it after TSM gives the merchant frame its width back", function()
+        local tsm = TSM.Install(true)
+        local v = arrive(tsm)
+        assert.are.equal(1, tsm.updates, "TSM showed Blizzard's frame")
+        ShowUIPanel(CharacterFrame)
+        assert.are.equal(room(v) + 16, blizzard.Left(CharacterFrame))
+      end)
+
+      it("gives the merchant frame the width TSM gave it as the merchant closes", function()
+        arrive(TSM.Install(true))
+        eventsRegistered["MERCHANT_CLOSED"](ctx())
+        HideUIPanel(MerchantFrame)
+        finishTweens()
+        assert.are.equal(336, MerchantFrame:GetAttribute("UIPanelLayout-width"))
+        assert.are.equal(0, MerchantFrame:GetAttribute("UIPanelLayout-xoffset"))
+      end)
+
+      it("leaves the merchant frame as TSM's window has it when it steps aside", function()
+        local v = arrive(TSM.Install(true))
+        click(v.tsmButton)
+        finishTweens()
+        nextFrame()
+        assert.are.equal(0, MerchantFrame:GetAttribute("UIPanelLayout-width"))
+        assert.are.equal(-32, MerchantFrame:GetAttribute("UIPanelLayout-xoffset"))
+        assert.are.equal(16, GetUIPanelLayoutAttribute("LEFT_OFFSET"))
+      end)
+    end)
   end)
 
   -- Enable Vendor Window off (#1262, next-bagsystem.md §11g): the bag system switches the vendor off (Deactivate) and gives
@@ -2303,6 +2404,266 @@ describe("NextVendor", function()
       eventsRegistered["MERCHANT_CLOSED"](ctx())
       finishTweens()
       assert.is_false(v:IsShown())
+    end)
+
+    -- Blizzard's own frame and TradeSkillMaster's switch buttons on it swap the two, as without BetterBags Next.
+    it("follows no TradeSkillMaster window", function()
+      TSM.Install(false)
+      switchedOff()
+      MerchantFrame:Show()
+      eventsRegistered["MERCHANT_SHOW"](ctx())
+      assert.is_nil(tradeSkillMaster.driver:GetScript("OnUpdate"))
+    end)
+  end)
+
+  -- TradeSkillMaster (integrations/tradeskillmaster.lua, .claude/rules/tradeskillmaster.md; issue #1315, asked: "build a
+  -- full integration with TSM"): the vendor and TSM's own vendor window swap, one at a time, as TSM swaps its window with
+  -- Blizzard's frame. Against TSM v4.15.6's vendor window (spec/helpers/tsm.lua).
+  describe("with TradeSkillMaster", function()
+    local sneaky
+
+    -- look runs what the integration follows each frame while a vendor is open (its driver's OnUpdate).
+    local function look()
+      local update = tradeSkillMaster.driver:GetScript("OnUpdate")
+      if update then update(tradeSkillMaster.driver, 1 / 60) end
+    end
+
+    -- hidden ends the vendor's slides, running its OnHide as the client does when one hid it (the mocks hide without it).
+    local function hidden(v)
+      local shown = v.frame:IsShown()
+      finishTweens()
+      if shown and not v.frame:IsShown() then
+        v.frame:GetScript("OnHide")(v.frame)
+      end
+    end
+
+    -- arrive opens a merchant as the client does with TSM loaded: Blizzard's merchant frame shown, the interaction (TSM's
+    -- PLAYER_INTERACTION_MANAGER_FRAME_SHOW), MERCHANT_SHOW, then the frame after, which TSM waits for.
+    local function arrive(tsm, v)
+      v = v or nextVendor:Create(ctx())
+      MerchantFrame:Show()
+      tsm:MerchantShow()
+      eventsRegistered["MERCHANT_SHOW"](ctx())
+      tsm:Frame()
+      look()
+      finishTweens()
+      return v
+    end
+
+    -- leave closes the merchant as the client does: the interaction ends (TSM's window hides), then MERCHANT_CLOSED.
+    local function leave(tsm, v)
+      tsm:MerchantHide()
+      MerchantFrame:Hide()
+      eventsRegistered["MERCHANT_CLOSED"](ctx())
+      hidden(v)
+      runTimers()
+    end
+
+    before_each(function()
+      sneaky = CreateFrame("Frame")
+      sneaky:Hide()
+      nextVendor:TakeOver(sneaky)
+    end)
+
+    it("shows no TradeSkillMaster button without TSM, and follows nothing", function()
+      local v = open()
+      assert.is_false(v.tsmButton:IsShown())
+      assert.is_nil(tradeSkillMaster.driver:GetScript("OnUpdate"))
+    end)
+
+    it("never opens while TSM's window is TSM's saved choice: no slide, no sound, before TSM's window shows", function()
+      TSM.Install(false)
+      local v = nextVendor:Create(ctx())
+      local played = {}
+      override(_G, "PlaySound", function(sound) table.insert(played, sound) end)
+      MerchantFrame:Show()
+      TSM.current:MerchantShow()
+      eventsRegistered["MERCHANT_SHOW"](ctx())
+      assert.is_false(v.frame:IsShown())
+      assert.are.same({}, played)
+      look()
+      assert.is_false(v.frame:IsShown(), "nor before TSM's window is up")
+    end)
+
+    -- PLAYER_INTERACTION_MANAGER_FRAME_HIDE, where TSM lets go of its window, may come a frame before MERCHANT_CLOSED.
+    it("stays away as TSM lets go of its window with the merchant closing", function()
+      local tsm = TSM.Install(false)
+      local v = arrive(tsm)
+      tsm:MerchantHide()
+      assert.is_false(tradeSkillMaster:WindowShown())
+      look()
+      finishTweens()
+      assert.is_false(v.frame:IsShown())
+    end)
+
+    it("stays out of the way of TSM's window when that is TSM's saved choice, the visit going on", function()
+      local tsm = TSM.Install(false)
+      local v = arrive(tsm)
+      assert.is_true(tradeSkillMaster:WindowShown())
+      assert.is_false(v:IsShown())
+      assert.is_true(v.atMerchant)
+      assert.is_true(MerchantFrame:IsShown(), "Blizzard's bag code sells while it is shown")
+      runTimers()
+      assert.are.equal(0, _G._merchantCalls.closed)
+    end)
+
+    it("comes in as TSM's WoW UI button chooses Blizzard's frame, the visit going on", function()
+      local tsm = TSM.Install(false)
+      local v = arrive(tsm)
+      tsm:ClickWoWUI()
+      look()
+      finishTweens()
+      assert.is_false(tradeSkillMaster:WindowShown())
+      assert.is_true(v:IsShown())
+      runTimers()
+      assert.are.equal(0, _G._merchantCalls.closed)
+    end)
+
+    it("opens as before when Blizzard's frame is TSM's saved choice, its button enabled once TSM's switch is there", function()
+      local tsm = TSM.Install(true)
+      local v = nextVendor:Create(ctx())
+      MerchantFrame:Show()
+      tsm:MerchantShow()
+      eventsRegistered["MERCHANT_SHOW"](ctx())
+      assert.is_true(v:IsShown())
+      assert.is_true(v.tsmButton:IsShown())
+      assert.is_false(v.tsmButton:IsEnabled(), "TSM makes its switch a frame later")
+      tsm:Frame()
+      look()
+      assert.is_true(v.tsmButton:IsEnabled())
+      assert.is_false(tradeSkillMaster:WindowShown())
+    end)
+
+    it("steps aside for TSM's window from its TradeSkillMaster button, ending nothing, and comes back from WoW UI", function()
+      local tsm = TSM.Install(true)
+      local v = arrive(tsm)
+      assert.is_true(v:IsShown())
+      click(v.tsmButton)
+      assert.is_true(tradeSkillMaster:WindowShown())
+      assert.is_false(_G.TradeSkillMasterDB[TSM.KEY], "saved as TSM's own switch saves it")
+      hidden(v)
+      assert.is_false(v:IsShown())
+      runTimers()
+      assert.are.equal(0, _G._merchantCalls.closed)
+      assert.is_true(v.atMerchant)
+      tsm:ClickWoWUI()
+      look()
+      finishTweens()
+      assert.is_true(v:IsShown())
+      runTimers()
+      assert.are.equal(0, _G._merchantCalls.closed)
+    end)
+
+    it("comes back on Buy, drawn again", function()
+      local tsm = TSM.Install(true)
+      local v = arrive(tsm)
+      v:OnTabClicked(ctx(), 2, "LeftButton")
+      click(v.tsmButton)
+      hidden(v)
+      data.items = { forSale(4, "Mats") }
+      tsm:ClickWoWUI()
+      look()
+      finishTweens()
+      assert.are.equal(1, v.tab)
+      assert.are.same({ "Mats" }, sectionNames(v))
+    end)
+
+    it("docks the Shopping List again as it comes back", function()
+      local frame = CreateFrame("Frame", nil, UIParent)
+      frame:Show()
+      local backpack = { frame = frame, scroll = { frame = CreateFrame("Frame", nil, frame) }, closing = false }
+      function backpack:IsShown() return self.frame:IsShown() end
+      override(addon, "Bags", { Backpack = backpack })
+      data.listAvailable, data.needs = true, { [1] = 10 }
+      local tsm = TSM.Install(true)
+      local v = arrive(tsm)
+      assert.is_not_nil(nextDock:EntryOf(v, "Shopping List"))
+      click(v.tsmButton)
+      hidden(v)
+      assert.is_nil(nextDock:EntryOf(v, "Shopping List"))
+      tsm:ClickWoWUI()
+      look()
+      finishTweens()
+      assert.is_not_nil(nextDock:EntryOf(v, "Shopping List"))
+    end)
+
+    it("ends the visit when TSM's window closes, staying away", function()
+      local tsm = TSM.Install(false)
+      local v = arrive(tsm)
+      tsm:CloseWindow()
+      assert.are.equal(1, _G._merchantCalls.closed, "TSM ends it")
+      look()
+      finishTweens()
+      assert.is_false(v:IsShown())
+      eventsRegistered["MERCHANT_CLOSED"](ctx())
+      assert.is_false(v.atMerchant)
+      assert.is_nil(tradeSkillMaster.driver:GetScript("OnUpdate"), "follows nothing once the vendor closed")
+      runTimers()
+      assert.are.equal(1, _G._merchantCalls.closed)
+    end)
+
+    it("still ends the visit when Blizzard's code hides its merchant frame while TSM's window shows", function()
+      local tsm = TSM.Install(false)
+      arrive(tsm)
+      MerchantFrame:Hide()
+      runTimers()
+      assert.are.equal(1, _G._merchantCalls.closed)
+    end)
+
+    it("ends the visit from its close button as before", function()
+      local tsm = TSM.Install(true)
+      local v = arrive(tsm)
+      click(v.closeButton)
+      assert.are.equal(1, _G._merchantCalls.closed)
+    end)
+
+    -- Found by the bug review: the button stays shown through the close's slide, and TSM's switch asks for no merchant: it
+    -- opened TSM's window with no vendor, and saved it as TSM's choice.
+    it("opens nothing from its TradeSkillMaster button once the merchant closed", function()
+      local tsm = TSM.Install(true)
+      local v = arrive(tsm)
+      eventsRegistered["MERCHANT_CLOSED"](ctx())
+      assert.is_true(v.frame:IsShown(), "sliding out")
+      assert.are.equal("closed", v:SwitchToTSM(ctx()))
+      click(v.tsmButton)
+      assert.is_false(tradeSkillMaster:WindowShown())
+      assert.is_true(_G.TradeSkillMasterDB[TSM.KEY])
+    end)
+
+    it("opens nothing from its TradeSkillMaster button once its close button asked the vendor to close", function()
+      local tsm = TSM.Install(true)
+      local v = arrive(tsm)
+      click(v.closeButton)
+      click(v.tsmButton)
+      assert.is_false(tradeSkillMaster:WindowShown())
+      assert.is_true(_G.TradeSkillMasterDB[TSM.KEY])
+    end)
+
+    it("steps neither aside nor back once it asked the vendor to close", function()
+      local tsm = TSM.Install(true)
+      local v = arrive(tsm)
+      click(v.closeButton)
+      tradeSkillMaster:SwitchButton():Click()
+      assert.is_true(tradeSkillMaster:WindowShown())
+      assert.are.equal("same", v:FollowTSM(ctx()))
+      assert.is_falsy(v.aside)
+    end)
+
+    it("opens the next vendor as TSM's last choice says", function()
+      local tsm = TSM.Install(true)
+      local v = arrive(tsm)
+      click(v.tsmButton)
+      hidden(v)
+      leave(tsm, v)
+      arrive(tsm, v)
+      assert.is_true(tradeSkillMaster:WindowShown())
+      assert.is_false(v:IsShown())
+      tsm:ClickWoWUI()
+      look()
+      leave(tsm, v)
+      arrive(tsm, v)
+      assert.is_false(tradeSkillMaster:WindowShown())
+      assert.is_true(v:IsShown())
     end)
   end)
 

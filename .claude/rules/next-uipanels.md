@@ -99,6 +99,18 @@ did the same (the Dressing Room, the Friends list, the group finder...).
   that frame: with nothing open the shift is the whole room, so the first panel opens past BetterBags Next at once, and
   only one that does not fit there moves back, the next frame. The manager keeps the same panels at any shift, so nothing
   closes meanwhile.
+- **Another addon writes the stand-in's layout** (TradeSkillMaster, as it switches its vendor window: `xoffset` -32 and
+  `width` 0 as its window opens, `xoffset` 0 and `width` 336 as Blizzard's frame shows, each followed by
+  `UpdateUIPanelPositions`; tradeskillmaster.md §4). Before, the Character pane opened 368 past the vendor (968 for 600)
+  until the vendor closed. `take` keeps what the frame had (`standInWidth`, `standInFit`) and `hold` gives it the width and
+  fit that take no room, keeping what the frame then reads (`heldWidth`, `heldFit`: a frame the manager has no entry for
+  keeps nothing, so it is never taken again) and the `xoffset` the width was worked out from (`heldX`). `Retake` (returns
+  whether it did), at the start of `PlaceLater`'s next frame, finds any of the three changed: what the other addon wrote
+  becomes what the frame gets back, and it holds again at its `xoffset` now, the panels laid out again (an open Character
+  pane moves back the same frame). `giveBack` gives the width and the fit back each only while it is still what `hold`
+  gave; another addon's stays. While a stand-in is held the hook is installed and `PlaceLater` runs even with no room (a
+  vendor chained on the backpack's right; found by the second bug review of the TradeSkillMaster integration, the
+  Character pane at 384 for 16). `Place` does nothing more with no room.
 
 ### 27d. Taint and the clients
 
@@ -148,8 +160,12 @@ widens, and the stand-in left at its own scale as Blizzard scales its panels to 
 body; WoW: Forever; on Era, Anniversary and Mists, the vendor (and the Dressing Room on a 4:3 screen), the vendor and the
 bank opening beside the Dressing Room and the Character pane on a narrow screen (the Character pane registered from
 each client's own `CharacterFrame.lua`), the bank's frame kept as a wide panel moves the panels back on a 4:3 screen (the
-other order of the two writes), the bank and the guild bank with their `xoffset`. Every guard was mutation-tested (13
-mutations, each caught; one that survived showed a guard that did nothing, removed). `spec/next/vendor_spec.lua`
+other order of the two writes), the bank and the guild bank with their `xoffset`; another addon's width and x offset
+(taken again, laid out again with the Character pane already open, kept as the vendor closes, nothing taken while
+unchanged or for a frame the manager has no entry for, and chained on the right). Every guard was mutation-tested (13
+mutations, each caught; one that survived showed a guard that did nothing, removed; then 8 for `Retake`, `hold` and
+`giveBack`, each caught). `spec/next/vendor_spec.lua` ("beside Blizzard's panels", "with TradeSkillMaster") runs
+TradeSkillMaster's own writes (`spec/helpers/tsm.lua`) with the real vendor. `spec/next/vendor_spec.lua`
 ("beside Blizzard's panels"): the real vendor opened the client's way (`ShowUIPanel(MerchantFrame)`, then
 `MERCHANT_SHOW`), the Character pane (#1247) and the Dressing Room (#1282) beside it, and the left edge given back as
 the merchant closes. `spec/next/small_spec.lua` ("gives Blizzard's panel layout its left edge back as a full companion

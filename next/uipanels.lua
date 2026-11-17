@@ -27,6 +27,9 @@ local chain = addon:GetModule('NextChain')
 ---@field standIn? Frame The frame of Blizzard's that takes no room in the layout.
 ---@field standInWidth? number Its width in the layout before.
 ---@field standInFit? number Its checkFitExtraWidth before.
+---@field heldWidth? number The width it was given (hold), so a width another addon gives it later shows.
+---@field heldFit? number The checkFitExtraWidth it was given.
+---@field heldX? number The x offset that width was worked out from.
 ---@field hooked? function The UpdateUIPanelPositions hooked (once: a hook cannot be taken off).
 ---@field driver Frame Places the panels again the frame after the manager lays them out.
 local uiPanels = addon:NewModule('NextUIPanels')
@@ -42,6 +45,7 @@ function uiPanels:Init()
   self.standIn = nil
   self.standInWidth = nil
   self.standInFit = nil
+  self.heldWidth, self.heldFit, self.heldX = nil, nil, nil
   self.hooked = nil
   if self.driver == nil then
     self.driver = CreateFrame("Frame")
@@ -116,20 +120,61 @@ function uiPanels:take(frame)
   self.standIn = frame
   self.standInWidth = panelAttribute(frame, "width")
   self.standInFit = panelAttribute(frame, "checkFitExtraWidth")
-  local width = -(layoutAttribute("PANEl_SPACING_X") + (panelAttribute(frame, "xoffset") or 0)) / frame:GetScale()
-  SetUIPanelAttribute(frame, "width", width)
-  SetUIPanelAttribute(frame, "checkFitExtraWidth", (self.standInFit or 20) + (self.standInWidth or frame:GetWidth()) - width)
+  self:hold()
 end
 
--- giveBack gives the frame taken its width in the layout and its fit's back.
+-- hold gives the frame taken the width and fit that take no room (take), keeping what it then has: a frame the manager
+-- has no entry for keeps none (SetUIPanelAttribute writes nothing).
+---@private
+function uiPanels:hold()
+  local frame = self.standIn
+  local x = panelAttribute(frame, "xoffset") or 0
+  local width = -(layoutAttribute("PANEl_SPACING_X") + x) / frame:GetScale()
+  SetUIPanelAttribute(frame, "width", width)
+  SetUIPanelAttribute(frame, "checkFitExtraWidth", (self.standInFit or 20) + (self.standInWidth or frame:GetWidth()) - width)
+  self.heldWidth, self.heldFit = panelAttribute(frame, "width"), panelAttribute(frame, "checkFitExtraWidth")
+  self.heldX = x
+end
+
+-- Retake takes the frame taken out of the layout again when another addon wrote its width, fit or x offset there since
+-- (TradeSkillMaster, as it switches its vendor window: tradeskillmaster.md): what that addon gave it is what it gets
+-- back (giveBack). It returns whether it took it again.
+---@return boolean
+function uiPanels:Retake()
+  local frame = self.standIn
+  if frame == nil then
+    return false
+  end
+  local width, fit = panelAttribute(frame, "width"), panelAttribute(frame, "checkFitExtraWidth")
+  local x = panelAttribute(frame, "xoffset") or 0
+  if width == self.heldWidth and fit == self.heldFit and x == self.heldX then
+    return false
+  end
+  if width ~= self.heldWidth then
+    self.standInWidth = width
+  end
+  if fit ~= self.heldFit then
+    self.standInFit = fit
+  end
+  self:hold()
+  return true
+end
+
+-- giveBack gives the frame taken its width in the layout and its fit's back: each only while it is still what take gave
+-- it, else another addon's since, which stays.
 ---@private
 function uiPanels:giveBack()
   if self.standIn == nil then
     return
   end
-  SetUIPanelAttribute(self.standIn, "width", self.standInWidth)
-  SetUIPanelAttribute(self.standIn, "checkFitExtraWidth", self.standInFit)
+  if panelAttribute(self.standIn, "width") == self.heldWidth then
+    SetUIPanelAttribute(self.standIn, "width", self.standInWidth)
+  end
+  if panelAttribute(self.standIn, "checkFitExtraWidth") == self.heldFit then
+    SetUIPanelAttribute(self.standIn, "checkFitExtraWidth", self.standInFit)
+  end
   self.standIn, self.standInWidth, self.standInFit = nil, nil, nil
+  self.heldWidth, self.heldFit, self.heldX = nil, nil, nil
 end
 
 -- rightEdge is where the last of the panels the manager laid out from the left edge ends, in UIParent's units (its width
@@ -200,13 +245,18 @@ function uiPanels:Place()
 end
 
 -- PlaceLater places the panels again a frame later (Place), once: the manager has laid them out (a panel opened or
--- closed, one changed its width), and its layout must not run again from inside its own.
+-- closed, one changed its width), and its layout must not run again from inside its own. The frame stood in for is
+-- taken out of the layout again first when another addon gave it a width there meanwhile (Retake), and laid out again:
+-- with no room too, while one is held (a vendor chained on the backpack's right).
 function uiPanels:PlaceLater()
-  if self.room == 0 and self.shift == 0 then
+  if self.room == 0 and self.shift == 0 and self.standIn == nil then
     return
   end
   self.driver:SetScript("OnUpdate", function(driver)
     driver:SetScript("OnUpdate", nil)
+    if self:Retake() then
+      UpdateUIPanelPositions()
+    end
     self:Place()
   end)
 end
@@ -240,7 +290,7 @@ function uiPanels:Update()
     end
   end
   self.room = room
-  if room > 0 then
+  if room > 0 or self.standIn ~= nil then
     self:hook()
   end
   UpdateUIPanelPositions()

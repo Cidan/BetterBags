@@ -94,6 +94,8 @@ local PROMPTS = { "CONFIRM_PURCHASE_TOKEN_ITEM", "CONFIRM_PURCHASE_ITEM_DELAYED"
 ---@field listOffered boolean Its Shopping List was docked in it this visit (OfferShoppingList).
 ---@field off? boolean Switched off (Deactivate): it answers no merchant, Blizzard's merchant frame shows the vendor.
 ---@field buybackKeys? string[] What buyback held when it last looked (NoteBuyback), newest first.
+---@field tsmButton Button Opens TradeSkillMaster's vendor window in its place (SwitchToTSM), shown with TSM loaded.
+---@field aside? boolean During a visit: TradeSkillMaster's vendor window shows it in the vendor's place (StepAside).
 local vendorProto = nextPanel:Extend({}, 'NextVendorPanel')
 -- A vendor's name can be any length: it is cut short to the room its header buttons leave at either
 -- size (FitTitle).
@@ -104,6 +106,12 @@ vendorProto.fitsTitle = true
 ---@return ProfessionShoppingListIntegration
 local function shoppingList()
   return addon:GetModule('ProfessionShoppingList')
+end
+
+-- tradeSkillMaster is the TradeSkillMaster integration (integrations/tradeskillmaster.lua, which loads after this file).
+---@return TradeSkillMasterIntegration
+local function tradeSkillMaster()
+  return addon:GetModule('TradeSkillMaster')
 end
 
 -- shoppingListName names the section of what a shopping list buys here.
@@ -199,6 +207,8 @@ function vendorProto:GetHeaderButtons()
   table.insert(buttons, { key = "guildRepairButton", tooltipFunc = function() self:RepairTooltip(true) end,
     label = L:G("Repair With Guild Funds"), menuTooltip = function() return self:RepairText(true) end,
     onClick = function() self:RepairAll(true) end })
+  table.insert(buttons, { key = "tsmButton", tooltip = L:G("Switch to TradeSkillMaster's vendor window"),
+    label = L:G("TradeSkillMaster"), onClick = function(ctx) self:SwitchToTSM(ctx) end })
   return buttons
 end
 
@@ -247,8 +257,10 @@ end
 
 -- UpdateHeader shows what the vendor offers and enables what can be done: the filter (retail,
 -- unless a game rule turns it off), the repair buttons at a vendor that repairs (the guild's when
--- the guild pays), Sell Junk with junk in the bags.
+-- the guild pays), Sell Junk with junk in the bags, TradeSkillMaster with TSM loaded once its switch is there.
 function vendorProto:UpdateHeader()
+  self.tsmButton:SetShown(tradeSkillMaster():Available())
+  self:SetHeaderButtonEnabled(self.tsmButton, tradeSkillMaster():CanSwitch())
   if self.filterButton then
     local disabled = C_GameRules and C_GameRules.IsGameRuleActive and Enum.GameRule
       and Enum.GameRule.MerchantFilterDisabled and C_GameRules.IsGameRuleActive(Enum.GameRule.MerchantFilterDisabled)
@@ -350,6 +362,8 @@ end
 
 -- OnMerchantShow opens the vendor (MERCHANT_SHOW), resetting the filter as Blizzard's merchant
 -- frame does on every open. Switched off, it opens nothing: Blizzard's merchant frame shows the vendor.
+-- While TradeSkillMaster's own vendor window is TSM's saved choice, TSM shows this vendor a frame later and the vendor
+-- stays out of its way (aside); either way it follows TSM's window until the vendor closes (FollowTSM).
 ---@param ctx Context
 function vendorProto:OnMerchantShow(ctx)
   if self.off then
@@ -362,7 +376,11 @@ function vendorProto:OnMerchantShow(ctx)
   if ResetSetMerchantFilter then
     ResetSetMerchantFilter()
   end
-  self:Show(ctx)
+  self.aside = tradeSkillMaster():ChoosesWindow()
+  tradeSkillMaster():Follow(function(c) self:FollowTSM(c) end)
+  if not self.aside then
+    self:Show(ctx)
+  end
 end
 
 -- OnMerchantClosed hides the vendor (MERCHANT_CLOSED), puts the cursor back and closes Blizzard's
@@ -375,6 +393,7 @@ function vendorProto:OnMerchantClosed(ctx)
   end
   self.atMerchant = false
   self.closeRequested = false
+  tradeSkillMaster():Stop()
   nextDock:SendBackBorrowed(self)
   ResetCursor()
   for _, which in ipairs(PROMPTS) do
@@ -383,14 +402,78 @@ function vendorProto:OnMerchantClosed(ctx)
   self:Hide(ctx)
 end
 
--- Hide slides the panel out, ending the vendor visit at once when the panel is what closes.
+-- Hide slides the panel out, ending the vendor visit at once when the panel is what closes; stepping aside for
+-- TradeSkillMaster's window ends nothing.
 ---@param ctx Context
 function vendorProto:Hide(ctx)
   nextPanel.proto.Hide(self, ctx)
-  if self.atMerchant and not self.closeRequested then
+  if self.atMerchant and not self.closeRequested and not self.aside then
     self.closeRequested = true
     CloseMerchant()
   end
+end
+
+-- StepAside slides the vendor out for TradeSkillMaster's window, the visit going on: Blizzard's merchant frame stays
+-- shown to Blizzard's code, so a right click on a bag item still sells. What waits in its dock from the backpack goes
+-- back at once, as when the merchant closes; its own Shopping List leaves with it (OnHidden).
+---@param ctx Context
+function vendorProto:StepAside(ctx)
+  self.aside = true
+  nextDock:SendBackBorrowed(self)
+  self:Hide(ctx)
+end
+
+-- StepBack brings the vendor back from TradeSkillMaster's window as it opens: on Buy, drawn again, and what waits for the
+-- player docked in it again.
+---@param ctx Context
+function vendorProto:StepBack(ctx)
+  self.aside = false
+  self.offered = {}
+  self.listOffered = false
+  self:Show(ctx)
+end
+
+-- FollowTSM follows TradeSkillMaster's vendor window while a vendor is open (TradeSkillMaster:Follow): the vendor steps
+-- aside as TSM's window shows, and comes back as it hides by its WoW UI button (TSM's saved choice then Blizzard's
+-- frame); closed by its own close button or Escape, the visit ends and the vendor stays away. Its TradeSkillMaster button
+-- is enabled once TSM's switch button is there. It returns what it did, for profiler traces: "aside", "back" or "same".
+---@param ctx Context
+---@return string
+function vendorProto:FollowTSM(ctx)
+  if not self.atMerchant or self.closeRequested then
+    return "same"
+  end
+  local tsm, did = tradeSkillMaster(), "same"
+  if tsm:WindowShown() then
+    if not self.aside then
+      self:StepAside(ctx)
+      did = "aside"
+    end
+  elseif self.aside and not tsm:ChoosesWindow() then
+    self:StepBack(ctx)
+    did = "back"
+  end
+  if self:IsShown() and not self.closing then
+    self:UpdateHeader()
+  end
+  return did
+end
+
+-- SwitchToTSM opens TradeSkillMaster's vendor window from the vendor's TradeSkillMaster button, as TSM's own switch on
+-- Blizzard's merchant frame does, and the vendor steps aside once it shows: at once when it showed in the click, through
+-- what follows TSM's window (TradeSkillMaster:Look, which tells FollowTSM), else a frame later. Only during a visit: the
+-- button shows through the close's slide, and TSM's switch would open its window with no merchant. It returns what TSM
+-- did (TradeSkillMaster:OpenWindow), or "closed".
+---@param ctx Context
+---@return string
+function vendorProto:SwitchToTSM(ctx)
+  local _ = ctx
+  if not self.atMerchant or self.closeRequested or self.closing then
+    return "closed"
+  end
+  local did = tradeSkillMaster():OpenWindow()
+  tradeSkillMaster():Look()
+  return did
 end
 
 -- EndVisitLater ends the vendor visit a frame later, when it is still open then: for a hide from
@@ -408,11 +491,13 @@ function vendorProto:EndVisitLater()
 end
 
 -- OnHidden ends the vendor visit a frame later when the panel hid some other way than closing
--- (Escape hides it directly).
+-- (Escape hides it directly), never once it stepped aside for TradeSkillMaster's window.
 ---@param ctx Context
 function vendorProto:OnHidden(ctx)
   nextPanel.proto.OnHidden(self, ctx)
-  self:EndVisitLater()
+  if not self.aside then
+    self:EndVisitLater()
+  end
 end
 
 -- Deactivate switches the vendor off, with BetterBags Next or by itself (Enable Vendor Window, next-bagsystem.md §11g): it hides

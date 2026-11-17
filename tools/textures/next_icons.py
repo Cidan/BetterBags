@@ -258,6 +258,11 @@ def guildRepair():
     shield = [(12.0, 10.6), (18.4, 10.6), (18.4, 14.2), (15.2, 18.4), (12.0, 14.2)]
     return union(cut(hammer(2.8, 15.4), fill(shield), 1.6), stroke(shield, True))
 
+def swap():
+    # The vendor's TradeSkillMaster button (tradeskillmaster.md): two arrows passing, one window for the other.
+    return union(line(3.0, 6.0, 16.4, 6.0), chevron(16.9, 6.0, 1, 0, 3.4),
+                 line(17.0, 14.0, 3.6, 14.0), chevron(3.1, 14.0, -1, 0, 3.4))
+
 # The controls' glyphs (next-settings.md): a dropdown's chevron, the settings window's Back, a menu's
 # check, a search box's magnifier, the plus of a button that makes something new, and a round switch's disc.
 
@@ -421,7 +426,7 @@ GLYPHS = {
     "settings": gear, "close": close, "anchor": anchorFree, "anchorshown": anchorShown, "lock": lock, "bags": bag,
     "small": shrink, "full": expand,
     "banktabs": tabs, "deposit": deposit, "withdraw": withdraw, "depositgold": depositGold, "withdrawgold": withdrawGold,
-    "filter": filt, "selljunk": tag, "repair": repair, "guildrepair": guildRepair,
+    "filter": filt, "selljunk": tag, "repair": repair, "guildrepair": guildRepair, "swap": swap,
     "chevron": chevronDown, "back": chevronLeft, "check": check, "search": magnifier, "plus": plus,
     "circle": circle, "minimize": minimize, "maximize": maximize,
     "quiver": arrow, "ammopouch": cartridges, "soulbag": skull, "leatherworking": hide, "inscription": quill,

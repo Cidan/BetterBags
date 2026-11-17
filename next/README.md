@@ -89,7 +89,12 @@ item) that cost's own, from an area that takes the pointer and lets clicks throu
 (`.claude/rules/next-vendor.md` §10b). A Shift-click asks how many in `NextDialog` over the vendor, its field a
 quantity: one purchase's worth to start, `-` and `+` a purchase's worth at a time, and Max, the most that can be bought
 at once, the currencies held counted too where the client lists the merchant's (`NextMerchant:MaxPurchasable`,
-`.claude/rules/next-vendor.md` §10d).
+`.claude/rules/next-vendor.md` §10d). With TradeSkillMaster loaded, the vendor and TSM's own vendor window take turns
+(`.claude/rules/tradeskillmaster.md`): the vendor stays aside (`aside`) while TSM's window shows the merchant, its
+TradeSkillMaster header button opens TSM's window (`SwitchToTSM`, the vendor sliding out without ending the visit,
+`StepAside`), and TSM's WoW UI button brings it back (`FollowTSM`, `StepBack`), followed every frame of a visit by
+`integrations/tradeskillmaster.lua`. TSM rewrites the merchant frame's width in Blizzard's layout as it switches;
+`uipanels.lua` takes it out of the layout again (`NextUIPanels:Retake`, `.claude/rules/next-uipanels.md` §27c).
 
 On WoW: Forever's gamepad interface every panel is in Blizzard's window list while it is open
 (`integrations/gamepad.lua`, `.claude/rules/gamepad.md`). Its cursor lands on what a panel marks (`bbGamepad`): the

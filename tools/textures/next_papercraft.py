@@ -860,6 +860,12 @@ def _guildrepair(h):
     h.curve([(38, 34), (58, 34), (57, 50), (48, 59), (39, 50), (38, 34)], width=2.8, wobble=0.5)
 
 
+@glyph("swap")
+def _swap(h):
+    arrow(h, 9, 20, 55, 20)
+    arrow(h, 55, 44, 9, 44)
+
+
 @glyph("chevron")
 def _chevron(h):
     h.curve([(12, 22), (32, 44), (52, 21)], width=5.4, wobble=0.6)

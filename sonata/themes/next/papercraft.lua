@@ -206,6 +206,7 @@ sonataNext:RegisterTheme({
     IconSellJunk = TEXTURES .. "icon_selljunk.png",
     IconRepair = TEXTURES .. "icon_repair.png",
     IconGuildRepair = TEXTURES .. "icon_guildrepair.png",
+    IconSwap = TEXTURES .. "icon_swap.png",
     IconChevron = TEXTURES .. "icon_chevron.png",
     IconBack = TEXTURES .. "icon_back.png",
     IconCheck = TEXTURES .. "icon_check.png",

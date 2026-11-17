@@ -330,7 +330,7 @@ BLOCKS = {
     "settings": PEACH, "anchor": LILAC, "anchorshown": SKY, "lock": ORANGE, "bags": SKY, "small": ORANGE, "full": ORANGE,
     "banktabs": SALMON,
     "deposit": BLUE, "depositgold": GOLD, "withdrawgold": GOLD, "filter": LILAC, "selljunk": SALMON, "repair": SKY,
-    "guildrepair": BLUE,
+    "guildrepair": BLUE, "swap": PEACH,
 }
 
 

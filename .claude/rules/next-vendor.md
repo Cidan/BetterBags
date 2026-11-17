@@ -54,6 +54,12 @@ the sell cursor). So the frame must stay shown, on tab 1, and never be seen:
   the purchase prompts to the frame's own `OnHide`; the `Hide` hook finds no visit to end (`atMerchant` stays false).
   `vendorProto:Activate` clears `off`, and `TakeOver` takes the frame again. The panel stays registered meanwhile: its
   other handlers act only while it shows. Coverage: `spec/next/vendor_spec.lua` ("switched off").
+- **TradeSkillMaster** (tradeskillmaster.md, #1315): TSM opens its own vendor window at every merchant, and its switch
+  back from Blizzard's frame lives on `MerchantFrame`, which the takeover hides. With TSM loaded the vendor and TSM's
+  window take turns: the vendor stays `aside` while TSM's window shows a visit (its `Hide` and `OnHidden` end nothing, the
+  frame stays shown to Blizzard's code), its TradeSkillMaster header button opens TSM's window (`SwitchToTSM`,
+  `StepAside`), and TSM's WoW UI button brings it back (`FollowTSM`, `StepBack`). The `Hide` hook still ends the visit
+  when Blizzard's code hides the frame.
 
 ### 10b. The panel (`next/vendor.lua`, `NextVendor`)
 

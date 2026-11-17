@@ -300,7 +300,8 @@ close button included.
   button by state), `bankTabsButton`, `depositButton` (the Warbank), `depositGoldButton`,
   `withdrawGoldButton` (the guild bank's: renamed from `depositButton`/`withdrawButton`, which would
   have shared the Warbank's key), `filterButton`, `sellJunkButton`, `repairAllButton`,
-  `guildRepairButton`. Default names its glyphs in `Textures` (`IconSettings`, `IconAnchor`, ...), so a
+  `guildRepairButton`, `tsmButton` (the vendor's TradeSkillMaster button, `IconSwap`; tradeskillmaster.md §3). Default
+  names its glyphs in `Textures` (`IconSettings`, `IconAnchor`, ...), so a
   theme can repoint one file for every use. The panels' button lists carry no art; a key the theme
   gives no icon is an error naming it (`SetHeaderIcon`), and every theme inherits Default's.
 - **Replacing one:** `Icons.<key> = { Texture, TexCoords }` or `{ Atlas }`. Theme tables merge key by
