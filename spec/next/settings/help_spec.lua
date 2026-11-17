@@ -119,7 +119,11 @@ describe("NextSettingsHelp", function()
       tabs = { { id = "main", title = "General", sections = { { title = "Bags", rows = { {
         option = { kind = "toggle", title = "Enable Fading", description = "Fade the bags.",
           get = function() return values.fade end, set = function(_, v) values.fade = v end },
-      } } } } } },
+      } } },
+        -- The catalog's settings as the window shows them; an article shows a setting only where the window does.
+        { title = "Fading", rows = { { setting = "fade", hidden = function() return values.hideFade == true end },
+          { setting = "quick" },
+          { setting = "secret", hidden = function() return true end } } } } } },
     })
     pages:Define(help:Page())
   end
@@ -391,7 +395,7 @@ describe("NextSettingsHelp", function()
       openHelp()
       typed(view().search, "search box ")
       settle()
-      assert.are.equal("Search Help", settings.title:GetText())
+      assert.are.equal("Search Results", settings.title:GetText())
       assert.is_truthy(settings.description:GetText():find("search box", 1, true))
       local text = view().shownCards[1].text:GetText()
       local r, g, b = style:RGBA(H().MatchColor)
@@ -619,6 +623,80 @@ describe("NextSettingsHelp", function()
       assert.is_true(values.fade)
     end)
 
+    -- Found by the review of the text written from the code: a link to a page or tab not shown now opened another
+    -- page (the window falls back to its first page and first tab).
+    it("leaves out a link to a settings page or tab not shown now", function()
+      pages:Define({ id = "guild", group = "Bags", title = "Guild Bank", description = "The guild bank.",
+        shown = function() return false end,
+        tabs = { { id = "layout", title = "Layout", sections = { { title = "Layout", rows = {} } } } } })
+      pages:Define({ id = "currencies", group = "BetterBags", title = "Currencies", description = "Currencies.",
+        tabs = { { id = "tracked", title = "Tracked", sections = { { title = "Tracked", rows = {} } } },
+          { id = "currencies", title = "Currencies", shown = function() return false end,
+            sections = { { title = "Currencies", rows = {} } } } } })
+      articles:Define({ id = "links", group = "bags", title = "Links", summary = "Links.", body = {
+        { open = { page = "guild", tab = "layout", text = "Open the Guild Bank" } },
+        { open = { page = "currencies", tab = "currencies", text = "Open the Currencies tab" } },
+        { open = { page = "currencies", tab = "tracked", text = "Open the Tracked tab" } },
+        { open = { page = "general", text = "Open General" } },
+      } })
+      help:OpenArticle(ctx(), "links")
+      settle()
+      local labels = {}
+      for _, block in ipairs(blocksOf("open")) do table.insert(labels, block.button.label:GetText()) end
+      assert.are.same({ "Open the Tracked tab", "Open General" }, labels)
+    end)
+
+    -- Found by the second review: a link to a category's tab was left out until the Categories page had been shown,
+    -- though its list chooses a category, and so the tabs, before the window reads them.
+    it("draws a link to a tab its page's list would choose, before the list has shown", function()
+      local chosen = false
+      pages:Define({ id = "cats", group = "BetterBags", title = "Cats", description = "Cats.",
+        choose = function() chosen = true end,
+        tabs = { { id = "settings", title = "Settings", sections = { { title = "Settings", rows = {} } } },
+          { id = "rule", title = "Rule", shown = function() return chosen end,
+            sections = { { title = "Rule", rows = {} } } } } })
+      articles:Define({ id = "cat", group = "bags", title = "Cat", summary = "Cat.",
+        body = { { open = { page = "cats", tab = "rule", text = "Open the Rule tab" } } } })
+      help:OpenArticle(ctx(), "cat")
+      settle()
+      assert.are.equal(1, #blocksOf("open"))
+    end)
+
+    -- Found by the second review: what an article draws is read when it shows, but an article was read only when another
+    -- was chosen, so coming back to the Help page showed what the article drew before.
+    it("reads its article again when it comes back into view", function()
+      values.hideFade = true
+      help:OpenArticle(ctx(), "welcome")
+      settle()
+      assert.are.equal(0, #blocksOf("setting"))
+      settings:Select("general", nil, ctx())
+      settle()
+      values.hideFade = false
+      settings:Select("help", nil, ctx())
+      settle()
+      assert.are.equal("welcome", help.state.articleId)
+      assert.are.equal(1, #blocksOf("setting"))
+      -- And the other way: a setting it drew before is left out once the window hides it.
+      settings:Select("general", nil, ctx())
+      settle()
+      values.hideFade = true
+      settings:Select("help", nil, ctx())
+      settle()
+      assert.are.equal(0, #blocksOf("setting"))
+    end)
+
+    -- Found by the same review: Show Keystone Level showed on clients whose settings window hides it.
+    it("leaves out a setting the settings window does not show now", function()
+      catalog.Has = function(_, id) return id == "fade" or id == "secret" end
+      articles:Define({ id = "hidden", group = "bags", title = "Hidden", summary = "Hidden.",
+        body = { { setting = "fade" }, { setting = "secret" } } })
+      help:OpenArticle(ctx(), "hidden")
+      settle()
+      local shown = {}
+      for _, block in ipairs(blocksOf("setting")) do table.insert(shown, block.def.setting) end
+      assert.are.same({ "fade" }, shown)
+    end)
+
     it("lists its related articles shown, and its neighbours in the tree", function()
       help:OpenArticle(ctx(), "next")
       settle()
@@ -633,7 +711,7 @@ describe("NextSettingsHelp", function()
       settle()
       local titles = {}
       for _, link in ipairs(view().article.related) do table.insert(titles, link.label:GetText()) end
-      assert.are.same({ "Searching your bags", "Sorting" }, titles)
+      assert.are.same({ "Sorting" }, titles, "its body links Searching your bags already")
       assert.is_false(view().article.previous.frame:IsShown(), "nothing before the first")
     end)
 
@@ -707,7 +785,7 @@ describe("NextSettingsHelp", function()
     settings:OnDesignChanged(ctx())
     settle()
     assert.are.equal("results", view().showing)
-    assert.are.equal("Search Help", settings.title:GetText())
+    assert.are.equal("Search Results", settings.title:GetText())
   end)
 
   -- Found by the bug review: Compact Sections stayed off in its article after Section Columns let it be used.

@@ -14,7 +14,7 @@ articles:Group({ id = "profiles", title = L:G("Profiles and Settings") })
 articles:Define({
   id = "profiles", group = "profiles",
   title = L:G("Profiles"),
-  summary = L:G("Saving your settings under a name and sharing them between characters."),
+  summary = L:G("Profile management, shared settings, and character assignments"),
   keywords = { L:G("profile"), L:G("profiles"), L:G("character"), L:G("alt"), L:G("copy settings"), L:G("new profile"),
     L:G("reset to defaults"), L:G("default profile"), L:G("per character"),
     L:G("share settings alts"), L:G("copy profile"), L:G("account wide settings")
@@ -30,22 +30,34 @@ articles:Define({
   pages = { "profiles", "profiles:profiles" },
   related = { "category-share", "category-gearsets" },
   body = {
-    { text = L:G("A profile holds all your settings: your categories, their order, your groups, your theme, your anchors, and everything else. Every character starts on the Default profile, so they all share it until you switch a character to another profile.") },
-    { heading = L:G("Profiles Page") },
+    { text = L:G("BetterBags stores your settings, categories, bag layouts, and appearance choices in named profiles so characters can share one setup or keep separate setups. Manage them on the Profiles page under the Profiles tab.") },
+    { heading = L:G("Profile Contents") },
+    { text = L:G("A profile holds every BetterBags setting, custom category, equipment set category configuration, and bag option except two settings.") },
     { list = {
-      L:G("Active Profile sets the profile this character uses. Switching profiles reloads the UI."),
-      L:G("Below Active Profile, you can see the characters on each profile."),
-      L:G("New Profile, Copy Profile, Rename Profile, and Delete Profile manage your profiles. Default can't be renamed or deleted."),
-      L:G("Reset to Defaults puts every setting of the active profile back as it was when BetterBags was new."),
+      L:G("Show What's New on Login is saved for your entire account across all profiles."),
+      L:G("Include Tradeable Reagents is the game's own setting and is saved per character."),
     } },
-    { open = { page = "profiles", text = L:G("Open the Profiles page") } },
+    { heading = L:G("Default Profile") },
+    { text = L:G("Every character starts on the built-in Default profile. You can switch to Default, copy its settings with Copy Profile, or wipe it back to factory state with Reset to Defaults, but you cannot rename or delete Default.") },
+    { heading = L:G("Profile Management") },
+    { text = L:G("The Active Profile dropdown on Profiles > Profiles switches this character to another profile after you confirm, which reloads the UI. Below the dropdown, the Characters line shows how many characters currently use each active profile.") },
+    { list = {
+      L:G("New Profile creates a profile up to 48 characters long and switches your character to it immediately, then asks whether to reload the UI. Clicking Cancel skips the reload and leaves your character on the new profile."),
+      L:G("Copy Profile creates a new profile, switches your character to it, copies all settings from your previous profile, and asks whether to reload now with Reload or Later. Your character stays on the copied profile regardless of which button you click."),
+      L:G("Rename Profile renames the active profile and reloads the UI right away. It cannot rename Default or reuse an existing profile name."),
+      L:G("Delete Profile asks for confirmation, switches your character back to Default, deletes the previously active profile, and reloads the UI. It cannot delete Default."),
+      L:G("Reset to Defaults asks for confirmation, erases all settings and categories in the active profile (including Default), and reloads the UI."),
+    } },
+    { open = { page = "profiles", tab = "profiles", text = L:G("Open Profiles Tab") } },
+    { see = "category-share" },
+    { see = "category-gearsets" },
   },
 })
 
 articles:Define({
   id = "reload-settings", group = "profiles",
-  title = L:G("Reload Required"),
-  summary = L:G("The few changes that take effect only after the UI reloads."),
+  title = L:G("Reloading Settings"),
+  summary = L:G("Changes that require a UI reload"),
   keywords = { L:G("reload"), L:G("reloadui"), L:G("restart"), L:G("not working"), L:G("didn't change"),
     L:G("reload UI"), L:G("settings need reload"), L:G("changes not applying"), L:G("restart UI")
   },
@@ -60,11 +72,21 @@ articles:Define({
   },
   related = { "bank-basics", "profiles", "designs" },
   body = {
-    { text = L:G("Almost every setting takes effect right away. A few take effect only after the UI reloads. For a setting or an import, BetterBags asks first: choose Later to keep playing, or Reload to reload now.") },
+    { text = L:G("Most BetterBags settings apply immediately. A small set of changes require reloading the user interface before the change takes effect.") },
+    { heading = L:G("Later or Reload") },
+    { text = L:G("For changes that offer Later or Reload, clicking Later keeps your saved change so you can finish other edits and run /reload when ready, while clicking Reload reloads the UI right away.") },
     { list = {
-      L:G("Changing Enable Bank Bags on the Bank page."),
-      L:G("Switching the active profile: choosing Switch reloads the UI right away."),
-      L:G("Importing all your categories."),
+      L:G("Enable Bank Bags under Bank > General switches between BetterBags and the default Blizzard bank window after the UI reloads."),
+      L:G("Copy Profile under Profiles > Profiles switches your character to the new copy first and then offers Later or Reload; whichever button you choose, your character is already using the copied profile."),
+      L:G("Import Categories under Profiles > Import / Export offers Later or Reload after replacing all categories from a full category export string; importing a single category string applies immediately without asking for a reload."),
     } },
+    { heading = L:G("Immediate Reloads") },
+    { text = L:G("Profile operations that replace or remove active data reload as soon as you confirm them.") },
+    { list = {
+      L:G("Selecting a profile in Active Profile under Profiles > Profiles reloads immediately when you click Switch."),
+      L:G("Confirming Rename Profile, Delete Profile, or Reset to Defaults reloads immediately."),
+      L:G("New Profile makes the new profile active before asking to switch; clicking Switch reloads immediately, while clicking Cancel leaves your character on the new profile without a reload."),
+    } },
+    { open = { page = "profiles", tab = "profiles", text = L:G("Open Profiles Settings") } },
   },
 })

@@ -30,6 +30,9 @@ local catalog = addon:GetModule('SettingsCatalog')
 ---@class HelpArticles: AceModule
 local articles = addon:GetModule('HelpArticles')
 
+---@class NextSettingsPages: AceModule
+local pages = addon:GetModule('NextSettingsPages')
+
 ---@class SonataNext: AceModule
 local sonataNext = addon:GetModule('SonataNext')
 
@@ -227,18 +230,21 @@ local function bagOf(name)
 end
 
 -- settingBlock returns the block of a setting (the settings window's own row of it), made once per setting and bag;
--- nil for one the bag does not have.
+-- nil for one the bag does not have, or the settings window does not show now (Show Keystone Level is retail's).
 ---@private
 ---@param def HelpBlock
 ---@return NextHelpBlock?
 function viewProto:settingBlock(def)
+  local bag = bagOf(def.bag)
+  if (def.bag ~= nil and bag == nil) or not pages:ShowsSetting(def.setting, bag) then
+    return nil
+  end
   local key = def.setting .. "\0" .. (def.bag or "")
   local block = self.settingRows[key]
   if block ~= nil then
     return block
   end
-  local bag = bagOf(def.bag)
-  if (def.bag ~= nil and bag == nil) or not catalog:Has(def.setting, bag) then
+  if not catalog:Has(def.setting, bag) then
     return nil
   end
   local frame = CreateFrame("Frame", nil, self.frame)
@@ -280,6 +286,29 @@ function viewProto:release()
   self.related = {}
 end
 
+-- opensShown says whether a link's settings page, and its tab when it names one, are shown now: the window opens another
+-- page or tab in place of one it does not show.
+---@param open {page: string, tab?: string}
+---@return boolean
+local function opensShown(open)
+  local page = pages:Get(open.page)
+  if page == nil or not pages:IsShown(page) then
+    return false
+  end
+  if open.tab == nil then
+    return true
+  end
+  if page.choose ~= nil then
+    page.choose()
+  end
+  for _, tab in ipairs(pages:ShownTabs(page)) do
+    if tab.id == open.tab then
+      return true
+    end
+  end
+  return false
+end
+
 -- kindOf returns which kind of block a piece of an article's body is.
 ---@param def HelpBlock
 ---@return string?
@@ -296,13 +325,15 @@ local function kindOf(def)
 end
 
 -- Show shows an article's body, its related articles and its neighbours, read now (what is shown changes with the
--- bags in use). Lay it out with Layout.
+-- bags in use): a link only to an article, page or tab shown now, a setting only where the settings window shows it,
+-- and under Related Articles only those its body does not link already. Lay it out with Layout.
 ---@param article HelpArticleDef
 ---@param ctx? Context
 function viewProto:Show(article, ctx)
   local C = style.Theme.Settings.Content
   self:release()
   self.article = article
+  local linked = {}
   for _, def in ipairs(article.body) do
     local kind = kindOf(def)
     local block
@@ -311,7 +342,17 @@ function viewProto:Show(article, ctx)
       if block ~= nil then
         block.row:Refresh(ctx)
       end
-    elseif kind ~= nil and (kind ~= "see" or articles:Get(def.see) ~= nil and articles:IsShown(articles:Get(def.see))) then
+    elseif kind == "see" then
+      local other = articles:Get(def.see)
+      if other ~= nil and articles:IsShown(other) then
+        block = self:block(kind)
+        linked[def.see] = true
+      end
+    elseif kind == "open" then
+      if opensShown(def.open) then
+        block = self:block(kind)
+      end
+    elseif kind ~= nil then
       block = self:block(kind)
     end
     if block ~= nil then
@@ -341,13 +382,15 @@ function viewProto:Show(article, ctx)
       table.insert(self.blocks, block)
     end
   end
-  for i, other in ipairs(articles:Related(article)) do
-    local link = table.remove(self.relatedFree) or nextButton:Create(self.frame, { text = "", style = "Link",
-      onClick = function() end })
-    link:SetText(other.title)
-    link.onClick = function(ctx2) self.opts.onArticle(ctx2, other.id) end
-    link.frame:Show()
-    self.related[i] = link
+  for _, other in ipairs(articles:Related(article)) do
+    if not linked[other.id] then
+      local link = table.remove(self.relatedFree) or nextButton:Create(self.frame, { text = "", style = "Link",
+        onClick = function() end })
+      link:SetText(other.title)
+      link.onClick = function(ctx2) self.opts.onArticle(ctx2, other.id) end
+      link.frame:Show()
+      table.insert(self.related, link)
+    end
   end
   self.before, self.after = articles:Adjacent(article)
   for _, pair in ipairs({ { self.previous, self.before }, { self.nextCard, self.after } }) do
@@ -529,8 +572,8 @@ function viewProto:Layout(width)
   self.relatedTitle:SetShown(#self.related > 0)
   if #self.related > 0 then
     y = y + headingGap
-    self.relatedTitle:SetText(style.Theme.Settings.Content.TitleUpper == false and L:G("Related")
-      or string.upper(L:G("Related")))
+    self.relatedTitle:SetText(style.Theme.Settings.Content.TitleUpper == false and L:G("Related Articles")
+      or string.upper(L:G("Related Articles")))
     self.relatedTitle:ClearAllPoints()
     pixel:Point(self.relatedTitle, "TOPLEFT", frame, "TOPLEFT", 0, -y)
     y = y + pixel:Ceil(frame, pixel:TextHeight(self.relatedTitle)) + pixel:Snap(frame, 6)

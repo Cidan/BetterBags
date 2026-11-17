@@ -521,6 +521,7 @@ function content:Init()
     description = L:G("Your categories: a rule, items you add, or both. Each bag uses those you choose."),
     -- Its own list in the sidebar, the chosen category's name and buttons in the header (next-settings.md §5).
     sidebar = function(parent, window) return categoryEditor:CreateList(parent, window, shownBags) end,
+    choose = function() categoryEditor:EnsureChosen() end,
     heading = function() return categoryEditor:Heading() end,
     actions = function(parent, window) return categoryEditor:CreateActions(parent, window) end,
     tabs = {

@@ -17,10 +17,10 @@ local search = addon:NewModule('HelpSearch')
 -- Each field's weight and how much its length counts against it (BM25F's b). Tuned against held-out searches players
 -- would type (help.md §2): an article's keywords say best what it is for, and its long body least.
 search.FIELDS = {
-  title = { weight = 4, b = 0.5 },
-  keywords = { weight = 6, b = 0.75 },
-  questions = { weight = 0.75, b = 0.9 },
-  headings = { weight = 1.5, b = 0.5 },
+  title = { weight = 6, b = 0.5 },
+  keywords = { weight = 4, b = 0.75 },
+  questions = { weight = 3, b = 0.9 },
+  headings = { weight = 0.75, b = 0.5 },
   body = { weight = 0.4, b = 0.9 },
 }
 

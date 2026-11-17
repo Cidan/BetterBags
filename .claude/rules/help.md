@@ -21,10 +21,17 @@ user:
 - **No bag menu entry.** `/bb help`, and help articles listed by the settings window's own search, open it.
 - **Articles hide by design and client**: an article about BetterBags Next's vendor does not show with the classic
   bags, one about the Warbank not on a client without one.
-- **The text is iterated with the `writer` agent** (`~/.config/ask/agents/writer.md`), in a loop (§3).
+- **The `writer` agent originates every piece of text** (asked, 2026-11-17: "have the writer originate the text, and
+  you can double check it factually, BUT DO NOT CORRECT its copy/text. it's critical you do not write or suggest text,
+  but instead if needed, update explainers or code pointers"). The coding agent writes briefs (what an article covers,
+  where the facts are in the code, facts already checked) and checks the writer's facts against the code; it never
+  writes, edits or suggests wording, not even a corrected sentence. A wrong fact goes back to the writer as a corrected
+  brief (§3). The earlier text, drafted by the coding agent and rewritten by the writer, was rejected ("it's all wrong in
+  multiple places, gets and get, confusing as hell structure to sentences").
 - **`tools/translate` is not run** for the new strings.
 - **The tree keeps every group open** (asked: "expand and keep expanded, all the help headers on the left"); its
   headings fold nothing.
+- **A subtitle is a noun phrase** of at most eight words, never a sentence (the same request).
 - **A title is one to three words** (asked: "titles should be 1, 2, MAYBE 3 words max. they are titles, not
   descriptions"): it names the article; its summary describes it. Each title is its own. The longer titles they had
   are kept among their keywords and questions, so a search for those words still finds them.
@@ -61,8 +68,8 @@ shown change (the bags switched) or an article is defined.
 line). `spec/help/content_spec.lua` checks every file. A search example is a raw string, never `L:G`: it is typed as is.
 
 **80 articles in 11 groups**: Getting Started (`start.lua`), Your Bags (`bags.lua`), BetterBags Next (`next.lua`),
-Search (`search.lua`), Categories (`categories.lua`), Selling and Depositing (`automation.lua`), Bank and Warbank
-(`bank.lua`), Appearance (`appearance.lua`), Profiles and Settings (`profiles.lua`), Other Addons
+Search (`search.lua`), Categories (`categories.lua`), Automation (`automation.lua`), Bank and Warbank
+(`bank.lua`), Appearance (`appearance.lua`), Profiles and Settings (`profiles.lua`), Integrations
 (`integrations.lua`), Troubleshooting (`troubleshooting.lua`). Coverage (`spec/integration/help_coverage_spec.lua`, on
 the whole addon): every setting of the catalog is in some article's `settings`; every page and tab of the settings
 window, with either design, in some article's `pages`; every `open` names a page and tab that exist and every
@@ -81,11 +88,19 @@ matching some.
 
 | Field | Weight | b | What it holds |
 |---|---|---|---|
-| title | 4 | 0.5 | The title |
-| keywords | 6 | 0.75 | Its keywords |
-| questions | 0.75 | 0.9 | Its questions |
-| headings | 1.5 | 0.5 | Its headings |
+| title | 6 | 0.5 | The title |
+| keywords | 4 | 0.75 | Its keywords |
+| questions | 3 | 0.9 | Its questions |
+| headings | 0.75 | 0.5 | Its headings |
 | body | 0.4 | 0.9 | Its summary, paragraphs, lists, steps, tips, warnings, examples |
+
+The weights were tuned again when the text was written from the code (§3): a grid over the five weights and the body's
+b, scored on rounds 1 and 2 alone. The new text says what the code does in the game's own names, which are seldom a
+player's words, so a player's questions now count for more. The body keeps 0.4: the grid preferred 0.2, which on the
+final text finds as many first on round 3 and 0.3 points more among the first three, but a field weighted that low
+barely saturates (the rule breaks between 0.24 and 0.23), so a body repeating one word typed outranked one matching every
+word typed (`spec/help/search_spec.lua`, "ranks the document matching every word above one matching a word many
+times"), against the rule above.
 
 What each word typed searches for (`indexProto:items`), each with how much a match counts: its stem (1); while it is
 still being typed (no space after it), longer words it starts (0.6 to 0.9, more for less left); its synonyms
@@ -114,25 +129,74 @@ words were tuned against; round 3 was not, and measures the search:
 | 3 (held out) | 76.8% | 89.0% | 0.837 |
 | 3, after the titles were shortened | 77.0% | 88.8% | 0.838 |
 | 3, after the headings were made titles | 77.5% | 89.5% | 0.841 |
+| 3, the text written from the code, old weights | 71.0% | 85.0% | 0.795 |
+| 3, the text written from the code, weights tuned again | 73.0% | 86.5% | 0.806 |
 
 On round 3, a question, a short search and a search with a typo find their article first about 89% of the time; a
 symptom ("my bags keep...") 56%, WoW slang 60%, and those are most of what misses: a word search cannot tell what a
-symptom means. `spec/help/quality_spec.lua` keeps every round at least what it found when the help shipped,
-less a little. To tune again: tune against rounds 1 and 2, have the writer write a new held-out round (never shown its
+symptom means. `spec/help/quality_spec.lua` keeps every round at least what it finds now, less a little (the floors were
+set again with the text written from the code: the queries were written from the earlier text's titles, summaries and
+headings, so they favour its words, and the text players now read was worth that cost). To tune again: tune against rounds 1 and 2, have the writer write a new held-out round (never shown its
 misses), measure on it, and add it to `queries.tsv` and the floors. Never tune against round 3.
 
 `Snippet` returns the part of an article's text around the words matched, with where they are, for a result card.
 
 ## 3. Writing the articles
 
-Facts come from the code, never from memory: the settings window's every page, tab, section and setting dumped from
-the whole addon (`spec/helpers/whole_addon.lua`), the catalog's names and descriptions, the README, the rules files,
-and the code where those disagree or say nothing (the menus, header buttons, tooltips, what a click does). The text
-went through the `writer` agent in a loop: each group's prose extracted as labelled pieces, rewritten by the writer
-(keeping every name of a setting, page, tab, button and command as written, and every fact), applied, and every
-changed piece checked against its draft for a changed fact, which was read and fixed when flagged. Keywords and
-questions came from the writer too: ten phrases a player would type per article, short ones as keywords, questions and
-longer ones as questions; then the concepts the tuning rounds showed missing (§2).
+The `writer` agent originates the text in its authoring mode ("Authoring from sources" in
+`~/.config/ask/agents/writer.md`, added for this): from a brief and the code, never from a draft. The coding agent does
+not write, edit or suggest wording; it writes briefs and checks facts. The working files were under `/tmp/help_author/`
+(throwaway); the process:
+
+1. **A shared brief** for every batch: where the text appears, the game clients and how to name them, facts that hold
+   across articles (each checked in the code, with its lines), the scope and level of detail (state what a player needs;
+   leave out a detail whose exceptions cannot be stated briefly), the reference files (the exact in-game names, the
+   settings window dumped from the whole addon, an index of every article's scope), the markup an article comes back in,
+   and the limits (titles and headings of one to three words that begin with neither an article, a preposition nor a
+   verb form; subtitles of at most eight words; strings `tools/translate` can read).
+2. **An article's own brief**: its group, where it shows (design, client), its scope, the settings and pages it must
+   explain (`settings`, `pages`), the code and rules files to read, and the facts earlier checks established.
+3. **The writer authors** each article as markup (`title:`, `subtitle:`, `heading:`, `paragraph:`, `list:`, `steps:`,
+   `tip:`, `warning:`, `example:` with `finds:`, `setting:`, `link:`, `see:`), with a model of its facts citing
+   file and line for each. A converter turns the markup into the article's `title`, `summary` and `body`, keeping its
+   data (`keywords`, `questions`, `related`, `settings`, `pages`, `design`, `shown`); it fills a setting's bag only when
+   the setting has one bag (from the real `SettingsCatalog`), and refuses anything a spec would.
+4. **A fact check** by a sub-agent reads every claim against the code and marks each problem MAJOR (a player following
+   the article gets another result in normal play) or MINOR (an edge a player rarely meets, or a detail incomplete but
+   not misleading), stating the true fact without wording for the article. Each fact becomes part of the article's
+   brief, or of the shared brief when it recurs, and the writer authors the article again from the corrected brief.
+   A checker's finding that contradicts an earlier one is settled in the code by the coding agent before it is used
+   (one was wrong: Recent Items comes before pinned sections in the classic bags, `data/items.lua` 946-947).
+5. **Stopping**: an article is done when a check finds nothing, or when, after one round given only minor findings, the
+   next check again finds only minor ones; what those leave is listed below. 23 rounds of writing ran for the 80
+   articles, the 11 group titles and the Help page's own strings.
+
+**Minor findings left in the text** (accepted under the stopping rule; each is an edge the article does not mention):
+the guild bank article puts Close among the Plain theme's menu entries (it stays in the header); move-category names
+only the bank's body as a drop that assigns a group; confirm-sale says Confirm Auto Sell is on whenever Auto Sell is
+turned on (it stays off for a category where it was turned off); category-rule and wrong-category leave out that Group
+By is hidden for plugin and equipment set categories, and wrong-category that the Search Results preview runs on the
+categories items show in now; recent-items' warning about the BetterBags Next bank's title sort without SortBags leaves
+out the Plain bag button; shopping-list leaves out needed items the player cannot buy, and where a right-click sends the
+card on another tab; next-dragging ties bank drops to Enable Groups (the backpack's setting); bag-menu, sorting and
+section-order leave out conditions on classic clients without SortBags, and the bag-by-bag views; dropping says the
+classic Shift-drop "always" adds the item though it states the equipment set refusal, and that a left-click with an item
+on the classic bag button opens the Create Category prompt (a Shift-left-click toggles the search). `help/README.md`,
+authored the same way, was accepted with minor imprecisions its fourth check found: it calls `Show` a method of
+`NextHelpArticle` (it is the view's), says `Related` keeps definition order (it keeps the article's `related` order),
+lists keywords and questions as optional (content_spec needs six together), and simplifies how a word's stem, prefix and
+synonym matches combine and how compound halves count.
+
+**Bugs in the addon the checks found**, outside the help and not fixed: QuickFind never selects the bank or Warbank tab
+holding an item (it calls `SwitchToBank`, `SwitchToCharacterBankTab` and `SwitchToAccountBank`, which nothing defines)
+and lists bank items only while the bank is open; the reagent bank move on a section right-click cannot be reached from
+any bank view; a double click on the vendor's red destroy card destroys two stacks; `rarity %= x` raises "Unknown
+operator"; Flash Stacks (`newItemFlash`) is read by nothing; New Profile makes the new profile active before asking, so
+Cancel leaves the character on it, and Copy Profile switches whichever button is chosen; Enable Enter to Make Category
+is hidden in BetterBags Next but still acts there; a search rule with a syntax mistake shows 0 results and can still be
+applied; Masque follows the classic Bag Theme even in BetterBags Next, where that setting is not shown; the gamepad
+radial's Character entry does not reopen a BetterBags backpack B closed; `keyring.md` leaves out The Burning Crusade
+Anniversary, which shows the keyring.
 
 A new feature needs its article, or its settings in an existing one's `settings`: the coverage spec fails on a setting
 or a settings page no article explains.
@@ -179,6 +243,24 @@ row bound to its bag, which changes it (made once per setting and bag); a change
 again (`RefreshSettings`), as a settings page does, since one may follow another (Compact Sections is used only with
 Section Columns over 1). A theme applied lays the article and the results out again in its fonts. Under them, its related articles shown, as
 links, and the articles before and after it in the tree as `NextSettingsCards` cards (next-settings.md §3).
+
+What an article draws is read when it shows, for the bags and client in use, as the settings window reads its own: a
+link to an article only while that article is shown; a link to a settings page only while the page is shown, and to a
+tab only while the tab is (`pages:IsShown`, `pages:ShownTabs`, after the page's `choose`: the Categories page's list
+chooses a category, and so its tabs, before the window reads them), since the window opens its first page or tab in
+place of one it does not show; a setting only while the settings window shows its row (`pages:ShowsSetting`: a tab shown now, a
+section and a row for the bags in use and not hidden; Show Keystone Level is retail's); and under Related Articles only
+the related articles its body does not link already. Found by the review of the text written from the code: Guild Bank
+links opened the General page with the classic bags and on Classic Era, a Currencies tab link the Tracked tab on Classic
+Era, category tab links the Settings tab with no category of the player's own, and 67 of 77 articles listed their links
+twice (`spec/next/settings/help_spec.lua`, "leaves out a link to a settings page or tab not shown now", "leaves out a
+setting the settings window does not show now", "lists its related articles shown"). Every article was opened on every
+client and design after the fix: no heading is left with nothing under it. Because what it draws is read when it
+shows, the view reads the article again whenever it comes back into view (`fillArticle` with `again`, keeping where it
+was scrolled), not only when another article is chosen (a second review found a link drawn or left out by what the
+Categories page chose stayed so on returning). A setting row is cached per setting and bag, and whether it shows is
+checked before the cache. Not changed: Enable Enter to Make Category is left out of articles with BetterBags Next, as
+the settings window leaves it out, though the setting still acts there (§3, bugs found).
 
 ## 6. Theme keys
 

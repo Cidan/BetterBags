@@ -103,7 +103,7 @@ end
 function help:Page()
   local keywords = { "help", "guide", "faq", "how to", "manual", "documentation", "tutorial" }
   return {
-    id = "help", group = L:G("Help"), title = L:G("Help"), description = L:G("Guides to everything BetterBags does."),
+    id = "help", group = L:G("Help"), title = L:G("Help"), description = L:G("Guides to BetterBags features and settings"),
     keywords = keywords,
     sidebar = function(parent, window) return self:CreateTree(parent, window) end,
     heading = function() return self:Heading() end,
@@ -141,9 +141,9 @@ function help:Heading()
       return article.title, article.summary
     end
   elseif s.view == "results" then
-    return L:G("Search Help"), format(L:G("Articles that match \"%s\""), strtrim(s.query))
+    return L:G("Search Results"), format(L:G("Help articles matching \"%s\""), strtrim(s.query))
   end
-  return L:G("Help"), L:G("Guides to everything BetterBags does. Search them, or pick a topic on the left.")
+  return L:G("Help"), L:G("Searchable guides to BetterBags")
 end
 
 -- ChosenKey returns the key of the tree's row for what the page shows: the article's, else Help Home's.
@@ -667,7 +667,7 @@ function help:CreateView(parent, owner)
   view.prompt:SetText(L:G("What do you need help with?"))
   view.lead = style:CreateText(view.hero, H.LeadFont)
   view.lead:SetJustifyH("CENTER")
-  view.lead:SetText(L:G("Search all guides, or pick a topic below."))
+  view.lead:SetText(L:G("Search all articles, select a card below, or choose a topic from the sidebar."))
   view.home = CreateFrame("Frame", nil, frame)
   view.popular = style:CreateText(view.home, H.SectionFont)
   view.popular:SetJustifyH("LEFT")
@@ -681,7 +681,7 @@ function help:CreateView(parent, owner)
     onPage = function(ctx, page, tab) settings:Select(page, tab, ctx) end,
   })
   view.search = nextInput:Create(frame, {
-    help = L:G("Search help"),
+    help = L:G("Search help articles"),
     width = function() return style.Theme.Settings.Help.SearchWidth end,
     onChange = function(ctx, text) help:Search(ctx, text) end,
     onEnter = function(ctx) view:OpenChosen(ctx) end,
@@ -734,7 +734,7 @@ function viewProto:Style()
   style:SetFont(self.lead, H.LeadFont)
   style:SetFont(self.popular, H.SectionFont)
   style:SetFont(self.empty, H.TextFont)
-  local title = L:G("Popular Topics")
+  local title = L:G("Featured Articles")
   self.popular:SetText(style.Theme.Settings.Content.TitleUpper == false and title or string.upper(title))
   controls:Paint(self.halo, H.Halo)
   self:paintCards()
@@ -1031,7 +1031,7 @@ function viewProto:fillResults(query, animate)
   self.shownCards = shown
   self.cursor = nil
   self.empty:SetShown(#found == 0)
-  self.empty:SetText(format(L:G("No articles match \"%s\". Try other words, or pick a topic on the left."),
+  self.empty:SetText(format(L:G("No articles match \"%s\". Try different words, or choose a topic from the sidebar."),
     strtrim(query)))
   self:layoutResults(false)
   -- A new search shows from its top, as the window's own search does, and so does one coming into view.
@@ -1067,18 +1067,22 @@ function viewProto:layoutResults(place)
   self.results.box:FullUpdate(true)
 end
 
--- fillArticle shows an article from its top.
+-- fillArticle shows an article from its top, or where it was scrolled when it is read again (what it draws is read
+-- when it shows: coming back into view, it may draw another link or setting).
 ---@private
 ---@param id string
 ---@param ctx? Context
-function viewProto:fillArticle(id, ctx)
+---@param again? boolean The article shown, read again.
+function viewProto:fillArticle(id, ctx, again)
   local article = articles:Get(id)
   if article == nil then
     return
   end
   self.article:Show(article, ctx)
   self:layoutArticle()
-  self.articleScroll.box:ScrollToOffset(0, true)
+  if not again then
+    self.articleScroll.box:ScrollToOffset(0, true)
+  end
 end
 
 -- layoutArticle lays the article shown out at the view's width.
@@ -1168,8 +1172,8 @@ function viewProto:Refresh(ctx)
   local newArticle = target == "article" and self.articleId ~= s.articleId
   if target == "results" then
     self:fillResults(s.query, not appearing)
-  elseif target == "article" and newArticle then
-    self:fillArticle(s.articleId, ctx)
+  elseif target == "article" and (newArticle or appearing) then
+    self:fillArticle(s.articleId, ctx, not newArticle)
   elseif target == "home" then
     self:fillHome()
   end
