@@ -256,6 +256,7 @@ integrations\consoleport.lua
 integrations\gamepad.lua
 integrations\pawn.lua
 integrations\professionshoppinglist.lua
+integrations\tradeskillmaster.lua
 integrations\masque.lua
 integrations\simpleitemlevel.lua
 integrations\quickfind.lua

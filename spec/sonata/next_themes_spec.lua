@@ -203,7 +203,7 @@ describe("BetterBags Next's shipped themes", function()
     local keys = { "settingsButton", "closeButton", "anchorButtonFree", "anchorButtonShown", "anchorButtonLocked",
       "bagsButton", "sizeButtonFull",
       "sizeButtonSmall", "bankTabsButton", "depositButton", "depositGoldButton", "withdrawGoldButton",
-      "filterButton", "sellJunkButton", "repairAllButton", "guildRepairButton" }
+      "filterButton", "sellJunkButton", "repairAllButton", "guildRepairButton", "tsmButton" }
     local files = {}
     for _, key in ipairs(keys) do
       local spec = icons[key]
@@ -1465,7 +1465,7 @@ describe("BetterBags Next's shipped themes", function()
       for _, name in ipairs({ "IconSettings", "IconClose", "IconAnchor", "IconAnchorShown", "IconLock", "IconBags", "IconSmall",
         "IconFull", "IconBankTabs",
         "IconDeposit", "IconWithdraw", "IconDepositGold", "IconWithdrawGold", "IconFilter", "IconSellJunk", "IconRepair",
-        "IconGuildRepair", "IconChevron", "IconBack", "IconCheck", "IconSearch", "IconPlus" }) do
+        "IconGuildRepair", "IconSwap", "IconChevron", "IconBack", "IconCheck", "IconSearch", "IconPlus" }) do
         assert.is_true(theme.Textures[name]:find("papercraft", 1, true) ~= nil, name)
       end
     end)
@@ -1764,8 +1764,9 @@ describe("BetterBags Next's shipped themes", function()
           assert.are.equal("\137PNG\r\n\26\n", data:sub(1, 8), name .. ": " .. file)
         end
       end
-      -- Its sort block gave way to the anchor button's three (docs/next-bag-anchor.md).
-      assert.are.equal(30, count)
+      -- Its sort block gave way to the anchor button's three (docs/next-bag-anchor.md); the vendor's TradeSkillMaster
+      -- button's came after (tradeskillmaster.md).
+      assert.are.equal(31, count)
     end)
 
     -- Asked: "the bags obviously need the star trek beam down, and beam up animation for appearing and closing".

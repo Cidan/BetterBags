@@ -94,6 +94,8 @@ sonataNext:RegisterTheme({
     IconSellJunk = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\selljunk.png",
     IconRepair = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\repair.png",
     IconGuildRepair = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\guildrepair.png",
+    -- The vendor's TradeSkillMaster button: two arrows passing, one window for the other.
+    IconSwap = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\swap.png",
     -- The controls' glyphs: a dropdown's chevron, a menu's check, the search box's magnifier, a plus.
     IconChevron = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\chevron.png",
     IconBack = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\back.png",
@@ -428,6 +430,7 @@ sonataNext:RegisterTheme({
         sellJunkButton = { Texture = "IconSellJunk" },
         repairAllButton = { Texture = "IconRepair" },
         guildRepairButton = { Texture = "IconGuildRepair" },
+        tsmButton = { Texture = "IconSwap" },
       } },
   },
 

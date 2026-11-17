@@ -6,6 +6,7 @@ paths:
   - "frames/{bag,item,tabs}.lua"
   - "core/{events,async,database,bagsystem}.lua"
   - "integrations/quickfind.lua"
+  - "integrations/tradeskillmaster.lua"
   - "util/serialization.lua"
 ---
 # State Management and Architecture Patterns
@@ -260,6 +261,24 @@ while it shows need nothing. Hand the Blizzard frame it stood in for back (`Give
 nil, so every reader takes the path it takes when that part does not exist (the classic design's). Make it only when first
 switched on, in the design's scope, so it unhooks with the design. Refuse the switch wherever a frame would change hands
 open, as the design switch does.
+
+## Driving Another Addon That Offers No API
+**Problem**: an integration needs another addon to do something its API does not offer (TradeSkillMaster shows its vendor
+window only from its own buttons; `TSM_API` only says whether it is up).
+**Solution**: press the addon's own control rather than redo what it does: find the frame it made (TSM marks every frame
+with its widget extensions, `TSMSetScript`) and `Button:Click()` it, so its own handler runs with its own checks and saves
+its own state. Read its saved variables only to know its choice, never write them (TSM's table is protected). Follow its
+state through what its API does offer, comparing each frame while it matters, when it has no event. Model the addon from
+its source in a spec helper, citing each piece (`spec/helpers/tsm.lua`), and test against the model. Then write down
+which internals are relied on and from which version (tradeskillmaster.md §2, §6).
+
+## Another Addon Writes What We Hold
+**Problem**: BetterBags writes a value another addon also writes (the merchant frame's width in Blizzard's panel layout,
+which TradeSkillMaster rewrites as it switches): restoring what was read before overwrites the other addon's value, and
+the other addon's write undoes ours.
+**Solution**: keep what was written as it reads back, notice when it differs (the other addon wrote since), adopt the new
+value as the one to give back and write ours again, and give back only what is still ours (`NextUIPanels:Retake`,
+`giveBack`; next-uipanels.md §27c).
 
 ## Debugging Strategies
 1. **Trace the call chain**: End symptom → query function → filter variable → where filter is set → events → switch point

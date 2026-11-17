@@ -732,6 +732,24 @@ end
 function WidgetMethods:IsEnabled()
   return self._enabled ~= false
 end
+-- Button:Click(button, isDown) (SimpleButtonAPIDocumentation.lua; warcraft.wiki.gg API Button:Click): a virtual click,
+-- its arguments ("LeftButton" and false unless given) passed to the PreClick, OnClick and PostClick scripts. It does
+-- nothing on a disabled button, or on one already being clicked; the wiki names no other condition.
+function WidgetMethods:Click(button, isDown)
+  if not self:IsEnabled() or self._clicking then
+    return
+  end
+  button = button or "LeftButton"
+  isDown = isDown == true
+  self._clicking = true
+  for _, script in ipairs({ "PreClick", "OnClick", "PostClick" }) do
+    local fn = self:GetScript(script)
+    if fn then
+      fn(self, button, isDown)
+    end
+  end
+  self._clicking = nil
+end
 -- SetEnabled(enabled) (SimpleButtonAPIDocumentation.lua).
 -- Button:SetMotionScriptsWhileDisabled(motionScriptsWhileDisabled) / GetMotionScriptsWhileDisabled()
 -- (SimpleButtonAPIDocumentation, every client): OnEnter and OnLeave fire on a disabled button too.

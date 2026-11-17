@@ -12,6 +12,7 @@ The integrations module provides seamless compatibility with popular World of Wa
   - [Pawn](#pawn-pawnlua)
   - [SimpleItemLevel](#simpleitemlevel-simpleitemlevellua)
   - [Profession Shopping List](#profession-shopping-list-professionshoppinglistlua)
+  - [TradeSkillMaster](#tradeskillmaster-tradeskillmasterlua)
   - [QuickFind](#quickfind-quickfindlua)
 - [Integration Architecture](#integration-architecture)
 - [Usage](#usage)
@@ -197,6 +198,30 @@ EventRegistry "ProfessionShoppingList.OnTrackedRecipesChanged"
 - Retries on `ADDON_LOADED` when Profession Shopping List loads after BetterBags
 - Sends `shoppingList/Changed` when the tracked recipes change
 
+### TradeSkillMaster (`tradeskillmaster.lua`)
+
+Swaps BetterBags Next's vendor and TradeSkillMaster's own vendor window, one at a time, as TSM swaps its window with
+Blizzard's merchant frame (`.claude/rules/tradeskillmaster.md`, issue #1315).
+
+**Features:**
+- At a vendor, whichever TSM saved last opens: TSM's window alone, or BetterBags Next's vendor
+- A TradeSkillMaster button on the vendor opens TSM's window, and the vendor slides out with the visit still open
+- TSM's own WoW UI button brings the vendor back; closing TSM's window ends the visit
+
+**Key Components:**
+```lua
+-- TSM's API: only whether its vendor window is up
+TSM_API.IsUIVisible("VENDORING")
+-- TSM's own, read as v4.15.6 has them (it has no API to show the window)
+TradeSkillMasterDB["g@ @vendoringUIContext@showDefault"] -- false: its window is its choice
+-- its switch button on MerchantFrame (a Button carrying TSMSetScript), clicked to open its window
+```
+
+**Behavior:**
+- Nothing without TSM: `TSM_API` absent, the button hidden, nothing followed
+- While a vendor is open it looks at TSM's window every frame (`Follow`, `Look`) and tells the vendor what changed
+- `NextUIPanels:Retake` keeps the merchant frame out of Blizzard's panel layout after TSM writes its width there
+
 ### QuickFind (`quickfind.lua`)
 
 Makes the items in the backpack and bank findable from the QuickFind addon (`.claude/rules/quickfind.md`).
@@ -253,7 +278,7 @@ end)
 
 Integrations are automatic and require no configuration:
 
-1. **Install the third-party addon** (ConsolePort, Masque, Pawn, SimpleItemLevel, Profession Shopping List, or QuickFind)
+1. **Install the third-party addon** (ConsolePort, Masque, Pawn, SimpleItemLevel, Profession Shopping List, TradeSkillMaster, or QuickFind)
 2. **Load BetterBags** - Integration automatically detects and activates
 3. **Check chat** - Confirmation message appears when integration loads
 
