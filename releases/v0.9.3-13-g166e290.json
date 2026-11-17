@@ -1,0 +1,17 @@
+{
+  "id": 1794888330,
+  "version": "v0.9.3-13-g166e290",
+  "channel": "alpha",
+  "date": "2026-11-17",
+  "from": "4a96eacd8476d4303be079343e7f92ad6bd78647",
+  "to": "166e290c0874a31285c634bd7363bdfb40843e9a",
+  "headline": "BetterBags Next's vendor now takes turns with TradeSkillMaster's vendor window instead of opening together.",
+  "entries": [
+    {
+      "category": "Fixed",
+      "title": "BetterBags Next's vendor and TradeSkillMaster take turns",
+      "details": "With TradeSkillMaster loaded, BetterBags Next's vendor and TSM's window no longer open together. A new TradeSkillMaster header button switches to TSM and returns docked items to your backpack, TSM's WoW UI button brings the vendor back, and panes like the Character pane stay aligned.",
+      "clients": []
+    }
+  ]
+}
