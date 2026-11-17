@@ -1,0 +1,19 @@
+{
+  "id": 1794874075,
+  "version": "v0.9.3-9-g12b976b",
+  "channel": "alpha",
+  "date": "2026-11-17",
+  "from": "1d1299a1872e2b4dc4358d9fa9a0b68ec1cd14fd",
+  "to": "12b976b5325c6f32c5a33b5d9e46b2c972895ca0",
+  "headline": "Bag windows now support Blizzard's Gamepad UI in WoW: Forever.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "Blizzard Gamepad UI support in bag windows",
+      "details": "Backpack, bank, and Next's vendor and guild bank windows now work with Blizzard's Gamepad UI, with d-pad navigation, triggers, input hints, and radial menu. A buys or sells on vendor cards, X right-clicks, and B returns held items or closes; gamepad mode pauses in combat and switches live with mouse.",
+      "clients": [
+        "Forever"
+      ]
+    }
+  ]
+}
