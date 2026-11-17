@@ -305,7 +305,9 @@ section dragged out of a panel returns to the panel's strata (next-drag.md §7).
   currency.md §4.
 - **Tabs** (`next/tabs.lua`): the backpack's groups as tabs stacked down the body's left edge,
   sticking out over the feather like bookmarks. The selected one is brighter, with a gold bar that
-  glides to it; a hovered one slides out a little. Left click switches group (the same data, drawn
+  glides to it; a hovered one slides out a little. Each is drawn from the theme's `Tabs`; Default's are solid boxes in
+  the search box's fill, edged in lavender, names in lavender, the selected one's edge gold, because players did not
+  see them beside a small panel (next-themes-shipped.md §8, Default). Left click switches group (the same data, drawn
   for that tab), right click opens the group menu (rename, delete) and "+" creates a group, both
   through the classic backpack behavior's dialogs. Hidden when groups are off. Deleting the group shown
   switches to Backpack, drawn; the delete's confirmation recalculates the bag so its categories are on

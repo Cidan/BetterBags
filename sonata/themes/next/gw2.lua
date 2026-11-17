@@ -305,6 +305,8 @@ sonataNext:RegisterTheme({
   Tabs = {
     Fill = { Texture = "Tab", TexCoords = TAB, Color = "TabIdle" },
     SelectedFill = { Texture = "Tab", TexCoords = TAB, Color = "White" },
+    Edge = false,
+    SelectedEdge = false,
     Glow = { Color = "LightHeader", Drop = 0.25, Pulse = 0.6 },
     Indicator = { Color = "Accent", Width = 3 },
   },

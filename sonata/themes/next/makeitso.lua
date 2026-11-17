@@ -312,6 +312,8 @@ sonataNext:RegisterTheme({
   Tabs = {
     Fill = { Texture = "LcarsTab", Color = "TabGlass" },
     SelectedFill = { Texture = "LcarsTab", Color = "LcarsOrange" },
+    Edge = false,
+    SelectedEdge = false,
     Indicator = false,
     Glow = { Color = "LcarsPeach", BlendMode = "ADD", Drop = 0.35, Pulse = 0.8 },
   },

@@ -127,3 +127,7 @@ reasoning about it can suggest a cause; it does not establish one.
   its cursor is on and its kind, the item X uses, each bag window's state), and the module's methods return what they did
   for the call trace. Added with the gamepad support (issue #1180), built with no Forever client here, so a player's dump
   can show where Blizzard's cursor and window list stand. Not captured yet.
+- **What each merchant update did to buyback** (next-vendor.md §10b): `NextVendorPanel:NoteBuyback` returns what it saw
+  on each `MERCHANT_UPDATE` (`"sold"`, `"bought back"`, `"unchanged"`, `"hidden"`), so a capture of a vendor
+  visit shows which updates flashed the Buyback tab. Added with that flash (issue #1277), which takes a sale to change
+  buyback with that event, as Blizzard's merchant frame does (its source); not captured yet.

@@ -141,7 +141,10 @@ sonataNext:RegisterTheme({
   },
 
   Tabs = {
+    Fill = "Tab",
     Fade = 0.6,
+    Edge = false,
+    SelectedEdge = false,
     Glow = { Color = "Seal", BlendMode = "BLEND", Drop = 0.15, Pulse = 0.35 },
     Indicator = { Color = "Seal" },
   },

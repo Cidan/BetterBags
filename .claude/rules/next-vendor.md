@@ -214,6 +214,22 @@ the sell cursor). So the frame must stay shown, on tab 1, and never be seen:
     in the vendor's order. Footer: the player's gold and the vendor's currencies
     (`C_MerchantFrame.GetMerchantCurrencies`, retail).
   - **Buyback:** what was sold, newest first, in one "Sold" section.
+    - **A sale flashes its tab** (issue #1277: players who could not see the tab beside the panel asked for buyback to
+      be added, or switched the addon off to buy back). `OnShowing` reads what buyback holds (`buybackKeys`: each
+      entry by its texture, quantity and price, which are read as soon as it is sold; its name and link can arrive
+      later) and `NoteBuyback`, on every `MERCHANT_UPDATE` before the draw, reads it again: more entries, or as many but
+      not the same, is a sale (only a sale adds to buyback; it keeps the last 12, `BUYBACK_ITEMS_PER_PAGE`, the oldest
+      dropped, so a full buyback changes without growing, by one entry or by several sold between two looks: Retail's
+      Sell Junk sells everything at once, `C_MerchantFrame.SellAllJunkItems`), and the rail flashes the tab
+      (`NextTabs:Pulse`, the theme's `Tabs.Glow.Pulse`, as a tab that received a dragged section does). Fewer is a
+      buyback. Any way of selling (a right click, a drop, a section, Sell Junk, Auto Sell) changes buyback, and
+      Blizzard's merchant frame draws its last sold item again on `MERCHANT_UPDATE` (`MerchantItemBuybackButton_OnLoad`
+      registers it), which is why the vendor reads it there; not captured in game. It returns what it saw, for the call
+      trace: `"sold"`, `"bought back"`, `"unchanged"` or `"hidden"` (the panel is not shown; it looks again as it opens).
+      It flashes on Buyback too. A first version took only a full buyback moved down by exactly one as a sale: two sold
+      between looks did not flash (found by the bug review). Left as they are: twelve entries alike (texture, quantity
+      and price) sold again read as unchanged, and a buyback with a sale in one update reads as a buyback; neither is
+      seen as anything but one flash less.
   - **Repair:** "Equipped" and "In your bags", each damaged item with its durability as a bar along
     the icon (green to red) and what repairing it costs; the footer the total.
 - **Search:** a box of its own, always shown, that searches the vendor's items in their own index
@@ -407,7 +423,9 @@ Buy staying open with no number); the dialog itself in `spec/next/controls/panel
 `spec/next/settings/window_spec.lua` (settings closing leaves the vendor's dialog open),
 `spec/next/vendor_spec.lua` (the panel,
 no drags, its search box; header buttons per client, shown and enabled per vendor, the title's
-room, the game rule; opening, tabs and footers, button reuse, updates; Sell Junk on both clients,
+room, the game rule; opening, tabs and footers, button reuse, updates; "flashing Buyback as something is sold": a
+sale, a full buyback moved down by one and by two, nothing sold, a buyback, once a sale, a name arriving later, only
+while shown, each visit starting from what buyback holds then; Sell Junk on both clients,
 three rounds, stopping on close; repairs and their tooltips; the filter; selling by dropping and
 Blizzard's refund question; every way of closing ending the visit once; the takeover),
 `spec/next/content_spec.lua` ("sections of other buttons"), `spec/tooltip_spec.lua` ("merchants and

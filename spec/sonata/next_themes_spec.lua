@@ -2207,4 +2207,85 @@ describe("BetterBags Next's shipped themes", function()
       assert.are.equal(papercraft.Title.X, papercraft.Compact.TextEnd, "the stroke's inset on both sides")
     end)
   end)
+
+  -- Tabs a player sees (issue #1277: players missed the vendor's Buyback tab beside its panel, and asked for buyback to be
+  -- added): Default's are drawn as its search box was when it was "very difficult to see" (next.md §3): a solid fill
+  -- lighter than the body, the small panel's lavender border round each, gold round the selected one, names in lavender.
+  describe("tabs that stand out", function()
+    local function luminance(c)
+      local function channel(v)
+        if v <= 0.03928 then return v / 12.92 end
+        return ((v + 0.055) / 1.055) ^ 2.4
+      end
+      return 0.2126 * channel(c[1]) + 0.7152 * channel(c[2]) + 0.0722 * channel(c[3])
+    end
+    -- contrast is two colors' contrast ratio (WCAG 2).
+    local function contrast(a, b)
+      local la, lb = luminance(a), luminance(b)
+      return (math.max(la, lb) + 0.05) / (math.min(la, lb) + 0.05)
+    end
+
+    local OWN = { Default = true, Ember = true, Quiet = true }
+
+    for key in pairs(OWN) do
+      it(key .. " draws its tabs in its search box's fill, solid, edged in lavender and the selected one in gold", function()
+        local t = sonataNext:Resolve(key)
+        local T = t.Tabs
+        assert.are.equal("SearchFill", T.Fill)
+        assert.are.equal("TabSelected", T.SelectedFill)
+        assert.are.equal(1, T.Fade, "no fading out under its name")
+        assert.are.same({ Color = "Lavender", Alpha = 0.35, Size = 1 }, T.Edge)
+        assert.are.same({ Color = "Gold", Alpha = 0.9, Size = 1 }, T.SelectedEdge)
+        assert.are.equal("Lavender", t.Fonts[T.Font].Color)
+        assert.are.equal("White", t.Fonts[T.SelectedFont].Color)
+        local fill = t.Palette[T.Fill]
+        assert.are.equal(1, fill[4], "opaque over the world beside a small panel")
+        assert.is_true(luminance(fill) > luminance(t.Palette.Body), "lighter than the body")
+        assert.is_true(contrast(t.Palette.Lavender, fill) >= 4.5, "its name read against it")
+      end)
+    end
+
+    it("edges Default's tabs as its small panel's border", function()
+      local t = sonataNext:Resolve("Default")
+      assert.are.equal(t.Panel.Edge.Color, t.Tabs.Edge.Color)
+      assert.are.equal(t.Panel.Edge.Alpha, t.Tabs.Edge.Alpha)
+    end)
+
+    -- Every other theme draws its own tabs as it did: each sets what it would otherwise take from Default.
+    it("leaves every other theme's tabs as they were", function()
+      local was = {
+        ElvUI = { Fill = "Tab", Fade = 1, Edge = "Border@1", SelectedEdge = "Accent@1", Font = "Gold" },
+        Frost = { Fill = "Tab", Fade = 0.35, Edge = "Ice@0.35", SelectedEdge = "Gold@0.8", Font = "Text" },
+        GW2 = { Fill = "Tab", Edge = false, SelectedEdge = false, Font = "Muted" },
+        Glitch = { Fill = "Tab", Fade = 1, Edge = "Lavender@0.75", SelectedEdge = "Gold@1", Font = "Text" },
+        Halloween = { Fill = "Tab", Fade = 0.85, Edge = false, SelectedEdge = false, Font = "PumpkinLight" },
+        MakeItSo = { Fill = "LcarsTab", Edge = false, SelectedEdge = false, Font = "LcarsPeach" },
+        Papercraft = { Fill = "TabScrap", Edge = false, SelectedEdge = false, Font = "InkSoft" },
+        Parchment = { Fill = "Tab", Fade = 0.6, Edge = false, SelectedEdge = false, Font = "InkSoft" },
+        Plain = { Fill = "Panel", Fade = 1, Edge = false, SelectedEdge = false, Font = "copy GameFontNormal" },
+        RainyWindow = { Fill = "Tab", Fade = 0.35, Edge = "Rain@0.3", SelectedEdge = "Gold@0.7", Font = "Muted" },
+      }
+      local function edge(spec)
+        return spec and (spec.Color .. "@" .. spec.Alpha) or false
+      end
+      for _, key in ipairs(shipped()) do
+        if not OWN[key] then
+          assert.is_not_nil(was[key], key .. " is listed here")
+          local t = sonataNext:Resolve(key)
+          local T = t.Tabs
+          local art = type(T.Fill) == "table"
+          -- A copied client font takes no color it inherits (NextStyle:makeFont).
+          local font = t.Fonts[T.Font]
+          assert.are.same(was[key], {
+            -- Art's fill is its texture; a color's fades by Fade (art has none).
+            Fill = art and T.Fill.Texture or T.Fill,
+            Fade = (not art) and T.Fade or nil,
+            Edge = edge(T.Edge),
+            SelectedEdge = edge(T.SelectedEdge),
+            Font = font.Copy and ("copy " .. font.Copy) or font.Color,
+          }, key)
+        end
+      end
+    end)
+  end)
 end)

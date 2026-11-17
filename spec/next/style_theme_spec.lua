@@ -75,7 +75,8 @@ describe("NextStyle", function()
 
     it("draws every font as it was", function()
       style:Use(resolved("Default"))
-      for _, name in ipairs({ "Title", "Section", "SectionRecent", "SectionFree", "Count", "Tab", "TabSelected",
+      -- Tab's color changed (below).
+      for _, name in ipairs({ "Title", "Section", "SectionRecent", "SectionFree", "Count", "TabSelected",
         "Footer", "ConfirmTitle", "ConfirmWarning", "ConfirmHint", "Search", "SearchText" }) do
         local a, b = old:Font(name), style:Font(name)
         assert.are.same({ a:GetFont() }, { b:GetFont() }, name)
@@ -123,6 +124,18 @@ describe("NextStyle", function()
       local _, nameSize = style:Font(style.Theme.Vendor.NameFont):GetFont()
       assert.is_true(nameSize >= size)
       assert.is_true(2 * nameSize + size + style.VENDOR_PRICE_RAISE <= style.ICON)
+    end)
+
+    -- Changed since v0.7.0 on purpose (issue #1277: players did not see the tabs; next-themes-shipped.md §8, Default):
+    -- each tab a solid box in the search box's fill, edged in lavender, its name in lavender.
+    it("draws its tabs as its search box is, their names in lavender, otherwise as v0.7.0's", function()
+      style:Use(resolved("Default"))
+      assert.are.same(style.Color.SearchFill, style.Color[style.Theme.Tabs.Fill])
+      local a, b = old:Font("Tab"), style:Font("Tab")
+      assert.are.same({ a:GetFont() }, { b:GetFont() })
+      assert.are.same({ unpack(style.Color.Lavender, 1, 3) }, { unpack({ b:GetTextColor() }, 1, 3) })
+      assert.are.same({ a:GetShadowColor() }, { b:GetShadowColor() })
+      assert.are.same({ a:GetShadowOffset() }, { b:GetShadowOffset() })
     end)
   end)
 

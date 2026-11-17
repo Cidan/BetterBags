@@ -76,6 +76,9 @@ object is there; the panels provide the members they use (`Show`, `Hide`, `Toggl
 `behavior.SwitchToGroup`; the bank also `SwitchToBankAndWipe`, `bankTab`, `blizzardBankTab` and
 `behavior.SwitchToBlizzardTab`).
 
+The vendor's tabs are Buy, Buyback and Repair; a sale flashes the Buyback tab (`NoteBuyback` on `MERCHANT_UPDATE`,
+`.claude/rules/next-vendor.md` §10b).
+
 The vendor (`vendor.lua`, `addon.Vendor`) and the guild bank (`guildbank.lua`, `addon.Bags.GuildBank`) stand in for
 Blizzard's merchant and guild bank frames, each while its own switch is on (Enable Vendor Window, Enable Guild Bank
 Window, each on its page's General tab in the settings): `core/bagsystem.lua` switches either off and on at once (`.claude/rules/next-bagsystem.md` §11g). Switched off

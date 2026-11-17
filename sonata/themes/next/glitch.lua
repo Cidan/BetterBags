@@ -263,6 +263,7 @@ sonataNext:RegisterTheme({
 
   Tabs = {
     -- HUD boxes: a solid fill, an edge round each, the selected one lit with dark text.
+    Fill = "Tab",
     Fade = 1,
     Edge = { Color = "Lavender", Alpha = 0.75, Size = 1 },
     SelectedEdge = { Color = "Gold", Alpha = 1, Size = 1 },

@@ -904,6 +904,98 @@ describe("NextVendor", function()
       assert.are.equal("Nothing sold yet", v.emptyText:GetText())
     end)
 
+    -- Players who could not see the Buyback tab asked for buyback to be added (issue #1277): selling flashes it.
+    describe("flashing Buyback as something is sold", function()
+      local function glow(v) return v.tabs:Tab(2).glow end
+      local function sold(n) return { index = n, name = "Sold " .. n, texture = 20 + n, price = n, quantity = 1, isUsable = true } end
+
+      it("flashes Buyback when an item is sold, not as it opens with what was sold before", function()
+        local v = open()
+        eventsRegistered["MERCHANT_UPDATE"](ctx())
+        assert.is_false(glow(v):IsShown())
+        data.buyback = { sold(3), data.buyback[1], data.buyback[2] }
+        eventsRegistered["MERCHANT_UPDATE"](ctx())
+        assert.is_true(glow(v):IsShown())
+        assert.are.equal(style.Theme.Tabs.Glow.Pulse, glow(v):GetAlpha())
+        finishTweens()
+        assert.is_false(glow(v):IsShown(), "a flash, then gone")
+      end)
+
+      it("flashes it when buyback was full and the sale pushed out the oldest", function()
+        local full = {}
+        for n = 12, 1, -1 do table.insert(full, sold(n)) end
+        data.buyback = full
+        local v = open()
+        local after = { sold(13) }
+        for n = 1, 11 do table.insert(after, full[n]) end
+        data.buyback = after
+        assert.are.equal("sold", v:NoteBuyback())
+        assert.is_true(glow(v):IsShown())
+      end)
+
+      it("does not flash it when nothing was sold, or something was bought back", function()
+        local v = open()
+        assert.are.equal("unchanged", v:NoteBuyback())
+        data.buyback = { data.buyback[2] }
+        assert.are.equal("bought back", v:NoteBuyback())
+        eventsRegistered["MERCHANT_UPDATE"](ctx())
+        assert.is_false(glow(v):IsShown())
+      end)
+
+      it("flashes it when several sales pushed the oldest out of a full buyback between two looks", function()
+        local full = {}
+        for n = 12, 1, -1 do table.insert(full, sold(n)) end
+        data.buyback = full
+        local v = open()
+        local after = { sold(14), sold(13) }
+        for n = 1, 10 do table.insert(after, full[n]) end
+        data.buyback = after
+        assert.are.equal("sold", v:NoteBuyback())
+        assert.is_true(glow(v):IsShown())
+      end)
+
+      it("flashes it once for a sale, not again on the next update", function()
+        local v = open()
+        data.buyback = { sold(3), data.buyback[1], data.buyback[2] }
+        assert.are.equal("sold", v:NoteBuyback())
+        finishTweens()
+        eventsRegistered["MERCHANT_UPDATE"](ctx())
+        assert.is_false(glow(v):IsShown())
+        assert.are.equal("unchanged", v:NoteBuyback())
+      end)
+
+      it("reads an entry whose name arrives later as the same entry", function()
+        data.buyback = { { index = 1, texture = 21, price = 1, quantity = 1, isUsable = true } }
+        local v = open()
+        data.buyback = { sold(1) }
+        assert.are.equal("unchanged", v:NoteBuyback())
+        assert.is_false(glow(v):IsShown())
+      end)
+
+      it("looks only while it is shown", function()
+        local v = open()
+        eventsRegistered["MERCHANT_CLOSED"](ctx())
+        finishTweens()
+        data.buyback = { sold(3), data.buyback[1], data.buyback[2] }
+        assert.are.equal("hidden", v:NoteBuyback())
+        assert.is_false(glow(v):IsShown())
+      end)
+
+      it("starts from what buyback holds at each visit", function()
+        local v = open()
+        data.buyback = { sold(3), data.buyback[1], data.buyback[2] }
+        eventsRegistered["MERCHANT_UPDATE"](ctx())
+        finishTweens()
+        eventsRegistered["MERCHANT_CLOSED"](ctx())
+        finishTweens()
+        data.buyback = { sold(4), sold(3), data.buyback[2], data.buyback[3] }
+        eventsRegistered["MERCHANT_SHOW"](ctx())
+        finishTweens()
+        assert.are.equal("unchanged", v:NoteBuyback(), "sold away from this vendor is not a sale here")
+        assert.is_false(glow(v):IsShown())
+      end)
+    end)
+
     it("shows what needs repair, worn and in the bags, and what repairing it all costs", function()
       _G._merchant.canRepair = true
       local v = open()

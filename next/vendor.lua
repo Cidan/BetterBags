@@ -93,6 +93,7 @@ local PROMPTS = { "CONFIRM_PURCHASE_TOKEN_ITEM", "CONFIRM_PURCHASE_ITEM_DELAYED"
 ---@field toBuy NextVendorPurchase[] What the shopping list buys here, as last drawn (profession-shopping-list.md).
 ---@field listOffered boolean Its Shopping List was docked in it this visit (OfferShoppingList).
 ---@field off? boolean Switched off (Deactivate): it answers no merchant, Blizzard's merchant frame shows the vendor.
+---@field buybackKeys? string[] What buyback held when it last looked (NoteBuyback), newest first.
 local vendorProto = nextPanel:Extend({}, 'NextVendorPanel')
 -- A vendor's name can be any length: it is cut short to the room its header buttons leave at either
 -- size (FitTitle).
@@ -289,6 +290,39 @@ function vendorProto:OnTabClicked(ctx, id, button)
   self:Draw(ctx)
 end
 
+-- buybackKeys lists what buyback holds, newest first, each by what is read as soon as it is sold (its name and link can
+-- arrive later).
+---@return string[]
+local function buybackKeys()
+  local keys = {}
+  for _, entry in ipairs(merchant:ReadBuyback()) do
+    table.insert(keys, tostring(entry.texture) .. ":" .. entry.quantity .. ":" .. entry.price)
+  end
+  return keys
+end
+
+-- NoteBuyback flashes the Buyback tab when something was sold since it last looked: buyback holds more, or as many
+-- but not the same (it keeps the last 12, the oldest dropped, and only a sale adds to it). Buying back takes one out.
+-- It returns what it saw: "sold", "bought back", "unchanged", or "hidden".
+---@return string
+function vendorProto:NoteBuyback()
+  if not self.frame:IsShown() then
+    return "hidden"
+  end
+  local was, now = self.buybackKeys or {}, buybackKeys()
+  self.buybackKeys = now
+  if #now < #was then
+    return "bought back"
+  end
+  for i = 1, #now do
+    if now[i] ~= was[i] then
+      self.tabs:Pulse(TAB_BUYBACK)
+      return "sold"
+    end
+  end
+  return "unchanged"
+end
+
 -- TabOrderKey saves the order of the vendor's tabs.
 ---@return string
 function vendorProto:TabOrderKey()
@@ -300,13 +334,14 @@ function vendorProto:GetCurrentTabID()
   return self.tab
 end
 
--- OnShowing sets the vendor up as it opens: its name, the Buy tab, its tabs and header, and a draw
--- once it shows.
+-- OnShowing sets the vendor up as it opens: its name, the Buy tab, its tabs and header, what buyback
+-- holds (NoteBuyback), and a draw once it shows.
 ---@param ctx Context
 function vendorProto:OnShowing(ctx)
   local _ = ctx
   self:SetTitle(UnitName("npc") or L:G("Vendor"))
   self.tab = TAB_BUY
+  self.buybackKeys = buybackKeys()
   self:RefreshTabs()
   self:UpdateHeader()
   self.lastSlotInfo = self.lastSlotInfo or {}
@@ -1051,7 +1086,11 @@ end
 function vendorProto:WatchKind()
   events:RegisterEvent("MERCHANT_SHOW", function(ctx) self:OnMerchantShow(ctx) end)
   events:RegisterEvent("MERCHANT_CLOSED", function(ctx) self:OnMerchantClosed(ctx) end)
-  events:RegisterEvent("MERCHANT_UPDATE", function(ctx) self:Refresh(ctx) end)
+  -- A sale changes buyback with MERCHANT_UPDATE: Blizzard's last sold item is drawn again on it (MerchantItemBuybackButton_OnLoad).
+  events:RegisterEvent("MERCHANT_UPDATE", function(ctx)
+    self:NoteBuyback()
+    self:Refresh(ctx)
+  end)
   events:RegisterEvent("MERCHANT_FILTER_ITEM_UPDATE", function(ctx) self:Refresh(ctx) end)
   for _, event in ipairs({ "UPDATE_INVENTORY_DURABILITY", "PLAYER_MONEY", "BAG_UPDATE_DELAYED" }) do
     events:RegisterEvent(event, function(ctx)
