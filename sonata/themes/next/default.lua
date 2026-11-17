@@ -30,6 +30,7 @@ sonataNext:RegisterTheme({
     Lavender = { 0.78, 0.72, 1.0, 1 },
     Text = { 0.96, 0.95, 1.0, 1 },
     Muted = { 0.62, 0.58, 0.78, 1 },
+    -- A tab's fill for a theme whose Tabs.Fill names it (Default's tabs are the search box's).
     Tab = { 0.09, 0.08, 0.16, 0.92 },
     TabSelected = { 0.18, 0.15, 0.32, 0.96 },
     -- A move waiting to be confirmed (the dock): its card, and the scrim dimming the panel behind it.
@@ -113,7 +114,7 @@ sonataNext:RegisterTheme({
     SectionRecent = { Size = 14, Color = "Gold", Shadow = true },
     SectionFree = { Size = 13, Color = "Muted" },
     Count = { Size = 11, Color = "Muted" },
-    Tab = { Size = 12, Color = "Muted" },
+    Tab = { Size = 12, Color = "Lavender" },
     TabSelected = { Size = 12, Color = "White", Shadow = true },
     Footer = { Size = 12, Color = "Muted" },
     -- "Nothing here yet" over an empty tab.
@@ -463,13 +464,17 @@ sonataNext:RegisterTheme({
   },
 
   Tabs = {
-    -- Colors, or art (drawn for the backpack's tabs, sticking out to the left, mirrored on the other panels).
-    Fill = "Tab",
+    -- Colors, or art (drawn for the backpack's tabs, sticking out to the left, mirrored on the other panels). The search
+    -- box's fill, lighter than the body: a tab beside a small panel stands over the world, not over the panel.
+    Fill = "SearchFill",
     SelectedFill = "TabSelected",
-    -- A colored tab fades out toward its far end, to this share of its alpha.
-    Fade = 0.35,
+    -- A colored tab fades out toward its far end, to this share of its alpha (1: solid, its name on its fill).
+    Fade = 1,
     Font = "Tab",
     SelectedFont = "TabSelected",
+    -- Round each tab (false: none), as round a small panel (Panel.Edge) and the search box; the selected one's in gold.
+    Edge = { Color = "Lavender", Alpha = 0.35, Size = 1 },
+    SelectedEdge = { Color = "Gold", Alpha = 0.9, Size = 1 },
     -- Lit on a tab a dragged section would drop on (Drop), and flashing on one that received one
     -- (Pulse, fading from).
     Glow = { Color = "Lavender", BlendMode = "ADD", Drop = 0.3, Pulse = 0.8 },

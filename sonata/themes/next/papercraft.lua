@@ -409,6 +409,8 @@ sonataNext:RegisterTheme({
   Tabs = {
     Fill = { Texture = "TabScrap", Color = "White" },
     SelectedFill = { Texture = "TabScrapChosen", Color = "White" },
+    Edge = false,
+    SelectedEdge = false,
     Indicator = false,
     Glow = { Color = "PencilBlue", BlendMode = "BLEND", Drop = 0.3, Pulse = 0.5 },
   },

@@ -311,6 +311,8 @@ sonataNext:RegisterTheme({
     Fade = 1,
     Font = "Tab",
     SelectedFont = "TabSelected",
+    Edge = false,
+    SelectedEdge = false,
     Glow = { Color = "Gold", BlendMode = "ADD", Drop = 0.3, Pulse = 0.8 },
     Indicator = false,
     Highlight = LIST_HOVER,

@@ -147,6 +147,8 @@ sonataNext:RegisterTheme({
   },
 
   Tabs = {
+    Fill = "Tab",
+    Fade = 0.35,
     Edge = { Color = "Rain", Alpha = 0.3, Size = 1 },
     SelectedEdge = { Color = "Gold", Alpha = 0.7, Size = 1 },
     Glow = { Color = "Gold", BlendMode = "ADD", Drop = 0.25, Pulse = 0.7 },

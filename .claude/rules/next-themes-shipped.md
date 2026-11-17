@@ -7,7 +7,23 @@ paths:
 ---
 ## 8. The shipped themes
 
-- **Default**: the design as it was.
+- **Default**: the design as it was, but for its tabs.
+  - **Tabs a player sees** (issue #1277; players missed the vendor's Buyback tab and asked for buyback to be added; a
+    screenshot of the small backpack showed its "+" tab as a glyph over the world). They were a dark fill barely lighter
+    than the body, fading to a third of its alpha toward the outer end (under the name), with no edge, names in muted
+    lavender; beside a small panel, which has no feather, they stand over the world. Now they are drawn as the search box
+    was when it was "very difficult to see" (next.md §3): `SearchFill`, solid (`Fade = 1`), a 1-pixel lavender edge at
+    0.35 (as `Panel.Edge`, a small panel's border), the selected one's gold at 0.9 (as the settings' theme cards), names
+    in `Lavender` (about 8.9:1 on the fill, computed); the selected one keeps `TabSelected`, its white name and its gold
+    bar. Ember and Quiet take it in their own colors. `Palette.Tab` stays in all three, unused by them: a theme that
+    sets `Tabs.Fill = "Tab"` (Frost, and themes outside BetterBags) still finds it.
+  - Every other theme keeps its tabs: each sets what it took from Default (`Fill = "Tab"` on Frost, Glitch, Halloween,
+    Parchment and Rainy Window, and `Fade = 0.35` on Frost and Rainy Window; `Edge = false` and `SelectedEdge = false` on
+    GW2, Halloween, Make It So, Papercraft, Parchment and Plain). Plain's tab font copies Blizzard's, which takes no
+    inherited color (`NextStyle:makeFont`), so it needs nothing.
+  - Coverage: `spec/sonata/next_themes_spec.lua` ("tabs that stand out": the look, opacity, a fill lighter than the body
+    and the name's contrast on Default, Ember and Quiet; every other theme's tabs as before, by name, so a new theme must
+    say); `spec/next/tabs_spec.lua` sets the fade and edges it tests itself. Not seen in game yet.
 - **Ember**: a charcoal and amber palette, sparkles drifting slowly and rising like embers.
 - **Parchment**: Moonlight's parchment art (the plain middle, away from its burnt edges) for the body
   and the dock's card; dark ink text in Blizzard's parchment text colors with no shadow (numbers over
