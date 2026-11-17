@@ -81,6 +81,18 @@ What the Papercraft theme (next-themes-shipped.md §8) needed of the engine, all
   bag's glyph on it is drawn in ink (`ItemButton.FamilyIcon`, Papercraft's `Ink` at 0.4, sonata.md §3a): the white every
   other theme draws vanished on it (issue #1327). The ink at 0.4 was picked from composites of the real glyph on
   `item_empty.png` against InkSoft and InkMuted and other alphas: it reads as the same faint hint the white does on a dark slot.
+- **Lettered art is not mirrored:** the panels across the screen (the bank, the vendor, the guild bank, `side = "LEFT"`)
+  draw the theme's ornaments mirrored (next-themes-ornaments.md §12), art and all. The note to self in the margin
+  (`NoteNeed`, "do I really need all this?") is handwriting, and read backwards there (issue #1328), so it sets
+  `Mirror = false`: placed in their mirrored corner, its art the right way round. Any ornament with letters on it does
+  the same; the doodles, tape and pencil lines mirror with the panel. Art kept unflipped keeps its blank where it was,
+  so its writing must sit evenly in it: `note_need.png`'s writing runs from pixel 20 to 182 of 256, and uncropped it sat
+  43 units nearer the outer side across the screen, 6.6 from the mug doodle (51.4 on the backpack; found by the bug
+  review). It is cropped to the same 20 pixels on the right (`TexCoords = { 0, 202 / 256, 0, 1 }`, its `Width` with it),
+  so its writing is as far from the inner side on every panel and the backpack's is where it was. The note on the folded sheet (`Open.Note`,
+  "BetterBags") is not an ornament: `drawNotes` lays its art left to right on the screen on either side. Coverage:
+  `spec/integration/papercraft_spec.lua` ("writes its note in the margin the right way round on the panels across the
+  screen").
 - **Check** (`SonataNext:Check`): a stop motion's parts, an `FPS` above nothing, a `Spacing` from 0 to under a half; a sheet's
   parts (`NextPaper.KEYS` and its neighbours), `Front`, `Back` and `Rate`, `From`, every number's range, angles in `Half` and
   `Full`, `Poses` ending in 1, `Drift` the least first.
