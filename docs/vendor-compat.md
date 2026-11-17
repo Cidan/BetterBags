@@ -104,8 +104,11 @@ APIs, though, and BetterBags has no required level at all.
   92181 (`C_CurveUtil.EvaluateGameCurve`, documented in `CurveUtilDocumentation.lua`, never called by
   Blizzard's UI): `MaxLevel` when it is more than 26 above `Level` (Blizzard "did not properly reduce
   maxItemLevel for upgradeable items", `itemproperties.lua:192-197`), and `Level` of Poor
-  Bind-on-Equip items above 200 (`itemproperties.lua:247-250`). BetterBags applies neither. Whether
-  Blizzard has since fixed either is unverified.
+  Bind-on-Equip items above 200 (`itemproperties.lua:247-250`). Vendor has since (2026-09-21) commented
+  the first out: "it seems blizzard realized the error and instead made everything 0", and when
+  `maxItemLevel` is 0 it works `MaxLevel` out from the item level and upgrade rank
+  (`getMaxItemLevelForUpgradeInfo`). BetterBags does the same (`topOfTrack`, item-sort.md §4a). The
+  second is not applied; whether Blizzard has since fixed it is unverified.
 - **BetterBags reads `GetItemInfo` by item ID, not by link** (`items:ReadItemProperties`,
   `data/items.lua:3099-3101`). So the fields it reads from it today but does not search on
   (`itemLevel`, `itemMinLevel`, `sellPrice`) describe the base item, not the item in the slot.
@@ -442,7 +445,7 @@ with its invalidation, as that file requires.
 | `quality` (done) | number | the crafting tier: `GetItemReagentQualityByItemInfo`, else `GetItemCraftedQualityByItemInfo`, from the link | retail | the slot changes |
 | `bagname`, `bag` (done) | text | `items:GetPlainBagName(bagid)` (`C_Container.GetBagName`) | all | read every sweep |
 | `minlevel` (done) | number | `GetItemInfo(link)` 5th | all | the slot changes |
-| `maxlevel` (done) | number | `GetItemUpgradeInfo(link).maxItemLevel`, else `level` | retail (else `level`) | the slot changes |
+| `maxlevel` (done) | number | `GetItemUpgradeInfo(link).maxItemLevel` (when 0, worked out from the link's item level and rank), else `level` | retail (else `level`) | the slot changes |
 | `upgradeable`, `track`, `upgradelevel`, `upgrademax` (done) | bool, text, numbers | `GetItemUpgradeInfo(link)` | retail | the slot changes |
 | `stacksize` (done) | number | `GetItemInfo(link)` 8th | all | the slot changes |
 | `price` (done); `totalprice` (dropped: `price * count` once arithmetic exists) | numbers (copper) | `GetItemInfo(link)` 11th | all | the slot changes |
@@ -586,8 +589,8 @@ with the bank, 509 bank items, the worn gear and every bag's name):
 Only items this character does not have can settle these; the Dump tab records what is needed when
 one is in the bags or the bank.
 
-- An item with upgrade levels (Veteran and up, with levels): its `maxItemLevel`, and whether curve
-  92181 is still needed.
+- An item with upgrade levels (Veteran and up, with levels): its `maxItemLevel` (0, as Vendor
+  reports?), and its item level at each rank against `topOfTrack`'s ladder (item-sort.md §4a).
 - An heirloom and level-scaled gear: `GetCurrentItemLevel(location)` against the tooltip.
 - Two copies of a crafted item at different tiers.
 - An uncollected appearance: which of the ways of asking says so (BetterBags asks all three, in
