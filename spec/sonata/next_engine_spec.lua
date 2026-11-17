@@ -917,6 +917,21 @@ describe("SonataNext", function()
       assert.are.same({}, sonataNext:Check("Default"))
     end)
 
+    -- The Help page's own fonts and its match color (help.md §4).
+    it("names a Help page font or color a theme does not have", function()
+      sonataNext:RegisterTheme({ Name = "BrokenHelp", Settings = { Help = { PromptFont = "NoPrompt",
+        SectionFont = "NoSection", HeadingFont = "NoHeading", ExampleFont = "NoExample", MatchColor = "NoMatch" } } })
+      local problems = sonataNext:Check("BrokenHelp")
+      table.sort(problems)
+      assert.are.same({
+        "Settings.Help.ExampleFont: no font named NoExample",
+        "Settings.Help.HeadingFont: no font named NoHeading",
+        "Settings.Help.MatchColor: no color named NoMatch",
+        "Settings.Help.PromptFont: no font named NoPrompt",
+        "Settings.Help.SectionFont: no font named NoSection",
+      }, problems)
+    end)
+
     -- Reported in game on the Papercraft theme: its caps took their Size from the fill, which reads each cap's own, so they
     -- had no width, and a texture with none draws at its file's: a sliver of art stretched 128 units across, over the
     -- control and past it.

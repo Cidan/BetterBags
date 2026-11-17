@@ -26,9 +26,15 @@ end
 
 function config:RegisterSettings()
   -- /bb opens the settings; /bb changelog opens the changelog (frames/changelog.lua); /bb next
-  -- switches the bags between the classic design and BetterBags Next (next.md §11).
+  -- switches the bags between the classic design and BetterBags Next (next.md §11); /bb help opens the settings
+  -- window's Help page, searching for whatever follows it (help.md §4).
   LibStub('AceConsole-3.0'):RegisterChatCommand("bb", function(input)
     local command = strtrim(input or ""):lower()
+    local word, rest = strtrim(input or ""):match("^(%S+)%s*(.-)$")
+    if word ~= nil and word:lower() == "help" then
+      events:SendMessage(context:New('SlashHelp'), 'help/Open', rest)
+      return
+    end
     if command == "changelog" then
       events:SendMessage(context:New('SlashChangelog'), 'changelog/Open')
       return

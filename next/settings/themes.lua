@@ -12,9 +12,6 @@ local L = addon:GetModule('Localization')
 ---@class NextStyle: AceModule
 local style = addon:GetModule('NextStyle')
 
----@class NextControls: AceModule
-local controls = addon:GetModule('NextControls')
-
 ---@class NextButton: AceModule
 local nextButton = addon:GetModule('NextButton')
 
@@ -23,6 +20,9 @@ local sonataNext = addon:GetModule('SonataNext')
 
 ---@class NextPixel: AceModule
 local pixel = addon:GetModule('NextPixel')
+
+---@class NextSettingsCards: AceModule
+local cards = addon:GetModule('NextSettingsCards')
 
 -- NextSettingsThemes is the Appearance page's theme picker (next-settings.md §4), a wide row: a card
 -- per theme an engine lists (SonataNext, BetterBags Next's themes; or Sonata, the bags' themes, which
@@ -45,15 +45,8 @@ local themes = addon:NewModule('NextSettingsThemes')
 ---@field ApplyTheme fun(self, ctx: Context, key: string, save?: boolean)
 ---@field RestoreSavedTheme fun(self, ctx: Context)
 
----@class NextSettingsThemeCard
----@field frame Button
----@field fill Texture
----@field edge NextEdge
----@field name FontString
----@field text FontString
----@field status FontString
+---@class NextSettingsThemeCard: NextSettingsCard
 ---@field key? string
----@field hovered boolean
 
 ---@class NextSettingsThemesBlock
 ---@field frame Frame
@@ -105,25 +98,8 @@ function blockProto:card(i)
   if card ~= nil then
     return card
   end
-  local K = style.Theme.Settings.Cards
-  local frame = CreateFrame("Button", nil, self.frame)
-  frame:RegisterForClicks("LeftButtonUp")
-  card = {
-    frame = frame,
-    fill = frame:CreateTexture(nil, "BACKGROUND"),
-    edge = controls:CreateEdge(frame),
-    name = style:CreateText(frame, K.NameFont),
-    text = style:CreateText(frame, K.TextFont),
-    status = style:CreateText(frame, K.TextFont),
-    hovered = false,
-  }
-  card.fill:SetAllPoints(frame)
-  card.name:SetJustifyH("LEFT")
-  card.text:SetJustifyH("LEFT")
-  card.text:SetJustifyV("TOP")
-  card.text:SetWordWrap(true)
-  card.text:SetMaxLines(2)
-  card.status:SetJustifyH("RIGHT")
+  card = cards:Create(self.frame) --[[@as NextSettingsThemeCard]]
+  local frame = card.frame
   addon.SetScript(frame, "OnClick", function() self:Pick(card.key) end)
   addon.SetScript(frame, "OnEnter", function() card.hovered = true self:Paint() end)
   addon.SetScript(frame, "OnLeave", function() card.hovered = false self:Paint() end)
@@ -177,10 +153,7 @@ function blockProto:Paint()
   local chosen = self.picked or saved
   for i = 1, #self.entries do
     local card, entry = self.cards[i], self.entries[i]
-    controls:Paint(card.fill, card.hovered and K.HoverFill or K.Fill)
-    controls:PaintEdge(card.edge, entry.key == chosen and K.SelectedEdge or K.Edge)
-    style:SetFont(card.name, K.NameFont)
-    style:SetFont(card.text, K.TextFont)
+    cards:Paint(card, entry.key == chosen)
     local status, font = "", K.TextFont
     if not entry.available then
       status, font = L:G("Unavailable"), K.UnavailableFont
@@ -304,17 +277,7 @@ function blockProto:Place(x, y, width, height)
   for i = 1, #self.entries do
     local card = self.cards[i]
     local column, line = (i - 1) % columns, math.floor((i - 1) / columns)
-    card.frame:ClearAllPoints()
-    card.frame:SetPoint("TOPLEFT", frame, "TOPLEFT", m.pad + column * (cardWidth + m.gap), -(m.half + line * (m.height + m.gap)))
-    card.frame:SetSize(cardWidth, m.height)
-    card.name:ClearAllPoints()
-    pixel:Point(card.name, "TOPLEFT", card.frame, "TOPLEFT", m.cardPad, -m.cardPad)
-    card.status:ClearAllPoints()
-    pixel:Point(card.status, "TOPRIGHT", card.frame, "TOPRIGHT", -m.cardPad, -m.cardPad)
-    card.text:ClearAllPoints()
-    pixel:Point(card.text, "TOPLEFT", card.frame, "TOPLEFT", m.cardPad,
-      -(m.cardPad + pixel:Ceil(frame, pixel:TextHeight(card.name)) + pixel:Snap(frame, 6)))
-    card.text:SetWidth(math.max(pixel:Unit(frame), cardWidth - 2 * m.cardPad))
+    cards:Place(card, frame, m.pad + column * (cardWidth + m.gap), m.half + line * (m.height + m.gap), cardWidth, m.height)
   end
   local lines = math.max(1, math.ceil(#self.entries / columns))
   self.apply.frame:ClearAllPoints()

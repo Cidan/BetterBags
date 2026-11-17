@@ -154,7 +154,7 @@ describe("BetterBags Next's settings window on the whole addon", function()
       "backpack > order", "bank > general", "bank > layout", "bank > size", "bank > items", "bank > categories",
       "bank > order", "guild > general", "guild > layout", "guild > size", "guild > items", "guild > categories",
       "guild > order", "vendor > general", "vendor > size", "profiles > profiles",
-      "profiles > transfer", "quickfind > main" }, builtEveryTab(addon))
+      "profiles > transfer", "quickfind > main", "help > help" }, builtEveryTab(addon))
     settings:Close()
     assert.are.same({}, handle.errors, "closing")
   end)
@@ -280,7 +280,7 @@ describe("BetterBags Next's settings window on the whole addon", function()
       "currency > main",
       "backpack > layout", "backpack > items", "backpack > categories", "backpack > order", "bank > general",
       "bank > layout", "bank > items", "bank > categories", "bank > order", "profiles > profiles", "profiles > transfer",
-      "quickfind > main" }, builtEveryTab(addon))
+      "quickfind > main", "help > help" }, builtEveryTab(addon))
     settings:Open("backpack", "layout")
     assert.is_not_nil(rowOf(settings, "itemsPerRow"), "rows and columns, for the classic bags")
     assert.is_not_nil(rowOf(settings, "columns"))

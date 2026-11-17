@@ -22,7 +22,7 @@ local modules = { { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.
   { "NextDropdown", "next/controls/dropdown.lua" }, { "NextSwatch", "next/controls/swatch.lua" },
   { "NextTopTabs", "next/controls/toptabs.lua" }, { "NextLift", "next/lift.lua" }, { "NextDialog", "next/controls/dialog.lua" },
   { "NextSettingsRows", "next/settings/rows.lua" }, { "NextSettingsPage", "next/settings/page.lua" },
-  { "NextSettingsPages", "next/settings/pages.lua" }, { "NextSettings", "next/settings/window.lua" } }
+  { "NextSettingsPages", "next/settings/pages.lua" }, { "HelpSearch", "help/search.lua" }, { "HelpArticles", "help/articles.lua" }, { "NextSettingsNav", "next/settings/nav.lua" }, { "NextSettings", "next/settings/window.lua" } }
 for _, m in ipairs(modules) do
   ResetModuleStub(m[1], m[2])
   LoadBetterBagsModule(m[2])

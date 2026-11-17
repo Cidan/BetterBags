@@ -56,15 +56,16 @@ for _, m in ipairs({ { "Sort", "util/sort.lua" }, { "SettingsCatalog", "config/c
   { "NextTopTabs", "next/controls/toptabs.lua" }, { "NextLift", "next/lift.lua" }, { "NextDialog", "next/controls/dialog.lua" },
   { "NextItemGrid", "next/controls/itemgrid.lua" },
   { "NextSettingsRows", "next/settings/rows.lua" }, { "NextSettingsPage", "next/settings/page.lua" },
-  { "NextSettingsPages", "next/settings/pages.lua" }, { "NextSettings", "next/settings/window.lua" },
-  { "NextSettingsThemes", "next/settings/themes.lua" }, { "NextListReorder", "next/settings/reorder.lua" },
+  { "NextSettingsPages", "next/settings/pages.lua" }, { "HelpSearch", "help/search.lua" }, { "HelpArticles", "help/articles.lua" }, { "NextSettingsNav", "next/settings/nav.lua" }, { "NextSettings", "next/settings/window.lua" },
+  { "NextSettingsCards", "next/settings/cards.lua" }, { "NextSettingsThemes", "next/settings/themes.lua" }, { "NextListReorder", "next/settings/reorder.lua" },
   { "NextSettingsItemsTab", "next/settings/itemstab.lua" },
   { "NextSettingsCategories", "next/settings/categories.lua" },
   { "NextSettingsBagCategories", "next/settings/bagcategories.lua" },
   { "Currencies", "data/currencies.lua" },
   { "NextSettingsCurrency", "next/settings/currency.lua" },
   { "NextSettingsCurrencies", "next/settings/currencies.lua" },
-  { "NextSettingsContent", "next/settings/content.lua" } }) do
+  { "NextSettingsCards", "next/settings/cards.lua" }, { "NextHelpArticle", "next/settings/article.lua" },
+  { "NextSettingsHelp", "next/settings/help.lua" }, { "NextSettingsContent", "next/settings/content.lua" } }) do
   ResetModuleStub(m[1], m[2])
   LoadBetterBagsModule(m[2])
 end
@@ -192,7 +193,7 @@ describe("NextSettingsContent", function()
       assert.are.same({ "BetterBags: General", "BetterBags: Appearance", "BetterBags: Item Colors",
         "BetterBags: Categories", "BetterBags: Currencies", "BetterBags: Food & Drink", "Bags: Backpack", "Bags: Bank",
         "Bags: Vendor", "Profiles: Profiles",
-        "Integrations: QuickFind" }, list)
+        "Integrations: QuickFind", "Help: Help" }, list)
     end)
 
     -- Asked: "we need to add a bag menu for all our bag windows, so we have Backpack, Bank, and Guild Bank, we need to add
@@ -385,7 +386,7 @@ describe("NextSettingsContent", function()
       end
       addon.isRetail = true
       assert.are.same({ "General", "Appearance", "Item Colors", "Categories", "Currency", "Backpack", "Bank",
-        "Profiles", "QuickFind" }, listed(), "no vendor page: the classic bags leave vendors to Blizzard")
+        "Profiles", "QuickFind", "Help" }, listed(), "no vendor page: the classic bags leave vendors to Blizzard")
       addon.isRetail = false
       addon.isMists = true
       assert.are.equal("Currency", listed()[5])

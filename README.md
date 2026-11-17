@@ -109,6 +109,9 @@ Most options and other important information in BetterBags can be reached by lef
 *Menu in Retail.*
 </div>
 
+### Help
+The settings window has a **Help** page: guides to everything BetterBags does, from sorting and searching to selling, depositing and themes. Type what you need help with, in your own words, and the guides that answer it show as you type; or pick a topic from the list on the left. Open it with `/bb help`, or type `/bb help` followed by a few words (`/bb help auto sell`) to search it at once. The settings window's own search lists matching guides too. The guides show only what applies to the bags you use and your version of the game.
+
 ### Show Bags
 This temporary view allows you to see your bags and the items within them how they currently are. It also allows you to swap out which bags are equipped for both the backpack and the bank.
 

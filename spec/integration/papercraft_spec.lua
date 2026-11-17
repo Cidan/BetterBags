@@ -262,8 +262,24 @@ describe("the Papercraft theme on the whole addon", function()
       for _, child in ipairs({ frame:GetChildren() }) do unpin(child) end
     end
 
+    local function sizes(frame, out)
+      out[frame] = { frame:GetSize() }
+      for _, child in ipairs({ frame:GetChildren() }) do sizes(child, out) end
+      return out
+    end
+
+    -- The client tells a frame its size changed (OnSizeChanged) when its anchors give it another, as they do here once the
+    -- pins are gone: a scroll bar sizes its thumb so.
     local function missing(frame)
+      local before = sizes(frame, {})
       unpin(frame)
+      for f, size in pairs(before) do
+        local width, height = f:GetSize()
+        local changed = f.GetScript and f:GetScript("OnSizeChanged")
+        if changed and (width ~= size[1] or height ~= size[2]) then
+          changed(f, width, height)
+        end
+      end
       return layout.ArtWithNoSize(frame)
     end
 

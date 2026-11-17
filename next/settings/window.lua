@@ -69,6 +69,12 @@ local pixel = addon:GetModule('NextPixel')
 ---@class NextFill: AceModule
 local fills = addon:GetModule('NextFill')
 
+---@class NextSettingsNav: AceModule
+local nav = addon:GetModule('NextSettingsNav')
+
+---@class HelpArticles: AceModule
+local articles = addon:GetModule('HelpArticles')
+
 ---@class NextFrameArt: AceModule
 local frameArt = addon:GetModule('NextFrameArt')
 
@@ -115,6 +121,9 @@ local settings = addon:NewModule('NextSettings')
 
 -- The share of the screen the window takes at most.
 local SCREEN_SHARE = 0.95
+
+-- At most this many help articles listed under a search's settings.
+local HELP_RESULTS = 4
 
 -- The window's render root: it hands its scroll box the content's width and height.
 local rootProto = drawable:Extend({}, 'NextSettingsRoot')
@@ -1097,24 +1106,8 @@ function settings:navRow(i)
   if row ~= nil then
     return row
   end
-  local frame = CreateFrame("Button", nil, self.navList)
-  frame:RegisterForClicks("LeftButtonUp")
-  local N = style.Theme.Settings.Nav
-  row = {
-    frame = frame,
-    fill = frame:CreateTexture(nil, "BACKGROUND"),
-    hover = frame:CreateTexture(nil, "BACKGROUND", nil, 1),
-    indicator = frame:CreateTexture(nil, "ARTWORK"),
-    label = style:CreateText(frame, N.Font),
-    hovered = false,
-  }
-  row.fill:SetAllPoints(frame)
-  row.hover:SetAllPoints(frame)
-  -- Fills (NextFill): filling the row, or an atlas at its own size (Blizzard's settings list).
-  fills:Wrap(row.fill, frame)
-  fills:Wrap(row.hover, frame)
-  row.label:SetJustifyH("LEFT")
-  row.label:SetWordWrap(false)
+  row = nav:CreateRow(self.navList)
+  local frame = row.frame
   addon.SetScript(frame, "OnClick", function(ctx)
     if row.page then
       self:Select(row.page.id, nil, ctx)
@@ -1132,10 +1125,8 @@ end
 function settings:buildNav()
   local N = style.Theme.Settings.Nav
   -- Whole pixels apart (docs/next-pixel-perfect.md).
-  local groupGap, groupHeight, itemHeight = pixel:Snap(self.frame, N.GroupGap), pixel:Length(self.frame, N.GroupHeight),
-    pixel:Length(self.frame, N.ItemHeight)
-  -- Between every heading and row (Blizzard's settings list: its view's spacing).
-  local spacing = pixel:Snap(self.frame, N.Spacing or 0)
+  local m = nav:Metrics(self.frame)
+  local groupGap, groupHeight, itemHeight, spacing = m.groupGap, m.groupHeight, m.itemHeight, m.spacing
   local groups, order = {}, {}
   for _, page in ipairs(pages:List()) do
     if groups[page.group] == nil then
@@ -1183,67 +1174,23 @@ function settings:buildNav()
   self.navBox:FullUpdate(true)
 end
 
--- placeNavRow puts an entry y down the list: across it, or ItemWidth wide from its left (Nav.ItemWidth: Blizzard's rows
--- and headings, 175 wide in a list 199 wide).
+-- placeNavRow puts an entry y down the list (NextSettingsNav).
 ---@private
 ---@param row table
 ---@param y number
 function settings:placeNavRow(row, y)
-  local width = style.Theme.Settings.Nav.ItemWidth
-  row.frame:ClearAllPoints()
-  row.frame:SetPoint("TOPLEFT", self.navList, "TOPLEFT", 0, -y)
-  if width then
-    pixel:Width(row.frame, width)
-  else
-    row.frame:SetPoint("TOPRIGHT", self.navList, "TOPRIGHT", 0, -y)
-  end
+  nav:PlaceRow(row, self.navList, y)
 end
 
--- paintNavRow draws an entry: a heading, or a page chosen, under the pointer, or neither.
+-- paintNavRow draws an entry: a heading, or a page chosen, under the pointer, or neither (NextSettingsNav).
 ---@private
 ---@param row table
 function settings:paintNavRow(row)
-  local N, frame = style.Theme.Settings.Nav, self.frame
-  local pad = pixel:Snap(frame, style.Theme.Settings.Sidebar.Pad)
-  local chosen = row.page ~= nil and self.query == nil and row.page.id == self.pageId
-  row.label:ClearAllPoints()
   if row.group then
-    style:SetFont(row.label, N.GroupFont)
-    -- A heading's art, the theme's fills cycled through the headings (Blizzard's settings list cycles
-    -- Options_CategoryHeader_1 to 3), and its label where the theme says, else above its bottom.
-    local headings, at = N.GroupFills, N.GroupLabel
-    if at then
-      pixel:Point(row.label, at.Point, row.frame, at.Point, pixel:Snap(frame, at.X or 0), pixel:Snap(frame, at.Y or 0))
-    else
-      pixel:Point(row.label, "BOTTOMLEFT", row.frame, "BOTTOMLEFT", pad, pixel:Snap(frame, 4))
-    end
-    controls:Paint(row.fill, (headings and #headings > 0) and headings[((row.groupIndex or 1) - 1) % #headings + 1] or false)
-    row.hover:Hide()
-    row.indicator:Hide()
+    nav:PaintHeading(row, self.frame, row.groupIndex)
     return
   end
-  local font = N.Font
-  if chosen then
-    font = N.SelectedFont
-  elseif row.hovered then
-    font = N.HoverFont
-  end
-  style:SetFont(row.label, font)
-  -- From the row's corners, centered on its height by the font's (its middle may be between pixels), TextRaise above
-  -- it (Blizzard's settings list raises its rows' text by 1).
-  local height = pixel:Length(frame, N.ItemHeight)
-  local raise = -(N.TextRaise or 0)
-  pixel:Row(row.label, "TOPLEFT", row.frame, pad + pixel:Snap(frame, N.Indent), height, nil, raise)
-  pixel:Row(row.label, "TOPRIGHT", row.frame, pad, height, nil, raise)
-  controls:Paint(row.fill, chosen and N.SelectedFill or false)
-  controls:Paint(row.hover, (row.hovered and not chosen) and N.HoverFill or false)
-  row.indicator:ClearAllPoints()
-  row.indicator:SetPoint("TOPLEFT", row.frame, "TOPLEFT", 0, 0)
-  row.indicator:SetPoint("BOTTOMLEFT", row.frame, "BOTTOMLEFT", 0, 0)
-  -- A theme may draw no bar (Indicator = false: Blizzard's list marks the chosen row with its fill).
-  local bar = N.Indicator
-  pixel:Width(row.indicator, bar and bar.Width or 1)
-  controls:Paint(row.indicator, (chosen and bar) and { Color = bar.Color } or false)
+  nav:PaintEntry(row, self.frame, row.page ~= nil and self.query == nil and row.page.id == self.pageId)
 end
 
 ---@private
@@ -1456,6 +1403,21 @@ function settings:OnDesignChanged(ctx)
   end
 end
 
+-- ShowHeading shows the heading of the page shown again (a page whose heading changes as it is used: Help's, as its
+-- search is typed), unless the window's search shows.
+function settings:ShowHeading()
+  if self.frame == nil or not self.shown or self.query ~= nil then
+    return
+  end
+  local page = self.pageId and pages:Get(self.pageId)
+  if page == nil or page.heading == nil then
+    return
+  end
+  local title, description = page.heading()
+  self.title:SetText(title)
+  self.description:SetText(description or "")
+end
+
 -- Refresh shows the values of the page shown again (a block changed them: a reset).
 ---@param ctx? Context
 function settings:Refresh(ctx)
@@ -1543,6 +1505,22 @@ function settings:resultLink(page, tab, title)
   return row
 end
 
+-- helpLink returns the link to a help article, made once and kept: it opens the article on the Help page.
+---@private
+---@param article HelpArticleDef
+---@return NextSettingsRow
+function settings:helpLink(article)
+  local key = "help\0" .. article.id
+  local row = self.resultRows[key]
+  if row == nil then
+    row = rows:CreateLink(self.results.frame, article.title, function(ctx)
+      events:SendMessage(ctx, 'help/OpenArticle', article.id)
+    end)
+    self.resultRows[key] = row
+  end
+  return row
+end
+
 -- Search lists every setting matching text (in any case), live, a section per page and tab with a
 -- link to it; nothing left goes back to the page.
 ---@param ctx Context
@@ -1587,6 +1565,14 @@ function settings:Search(ctx, text)
         table.insert(sections, { title = title, rows = list })
       end
     end
+  end
+  -- The help's articles it finds (help.md §4), each opening on the Help page.
+  local help = {}
+  for _, result in ipairs(articles:Search(text, HELP_RESULTS)) do
+    table.insert(help, self:helpLink(result.article))
+  end
+  if #help > 0 then
+    table.insert(sections, { title = L:G("Help Articles"), rows = help })
   end
   self.title:SetText(L:G("Search"))
   self.description:SetText(format(L:G("Settings matching \"%s\""), text))

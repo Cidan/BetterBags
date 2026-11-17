@@ -793,6 +793,26 @@ sonataNext:RegisterTheme({
       NameFont = "SettingsLabel", TextFont = "SettingsText",
       ActiveFont = "SettingsLink", PreviewFont = "SettingsNavHover", UnavailableFont = "ControlMuted",
     },
+    -- The Help page (help.md §4, §5). Its home: the prompt in PromptFont and the line under it in LeadFont, PromptGap
+    -- apart, the search box SearchWidth wide Gap under them with a soft Halo round it (FocusAlpha while it is focused),
+    -- and the featured articles as cards (Cards) under their title in SectionFont, Gap below. A search glides the box to
+    -- the page's top and lists the articles found as cards, a word matched in MatchColor. An article: at most MaxWidth
+    -- wide, its blocks BlockGap apart, a heading HeadingGap above it in HeadingFont (in capitals, as a page's section
+    -- titles), its text in TextFont, a list's lines ListIndent in after their Bullet, steps after their numbers; an
+    -- example as typed in a field (Controls.Input's fill and edge) in ExampleFont; a tip and a warning over their Fill,
+    -- their Accent down their left AccentWidth wide, NotePad inside.
+    Help = {
+      PromptFont = "SettingsTitle", LeadFont = "SettingsDescription", SectionFont = "SettingsSection",
+      PromptGap = 8, Gap = 22, SearchWidth = 440,
+      Halo = { Texture = "Glow", Color = "Gold", Alpha = 0.12, Spread = 36, BlendMode = "ADD" }, FocusAlpha = 0.3,
+      MatchColor = "Gold",
+      MaxWidth = 640, BlockGap = 12, HeadingGap = 22,
+      HeadingFont = "SettingsSection", TextFont = "SettingsLabel", ExampleFont = "ControlText",
+      ListIndent = 18, Bullet = { Color = "Gold", Size = 4 },
+      Tip = { Fill = { Color = "Gold", Alpha = 0.06 }, Accent = { Color = "Gold", Alpha = 0.8 } },
+      Warning = { Fill = { Color = "Danger", Alpha = 0.08 }, Accent = { Color = "Danger", Alpha = 0.9 } },
+      AccentWidth = 3, NotePad = 10,
+    },
   },
 
   -- BetterBags Next's controls (next-settings.md): every one is BetterBags' own, drawn from here. A

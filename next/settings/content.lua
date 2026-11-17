@@ -39,6 +39,9 @@ local settings = addon:GetModule('NextSettings')
 ---@class NextSettingsThemes: AceModule
 local themes = addon:GetModule('NextSettingsThemes')
 
+---@class NextSettingsHelp: AceModule
+local helpPage = addon:GetModule('NextSettingsHelp')
+
 ---@class NextSettingsCategories: AceModule
 local categoryEditor = addon:GetModule('NextSettingsCategories')
 
@@ -704,6 +707,8 @@ function content:Init()
       } },
     } } },
   })
+  -- The help's articles, last (help.md §4): its own list in the sidebar, as the Categories page has.
+  pages:Define(helpPage:Page())
 end
 
 -- OnEnable names the item level colors' ranges again when the highest item level seen changes while
