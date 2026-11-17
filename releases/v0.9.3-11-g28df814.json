@@ -1,0 +1,23 @@
+{
+  "id": 1794875414,
+  "version": "v0.9.3-11-g28df814",
+  "channel": "alpha",
+  "date": "2026-11-17",
+  "from": "ad2d5be50822b88bd3a35aadb87be405e13eb6e2",
+  "to": "28df8142c5f3b6a10897e5467fa63c36783a7bb2",
+  "headline": "Fixed Upgrade Track item sorting and the maxlevel search filter for upgradeable gear.",
+  "entries": [
+    {
+      "category": "Fixed",
+      "title": "Upgrade Track item sorting",
+      "details": "With Item Order set to Upgrade Track, upgradeable gear now sorts by its upgrade track again instead of falling back to item level order. Items on the same track are still ordered by your Then By setting.",
+      "clients": []
+    },
+    {
+      "category": "Fixed",
+      "title": "maxlevel search filter for upgradeable gear",
+      "details": "The maxlevel search filter now uses the fully upgraded item level of gear on an upgrade track again.",
+      "clients": []
+    }
+  ]
+}
