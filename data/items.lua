@@ -3557,6 +3557,20 @@ function items:OnCharacterStateChanged(petJournal)
   end
 end
 
+-- topOfTrack is the item level an item on an upgrade track reaches at its track's last rank, from the
+-- level it is at and its rank: each rank adds 3 item levels, 4 from a level of 12 modulo 13 (Midnight's
+-- Hero track: 305, 308, 311, 315, 318, 321).
+---@param level number
+---@param rank number
+---@param ranks number
+---@return number
+local function topOfTrack(level, rank, ranks)
+  for _ = rank + 1, ranks do
+    level = level + (level % 13 == 12 and 4 or 3)
+  end
+  return level
+end
+
 -- ReadItemTraits reads what the search knows of an item beyond its name and type
 -- (search-indexing.md §10), from the slot's link: what it is, its upgrade track, its stats, its
 -- crafting tier. minLevel, stackSize and sellPrice are its link's (ReadLinkInfo). Call it only once
@@ -3616,6 +3630,13 @@ function items:ReadItemTraits(itemID, itemLink, minLevel, stackSize, sellPrice)
       traits.upgradeLevel = upgrade.currentLevel
       traits.upgradeMax = upgrade.maxLevel
       traits.upgradeMaxItemLevel = upgrade.maxItemLevel
+      -- Midnight's client answers 0 for the item level the track reaches.
+      if upgrade.maxItemLevel == 0 then
+        local level = C_Item.GetDetailedItemLevelInfo(itemLink)
+        if level then
+          traits.upgradeMaxItemLevel = topOfTrack(level, upgrade.currentLevel, upgrade.maxLevel)
+        end
+      end
     end
   end
   -- The stats' names (GetItemStats keys are global strings: ITEM_MOD_HASTE_RATING_SHORT is "Haste").

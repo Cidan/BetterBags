@@ -190,8 +190,9 @@ Then By Item Level, which a saved order 7 becomes (§1b). The user decided again
 a category of one track is a search category (`track = hero`, README).
 
 - **A track's rank is the item level it upgrades to** (`trackTop` in `util/sort.lua`): the item's
-  `itemInfo.traits.upgradeMaxItemLevel`, from `C_Item.GetItemUpgradeInfo(link).maxItemLevel`
-  (`items:ReadItemTraits`, search-indexing.md §10). Within a season every track tops out at its own item level,
+  `itemInfo.traits.upgradeMaxItemLevel` (`items:ReadItemTraits`, search-indexing.md §10), the client's
+  `C_Item.GetItemUpgradeInfo(link).maxItemLevel`, or the level the item's own level and rank reach when the client
+  answers 0, as Midnight's does (§4a). Within a season every track tops out at its own item level,
   higher for a higher track. The track's name (`trackString`) cannot rank it: it is in the game's language.
   `trackStringID` was not used either: one value has been seen (Adventurer, 971, `spec/fixtures/dump_retail_12_1_5.lua`),
   so nothing says its IDs follow the tracks' order.
@@ -201,14 +202,44 @@ a category of one track is a search category (`track = hero`, README).
 - **Once a cold item's data loads**, it gets its traits and its rank in place; with the bag open it is kept where it
   was and the bag is marked, and closing it puts it in order (§3). So does an item upgraded at the upgrade vendor
   while the bag is open (a new link and item level).
-- **Not verified in game, by the user's decision** ("no need for a capture"): no capture has held gear with upgrade
-  levels (docs/vendor-compat.md, "Needs an in-game check"), so neither the `maxItemLevel` the client reports for each
-  track nor the gap Vendor patches after the Midnight item level squish (a `maxItemLevel` more than 26 above the item
-  level, docs/vendor-compat.md) has been seen. The order holds as long as a higher track reports a higher
-  `maxItemLevel` than a lower one in the same bag.
+- **Not verified in game, by the user's decision** ("no need for a capture", and for #1332 "skip the capture step"):
+  no capture has held gear with upgrade levels (docs/vendor-compat.md, "Needs an in-game check"). #1325 trusted the
+  client's `maxItemLevel`, which the game answers 0 (§4a).
 - **#1325's bug review** found no bug in the order or the re-sort on close. It found the description and keywords
   naming Upgrade Track where the dropdown did not offer it, and a gap test that passed with the gap check removed;
   both fixed then.
+
+### 4a. When the client answers 0 (issue #1332)
+
+Reported: with Upgrade Track chosen, the bags stayed in item level order. Midnight's client answers 0 for the
+`maxItemLevel` of gear on a track: Vendor (typicalzergling/vendor, `systems/itemproperties/itemproperties.lua`) works the
+level out itself since 2026-09-21 ("it seems blizzard realized the error and instead made everything 0"). Every track
+then ranked 0, Upgrade Track ordered nothing, and its Then By decided alone (Item Level, the order #1325 made): a
+Champion 6/6 at 308 above a Hero 1/6 at 305. #1325's specs mocked a `maxItemLevel` for each track, so they passed.
+
+- **`topOfTrack(level, rank, ranks)`** (`data/items.lua`, called by `ReadItemTraits` when the client answers 0): from
+  the link's item level (`C_Item.GetDetailedItemLevelInfo(link)`, the tooltip's, upgrades included; the retail 12.1.5
+  capture had it equal `GetCurrentItemLevel` at the slot for every item), each rank to the last adds 3 item levels, 4
+  from a level of 12 modulo 13. It agrees with Vendor's `getMaxItemLevelForUpgradeInfo` for every item level on that
+  ladder (3, 6, 9 or 12 modulo 13) at rank 1 and up (the bug review compared both from 200 to 400, tracks of 1 to 8
+  ranks), and it gives each published track range from every rank: Season 2's Adventurer 266-282, Veteran 279-295,
+  Champion 292-308, Hero 305-321 and Myth 318-334, Season 1's Hero 259-276 and Myth 272-289 (`spec/items_spec.lua`).
+  Every item on one track reaches the same level, so Then By orders a track's items.
+- **The client's own when it gives one** (above 0); the link's item level is not asked for then. When the link has no
+  item level (`GetDetailedItemLevelInfo` may return nothing), the client's 0 stays: that item ranks with no track.
+- **The search's `maxlevel`** reads the same trait, so it is the fully upgraded item level again too (search-indexing.md
+  §10).
+- **Left as is: a season whose ranks step otherwise.** Its levels would come out a little off: the tracks still rank
+  right while each lands nearer its own top than the next track's (13 apart in both Midnight seasons), but two items of
+  one track could rank apart, before Then By. Not seen: both Midnight seasons follow the ladder. Off the ladder Vendor
+  reads any other remainder as 6 (286 at 3/6: 296 there, 295 here); neither is a level the tracks have.
+- **Left as is: an item at rank 0 of a track** (`currentLevel` 0, `maxLevel` above 0). `topOfTrack` adds every rank, so
+  a Hero 0/6 at 305 would reach 324, past the track's top, where Vendor keeps the item's own level. Found by the bug
+  review; not built for, as no client has shown a track item at rank 0 (`currentLevel` is documented only as never nil,
+  `ItemDocumentation.lua`).
+- Coverage: `spec/items_spec.lua` ("the item level a track reaches, when the client answers 0": every rank of the seven
+  ranges, the issue's two items, the client's own value kept without the extra call, a link with no item level),
+  `spec/refresh_pipeline_spec.lua` ("sorting by upgrade track": the bag in track order with the client answering 0).
 
 ## 5. A category's own order (issue #108)
 

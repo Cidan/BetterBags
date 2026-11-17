@@ -461,6 +461,7 @@ describe("Items (New Data Farming Engine)", function()
         savedOf(_G, "C_TradeSkillUI"), savedOf(_G, "C_PetJournal"),
         savedOf(C_Item, "GetItemInfo"), savedOf(C_Item, "GetItemStats"), savedOf(C_Item, "IsEquippableItem"),
         savedOf(C_Item, "GetItemSpell"), savedOf(C_Item, "IsCosmeticItem"), savedOf(C_Item, "GetItemUpgradeInfo"),
+        savedOf(C_Item, "GetDetailedItemLevelInfo"),
         savedOf(_G, "ITEM_MOD_CRIT_RATING_SHORT"), savedOf(_G, "ITEM_MOD_HASTE_RATING_SHORT"),
         savedOf(_G, "C_TransmogCollection"),
       }
@@ -540,6 +541,78 @@ describe("Items (New Data Farming Engine)", function()
       local t = items:ReadItemProperties(42, link).traits
       assert.is_nil(t.upgradeTrack)
       assert.is_nil(t.upgradeMaxItemLevel)
+    end)
+
+    -- Issue #1332: Midnight's client answers 0 for the item level a track reaches (Vendor works it out
+    -- since, itemproperties.lua getMaxItemLevelForUpgradeInfo), which put every track level with every
+    -- other under Upgrade Track. The item's own level and rank give it: each rank adds 3 item levels, 4
+    -- from a level of 12 modulo 13. Each track's item levels by rank, 1/6 to 6/6: Season 2's published
+    -- ranges (Adventurer 266-282 ... Myth 318-334) and Season 1's Hero and Myth (259-276, 272-289).
+    describe("the item level a track reaches, when the client answers 0", function()
+      local TRACKS = {
+        { "Adventurer", { 266, 269, 272, 276, 279, 282 } },
+        { "Veteran", { 279, 282, 285, 289, 292, 295 } },
+        { "Champion", { 292, 295, 298, 302, 305, 308 } },
+        { "Hero", { 305, 308, 311, 315, 318, 321 } },
+        { "Myth", { 318, 321, 324, 328, 331, 334 } },
+        { "Hero", { 259, 263, 266, 269, 272, 276 } },
+        { "Myth", { 272, 276, 279, 282, 285, 289 } },
+      }
+
+      -- The client as Midnight's answers: the track and its ranks, 0 for the item level it reaches, and the
+      -- link's item level (the base item's by item ID, as ReadItemProperties asks too).
+      local function answer(track, rank, level)
+        C_Item.GetItemUpgradeInfo = function(l)
+          if l == link then
+            return { currentLevel = rank, maxLevel = 6, maxItemLevel = 0, trackString = track, trackStringID = 974 }
+          end
+        end
+        C_Item.GetDetailedItemLevelInfo = function(info)
+          if info == link then return level, false, level end
+          return 580, false, 580
+        end
+      end
+
+      it("is the item level at the track's last rank, from any rank", function()
+        for _, entry in ipairs(TRACKS) do
+          local track, levels = entry[1], entry[2]
+          for rank, level in ipairs(levels) do
+            answer(track, rank, level)
+            local t = items:ReadItemProperties(42, link).traits
+            assert.are.equal(track, t.upgradeTrack)
+            assert.are.equal(levels[6], t.upgradeMaxItemLevel,
+              track .. " " .. rank .. "/6 at " .. level .. " reaches " .. levels[6])
+          end
+        end
+      end)
+
+      it("has the issue's Hero 1/6 at 305 reach 321, past the 308 of a Champion 6/6 at 308", function()
+        answer("Hero", 1, 305)
+        local hero = items:ReadItemProperties(42, link).traits.upgradeMaxItemLevel
+        answer("Champion", 6, 308)
+        local champion = items:ReadItemProperties(42, link).traits.upgradeMaxItemLevel
+        assert.are.same({ 321, 308 }, { hero, champion })
+      end)
+
+      it("is the client's own when it gives one, without asking the link's item level", function()
+        local asked = 0
+        C_Item.GetDetailedItemLevelInfo = function(info)
+          if info == link then asked = asked + 1 end
+          return 580, false, 580
+        end
+        assert.are.equal(619, items:ReadItemProperties(42, link).traits.upgradeMaxItemLevel)
+        assert.are.equal(0, asked)
+      end)
+
+      it("stays the client's 0 when the link has no item level", function()
+        answer("Hero", 1, 305)
+        C_Item.GetDetailedItemLevelInfo = function(info)
+          if info ~= link then return 580, false, 580 end
+        end
+        local t = items:ReadItemProperties(42, link).traits
+        assert.are.equal("Hero", t.upgradeTrack)
+        assert.are.equal(0, t.upgradeMaxItemLevel)
+      end)
     end)
 
     -- A retail dump's Adventurer cloak (spec/fixtures/dump_retail_12_1_5.lua): a track string with

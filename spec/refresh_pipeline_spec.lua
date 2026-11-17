@@ -4767,18 +4767,20 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
   -- Issue #769: gear by its upgrade track, read from the slot's link (items:ReadItemTraits), through the real Sort
   -- module's item orders.
   describe("sorting by upgrade track", function()
+    local tracks, levels
+    local function idOf(l) return tonumber(l) or tonumber(tostring(l):match("item:(%d+)")) end
+
     before_each(function()
       -- 101 Champion 6/6 at 308; 201 Hero 1/6 at 305; 202 gear on no track at 310, answering as a retail dump's
       -- last-season cloak did (0/0, maximum item level 0; that a track string alone is no track is items_spec's);
       -- 303 not gear, at 1. GetItemUpgradeInfo answered a table of zeros for what is not gear in the same dump
       -- (spec/fixtures/dump_retail_12_1_5.lua).
-      local tracks = {
+      tracks = {
         [101] = { currentLevel = 6, maxLevel = 6, maxItemLevel = 308, trackString = "Champion" },
         [201] = { currentLevel = 1, maxLevel = 6, maxItemLevel = 321, trackString = "Hero" },
         [202] = { currentLevel = 0, maxLevel = 0, maxItemLevel = 0, trackString = "Adventurer", trackStringID = 971 },
       }
-      local levels = { [101] = 308, [201] = 305, [202] = 310, [303] = 1 }
-      local function idOf(l) return tonumber(l) or tonumber(tostring(l):match("item:(%d+)")) end
+      levels = { [101] = 308, [201] = 305, [202] = 310, [303] = 1 }
       override(_G.C_Item, "IsEquippableItem", function(l) return tracks[idOf(l)] ~= nil end)
       override(_G.C_Item, "GetItemUpgradeInfo", function(l)
         return tracks[idOf(l)] or { currentLevel = 0, maxLevel = 0, maxItemLevel = 0 }
@@ -4802,6 +4804,21 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
     it("mixes the tracks by item level under Item Level", function()
       useItemOrder("itemLevel")
       assert.are.same({ 202, 101, 201, 303 }, idsInOrder(refreshBackpack({ wipe = true })))
+    end)
+
+    -- Issue #1332: Midnight's client answers 0 for the item level a track reaches, which left Upgrade Track
+    -- ordering nothing and the bag in Item Level's order. The link's item level and the rank give it.
+    it("puts gear on the higher track first when the client answers 0 for the item level a track reaches", function()
+      tracks[101].maxItemLevel, tracks[201].maxItemLevel = 0, 0
+      override(_G.C_Item, "GetDetailedItemLevelInfo", function(l)
+        local level = levels[idOf(l)] or 1
+        return level, false, level
+      end)
+      useItemOrder("upgradeTrack", "itemLevel")
+      local slotInfo = refreshBackpack({ wipe = true })
+      assert.are.equal(321, slotInfo.itemsBySlotKey["0_4"].itemInfo.traits.upgradeMaxItemLevel)
+      assert.are.equal(308, slotInfo.itemsBySlotKey["0_3"].itemInfo.traits.upgradeMaxItemLevel)
+      assert.are.same({ 201, 101, 202, 303 }, idsInOrder(slotInfo))
     end)
   end)
 
