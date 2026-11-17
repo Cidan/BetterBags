@@ -1,0 +1,23 @@
+{
+  "id": 1794883465,
+  "version": "v0.9.3-12-g4a96eac",
+  "channel": "alpha",
+  "date": "2026-11-17",
+  "from": "28df8142c5f3b6a10897e5467fa63c36783a7bb2",
+  "to": "4a96eacd8476d4303be079343e7f92ad6bd78647",
+  "headline": "Side tabs in BetterBags Next are now easier to spot, and selling to a vendor flashes the Buyback tab.",
+  "entries": [
+    {
+      "category": "Improved",
+      "title": "More visible side tabs in BetterBags Next",
+      "details": "Unselected side tabs in the Default, Ember, and Quiet themes now have a solid background, a thin border, and brighter text across the backpack, bank, guild bank, and vendor windows. Selected tabs also gain a border, while other themes keep their previous look.",
+      "clients": []
+    },
+    {
+      "category": "Improved",
+      "title": "Vendor Buyback tab flashes when selling an item",
+      "details": "In BetterBags Next, selling an item while the vendor panel is open now pulses the Buyback tab with your theme's glow so it is easy to spot.",
+      "clients": []
+    }
+  ]
+}
