@@ -1,0 +1,17 @@
+{
+  "id": 1794874830,
+  "version": "v0.9.3-10-gad2d5be",
+  "channel": "alpha",
+  "date": "2026-11-17",
+  "from": "12b976b5325c6f32c5a33b5d9e46b2c972895ca0",
+  "to": "ad2d5be50822b88bd3a35aadb87be405e13eb6e2",
+  "headline": "Fixes the Papercraft theme's handwritten margin note appearing backwards on the bank, vendor, and guild bank.",
+  "entries": [
+    {
+      "category": "Fixed",
+      "title": "Papercraft margin note reads forward on bank and vendor",
+      "details": "In the Papercraft theme, the handwritten margin note on the bank, vendor, and guild bank panels previously read backwards. It now displays the right way round.",
+      "clients": []
+    }
+  ]
+}
