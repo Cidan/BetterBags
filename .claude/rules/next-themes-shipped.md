@@ -288,7 +288,8 @@ paths:
     shadow on the world, washi tape holding it to the screen and over its small corners, a red pencil under the title,
     section names over a highlighter's streak with a pencil line on across the section, items mounted on squares of lighter
     paper pencilled round with their quality in coloured pencil, tabs as scraps of paper taped to the bag's side; in the
-    margins a cat, a sprig, a sun, a mug, a paper plane, stars, a heart and a note to self (English clients).
+    margins a cat, a sprig, a sun, a mug, a paper plane, stars, a heart and a note to self (English clients; never
+    mirrored, so it reads the right way round on the bank and the vendor, next-themes-papercraft.md §25).
   - **Text:** Caveat for display text and Patrick Hand for the rest (fonts/papercraft, SIL Open Font License, the licenses
     beside them): every role, the bags' money (`Footer.CoinFont`), item counts and levels, and cooldown numbers. Caveat has
     Latin and Cyrillic and Patrick Hand Latin, so other locales draw the client's font (`Locales`, and the countdown's own:

@@ -166,6 +166,50 @@ describe("the Papercraft theme on the whole addon", function()
     assert.same({}, handle.errors)
   end)
 
+  -- Issue #1328: the note to self in the margin is lettered, and read backwards on the panels across the screen (the bank,
+  -- the vendor, the guild bank), whose ornaments are the backpack's mirrored. It sits in their mirrored corner all the same,
+  -- its writing as far from their inner side as on the backpack.
+  it("writes its note in the margin the right way round on the panels across the screen", function()
+    -- Where note_need.png's writing is across its 256 pixels (measured from the file).
+    local INK_LEFT, INK_RIGHT = 20 / 256, 182 / 256
+    local addon = start(nil, "full")
+    local panels = { addon.Bags.Backpack, addon.Bags.Bank, module("NextVendor").panel, module("NextGuildBank").panel }
+    -- The writing's two ends, from the body's inner side.
+    local function writing(panel, note)
+      local _, _, _, x = note:GetPoint(1)
+      local u0, _, _, _, u1 = note:GetTexCoord()
+      local width = note:GetWidth()
+      local function along(u)
+        return (u - u0) / (u1 - u0) * width
+      end
+      if panel.side == "LEFT" then
+        return -x + width - along(INK_RIGHT), -x + width - along(INK_LEFT)
+      end
+      return x + along(INK_LEFT), x + along(INK_RIGHT)
+    end
+    local near, far
+    for _, panel in ipairs(panels) do
+      local note
+      for i = 1, panel.ornaments.count do
+        local piece = panel.ornaments.pieces[i]
+        if piece.spec.Texture == "NoteNeed" then
+          note = piece.texture
+        end
+      end
+      local name = panel.frame:GetName()
+      assert.is_true(note:IsShown(), name)
+      local ulx, _, _, _, urx = note:GetTexCoord()
+      assert.is_true(ulx < urx, name .. ": the art is not flipped")
+      assert.are.equal(panel.side == "LEFT" and "BOTTOMRIGHT" or "BOTTOMLEFT", (note:GetPoint(1)), name)
+      local a, b = writing(panel, note)
+      near, far = near or a, far or b
+      assert.is_true(math.abs(a - near) < 1 and math.abs(b - far) < 1,
+        string.format("%s: the writing %.1f to %.1f from its inner side, not %.1f to %.1f", name, a, b, near, far))
+    end
+    assert.are.same({ "RIGHT", "LEFT", "LEFT", "LEFT" }, { panels[1].side, panels[2].side, panels[3].side, panels[4].side })
+    assert.same({}, handle.errors)
+  end)
+
   it("writes the money in the footer's font under a Next theme that names no other", function()
     local addon = start("Default")
     for _, button in ipairs(buttons(addon.Bags.Backpack)) do

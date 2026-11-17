@@ -335,9 +335,12 @@ sonataNext:RegisterTheme({
       doodle("DoodleStar", "PencilRed", 0.5, "BOTTOMOUTER", 148, -152, 18, "Full"),
       doodle("DoodlePlane", "InkSoft", 0.5, "BOTTOMINNER", 40, -236, 96, "Full"),
       doodle("DoodleMug", "InkSoft", 0.55, "BOTTOMOUTER", 134, -44, 46, "Full"),
-      -- A note to self, in English.
-      { Texture = "NoteNeed", Point = "BOTTOMINNER", X = 104, Y = -52, Width = 200, Height = 100, Color = "InkSoft",
-        Alpha = 0.7, Locales = ENGLISH, Sizes = "Full", Layer = "ARTWORK", SubLevel = 1 },
+      -- A note to self, in English: its art is not flipped across the screen, where it would read backwards (issue #1328).
+      -- Cropped to the blank its writing has on the left (20 of its 256 pixels), so the writing is as far from the inner
+      -- side on either.
+      { Texture = "NoteNeed", TexCoords = { 0, 202 / 256, 0, 1 }, Point = "BOTTOMINNER", X = 104, Y = -52,
+        Width = 200 * 202 / 256, Height = 100, Color = "InkSoft", Alpha = 0.7, Locales = ENGLISH, Sizes = "Full",
+        Mirror = false, Layer = "ARTWORK", SubLevel = 1 },
       -- Tape holding it to the screen, over its inner edge, and across its corners on a small bag.
       tape("TapeLeft", "TapeTan", "TOPINNER", -58, 16, 96, 48),
       tape("TapeRight", "TapeBlue", "BOTTOMINNER", -48, -110, 96, 48),
