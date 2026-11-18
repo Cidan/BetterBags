@@ -1,0 +1,17 @@
+{
+  "id": 1794966729,
+  "version": "v0.9.4-1-g31edf8d",
+  "channel": "alpha",
+  "date": "2026-11-18",
+  "from": "166e290c0874a31285c634bd7363bdfb40843e9a",
+  "to": "31edf8d04f3e9443558e1b6d6dac78a6876292c3",
+  "headline": "Added an in-game Help page with 80 searchable articles to the settings window.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "In-game Help page with searchable articles",
+      "details": "A new Help page in the settings window offers 80 searchable articles about how BetterBags works. Search as you type on the Help page, in settings search, or with /bb help. Articles include links and settings themselves, showing only what applies to your bag design and game version.",
+      "clients": []
+    }
+  ]
+}
