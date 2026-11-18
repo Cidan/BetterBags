@@ -228,8 +228,12 @@ Makes the items in the backpack and bank findable from the QuickFind addon (`.cl
 
 **Features:**
 - Every item of both bags is a QuickFind entry, tagged with its type, subtype, category, equipment slot and
-  location ("Backpack", "Bank")
-- Enter on one opens its bag, switches to the tab that holds it and searches for its name (In-Bag Search on)
+  location ("Backpack", "Bank"); bank items only while the bank is open (closing it clears BetterBags' bank data,
+  `items:ClearBankCache`)
+- Enter on one opens its bag and switches to the tab holding it through the bag's own behavior: a backpack group, or a
+  bank group by the item's category and bank type (`SwitchToGroup`); with Show Bank Tabs on, the Blizzard bank tab it
+  is in (`SwitchToBlizzardTab`, through the classic bank's tab slots panel, `SelectTab`)
+- With In-Bag Search on, it searches for the item's exact name: `name == "Item Name"` (`NameQuery`)
 
 **Key Components:**
 ```lua

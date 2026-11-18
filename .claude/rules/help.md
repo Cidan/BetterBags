@@ -185,18 +185,24 @@ on the classic bag button opens the Create Category prompt (a Shift-left-click t
 authored the same way, was accepted with minor imprecisions its fourth check found: it calls `Show` a method of
 `NextHelpArticle` (it is the view's), says `Related` keeps definition order (it keeps the article's `related` order),
 lists keywords and questions as optional (content_spec needs six together), and simplifies how a word's stem, prefix and
-synonym matches combine and how compound halves count.
+synonym matches combine and how compound halves count. The quickfind article's Item Selection, written again with
+#1343 and #1344 (two rounds, both checks finding only minor problems with the text): the backpack's Show Bags and Show
+Blizzard Bags views send an item to the Backpack group, its section being its bag's name (every tab there holds every
+item); Hide In hides nothing in the bag-by-bag views, and never a new item in Recent Items; a new item shows in Recent
+Items only with that category on, outside the bag-by-bag views, and when its category does not skip Recent Items.
 
-**Bugs in the addon the checks found**, outside the help and not fixed: QuickFind never selects the bank or Warbank tab
-holding an item (it calls `SwitchToBank`, `SwitchToCharacterBankTab` and `SwitchToAccountBank`, which nothing defines)
-and lists bank items only while the bank is open; the reagent bank move on a section right-click cannot be reached from
+**Bugs in the addon the checks found**, outside the help and not fixed (QuickFind's bank tab and its search by a
+name's first word were fixed since, #1343 and #1344, and the quickfind article's Item Selection written again; its bank
+items listed only while the bank is open are kept by design, quickfind.md §3): the reagent bank move on a section right-click cannot be reached from
 any bank view; a double click on the vendor's red destroy card destroys two stacks; `rarity %= x` raises "Unknown
 operator"; Flash Stacks (`newItemFlash`) is read by nothing; New Profile makes the new profile active before asking, so
 Cancel leaves the character on it, and Copy Profile switches whichever button is chosen; Enable Enter to Make Category
 is hidden in BetterBags Next but still acts there; a search rule with a syntax mistake shows 0 results and can still be
 applied; Masque follows the classic Bag Theme even in BetterBags Next, where that setting is not shown; the gamepad
 radial's Character entry does not reopen a BetterBags backpack B closed; `keyring.md` leaves out The Burning Crusade
-Anniversary, which shows the keyring.
+Anniversary, which shows the keyring; in the classic bags a search typed in the box never reaches the Recent Items
+section (`bagProto:Search` updates the tab view's buttons; Recent Items' are the bag's global section buttons), so those
+keep the dimming of their last draw until the bag is recalculated (BetterBags Next's search covers them).
 
 A new feature needs its article, or its settings in an existing one's `settings`: the coverage spec fails on a setting
 or a settings page no article explains.
