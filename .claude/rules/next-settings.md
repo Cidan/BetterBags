@@ -59,9 +59,11 @@ description: each caught).
 
 | Module | File | What it is |
 |---|---|---|
-| `NextSettingsPages` | `pages.lua` | The pages, in the order defined (`Define`, replacing one with the same id in its place): each in a `group` (the sidebar's headings, in the order their first page was defined), with a `title`, a `description`, an optional `bag` its settings are bound to, `shown()` (a page shown only sometimes: the guild bank), and `tabs` (a tab's `shown()` leaves it out while false; `ShownTabs`). A page may have its own list in the sidebar (`sidebar(parent, owner)`), a `heading()` read in place of its title and description, and buttons in the header (`actions(parent, owner)`): below, "A page's own list". A tab's `sections` (a list, or a function read when the tab is built) hold row definitions: `setting` (a catalog id, bound to the page's bag; one the bag does not have is left out), `option` (a page's own), `text`, `buttons`, or `block` (a function making a wide row, with a `title` and `keywords` for search). Pages are data. |
+| `NextSettingsPages` | `pages.lua` | The pages, in the order defined (`Define`, replacing one with the same id in its place): each in a `group` (the sidebar's headings, in the order their first page was defined), with a `title`, a `description`, an optional `bag` its settings are bound to, `shown()` (a page shown only sometimes: the guild bank), and `tabs` (a tab's `shown()` leaves it out while false; `ShownTabs`). `ShowsSetting(id, bag)` says whether the window shows a setting's row now (the Help page shows a setting only then, help.md §5). A page's `choose()` is what its list chooses before the window reads its tabs (the Categories page's category); anything else reading its tabs calls it first. A page may have its own list in the sidebar (`sidebar(parent, owner)`), a `heading()` read in place of its title and description, and buttons in the header (`actions(parent, owner)`): below, "A page's own list". A tab's `sections` (a list, or a function read when the tab is built) hold row definitions: `setting` (a catalog id, bound to the page's bag; one the bag does not have is left out), `option` (a page's own), `text`, `buttons`, or `block` (a function making a wide row, with a `title` and `keywords` for search). Pages are data. |
 | `NextSettingsRows` | `rows.lua` | A setting's row: its name (wrapping) on the left and its control on the right (`toggle`, `dropdown`, `slider`, `color`), at least `RowHeight` tall. It reads the option into the control (`Refresh`), writes what the player changes, shows the option again when the change was refused (`set` returns false), after a change it took has the window show every row's value again (`onChanged`, set by the window on every setting and option row: a setting may follow another, as Tracker Grows follows Tracker Layout, currency.md §6; reported: it kept "Left" after the layout became Column), and asks in a `NextDialog` over the window to reload after a change that needs one (`reload`). Its description is its tooltip, which stays while the pointer is over its control (`IsMouseOver` on leaving). Rows across the page: `CreateText`, `CreateButtons`, `CreateLink`. Every row answers `Measure(width)`, `Place(x, y, width, height)`, `Refresh(ctx)`, and `wide`. |
 | `NextSettingsPage` | `page.lua` | A drawable (render-pipeline.md) laying sections out at the width it is given: a title in capitals and a note, a card of rows in two columns when the page is at least twice `MinColumn` wide (one otherwise), a pair as tall as its taller row, a wide row on a line of its own across both; lines between the card's lines and between a pair's columns; rows of an earlier layout not placed again are hidden; empty text when there are no sections. |
+| `NextSettingsNav` | `nav.lua` | A sidebar list's parts, one look for every list: a row (`CreateRow`) painted as a heading (`PaintHeading`: capitals unless `Nav.GroupUpper` is false, the theme's heading font and gap) or an entry (`PaintEntry`: chosen, lit under the pointer, or plain), and a marker (`CreateMarker`, `PaintMarker`) drawing the chosen entry's fill and bar on a frame of its own, which a list glides from one entry to the next. The window's list of pages and the Help page's tree of articles (help.md §4) draw with it. |
+| `NextSettingsCards` | `cards.lua` | A card, one look for every card: a name, a status on the right and two lines of text under the name, from the theme's `Settings.Cards` (`Create`; `Paint`: filled, lit under the pointer, edged, the chosen one in its own edge), its lengths on the window's grid (`Metrics`), put in place on whole pixels (`Place`) and its parts laid out within it (`Layout`). Each owner says what it shows, what a click does and where the cards go. The Appearance page's theme cards and the Help page's cards (help.md §4, §5) are these. |
 | `NextSettings` | `window.lua` | The window, below. |
 
 **The window** (`BetterBagsNextSettings`, `DIALOG` strata, above every Next panel, toplevel, clamped):
@@ -128,11 +130,17 @@ for the Categories page, as asked).
   section per page and tab ("Backpack > Items", a page with one tab by its title alone) led by a link
   to it (going there leaves the search). Pages not shown are left out; nothing found says so;
   clearing the box (or Escape in it) goes back to the page. Result rows are made once per setting and
-  kept for later searches.
+  kept for later searches. Under them, a **Help Articles** section (named apart from the Help page's own section, which its keywords
+  find) links the help articles the help's own search
+  ranks first for the text (at most 4, `helpLink`, each made once; a click sends `help/OpenArticle`,
+  help.md §4).
+- **ShowHeading** shows the shown page's `heading()` again, unless the window's search shows: the Help
+  page's header follows its own search as it is typed (help.md §4).
 - **Theme**: `ApplyStyle` restyles every part and lays the window out again.
 
 **Opening it** (`config/config.lua`): `config:Open` (the `config/Open` message: the settings
-buttons, the bag menu, `/bb`) opens `NextSettings`, for either design. On `bags/DesignChanged` the
+buttons, the bag menu, `/bb`) opens `NextSettings`, for either design; `/bb help` opens it on the Help
+page (`help/Open`, help.md §4). On `bags/DesignChanged` the
 window, if open, shows the new design's settings and stays open (§7). `core/init.lua` calls
 `NextSettings:Init()` after `SonataNext`
 (initialization.md). The settings files load after `config\plugin.lua` in every TOC (they need the

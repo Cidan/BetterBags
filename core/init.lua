@@ -225,6 +225,8 @@ function addon:OnInitialize()
   addon:GetModule('SonataNext'):WatchAnimation()
   -- BetterBags Next's settings window (next-settings.md §3): built the first time it opens.
   addon:GetModule('NextSettings'):Init()
+  -- Its Help page starts each session on its home (help.md §4).
+  addon:GetModule('NextSettingsHelp'):Init()
   addon:GetModule('NextSettingsContent'):Init()
   addon:GetModule('Tabs'):Init()
   itemFrame:Init()
@@ -439,6 +441,8 @@ function addon:OnEnable()
   form:Enable()
   addon:GetModule('ChangelogWindow'):Enable()
   addon:GetModule('NextSettingsContent'):Enable()
+  -- /bb help and the settings window's search open the Help page (help.md §4).
+  addon:GetModule('NextSettingsHelp'):Enable()
 
   consoleport:Enable()
   gamepad:Enable()

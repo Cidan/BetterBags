@@ -63,6 +63,7 @@ local pages = addon:NewModule('NextSettingsPages')
 ---@field design? BagDesign
 ---@field keywords? string[]
 ---@field sidebar? fun(parent: Frame, owner: Frame): NextSettingsSidebar Its own list (next-settings.md §5), made once.
+---@field choose? fun() What its list chooses before the window reads its tabs (the Categories page's category, and so its tabs); anything else reading its tabs calls it first.
 ---@field heading? fun(): string, string? Its title and description now, in place of title and description.
 ---@field actions? fun(parent: Frame, owner: Frame): NextSettingsActions Its buttons in the header, made once.
 ---@field tabs NextSettingsTabDef[]
@@ -128,6 +129,32 @@ function pages:ShownTabs(page)
     end
   end
   return list
+end
+
+-- ShowsSetting says whether the settings window shows a setting's row now: in a tab shown now of a page shown now bound
+-- to the bag (a page with no bag for a setting of none) that has the setting, in a section and a row for the bags in
+-- use, neither hidden.
+---@param id string
+---@param bag? SettingBag
+---@return boolean
+function pages:ShowsSetting(id, bag)
+  for _, page in ipairs(self:List()) do
+    if ((bag == nil and page.bag == nil) or (bag ~= nil and page.bag ~= nil and page.bag.kind == bag.kind))
+      and addon:GetModule('SettingsCatalog'):Has(id, page.bag) then
+      for _, tab in ipairs(self:ShownTabs(page)) do
+        for _, section in ipairs(self:Sections(tab)) do
+          if self:InDesign(section) and not (section.hidden ~= nil and section.hidden() == true) then
+            for _, row in ipairs(section.rows) do
+              if row.setting == id and self:InDesign(row) and not (row.hidden ~= nil and row.hidden() == true) then
+                return true
+              end
+            end
+          end
+        end
+      end
+    end
+  end
+  return false
 end
 
 -- List returns the pages shown now, in order.

@@ -23,7 +23,7 @@ for _, m in ipairs({ { "NextStyle", "next/style.lua" }, { "NextTween", "next/twe
   { "NextSwatch", "next/controls/swatch.lua" }, { "NextTopTabs", "next/controls/toptabs.lua" },
   { "NextLift", "next/lift.lua" }, { "NextDialog", "next/controls/dialog.lua" }, { "NextSettingsRows", "next/settings/rows.lua" },
   { "NextSettingsPage", "next/settings/page.lua" }, { "NextSettingsPages", "next/settings/pages.lua" },
-  { "NextSettings", "next/settings/window.lua" } }) do
+  { "HelpSearch", "help/search.lua" }, { "HelpArticles", "help/articles.lua" }, { "NextSettingsNav", "next/settings/nav.lua" }, { "NextSettings", "next/settings/window.lua" } }) do
   ResetModuleStub(m[1], m[2])
   LoadBetterBagsModule(m[2])
 end

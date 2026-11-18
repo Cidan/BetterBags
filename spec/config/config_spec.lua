@@ -23,7 +23,7 @@ LoadFreshBetterBagsModule("Config", "config/config.lua")
 local config = addon:GetModule("Config")
 
 describe("Config", function()
-  local handlers, sent, log, saved, console
+  local handlers, sent, log, saved, console, helpQueries
 
   local function override(tbl, key, value)
     table.insert(saved, { tbl, key, rawget(tbl, key) })
@@ -31,11 +31,14 @@ describe("Config", function()
   end
 
   before_each(function()
-    handlers, sent, log, saved = {}, {}, {}, {}
+    handlers, sent, log, saved, helpQueries = {}, {}, {}, {}, {}
     console = LibStub("AceConsole-3.0")
     override(console, "RegisterChatCommand", function(_, command, fn) handlers[command] = fn end)
     override(events, "RegisterMessage", function(_, name, fn) handlers["message " .. name] = fn end)
-    override(events, "SendMessage", function(_, _, message) table.insert(sent, message) end)
+    override(events, "SendMessage", function(_, _, message, query)
+      table.insert(sent, message)
+      if message == "help/Open" then table.insert(helpQueries, query) end
+    end)
     override(nextSettings, "Open", function(_, page) table.insert(log, "open " .. tostring(page)) end)
     override(nextSettings, "OnDesignChanged", function(_, ctx)
       assert.is_not_nil(ctx)
@@ -106,6 +109,15 @@ describe("Config", function()
     handlers.bb("  ChangeLog ")
     assert.are.same({}, log)
     assert.are.same({ "changelog/Open", "changelog/Open" }, sent)
+  end)
+
+  -- /bb help opens the settings window's Help page (help.md §4), searching for what follows, as typed.
+  it("opens the help on /bb help, searching for the words after it", function()
+    handlers.bb("help")
+    handlers.bb(" HELP  auto sell ")
+    assert.are.same({}, log, "not the settings' first page")
+    assert.are.same({ "help/Open", "help/Open" }, sent)
+    assert.are.same({ "", "auto sell" }, helpQueries)
   end)
 
   -- A BetterBagsNext backpack has no anchor (next.md §1).

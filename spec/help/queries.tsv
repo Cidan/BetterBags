@@ -1,0 +1,1200 @@
+1	opening	how do i pull up config
+1	opening	shortcut to get back to guide
+1	opening	cant find options menu
+1	opening	hotkey for backpack
+1	opening	cant find settigns menu
+1	designs	change back to old ui style
+1	designs	how do i try the new layout
+1	designs	switch between the two looks
+1	designs	revert to old look
+1	designs	how to switch bag desgin
+1	slash-commands	what can i type in chat
+1	slash-commands	list of hotkeys
+1	slash-commands	keyboard shortcuts list
+1	slash-commands	how to bind keys for addon
+1	slash-commands	chat shortcts list
+1	settings-window	how do i look up an option
+1	settings-window	where did a specific toggle go
+1	settings-window	options menu layout
+1	settings-window	bank options vs backpack options
+1	settings-window	cant locate an optin in menu
+1	whats-new	patch notes for addon
+1	whats-new	what changed in latest update
+1	whats-new	recent bug fixes and additions
+1	whats-new	version history
+1	whats-new	recent patch changlog
+1	sections	how are items grouped together
+1	sections	why are there headers in my bag
+1	sections	where do item groups come from
+1	sections	which group takes priority
+1	sections	how items get sorted into gropus
+1	bag-menu	what are the icons in top bar
+1	bag-menu	little clickable icons near title
+1	bag-menu	what does the top left icon do
+1	bag-menu	corner dropdown actions
+1	bag-menu	top bar icon buton meanings
+1	sorting	tidy up my inventory
+1	sorting	button to clean up messy slots
+1	sorting	how to organize bank items
+1	sorting	automatic inventory cleanup
+1	sorting	how to auto clean backapck
+1	section-layout	put item groups next to each other
+1	section-layout	arrange groups horizontally
+1	section-layout	side by side grid
+1	section-layout	wide view instead of vertical stack
+1	section-layout	arrange groups sidebyside
+1	classic-window	make frame transparent
+1	classic-window	how many slots per row
+1	classic-window	drag corner to resize old frame
+1	classic-window	change background see through
+1	classic-window	how to change frame opacitiy
+1	section-order	keep my favorite group at the top
+1	section-order	change which header comes first
+1	section-order	pin a group above everything else
+1	section-order	sort headers alphabetically
+1	section-order	pin group to top alway
+1	item-order	sort loot by rarity or name
+1	item-order	arrange gear inside each group
+1	item-order	change how things line up in a group
+1	item-order	put highest ilvl first in group
+1	item-order	change loot sort within grop
+1	free-space	hide extra empty squares
+1	free-space	leave blank spot when i sell something
+1	free-space	why are there holes in my bag
+1	free-space	show every open slot
+1	free-space	keep blank spot after moving itme
+1	stacking	combine duplicate stacks visually
+1	stacking	why do i only see one icon for 40 herbs
+1	stacking	stop combining stacks into one slot
+1	stacking	show real number of stacks
+1	stacking	combine stacks into one buton
+1	item-buttons	display ilvl on gear icons
+1	item-buttons	mythic plus key number on icon
+1	item-buttons	colored border around epic loot
+1	item-buttons	hide gear score text on icons
+1	item-buttons	show mythic key levle on icon
+1	item-colors	why is ilvl text green or red
+1	item-colors	number shade based on equipped gear
+1	item-colors	change text tint for gear power
+1	item-colors	ilvl color scale
+1	item-colors	what do ilvl text colrs mean
+1	upgrades	why is there a green pointer on loot
+1	upgrades	gear improvement indicator missing
+1	upgrades	how does it know if gear is better
+1	upgrades	green up indicator not showing
+1	upgrades	green up arow missing
+1	recent-items	newly looted stuff at the top
+1	recent-items	how long new loot stays marked
+1	recent-items	clear out new loot list
+1	recent-items	turn off newly acquired group
+1	recent-items	disable new loot sectin
+1	show-bags	equip a bigger pouch
+1	show-bags	see which pouch holds what
+1	show-bags	swap out an old backpack slot
+1	show-bags	where do i put new pouch i bought
+1	show-bags	how to equip new backapck
+1	dropping	drag gear onto frame to store it
+1	dropping	do i have to aim at an empty slot
+1	dropping	toss loot anywhere on the panel
+1	dropping	put gear in bank without finding blank square
+1	dropping	put loot anyhwere in inventory
+1	anchors	frame went off screen
+1	anchors	lock panel position to bottom right
+1	anchors	keep window from going off edge
+1	anchors	drag frame to another spot
+1	anchors	pin panel to screen cornre
+1	groups	split bag into separate pages
+1	groups	window is too tall want tabs
+1	groups	make a new page for gear or mats
+1	groups	organize buckets onto tabs
+1	groups	put buckets on thier own tabs
+1	interactions	stop bag popping up at mail
+1	interactions	auto show when talking to merchant
+1	interactions	inventory wont pop up when trading
+1	interactions	disable auto open at auction house
+1	interactions	auto pop up at vendro
+1	blizzard-button	hide default backpack icon on bar
+1	blizzard-button	remove original game bag bar
+1	blizzard-button	bring back the standard bag icon
+1	blizzard-button	default ui bag icon missing
+1	blizzard-button	hide default blizzrd bag icon
+1	next-panels	docked sidebar mode vs floating box
+1	next-panels	full screen height side panel
+1	next-panels	switch between compact and tall view
+1	next-panels	how do i dock window to screen edge
+1	next-panels	floating box vs tall side panle
+1	next-size	make icons bigger
+1	next-size	shrink whole frame
+1	next-size	why does compact window grow taller
+1	next-size	adjust slot icon width
+1	next-size	resize icons and windw
+1	next-chain	snap backpack next to merchant
+1	next-chain	attach bank and backpack side by side
+1	next-chain	windows overlap instead of sitting beside each other
+1	next-chain	dock panels next to each other
+1	next-chain	stick bag and bank togther
+1	next-dragging	move a tab to change order
+1	next-dragging	grab group header with mouse
+1	next-dragging	move loot into another bucket
+1	next-dragging	reorder tabs with mouse
+1	next-dragging	drag and drop tabs to reoder
+1	next-vendor	how to repair gear at merchant
+1	next-vendor	where is the buyback button
+1	next-vendor	use default blizzard merchant frame
+1	next-vendor	repair all button at shop
+1	next-vendor	where is repair button at vendro
+1	next-guildbank	open guild vault with addon
+1	next-guildbank	see guild tabs sorted by group
+1	next-guildbank	guild storage frame
+1	next-guildbank	why does guild vault look different
+1	next-guildbank	guildbank tabs sorted
+1	next-currencies	watch crests and valorstones
+1	next-currencies	drag token bar onto screen
+1	next-currencies	pin token count to bottom bar
+1	next-currencies	floating currency widget
+1	next-currencies	track crests at botom of bag
+1	next-fooddrink	quick buttons for eating and drinking
+1	next-fooddrink	mage water and snacks shortcut on screen
+1	next-fooddrink	floating eat and hydrate icons
+1	next-fooddrink	hide the two snack buttons
+1	next-fooddrink	floating eat and drnk buttons
+1	next-bank	how does new storage frame work
+1	next-bank	where are warband and reagent buttons
+1	next-bank	buttons inside the new storage window
+1	next-bank	switch between tabs and groups in storage
+1	next-bank	new bank panle buttons
+1	search-basics	how to look up an item in my bags
+1	search-basics	keyboard shortcut for filter bar
+1	search-basics	filter inventory by typing
+1	search-basics	turn a query into a custom group
+1	search-basics	open serch bar in bag
+1	search-text	filter by equip slot like trinket
+1	search-text	find soulbound or boe stuff
+1	search-text	query by item type or tooltip words
+1	search-text	match weapon or armor subtype
+1	search-text	filter by equip slot or bindng
+1	search-numbers	find items above certain ilvl
+1	search-numbers	filter by vendor sell value
+1	search-numbers	check for epic or rare quality
+1	search-numbers	check stack count in query
+1	search-numbers	filter by gold value or ilv
+1	search-flags	find crafting mats only
+1	search-flags	filter out toys i already collected
+1	search-flags	look for transmog i dont know yet
+1	search-flags	find items that are soulbound
+1	search-flags	searhc for bound or reagent
+1	search-operators	exclude something from a query
+1	search-operators	combine two filters together
+1	search-operators	greater than or less than symbols
+1	search-operators	match either one thing or another
+1	search-operators	combne two filters with and or
+1	search-math	filter for gear above my own ilvl
+1	search-math	how to write 50g in a query
+1	search-math	compare item stats to my level
+1	search-math	add or multiply numbers in filter
+1	search-math	filter gold amonts like 10g
+1	search-examples	sample queries i can copy
+1	search-examples	query to find grey vendor trash
+1	search-examples	example filter for uncollected mounts
+1	search-examples	preset filters for upgrades
+1	search-examples	sample query for vendor jnk
+1	categories-intro	why cant an item be in two groups
+1	categories-intro	how custom buckets work
+1	categories-intro	priority when item matches two rules
+1	categories-intro	where to manage all custom groups
+1	categories-intro	item matches two catagories
+1	category-make	create my own item group
+1	category-make	right click item to start new group
+1	category-make	how to build a custom bucket
+1	category-make	save a filter as a new group
+1	category-make	make new custom catagory
+1	category-rule	smart group that updates automatically
+1	category-rule	auto sort items using a query
+1	category-rule	split dynamic group by subtype
+1	category-rule	dynamic folder based on filter
+1	category-rule	auto updating rule catagory
+1	category-items	manually assign loot to a group
+1	category-items	take one item back out of a group
+1	category-items	move gear by hand into custom bucket
+1	category-items	take wrongly added item off list
+1	category-items	put item manualy into group
+1	category-ignored	blacklist an item from a group
+1	category-ignored	stop item from going into a rule group
+1	category-ignored	exclude specific gear from custom bucket
+1	category-ignored	never put this piece in that group
+1	category-ignored	block item from catagory
+1	category-settings	change title color of a group
+1	category-settings	hide a group completely
+1	category-settings	only use group in bank not backpack
+1	category-settings	delete or rename custom group
+1	category-settings	rename or delte a group
+1	blizzard-categories	edit built in consumable or armor groups
+1	blizzard-categories	customize default item type buckets
+1	blizzard-categories	take over a default section
+1	blizzard-categories	why cant i edit consumables group
+1	blizzard-categories	customize default blizzrd groups
+1	category-gearsets	group for my saved armor outfits
+1	category-gearsets	keep raid and pvp sets together
+1	category-gearsets	customize gear manager groups
+1	category-gearsets	separate group per loadout
+1	category-gearsets	saved outift gearset group
+1	category-item-order	sort just one group differently
+1	category-item-order	custom arrangement for consumables only
+1	category-item-order	override item sorting for one bucket
+1	category-item-order	keep hearthstone first in one group
+1	category-item-order	different sort for one catagory
+1	category-share	copy my setup to a friend
+1	category-share	import string from a guildmate
+1	category-share	send custom groups as text
+1	category-share	back up all my custom groups
+1	category-share	import string from freind
+1	category-plugins	groups added by external addons
+1	category-plugins	third party item buckets
+1	category-plugins	why do i have extra groups from other addons
+1	category-plugins	manage groups from companion addons
+1	category-plugins	extra groups from plugns
+1	auto-sell	automatically vendor grey junk
+1	auto-sell	vendor a whole group at merchants
+1	auto-sell	what items are protected from vendoring
+1	auto-sell	speed of selling items at shop
+1	auto-sell	autosell junk at vendor
+1	confirm-sale	ask before selling a group at merchant
+1	confirm-sale	click twice to sell boes safely
+1	confirm-sale	stage items for sale without instant sell
+1	confirm-sale	review items before merchant takes them
+1	confirm-sale	doubleclick to confirm sale
+1	destroy	delete unsellable quest junk quickly
+1	destroy	get rid of items vendor wont buy
+1	destroy	one click trash deletion
+1	destroy	clear out worthless soulbound clutter
+1	destroy	delete unsellable items one click at a tme
+1	auto-deposit	automatically put mats in bank
+1	auto-deposit	move group to account bank on open
+1	auto-deposit	auto stash items when visiting banker
+1	auto-deposit	send items to storage automatically
+1	auto-deposit	autodeposit reagents to bank
+1	move-category	mail an entire group at once
+1	move-category	dump full group into trade window
+1	move-category	one click deposit full group to bank
+1	move-category	vendor everything in one group right now
+1	move-category	send entire group to mailbx
+1	skip-recent	stop certain loot from appearing as new
+1	skip-recent	bypass new loot section for mats
+1	skip-recent	go straight to normal group when looted
+1	skip-recent	ignore new item highlight for this group
+1	skip-recent	skiprecent items for a group
+1	classic-currency	pick tokens shown under old bag
+1	classic-currency	change tracked gold and emblems in classic view
+1	classic-currency	hide token bar under old frame
+1	classic-currency	show more tokens in old bag
+1	classic-currency	pick currencys under classic bag
+1	bank-basics	turn off addon for bank only
+1	bank-basics	use default game storage frame instead
+1	bank-basics	how storage view is organized
+1	bank-basics	revert storage to normal wow ui
+1	bank-basics	use default blizzrd bank instead
+1	warbank	put warbound gear into account storage
+1	warbank	deposit gold into shared account storage
+1	warbank	rename or buy account storage tabs
+1	warbank	account wide storage controls
+1	warbank	deposit gold in warbnak
+1	bank-tabs	see bank tab 1 tab 2 separately
+1	bank-tabs	show original bank tabs instead of groups
+1	bank-tabs	view reagent tab on its own
+1	bank-tabs	switch storage back to per tab view
+1	bank-tabs	view individul bank tabs
+1	bank-bags	unlock extra storage slots at banker
+1	bank-bags	buy another bag slot in storage
+1	bank-bags	equip new pouch at banker
+1	bank-bags	how to purchase storage slots
+1	bank-bags	buy extra bank bag sltos
+1	themes	change skin and colors of bags
+1	themes	preview a look before saving
+1	themes	switch visual style skin
+1	themes	try out dark or minimal skin
+1	themes	preview a diferent bag skin
+1	effects	disable snow or particle visuals
+1	effects	turn off glowing sparkles in window
+1	effects	stop moving background visuals
+1	effects	make skin stop animating
+1	effects	turn off skin sparkels and snow
+1	glass	adjust see through background darkness
+1	glass	turn off rain and thunder in dark skin
+1	glass	make translucent window more opaque
+1	glass	change shine on frosted look
+1	glass	turn off rain and lightnig effect
+1	profiles	copy setup to my alt character
+1	profiles	share layout across all characters
+1	profiles	save preset for different toon
+1	profiles	export or switch character presets
+1	profiles	copy config to alt charcter
+1	reload-settings	why didnt my change apply yet
+1	reload-settings	which toggles require reload ui
+1	reload-settings	option needs slash reload to work
+1	reload-settings	change only applies after reloading
+1	reload-settings	options needing ui relod
+1	quickfind	search addon compatibility
+1	quickfind	spotlight item finder integration
+1	quickfind	look up items across characters
+1	quickfind	fast bag finder addon support
+1	quickfind	qucikfind addon bag search
+1	pawn	use stat weights for green arrows
+1	pawn	connect external addon for gear scores
+1	pawn	simpleitemlevel arrow integration
+1	pawn	let another addon pick gear upgrades
+1	pawn	connect pawn stat weights for upgrdes
+1	tsm	tsm merchant ui conflict
+1	tsm	use tradeskillmaster shop screen instead
+1	tsm	switch back from tsm merchant frame
+1	tsm	vendor window replaced by tsm
+1	tsm	switch between tsm and bag vendro
+1	shopping-list	buy crafting mats from list in one click
+1	shopping-list	profession list auto buy at merchant
+1	shopping-list	integrate crafting mat tracker
+1	shopping-list	purchase needed reagents automatically
+1	shopping-list	buy prof shopping list mats at vendro
+1	masque	change icon borders with masque
+1	masque	use my button skin pack on slots
+1	masque	round or square slot borders
+1	masque	icon border styling addon
+1	masque	skin item icons with masqe
+1	gamepad	play with xbox or ps5 gamepad
+1	gamepad	consoleport bag navigation
+1	gamepad	steam deck controls for inventory
+1	gamepad	gamepad cursor support in bags
+1	gamepad	play bags with controllr
+1	elvui-gw2	make bags match my elvui skin
+1	elvui-gw2	guild wars 2 ui style skin
+1	elvui-gw2	automatic skin matching for ui packs
+1	elvui-gw2	match font and borders to elvui
+1	elvui-gw2	match elvui or gw2 ui skn
+1	plugins	extensions people make for this addon
+1	plugins	curseforge companion packs
+1	plugins	add extra filters via external addons
+1	plugins	third party extensions and packs
+1	plugins	third party addon plugns
+1	wrong-category	item ended up in the unexpected spot
+1	wrong-category	why is this potion in junk
+1	wrong-category	move misplaced item to right group
+1	wrong-category	fix item sorted into weird section
+1	wrong-category	item sorted in wrong catagory
+1	category-deleted-returns	removed group keeps coming back
+1	category-deleted-returns	cant permanently remove a section
+1	category-deleted-returns	group returned after relogging
+1	category-deleted-returns	why does removed bucket reappear
+1	category-deleted-returns	deleted group comes back after relod
+1	bags-not-opening	addon stopped replacing default bags
+1	bags-not-opening	normal backpack still opens instead
+1	bags-not-opening	why am i seeing standard wow bags
+1	bags-not-opening	addon isnt opening when i press b
+1	bags-not-opening	default wow bags keep opning
+1	performance	fps drop when opening backpack
+1	performance	lag spike when looting or sorting
+1	performance	capture trace for bug report
+1	performance	how to profile addon lag
+1	performance	record stutter for bug reprt
+1	welcome	what does this addon do
+1	welcome	how do i start using this
+1	welcome	overview of bag addon features
+1	welcome	where to begin after installing
+1	welcome	new to this adon where to start
+2	welcome	adibags replacement overview
+2	welcome	just installed this addon and i have no idea where to start
+2	welcome	intro guide
+2	welcome	I want a quick tour of what this inventory tool does and how its layouts work.
+2	welcome	geting started
+2	opening	bagnon menu keybind config
+2	opening	my inventory wont pop up when i press b and i cant find the options
+2	opening	show options
+2	opening	How do I bring up my inventory, the configuration menu, and this guide?
+2	opening	howto launch menu
+2	designs	elvui style vs adibags layout
+2	designs	my inventory looks totally different from the screenshots and i want the old look back
+2	designs	switch layout
+2	designs	I want to change between the two visual styles available for my inventory window.
+2	designs	change uistyle
+2	slash-commands	bagnon console shortcuts
+2	slash-commands	typing in chat does nothing and my hotkeys arent opening anything
+2	slash-commands	chat shortcuts
+2	slash-commands	What text triggers can I type in chat and what keyboard shortcuts can I assign?
+2	slash-commands	hotkeys chatcmds
+2	settings-window	arkinventory config navigation
+2	settings-window	there are too many menus and i cant locate the option i need
+2	settings-window	option search
+2	settings-window	How is the configuration screen organized so I can track down a specific toggle?
+2	settings-window	serch config
+2	whats-new	adibags changelog history
+2	whats-new	something changed after the latest patch and i dont know what got updated
+2	whats-new	patch notes
+2	whats-new	Where can I read the release notes for recent updates to this addon?
+2	whats-new	changlog updates
+2	sections	arkinventory rule buckets
+2	sections	my gear and potions keep landing in weird groups and i dont know why
+2	sections	item grouping
+2	sections	How does the addon decide which labeled box an item belongs in?
+2	sections	howitems sort
+2	bag-menu	bagnon top bar icons
+2	bag-menu	i clicked an icon at the top of my inventory and now everything looks weird
+2	bag-menu	top icons
+2	bag-menu	What do all the small clickable icons along the top edge of my inventory window do?
+2	bag-menu	topbar btns
+2	sorting	elvui cleanup button
+2	sorting	my inventory is a total mess and clicking cleanup isnt organizing slots
+2	sorting	clean up
+2	sorting	How do I automatically tidy up all the items inside my backpack and storage vault?
+2	sorting	autoclean slots
+2	section-layout	adibags grid width
+2	section-layout	all my item groups are stacked in one tall skinny line off my screen
+2	section-layout	horizontal groups
+2	section-layout	I want my item groups arranged next to each other horizontally instead of vertically.
+2	section-layout	colums width
+2	classic-window	bagnon frame scale opacity
+2	classic-window	my old style inventory is huge and transparent and i cant drag the corner
+2	classic-window	frame opacity
+2	classic-window	How do I adjust transparency, zoom scale, and items per line in the older layout?
+2	classic-window	resize oldframe
+2	section-order	adibags pinned groups top
+2	section-order	my hearthstone group keeps moving to the bottom instead of staying first
+2	section-order	pin group
+2	section-order	I want to lock certain item groups at the very top so they always appear first.
+2	section-order	pintop groups
+2	item-order	arkinventory sort within bar
+2	item-order	gear inside each group is jumbled by name instead of quality or ilvl
+2	item-order	inner sort
+2	item-order	How can I change how gear and consumables are arranged inside each labeled group?
+2	item-order	sortinside group
+2	free-space	adibags empty slots
+2	free-space	every time i sell something all the icons jump around instead of leaving a blank spot
+2	free-space	empty slots
+2	free-space	I want to see all my unused inventory slots or keep a placeholder where an item used to sit.
+2	free-space	emptyslots blank
+2	stacking	adibags virtual stacks
+2	stacking	i have five piles of herbs taking up tons of room and they wont combine visually
+2	stacking	combine piles
+2	stacking	How do I collapse duplicate piles of the same material into a single slot icon?
+2	stacking	virtualpile combine
+2	item-buttons	elvui ilvl border color
+2	item-buttons	my mythic keys dont show their tier number and purple gear has no colored border
+2	item-buttons	ilvl borders
+2	item-buttons	How do I turn on gear power numbers, rarity outlines, and dungeon key ratings on slot icons?
+2	item-buttons	showilvl mplus
+2	item-colors	elvui dynamic ilvl coloring
+2	item-colors	my gear numbers are all white instead of turning green or orange compared to what i wear
+2	item-colors	ilvl tint
+2	item-colors	Why do the power numbers on my gear change shade based on what my character has equipped?
+2	item-colors	ilvl tintscale
+2	upgrades	elvui bags green gear indicator missing
+2	upgrades	i looted better boots and there is no green marker showing on the icon
+2	upgrades	better gear
+2	upgrades	How does the addon decide when to mark a piece of equipment as stronger than what I am wearing?
+2	upgrades	greenarow gear
+2	recent-items	adibags new loot section
+2	recent-items	things i looted an hour ago are still stuck at the top and wont go away
+2	recent-items	new loot
+2	recent-items	How do I clear newly looted things or disable the temporary group for fresh drops?
+2	recent-items	clearnew loot
+2	show-bags	bagnon container bar equip
+2	show-bags	i bought a bigger pouch and i have nowhere to drop it to replace my old one
+2	show-bags	swap pouches
+2	show-bags	Where can I view my equipped containers so I can replace one or unlock extra storage slots?
+2	show-bags	equipnew pouch
+2	dropping	adibags click anywhere deposit
+2	dropping	when i drag loot off my cursor onto the frame it refuses to go in unless i hit an empty square
+2	dropping	quick drop
+2	dropping	Can I place something from my mouse cursor anywhere on the inventory window without aiming for a blank slot?
+2	dropping	dropanywhere slot
+2	anchors	elvui bags corner snap
+2	anchors	my inventory keeps drifting off the edge of my monitor whenever i resize it
+2	anchors	pin corner
+2	anchors	How do I drag my inventory frame to a new spot and lock which corner it grows from?
+2	anchors	lockposition screen
+2	groups	bagnon bag pages organization
+2	groups	my inventory window is way too tall and i want separate pages for gear and crafting
+2	groups	category pages
+2	groups	How can I organize my labeled item boxes onto separate clickable pages to save vertical space?
+2	groups	maketabs pages
+2	interactions	elvui auto open merchant mail
+2	interactions	my inventory wont pop up automatically when i check my mail or talk to a shopkeeper
+2	interactions	auto popup
+2	interactions	Where do I toggle whether my backpack appears on its own when trading, crafting, or visiting an auctioneer?
+2	interactions	autopopup shop
+2	blizzard-button	bagnon hide default micro menu backpack
+2	blizzard-button	the default game backpack icon is still sitting on my action bar and i want it gone
+2	blizzard-button	default icon
+2	blizzard-button	How do I hide or bring back the original game backpack icon on my action bar?
+2	blizzard-button	hideblizz icon
+2	next-panels	elvui side panel docked vs floating
+2	next-panels	my inventory takes up the entire right edge of my screen instead of being a compact floating box
+2	next-panels	docked panel
+2	next-panels	How do I switch between a compact floating window and a tall docked sidebar?
+2	next-panels	sidepanel mode
+2	next-size	bagnon icon spacing zoom
+2	next-size	the icons in my inventory are tiny and i cant read the stack counts
+2	next-size	icon zoom
+2	next-size	How do I make slot icons larger and control how a compact window expands as I loot more?
+2	next-size	biggericons zoom
+2	next-chain	elvui attach bank next to backpack
+2	next-chain	my vault window overlaps right on top of my backpack when i open both
+2	next-chain	snap windows
+2	next-chain	How do I dock my backpack and storage or merchant windows side by side so they move as one?
+2	next-chain	docktogether frames
+2	next-dragging	arkinventory drag rule bar
+2	next-dragging	i tried grabbing a group header to rearrange it and nothing moved
+2	next-dragging	mouse reorder
+2	next-dragging	How do I grab and move groups, individual pieces of loot, or page headers with my mouse?
+2	next-dragging	mousedrop reorder
+2	next-vendor	elvui merchant sell junk frame
+2	next-vendor	i cant find the repair button or how to buy back something i sold by mistake
+2	next-vendor	shop repair
+2	next-vendor	How does the replacement merchant screen handle repairing gear, selling items, and recovering sold loot?
+2	next-vendor	buybak repair
+2	next-guildbank	bagnon gbank tabs
+2	next-guildbank	my gbank isnt showing sorted groups like my backpack does
+2	next-guildbank	clan vault
+2	next-guildbank	How do I view and organize shared clan storage using my custom item groups?
+2	next-guildbank	gbankview layout
+2	next-currencies	elvui token bar bottom backpack
+2	next-currencies	my crests and gold tokens disappeared from the bottom bar and i want a floating counter
+2	next-currencies	token bar
+2	next-currencies	How do I pin crests, tokens, or consumables to the bottom footer or pull out a separate counter widget?
+2	next-currencies	pinnedtokens bar
+2	next-fooddrink	adibags mage water quick bar
+2	next-fooddrink	i have to dig through my backpack every pull just to eat and restore mana
+2	next-fooddrink	quick eat
+2	next-fooddrink	Where do I enable the two floating hotbar icons that keep my best meals and mana beverages ready?
+2	next-fooddrink	eatmana hud
+2	next-bank	bagnon personal vault warbank tabs
+2	next-bank	my storage vault tabs are missing and i cant switch to account wide storage
+2	next-bank	vault panel
+2	next-bank	How do the character vault, account-wide storage, and top buttons work in the modern layout?
+2	next-bank	myvault screen
+2	search-basics	bagnon filter box syntax
+2	search-basics	i typed a word into the find bar and nothing highlighted
+2	search-basics	find bar
+2	search-basics	How do I open the filter box and type words or queries to highlight matching loot?
+2	search-basics	itemfind box
+2	search-text	arkinventory rule string slot binding
+2	search-text	trying to filter for soulbound chest armor just matches every item with chest in the name
+2	search-text	slot filter
+2	search-text	Which keywords let me filter by equipment slot, item kind, or soulbound status?
+2	search-text	filterby slot
+2	search-numbers	arkinventory ilvl rarity value filter
+2	search-numbers	i want to find only gear above a certain power or vendor value and typing digits does nothing
+2	search-numbers	ilvl query
+2	search-numbers	Which filter keywords check numeric values like gear power, rarity tier, gold price, or stack quantity?
+2	search-numbers	numfilter ilvl
+2	search-flags	bagnon filter reagents toys bound
+2	search-flags	i cant figure out how to filter out crafting mats or unlearned collectibles
+2	search-flags	boolean tags
+2	search-flags	Which true-or-false keywords match crafting materials, collectibles, bound gear, or already learned appearances?
+2	search-flags	truefalse filter
+2	search-operators	arkinventory boolean and or not rule
+2	search-operators	when i put two conditions together in the filter box it ignores the second half
+2	search-operators	boolean logic
+2	search-operators	How do I combine multiple conditions, exclude things, and check greater-than or less-than comparisons?
+2	search-operators	andor logic
+2	search-math	arkinventory gold value level rule
+2	search-math	i tried checking for gear worth over 50 gold or below my level and the expression failed
+2	search-math	gold expressions
+2	search-math	How do I write arithmetic calculations, coin amounts, and comparisons against my own hero stats?
+2	search-math	goldcalc lvl
+2	search-examples	arkinventory sample rules junk upgrades
+2	search-examples	i dont want to learn syntax from scratch just give me strings i can paste for trash and transmog
+2	search-examples	sample queries
+2	search-examples	Can I copy ready-to-use filter expressions for finding vendor trash, gear upgrades, or uncollected appearances?
+2	search-examples	copypaste rules
+2	categories-intro	adibags filter priority order
+2	categories-intro	an item matches two of my custom rules and keeps ending up in the wrong box
+2	categories-intro	rule priority
+2	categories-intro	What happens when a piece of loot qualifies for multiple labeled groups at once?
+2	categories-intro	priorty conflict
+2	category-make	adibags create custom filter
+2	category-make	i want a new group for my raid consumes and i cant find the plus button
+2	category-make	new group
+2	category-make	What are all the ways to create a custom item group from scratch or from loot?
+2	category-make	creategroup new
+2	category-rule	arkinventory dynamic query group
+2	category-rule	my custom group wont update on its own when i loot new reagents that match my query
+2	category-rule	dynamic filter
+2	category-rule	How do I build a smart group that automatically collects everything matching a query and splits results by a property?
+2	category-rule	smartgroup groupby
+2	category-items	adibags manual item assignment
+2	category-items	i put my trinket into a custom group by mistake and now i cant get it back out
+2	category-items	manual assign
+2	category-items	How do I manually place a specific piece of gear into a custom group or take it out?
+2	category-items	assignloot remove
+2	category-ignored	arkinventory blacklist item from rule
+2	category-ignored	this one potion keeps getting pulled into my auto group even though i took it out twice
+2	category-ignored	exclude loot
+2	category-ignored	How do I permanently block a specific object from ever entering a particular group?
+2	category-ignored	blacklst item
+2	category-settings	adibags filter color rename delete
+2	category-settings	i want to hide a group in my bank and change its title color but cant find those toggles
+2	category-settings	group options
+2	category-settings	How do I rename, erase, recolor, split, or restrict where a specific item group appears?
+2	category-settings	renamegroup color
+2	blizzard-categories	adibags default item type filters
+2	blizzard-categories	it wont let me edit or add things to the built in consumables group
+2	blizzard-categories	default groups
+2	blizzard-categories	Why are the built-in loot type groups locked and how can I convert one so I can customize it?
+2	blizzard-categories	lockedgroups edit
+2	category-gearsets	adibags outfit manager filter
+2	category-gearsets	my tanking armor swap pieces arent grouped together automatically
+2	category-gearsets	outfit groups
+2	category-gearsets	How does the addon make groups for my saved armor outfits and what options can I tweak on them?
+2	category-gearsets	wardobe outfits
+2	category-item-order	arkinventory per bar sort method
+2	category-item-order	i want just my consumables sorted by stack count without messing up my armor sorting
+2	category-item-order	group sort
+2	category-item-order	How can I give one specific group a different sorting style from the rest of my inventory?
+2	category-item-order	customsort group
+2	category-share	arkinventory export import profile string
+2	category-share	my guildmate sent me a text string for his groups and i dont know where to paste it
+2	category-share	import export
+2	category-share	How do I copy my custom groups as text to give a friend or load someone else's setup?
+2	category-share	exprt string
+2	category-plugins	adibags third party filter module
+2	category-plugins	i installed a companion expansion filter addon and i cant delete the groups it added
+2	category-plugins	external filters
+2	category-plugins	How do item groups created by separate companion addons behave and what can I change about them?
+2	category-plugins	addonfilters thirdparty
+2	auto-sell	elvui vendor grays automatically
+2	auto-sell	it sold half my trash slowly or skipped epics i wanted vendored when i talked to a merchant
+2	auto-sell	vendor junk
+2	auto-sell	How do I make a group of items liquidate to a merchant automatically whenever I open a shop?
+2	auto-sell	vendorjunk fast
+2	confirm-sale	bagnon safe sell list merchant
+2	confirm-sale	i keep vendoring boe blues by accident so i want a double click safety check first
+2	confirm-sale	doubleclick liquidate
+2	confirm-sale	How do I queue a group of items at a shopkeeper so nothing gets sold until I double-click to approve it?
+2	confirm-sale	safeliquidate check
+2	destroy	arkinventory delete unusable junk
+2	destroy	my bags are full of quest scraps and worthless tokens that merchants refuse to buy
+2	destroy	delete junk
+2	destroy	How do I quickly throw away items with no copper value that shopkeepers will not purchase?
+2	destroy	autodelete trash
+2	auto-deposit	elvui auto bank reagents
+2	auto-deposit	my crafting herbs never move into storage on their own when i visit the vault
+2	auto-deposit	quick stash
+2	auto-deposit	How do I make specific groups of items transfer into personal or account storage automatically when I open it?
+2	auto-deposit	quickstash bank
+2	move-category	bagnon transfer group to mail trade
+2	move-category	i have to right click thirty herbs one by one to mail them to my alt
+2	move-category	bulk transfer
+2	move-category	How can I send every item in a single group to storage, mail, a trade window, or a shopkeeper with one click?
+2	move-category	sendall group
+2	skip-recent	adibags bypass new loot group
+2	skip-recent	things i just bought keep sitting in the new loot box instead of going straight to my raid group
+2	skip-recent	bypass new
+2	skip-recent	How do I make fresh drops go directly into their normal group instead of pausing in the temporary new list?
+2	skip-recent	bypassnew loot
+2	classic-currency	elvui classic token tracker bar
+2	classic-currency	i want to pick which crests show along the lower edge of the old style frame
+2	classic-currency	token footer
+2	classic-currency	How do I select which tokens appear along the lower edge of the older inventory layout?
+2	classic-currency	oldtokens footer
+2	bank-basics	bagnon toggle default vault frame
+2	bank-basics	i just want the normal game vault window back because something isnt working right
+2	bank-basics	blizzard vault
+2	bank-basics	How does the addon display personal storage and how do I revert to the game's original frame instead?
+2	bank-basics	defaultvault frame
+2	warbank	bagnon account shared vault gold
+2	warbank	i cant deposit my account bound gear or gold into shared storage tabs
+2	warbank	shared vault
+2	warbank	How do I stash warbound items and gold into account-wide storage and organize its pages?
+2	warbank	warbnk gold
+2	bank-tabs	elvui individual bag slots storage
+2	bank-tabs	all my vault pages are mashed together and i want to see each storage page separately
+2	bank-tabs	vault pages
+2	bank-tabs	How can I browse each personal storage page on its own instead of seeing merged item groups?
+2	bank-tabs	splitvault pages
+2	bank-bags	bagnon buy extra storage slot
+2	bank-bags	i unlocked a new vault slot and cant figure out where to equip my spare pouch
+2	bank-bags	vault pouches
+2	bank-bags	How do I purchase extra personal storage slots and equip containers inside them?
+2	bank-bags	buyvault slot
+2	themes	elvui bag skin presets
+2	themes	my inventory looks too plain and i want to preview different visual styles before applying one
+2	themes	visual skin
+2	themes	How do I change the visual skin of my inventory and preview a look before keeping it?
+2	themes	changelook skin
+2	effects	elvui disable particle weather skins
+2	effects	the falling snow and glowing particles on my inventory background are distracting me
+2	effects	stop sparkles
+2	effects	How do I disable falling snow, smoke, sparkles, and other moving background visuals?
+2	effects	turnoff snow
+2	glass	elvui transparent frost skin blur
+2	glass	my see through inventory is way too bright to read the text and the rain is annoying
+2	glass	translucent tint
+2	glass	How do I adjust darkness, rain, lightning, and shine on translucent inventory skins?
+2	glass	darkfrosted rain
+2	profiles	elvui copy settings to alt
+2	profiles	i set up my main character perfectly and now on my alt everything is back to defaults
+2	profiles	copy setup
+2	profiles	How do I save my configuration under a name so my other characters can share it?
+2	profiles	sharealts setup
+2	reload-settings	bagnon ui restart required options
+2	reload-settings	i flipped a toggle in the options and absolutely nothing changed on screen
+2	reload-settings	restart ui
+2	reload-settings	Which configuration changes only take effect after refreshing the game interface?
+2	reload-settings	uirefresh required
+2	quickfind	bagnon external item finder addon
+2	quickfind	i want to search across my inventory from anywhere without opening my backpack first
+2	quickfind	external finder
+2	quickfind	How do I locate items in my storage using the third-party global finder addon?
+2	quickfind	quikfind addon
+2	pawn	elvui bags gear advisor indicator
+2	pawn	my green upgrade icons dont match the stat weights i set up in my gear advisor addon
+2	pawn	stat weights
+2	pawn	How do I connect a stat-weight or item-power addon to decide which gear gets marked as better?
+2	pawn	statweight arrow
+2	tsm	elvui bags tsm merchant frame conflict
+2	tsm	opening a shopkeeper shows the wrong auction addon merchant screen instead of the one i want
+2	tsm	merchant conflict
+2	tsm	How do I swap between the custom shop screen and the auction helper's merchant interface?
+2	tsm	tsmvendor toggle
+2	shopping-list	bagnon crafting buy list reagents
+2	shopping-list	i have a crafting recipe list open at a vendor and still have to buy every reagent by hand
+2	shopping-list	buy mats
+2	shopping-list	How do I purchase every material queued in my crafting tracker from a merchant in one batch?
+2	shopping-list	craftlist vendor
+2	masque	elvui bags button skinning
+2	masque	my slot icons still have default square borders instead of matching my action bar skin
+2	masque	button skins
+2	masque	How do I style inventory slot borders using the popular icon-skinning addon?
+2	masque	iconskin borders
+2	gamepad	bagnon xbox pad navigation
+2	gamepad	i cant move my cursor onto bag slots with my xbox pad triggers
+2	gamepad	xbox pad
+2	gamepad	How do I navigate my inventory using a console pad or the built-in gamepad mode?
+2	gamepad	gamepd mode
+2	elvui-gw2	adibags match interface skin
+2	elvui-gw2	my inventory frame looks out of place next to my dark minimalist unit frames
+2	elvui-gw2	overhaul skin
+2	elvui-gw2	Where do I pick visual styles designed to blend in with popular full-interface overhaul addons?
+2	elvui-gw2	matchoverhaul skin
+2	plugins	adibags third party extensions
+2	plugins	i downloaded an extra module from curseforge and i dont see its new options anywhere
+2	plugins	extra modules
+2	plugins	How do separate community add-ons attach extra item groups, toggles, and visual skins here?
+2	plugins	extensins addons
+2	wrong-category	arkinventory debug why rule matched
+2	wrong-category	my raid flask keeps landing inside junk instead of consumables and i dont know why
+2	wrong-category	misplaced loot
+2	wrong-category	Why did a piece of loot land in an unexpected group and how do I reassign it?
+2	wrong-category	badgroup move
+2	category-deleted-returns	adibags phantom filter respawns reload
+2	category-deleted-returns	every time i remove this annoying group it keeps reappearing after i log back in
+2	category-deleted-returns	group respawns
+2	category-deleted-returns	Why does an item group I removed keep reappearing after I refresh my interface?
+2	category-deleted-returns	keepsreappearing group
+2	bags-not-opening	bagnon not replacing default frames
+2	bags-not-opening	i enabled the addon and my inventory still opens the ugly default game pouches
+2	bags-not-opening	default frames
+2	bags-not-opening	Why are the game's original inventory or storage screens appearing instead of this addon?
+2	bags-not-opening	stilldefault ui
+2	performance	elvui bag lag spike profiler
+2	performance	my game freezes for half a second every time i open my inventory or loot something
+2	performance	lag spike
+2	performance	How do I capture a diagnostic trace when the game hitches so I can attach it to a bug ticket?
+2	performance	lagtrace profiler
+3	welcome	how do i start using betterbags
+3	welcome	addon basics
+3	welcome	installed addon and dont know what it changed in my inventory
+3	welcome	coming from adibags what does this toon addon do
+3	welcome	betterbgs overview
+3	opening	where is the button to open options
+3	opening	open options
+3	opening	pressed b and nothing opens the config menu
+3	opening	how to bind bag toggle on this toon
+3	opening	open bag setings
+3	designs	can i go back to the old bag layout
+3	designs	switch bag style
+3	designs	my inventory looks completely different after updating
+3	designs	change ui look across my alts
+3	designs	swtich to classic mode
+3	slash-commands	where do i see all slash commands
+3	slash-commands	bag keybinds
+3	slash-commands	typing slash commands in chat does nothing
+3	slash-commands	keybind for opening bags on my toon
+3	slash-commands	slash comands list
+3	settings-window	where did the bag options go
+3	settings-window	navigate options
+3	settings-window	i scroll through menus and still cannot locate an option
+3	settings-window	looking for bank alt options in the config
+3	settings-window	serching the options menu
+3	whats-new	where can i read the patch notes
+3	whats-new	recent changes
+3	whats-new	addon updated and things look different with no popup
+3	whats-new	changelog for latest retail patch on my main
+3	whats-new	addon patch ntes
+3	sections	why are my items grouped this way
+3	sections	item groupings
+3	sections	gear and mats are split into weird blocks in my bag
+3	sections	why did my hearth and pots land under consumables
+3	sections	how sectons are made
+3	bag-menu	where do the top bar icons go
+3	bag-menu	top bar icons
+3	bag-menu	tiny icons at the top corner of my bag dont have labels
+3	bag-menu	clicking the cog icon on my toon bag
+3	bag-menu	bag header butons
+3	sorting	how do i clean up messy bags
+3	sorting	clean up bags
+3	sorting	items stay scattered all over my slots when i loot
+3	sorting	tidy up my bank alt inventory
+3	sorting	sort my bakcpack
+3	section-layout	can i put item groups side by side
+3	section-layout	multi column bags
+3	section-layout	everything stacks in one tall strip instead of columns
+3	section-layout	widen my bag layout for raiding mats
+3	section-layout	colums side by side
+3	classic-window	how do i make the bag window smaller
+3	classic-window	window transparency
+3	classic-window	bag frame covers half my screen and looks huge
+3	classic-window	shrink bag frame on my alt
+3	classic-window	resize clasic bag window
+3	section-order	can i keep one group always at the top
+3	section-order	pin group first
+3	section-order	my most used items keep moving down below other blocks
+3	section-order	keep hearth and pots at top of bag
+3	section-order	pin secton to top
+3	item-order	how are items arranged inside each block
+3	item-order	sort items inside
+3	item-order	low level greens appear before my raid purples inside a block
+3	item-order	sort gear by ilvl inside group
+3	item-order	itme order inside section
+3	free-space	why do i see empty squares everywhere
+3	free-space	empty slots display
+3	free-space	blank squares stay behind after i sell or move gear
+3	free-space	show open space for raid loot drops
+3	free-space	keep empty sltos gap
+3	stacking	can i combine duplicate stacks into one icon
+3	stacking	merge identical stacks
+3	stacking	three piles of herbs take up three separate icons in my bag
+3	stacking	stack all my crafting mats into one slot
+3	stacking	merge dupicate stacks
+3	item-buttons	why dont my gear icons show numbers
+3	item-buttons	gear icon badges
+3	item-buttons	gear looks plain with no colored edge or number on it
+3	item-buttons	show ilvl and m+ key number on icon
+3	item-buttons	item qualty glow border
+3	item-colors	why are some gear numbers green and others orange
+3	item-colors	number text colors
+3	item-colors	item numbers on buttons turned grey and red
+3	item-colors	ilvl color compared to my toon equipped gear
+3	item-colors	item levl text color
+3	upgrades	why is there no arrow on higher gear
+3	upgrades	gear upgrade indicator
+3	upgrades	looted a stronger ring and no icon appeared on it
+3	upgrades	arrow missing on higher ilvl boe drop
+3	upgrades	green upgade arrow missing
+3	recent-items	why do looted items sit in their own group
+3	recent-items	newly looted group
+3	recent-items	stuff i picked up hours ago is still stuck at the top
+3	recent-items	new drops not going straight to mats
+3	recent-items	clear recnt items
+3	show-bags	where do i equip a bigger bag
+3	show-bags	swap equipped bags
+3	show-bags	cannot see my four bag slots to replace an old pouch
+3	show-bags	replace 32 slot bag on my alt
+3	show-bags	equip new bag slts
+3	dropping	can i drag an item anywhere onto the bag frame
+3	dropping	drop anywhere
+3	dropping	dragging an item onto a section header does not place it in
+3	dropping	drop boe straight onto bag frame
+3	dropping	drag and drpo onto bag
+3	anchors	why does my bag keep sliding off the edge
+3	anchors	bag window position
+3	anchors	window drifts off the monitor when i open it
+3	anchors	pin backpack near minimap on this toon
+3	anchors	anchor bag windw corner
+3	groups	how do i split categories onto separate tabs
+3	groups	category tabs
+3	groups	my bag window is way too tall and goes off screen
+3	groups	put mog and mats on their own bag tab
+3	groups	make category tbas
+3	interactions	why dont my bags open when i talk to a merchant
+3	interactions	auto open bags
+3	interactions	talking to the auctioneer leaves my inventory closed
+3	interactions	open backpack automatically at ah and mailbox
+3	interactions	open bags at vendr
+3	blizzard-button	where did the default bag bar button go
+3	blizzard-button	default bag icon
+3	blizzard-button	the little backpack icon on my action bar disappeared
+3	blizzard-button	hide default wow micro menu bag icon
+3	blizzard-button	blizzard bag buton
+3	next-panels	how do i switch between full height and floating bags
+3	next-panels	floating vs docked
+3	next-panels	bag panel stretches from top to bottom of the screen
+3	next-panels	make bags a small floating window on my toon
+3	next-panels	full heigth edge panel
+3	next-size	why does my small bag keep changing width
+3	next-size	shrink icon size
+3	next-size	item squares look tiny and the bag box grows on its own
+3	next-size	make gear icons bigger on my alt
+3	next-size	change icon sice and scale
+3	next-chain	why do the bank and backpack overlap each other
+3	next-chain	dock windows together
+3	next-chain	opening the merchant covers up my backpack window
+3	next-chain	snap backpack next to gbank window
+3	next-chain	chaining windws together
+3	next-dragging	how do i rearrange tabs and groups with my mouse
+3	next-dragging	drag and drop
+3	next-dragging	dragging a group header will not move it where i want
+3	next-dragging	drag boe item onto another group header
+3	next-dragging	drag tabs to reoder
+3	next-vendor	where is the repair all button at the merchant
+3	next-vendor	custom merchant panel
+3	next-vendor	merchant window looks unfamiliar and has a big sell area
+3	next-vendor	sell vendor trash and repair armor
+3	next-vendor	vendr repair and buyback
+3	next-guildbank	why does the guild vault look like my bags
+3	next-guildbank	guild vault categories
+3	next-guildbank	opening the guild vault splits items into sections instead of a grid
+3	next-guildbank	view gbank tabs sorted by mats and gear
+3	next-guildbank	guild bnk window
+3	next-currencies	how do i watch valorstones and gold at the bottom
+3	next-currencies	floating currency bar
+3	next-currencies	bottom bar shows coins i dont care about
+3	next-currencies	pin m+ crests and mats count on screen
+3	next-currencies	track curencies at bottom
+3	next-fooddrink	where do the two eat and drink buttons come from
+3	next-fooddrink	eat drink bar
+3	next-fooddrink	two small square buttons float on my screen with bread and water
+3	next-fooddrink	quick button for mage water and buff food
+3	next-fooddrink	food and drnk buttons
+3	next-bank	where are the warbank and reagent buttons in the bank
+3	next-bank	bank panel buttons
+3	next-bank	bank opens as a tall panel and i cannot find deposit reagents
+3	next-bank	switch between bank tabs and warbank on my alt
+3	next-bank	next bnak panel
+3	search-basics	how do i filter items in my bags by name
+3	search-basics	search box shortcut
+3	search-basics	typing in the box does not match what i expected
+3	search-basics	find all my transmog or boe gear fast
+3	search-basics	serach items in bags
+3	search-text	how do i search by armor slot or binding
+3	search-text	filter by binding
+3	search-text	typing trinket into search finds things with trinket in the tooltip
+3	search-text	filter by boe or soulbound text
+3	search-text	search by equipemnt slot
+3	search-numbers	can i search for items above a certain sell value
+3	search-numbers	numeric search filters
+3	search-numbers	searching a number shows items with that number in the name instead
+3	search-numbers	find high ilvl gear or expensive vendor trash
+3	search-numbers	search by item rarty
+3	search-flags	how do i find uncollected recipes or toys i own
+3	search-flags	boolean search flags
+3	search-flags	cannot tell which items in my bag are crafting materials or already learned
+3	search-flags	search for uncollected mog or mats
+3	search-flags	filter by knwn flag
+3	search-operators	how do i exclude items from a search
+3	search-operators	search logic operators
+3	search-operators	putting two words together returns way too many items
+3	search-operators	find boe gear that is not soulbound
+3	search-operators	combine search with operaters
+3	search-math	how do i write gold and silver in a search
+3	search-math	gold filter syntax
+3	search-math	comparing against my character gear level gives no results
+3	search-math	search items worth more than 50g for my toon
+3	search-math	write gld amounts in search
+3	search-examples	where are sample search queries i can copy
+3	search-examples	example search queries
+3	search-examples	bags are full of old gear and i do not know what to search
+3	search-examples	copy paste search for vendor trash and mog
+3	search-examples	sample serach strings
+3	categories-intro	why does an item pick one group over another
+3	categories-intro	category priority rules
+3	categories-intro	an item matches two rules and always ends up in the wrong one
+3	categories-intro	which rule wins when a boe matches two groups
+3	categories-intro	how categries pick items
+3	category-make	how do i create a brand new group for items
+3	category-make	create new group
+3	category-make	i see no add button on the bag window itself
+3	category-make	make a custom group for my m+ consumes
+3	category-make	create new categry
+3	category-rule	how do i make a group that updates itself automatically
+3	category-rule	automatic search rule
+3	category-rule	new drops do not join my custom group without dragging them in
+3	category-rule	auto group boe gear and crafting mats
+3	category-rule	search ruel category
+3	category-items	how do i take one item out of a group manually
+3	category-items	manual item assignment
+3	category-items	dragged an item into a group and now i cannot undo it
+3	category-items	move my hearthstone into another group
+3	category-items	add and remve items
+3	category-ignored	how do i block an item from entering a group
+3	category-ignored	block item rule
+3	category-ignored	an item keeps jumping back into a custom rule group
+3	category-ignored	blacklist my hearth from junk group
+3	category-ignored	igored items list
+3	category-settings	how do i change a group header color or hide it
+3	category-settings	hide or recolor
+3	category-settings	a group shows in my bank when i only want it in my backpack
+3	category-settings	show mats group only in bank not on toon
+3	category-settings	remane and hide category
+3	blizzard-categories	can i rename or edit the built in item groups
+3	blizzard-categories	default item types
+3	blizzard-categories	built in sections like consumables and trade goods are locked
+3	blizzard-categories	customize default mats and quest sections
+3	blizzard-categories	edit blizard categories
+3	category-gearsets	why do my gear sets each have their own group
+3	category-gearsets	gear set groups
+3	category-gearsets	swapping specs leaves old armor scattered under equipment names
+3	category-gearsets	separate pvp and raid gear sets in bag
+3	category-gearsets	equipmnt set groups
+3	category-item-order	can one group sort its items differently from the rest
+3	category-item-order	per group sort
+3	category-item-order	changing item sort flips my consumables when i only want gear sorted
+3	category-item-order	sort my mog group differently from consumables
+3	category-item-order	category own itme order
+3	category-share	how do i copy my groups to a friend
+3	category-share	import export strings
+3	category-share	pasted a string from discord and nothing appeared
+3	category-share	share my boe and mats setup with guildies
+3	category-share	export and impot categories
+3	category-plugins	why cant i edit a group that came from another addon
+3	category-plugins	third party groups
+3	category-plugins	a section from another addon has greyed out rules
+3	category-plugins	edit groups added by an external plugin on my alt
+3	category-plugins	plugin categries
+3	auto-sell	how do i sell junk automatically at a merchant
+3	auto-sell	sell junk automatically
+3	auto-sell	grey items sit in my bag when i talk to a merchant
+3	auto-sell	auto vendor trash grays at npc
+3	auto-sell	auto sel junk
+3	confirm-sale	how do i double check items before they sell
+3	confirm-sale	double click sell
+3	confirm-sale	valuable greens get sold right away before i can inspect them
+3	confirm-sale	confirm before vendoring boe greens
+3	confirm-sale	confrm sale at vendor
+3	destroy	how do i delete unsellable junk from my bags
+3	destroy	delete unsellable items
+3	destroy	grey items with no copper value stay stuck in my inventory
+3	destroy	clear worthless quest trash that npcs reject
+3	destroy	destory unsellable items
+3	auto-deposit	how do i automatically put reagents in my bank
+3	auto-deposit	auto bank deposit
+3	auto-deposit	opening the bank leaves all my crafting items sitting in my backpack
+3	auto-deposit	auto stash mats into bank or alt warbank
+3	auto-deposit	auto depost to bank
+3	move-category	can i mail or trade an entire group at once
+3	move-category	send whole group
+3	move-category	clicking each stack one by one to mail to my alt takes forever
+3	move-category	send all mats to bank alt via mail
+3	move-category	move whole sectin
+3	skip-recent	why do items from a group keep going into recent first
+3	skip-recent	bypass recent group
+3	skip-recent	freshly looted reagents sit at the top instead of joining my profession block
+3	skip-recent	send new mats loot straight to their group
+3	skip-recent	skip recnt items
+3	classic-currency	how do i change the tokens shown at the bottom
+3	classic-currency	bottom currency tokens
+3	classic-currency	the bottom bar of classic bags shows old currencies i do not track
+3	classic-currency	show m+ crests and valor on classic bar
+3	classic-currency	classic bottom curency
+3	bank-basics	can i use the default game bank frame instead
+3	bank-basics	toggle custom bank
+3	bank-basics	opening the bank shows a custom frame instead of the default tabs
+3	bank-basics	switch back to stock wow vault ui
+3	bank-basics	use blizard bank window
+3	warbank	how do i put gold into the account bank
+3	warbank	account bank gold
+3	warbank	cannot find the button to move account bound gear or gold
+3	warbank	stash boe and account mats for my alts
+3	warbank	deposit gold in warbnd
+3	bank-tabs	can i view my bank tab by tab without categories
+3	bank-tabs	view bank tabs
+3	bank-tabs	all my bank slots merge into categories so i cannot see which tab holds what
+3	bank-tabs	show individual toon vault tabs
+3	bank-tabs	character bank tbas
+3	bank-bags	where do i buy extra bank bag slots
+3	bank-bags	buy bank slots
+3	bank-bags	dragged a new pouch to the bank and see no slot to put it in
+3	bank-bags	equip bigger bags on my bank alt
+3	bank-bags	buy bnak bag slots
+3	themes	how do i change the skin of my bags
+3	themes	preview bag skins
+3	themes	bag frame looks plain grey and i want a different style
+3	themes	try a dark skin on my main
+3	themes	preview bag thmes
+3	effects	how do i turn off snow and particle effects
+3	effects	disable theme sparkles
+3	effects	moving particles and fog animate behind my items and distract me
+3	effects	turn off laggy visual particles on bag frame
+3	effects	turn off animtion effects
+3	glass	how do i make the see through bag darker
+3	glass	transparent bag opacity
+3	glass	items are hard to read because the background is too transparent
+3	glass	darken background and turn off storm on my alt
+3	glass	glass theme rain lightnig
+3	profiles	how do i copy my bag setup to another character
+3	profiles	copy character setup
+3	profiles	logging onto a new character resets all my layout choices
+3	profiles	share bag config across all my alts and toons
+3	profiles	copy profle to alts
+3	reload-settings	why did a setting i toggled not apply right away
+3	reload-settings	needs ui reload
+3	reload-settings	flipped an option and nothing changed until i logged out
+3	reload-settings	options that need slash reload to work
+3	reload-settings	setings needing reload
+3	quickfind	how do i use quickfind with betterbags
+3	quickfind	quickfind addon integration
+3	quickfind	searching in quickfind does not highlight or show my bag items
+3	quickfind	find mats across alts with quickfind
+3	quickfind	quickfnd bag search
+3	pawn	how do i make upgrade arrows follow my pawn weights
+3	pawn	pawn stat weights
+3	pawn	upgrade arrows disagree with my stat weights addon
+3	pawn	use simmed pawn strings for gear ilvl arrows
+3	pawn	pawn upgrde arrows
+3	tsm	why does tsm cover the vendor frame
+3	tsm	tsm vendor conflict
+3	tsm	talking to a merchant opens tradeskillmaster instead of betterbags
+3	tsm	toggle ah goldmaking tsm merchant window
+3	tsm	tradeskillmaster vendr window
+3	shopping-list	how do i buy my craft list mats from a vendor
+3	shopping-list	profession buy list
+3	shopping-list	merchant window does not show a button to purchase tracked craft materials
+3	shopping-list	one click buy crafting mats for profs
+3	shopping-list	profession shoping list
+3	masque	can i change item slot borders with masque
+3	masque	masque button skins
+3	masque	item squares do not match the rest of my action bar borders
+3	masque	skin bag slots to match elvui or masque icons
+3	masque	masuqe button skinning
+3	gamepad	can i navigate my bags with an xbox controller
+3	gamepad	controller support
+3	gamepad	moving the dpad skips bag slots or gets stuck on buttons
+3	gamepad	navigate inventory on steam deck with consoleport
+3	gamepad	play with controler
+3	elvui-gw2	how do i make my bags match elvui
+3	elvui-gw2	match elvui style
+3	elvui-gw2	my bags look completely out of place next to my unit frames
+3	elvui-gw2	pixel skin to match my main ui
+3	elvui-gw2	match elvui thme
+3	plugins	where do i find extra addons that extend betterbags
+3	plugins	third party plugins
+3	plugins	i installed a plugin on curseforge and cannot tell where its options went
+3	plugins	addons for boe or transmog sections
+3	plugins	betterbags plugns
+3	wrong-category	why did my gear land in the wrong group
+3	wrong-category	misplaced item
+3	wrong-category	a trinket ended up inside junk instead of my equipment block
+3	wrong-category	my boe epic went into consumables instead of gear
+3	wrong-category	item in wronge category
+3	category-deleted-returns	why does a group i removed keep coming back
+3	category-deleted-returns	deleted group returns
+3	category-deleted-returns	i deleted a custom group and it came right back after logging in
+3	category-deleted-returns	deleted mats group respawns after relog
+3	category-deleted-returns	deleted categry comes back
+3	bags-not-opening	why are the default bags opening instead of betterbags
+3	bags-not-opening	default bags showing
+3	bags-not-opening	i pressed b and the regular game backpack popped up
+3	bags-not-opening	addon disabled or showing stock blizz bags on my alt
+3	bags-not-opening	default bags opeing
+3	performance	why does my game freeze when i open my bags
+3	performance	fps drops stutter
+3	performance	the client hitches for a second every time i loot or open the bank
+3	performance	capture profiler log for bag lag in raid
+3	performance	game stutters opening bakcpack

@@ -109,6 +109,11 @@ Most options and other important information in BetterBags can be reached by lef
 *Menu in Retail.*
 </div>
 
+### Help
+The Settings Window includes a Help page with guides covering BetterBags features, settings, search syntax, and troubleshooting. Open the page by typing `/bb help` in chat or by selecting Help in the Settings Window sidebar; adding words after the command, such as `/bb help auto sell`, opens the page directly on the search results for those words.
+
+Typing in the Help search box ranks matching articles as you type, highlighting matched words in result snippets and matching word prefixes, minor typos, run-together words, and common synonyms, while the sidebar lists every group and article for browsing. Searching from the Settings Window sidebar also lists matching guides under Help Articles alongside matching settings. Both the sidebar tree and search results filter articles by your active bag design and game client version, displaying only the guides that apply to your current setup.
+
 ### Show Bags
 This temporary view allows you to see your bags and the items within them how they currently are. It also allows you to swap out which bags are equipped for both the backpack and the bank.
 

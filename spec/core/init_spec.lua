@@ -48,7 +48,7 @@ describe("Core Init and Enable flow", function()
       "Currency", "Search", "ConsolePort", "Gamepad", "Pawn", "Question", "SimpleItemLevel",
       "QuickFind", "Refresh", "ItemLoader", "Views",
       "Async", "Context", "Debug", "Form", "Bucket", "TooltipScanner", "Groups",
-      "EquipmentSets", "BagButton", "ItemRowFrame", "Perf", "PerfSessions", "RenderRecorder", "Simulator", "Render", "Window", "Sonata", "NextSettings", "NextSettingsContent", "Tabs", "ChangelogWindow", "NextBag", "NextBank", "NextVendor",
+      "EquipmentSets", "BagButton", "ItemRowFrame", "Perf", "PerfSessions", "RenderRecorder", "Simulator", "Render", "Window", "Sonata", "NextSettings", "NextSettingsHelp", "NextSettingsContent", "Tabs", "ChangelogWindow", "NextBag", "NextBank", "NextVendor",
       "GuildBank", "NextGuildBank", "Automation", "Seller", "ProfessionShoppingList", "Currencies", "FoodDrink",
       "NextShatter",
       "NextSmoke", "NextBats", "NextBeam", "NextPaper", "NextSheen"
@@ -383,6 +383,17 @@ describe("Core Init and Enable flow", function()
     addon:OnInitialize()
     addon:OnEnable()
     assert.spy(content.Enable).was.called(1)
+  end)
+
+  -- The Help page starts each session on its home and listens for /bb help and the settings window's search (help.md §4).
+  it("starts the Help page with the settings window and enables it", function()
+    local helpPage = addon:GetModule("NextSettingsHelp")
+    helpPage.Init = spy.new(function() end)
+    helpPage.Enable = spy.new(function() end)
+    addon:OnInitialize()
+    addon:OnEnable()
+    assert.spy(helpPage.Init).was.called(1)
+    assert.spy(helpPage.Enable).was.called(1)
   end)
 
   -- The guild bank's data source (data/guildbank.lua) follows the guild banker interaction from its
