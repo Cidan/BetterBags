@@ -109,8 +109,8 @@ describe("ItemProbe", function()
     assert.is_false(probe.legacyAuctionHouse[1])
   end)
 
-  -- Blizzard's own code asks C_Bank.IsItemAllowedInBankType only of the bank and the Warbank; BetterBags asks it of the
-  -- guild bank too (#768), so a dump records what it answers for every bank type the client has.
+  -- Blizzard's own code asks C_Bank.IsItemAllowedInBankType only of the bank and the Warbank; what it answers for the
+  -- guild bank is not known (#1364), so a dump records what it answers for every bank type the client has.
   it("records whether each bank takes the item", function()
     override(_G.Enum, "BankType", { Character = 0, Guild = 1, Account = 2 })
     local asked = {}

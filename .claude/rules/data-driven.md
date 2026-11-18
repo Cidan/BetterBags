@@ -78,7 +78,7 @@ reasoning about it can suggest a cause; it does not establish one.
   `IsItemDataCachedByID`), `IsEquippableItem`, `GetItemSpell`, `IsCosmeticItem`,
   `GetItemUpgradeInfo`, `CanScrapItem`, `C_AuctionHouse.IsSellItemValid` and `IsUsingLegacyAuctionClient`,
   `C_Bank.IsItemAllowedInBankType` for every `Enum.BankType` (`bankAllowed`, by name: Blizzard asks it only of the
-  bank and the Warbank, BetterBags of the guild bank too, guild-bank.md §3a), `GetItemStats`, both crafting tiers, the pet journal (and
+  bank and the Warbank; its answer for the guild bank is what guild-bank.md §3a needs captured), `GetItemStats`, both crafting tiers, the pet journal (and
   the species' collected count), the toy box (`C_ToyBox.GetToyInfo`, `PlayerHasToy`),
   `C_PlayerInfo.CanUseItem`, the upgrade watermark, the appearance and whether it is collected, the
   bag's name, and the tooltip's lines with their types (`C_TooltipInfo.GetBagItem`). Each call is

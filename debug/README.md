@@ -156,8 +156,8 @@ dumped backpack item as `apiProbe`), so one dump from the game settles what an A
 - `ItemProbe:Probe(bagid, slotid)`, `ItemProbe:ProbeEquipped(slot)`, `ItemProbe:ProbeEquipment()`: every value each
   item API returned (`n` is how many), an error recorded instead of raised, a value the addon may not access recorded
   as `<secret type>`, an API the client lacks left out. Among them whether each bank takes the item
-  (`bankAllowed`: `C_Bank.IsItemAllowedInBankType` for every `Enum.BankType`, by name), which BetterBags asks of the
-  guild bank to dim what it refuses (`.claude/rules/guild-bank.md` §3a).
+  (`bankAllowed`: `C_Bank.IsItemAllowedInBankType` for every `Enum.BankType`, by name). A dump at the guild bank
+  shows what the check answers there, which guild bank dimming waits on (`.claude/rules/guild-bank.md` §3a).
 - `ItemProbe:Player()`, `ItemProbe:BagNames()`, `ItemProbe:Sample()`, `ItemProbe:Client()`: the player's values, every
   container's name and size, what follows the character for the backpack's items, and the client the dump came from.
 - `ItemProbe:EquipmentSets()`: every equipment set the client lists for the character, by ID, with every value each

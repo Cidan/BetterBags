@@ -147,33 +147,34 @@ nothing.
   `bags/Rederive` naming no kind recalculates every kind. `guildLoad` says why a read ran
   (`"primed"`, `"timeout"`), for profiler traces.
 
-## 3a. Dimming what it refuses in the backpack (issue #768)
+## 3a. Backpack dimming at the guild bank (removed; issues #768, #1364)
 
-While the guild bank is open, a backpack item it would refuse is dimmed, as an item the Warbank
-refuses is at the bank and one that cannot be posted is at the Auction House (item-drawing.md §8).
-With both bag designs: the flag is the guild bank's own (`addon.atGuildBank`, §2), set whether or not
-BetterBags Next's panel shows the guild bank, and the backpack is BetterBags' either way.
+Nothing in the backpack dims while the guild bank is open. v0.9.4 (#768) dimmed a backpack item for
+which `C_Bank.IsItemAllowedInBankType(Enum.BankType.Guild, itemLocation)` was false, as an item the
+Warbank refuses dims at the bank (item-drawing.md §8). The rule was written without a capture: Blizzard
+has no item context for the guild bank, and its own code asks the check only of the bank and the
+Warbank (`ItemUtil.lua`, `BankFrame.lua`), so what the check answers for the guild bank had never been
+seen. Issue #1364: a player saw every backpack item dim at the guild bank, tradable inks it takes
+among them, and saw the check answer false for those inks. v0.9.5 removed the rule, at the user's
+request, until what the check answers is captured:
 
-- **The check:** `C_Bank.IsItemAllowedInBankType(Enum.BankType.Guild, itemLocation)`
-  (`BankDocumentation.lua`; `Enum.BankType` is Character 0, Guild 1, Account 2 on retail and WoW:
-  Forever). Blizzard has no item context for the guild bank and its own code asks the check only of
-  the bank and the Warbank, so what it answers for the guild bank has not been seen (§7). Written
-  without a capture, at the user's request; the Dump tab's probe records the check's answer for every
-  bank type (`bankAllowed`, data-driven.md), so one dump at a guild bank settles it.
-- **Where:** `items:ResolveItemContextMatchResult`, after the Auction House's rule, for backpack items
-  only; a window's own item context wins. A client without the check (TBC Anniversary, Mists: the
-  `classic` and `classic_anniversary` branches' `BankDocumentation.lua` have no such function) dims
-  nothing. Only the item: a tab the player cannot deposit in, or a full one, dims nothing.
-- **When:** the guild banker interaction recalculates the backpack on open and close (`core/hooks.lua`),
-  and `contextSignature` holds the flag, so kept grey-out is worked out again. The guild bank's listener
-  and the interaction's are separate, and the recalculation reads the flag a step after both ran:
-  their order does not matter (the whole-addon spec passes with them swapped).
-- **Left as is (bug review):** with the game menu showing as the guild bank opens, `OpenInteractionWindow`
-  returns before it recalculates (or opens) the backpack, while the guild bank's listener still sets the
-  flag: nothing dims until the next backpack read in the visit (a loot, a deposit), then everything that
-  should. Closing clears it as usual. At the Auction House that early return leaves the flag unset, so
-  nothing dims all visit. Making the early return recalculate for one window would split it by case;
-  nobody has reported opening the guild bank behind the game menu.
+- `items:ResolveItemContextMatchResult` does not ask the check, and `items:contextSignature` does not
+  hold `addon.atGuildBank`, so opening or closing the guild bank works no kept grey-out out again. The
+  flag itself stays (§2; other code reads it), and the guild banker interaction still recalculates the
+  backpack on open and close (`core/hooks.lua`), as it did before #768.
+- **Before any dimming comes back:** a `/bbdb` dump at the guild bank (§7). The Dump tab's probe
+  records the check's answer for every bank type beside each backpack item (`bankAllowed`,
+  data-driven.md), so the dump shows whether the check refuses every item or only some.
+- **If the check cannot be used:** a rule of BetterBags' own from what the item's read holds, as
+  `items:LegacyAuctionableOf` does for the legacy auction house. The client's refusal messages name
+  what the guild bank refuses: `ERR_GUILD_BANK_BOUND_ITEM` (soulbound), `ERR_GUILD_BANK_CONJURED_ITEM`,
+  `ERR_GUILD_BANK_QUEST_ITEM`, `ERR_GUILD_BANK_WRAPPED_ITEM` (the live client's strings,
+  `Resources/GlobalStrings/enUS.lua` of Ketho/BlizzardInterfaceResources on its `live` branch; not under `.libraries`). The
+  read holds whether an item is bound (`bindingInfo.bound`) and a quest item (`questInfo.isQuestItem`);
+  retail's tooltip scan records no conjured or wrapped mark (`data/tooltip.lua`, `markClassicLine`), so
+  it would have to.
+- A client without the check (TBC Anniversary, Mists: the `classic` and `classic_anniversary` branches'
+  `BankDocumentation.lua` have no such function) never dimmed anything there.
 
 ## 4. Two views
 
@@ -413,10 +414,11 @@ None of it has been seen in a client. Per data-driven.md, the first visit should
   and out of combat. `Logs/taint.log` should have no BetterBags entries blocking an action.
 - Whether the server answers a query for every tab with `GUILDBANKBAGSLOTS_CHANGED` (Syndicator relies
   on it), and whether Blizzard's tab item buttons, under the hidden frame, ever show.
-- **What `C_Bank.IsItemAllowedInBankType(Enum.BankType.Guild, …)` answers** (§3a): a `/bbdb` dump at
-  the guild bank with soulbound, warbound, warbound-until-equipped, bind-on-equip, quest, conjured and
-  unbound items in the backpack (`bankAllowed` beside each), checked against depositing each one. Also
-  whether it answers the same away from the guild bank, and whether a dimmed item draws dimmed.
+- **What `C_Bank.IsItemAllowedInBankType(Enum.BankType.Guild, …)` answers** (§3a): one player saw it
+  answer false for tradable inks the guild bank takes (#1364), not captured. A `/bbdb` dump at the guild
+  bank with soulbound, warbound, warbound-until-equipped, bind-on-equip, quest, conjured and unbound
+  items in the backpack (`bankAllowed` beside each), checked against depositing each one. Also whether
+  it answers the same away from the guild bank.
 - **The views** (§5): a capture of opening Log on All Tabs, Money Log, and Info, with
   `GuildBank.Answered` (each log's and text's `"answered"` or `"timeout"`), `GuildBank.OnLogUpdate` and
   `NextGuildBankPanel.DrawView`. It shows whether every `QueryGuildBankLog` is answered by one
@@ -452,8 +454,8 @@ None of it has been seen in a client. Per data-driven.md, the first visit should
 the item's tab, placing the cursor's item, moving many items, gold and tabs, "the logs", "the tabs' info
 text"), `spec/next/guildbank_spec.lua` ("its views": every view, one tab chosen down the rail, from All
 Tabs to a tab to the money log and back, reads kept, the search again, the action glyphs, tabs coming into
-view, the rail's order, same-named tabs, editing lost, the visit ending, the box being typed in), `spec/integration/guild_bank_spec.lua` ("shows the money log from the rail's foot"; "dims the backpack's items the
-guild bank refuses while it is open", with both bag designs), `spec/refresh_pipeline_spec.lua` ("at the guild bank"),
+view, the rail's order, same-named tabs, editing lost, the visit ending, the box being typed in), `spec/integration/guild_bank_spec.lua` ("shows the money log from the rail's foot"; "dims none of the backpack's items
+while the guild bank is open", with both bag designs), `spec/refresh_pipeline_spec.lua` ("at the guild bank"),
 `spec/debug/itemprobe_spec.lua` ("records whether each bank takes the item"),
 `spec/guildbank_pipeline_spec.lua` (reading, kept slots, cold reads, binding, derive, both views,
 stacking across tabs, empty slots in place, the shared index, an ended read), `spec/tooltip_spec.lua`
