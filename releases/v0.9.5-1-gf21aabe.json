@@ -1,0 +1,23 @@
+{
+  "id": 1794980523,
+  "version": "v0.9.5-1-gf21aabe",
+  "channel": "alpha",
+  "date": "2026-11-18",
+  "from": "a1116a1a583aaea382335be4a618217c2c9d0e65",
+  "to": "f21aabee367496a99286ce1ac9dcd1fdc3c0af64",
+  "headline": "QuickFind now switches to a bank item's tab or group and searches items by exact name.",
+  "entries": [
+    {
+      "category": "Fixed",
+      "title": "QuickFind now switches to a bank item's tab or group",
+      "details": "Pressing Enter on a bank item in QuickFind did not switch the bank to the tab or group holding it. It now switches to the item's bank tab when showing tabs or bags, or to its assigned or default group when showing groups.",
+      "clients": []
+    },
+    {
+      "category": "Fixed",
+      "title": "QuickFind now searches an item's exact name",
+      "details": "Picking an item in QuickFind entered its name unquoted, so multi-word names or words like 'and' and 'not' could fail or match partial names and tooltips. It now searches for the exact item name so every stack of that item matches and nothing else.",
+      "clients": []
+    }
+  ]
+}
