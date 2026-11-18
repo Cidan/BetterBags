@@ -111,12 +111,14 @@ function groups:IsDefaultGroup(kind, groupID)
   return group and group.isDefault == true
 end
 
--- GetDefaultBankGroup returns the default Bank group.
+-- GetDefaultBankGroup returns the default group of a bank type: the Bank's (the character bank, when none is given), or
+-- the Warbank's.
+---@param bankType? BankType
 ---@return Group?
-function groups:GetDefaultBankGroup()
-  local charBankType = Enum.BankType and Enum.BankType.Character or 1
+function groups:GetDefaultBankGroup(bankType)
+  bankType = bankType or (Enum.BankType and Enum.BankType.Character or 1)
   for _, group in pairs(database:GetAllGroups(const.BAG_KIND.BANK)) do
-    if group.isDefault and group.bankType == charBankType then
+    if group.isDefault and group.bankType == bankType then
       return group
     end
   end

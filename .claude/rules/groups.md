@@ -26,7 +26,9 @@ backpack's Backpack, ID 1; the bank's Bank and Warbank, `isDefault`) shows every
 to another group. What is saved is in `core/database.lua`, per bag kind: the groups (`groups`), which group each
 category is in (`categoryToGroup`, by bank type on retail's bank) and the group shown (`activeGroup`). `Groups`
 (`data/groups.lua`) is the API, and sends `groups/Created`, `groups/Changed`, `groups/Deleted`,
-`groups/CategoryAssigned` and `groups/CategoryRemoved`.
+`groups/CategoryAssigned` and `groups/CategoryRemoved`. `Groups:GetDefaultBankGroup(bankType?)` is a bank type's
+default group, the character bank's when none is given (QuickFind shows a Warbank item in the Warbank's,
+quickfind.md §3).
 
 Which categories a tab shows is worked out when a bag is recalculated (`items:Phase10_PartitionIntoTabs`,
 `data/items.lua`): every group's tab gets its items in `slotInfo.tabs[groupID]`, and a draw shows the tab the active

@@ -658,7 +658,7 @@ An early look at a new design for your bags. Turn it on with **BetterBags Next (
 Not there yet: the bag menu, and an opacity setting. To go back to the regular bags, use the setting or `/bb next`. It is an experiment and may change or go away; please report what you think.
 
 ## QuickFind
-With the [QuickFind](https://www.curseforge.com/wow/addons/quickfind) addon installed, the items in your backpack and bank can be found from it, tagged with their type, category and where they are. Press Enter on one and BetterBags opens the bag it is in, on the tab that holds it, and searches for its name (In-Bag Search must be on). Turn it off with **Enable QuickFind Integration** on the QuickFind page under Integrations in the settings; it switches at once.
+With the [QuickFind](https://www.curseforge.com/wow/addons/quickfind) addon installed, the items in your backpack and bank can be found from it, tagged with their type, category and where they are. Bank items are listed only while the bank is open: the game lets addons read the bank only there, and BetterBags clears what it read when the bank closes. Press Enter on one and BetterBags opens the bag it is in, on the tab that holds it (in the bank, the group holding it, or with Show Bank Tabs on, the bank tab it is stored in), and searches for its exact name (In-Bag Search must be on). Turn it off with **Enable QuickFind Integration** on the QuickFind page under Integrations in the settings; it switches at once.
 
 ## Reporting Performance Problems
 If BetterBags makes your game stutter, you can record exactly what it was doing and send that along with your report.

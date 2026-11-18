@@ -134,39 +134,24 @@ function quickfind:ShowInBag(id)
   -- Open the bag
   bag:Show(ctx)
 
-  -- Find and switch to the appropriate tab
+  -- Switch to the tab holding the item, as a click on that tab does.
   local tabID = self:GetTabIDForItem(itemData, bagKind)
   if tabID and bag.behavior then
-    -- Dispatch to correct behavior method based on bag type
     if bagKind == const.BAG_KIND.BACKPACK then
-      -- Backpack uses group-based tabs
       if bag.behavior.SwitchToGroup then
         bag.behavior:SwitchToGroup(ctx, tabID)
       end
-    elseif bagKind == const.BAG_KIND.BANK then
-      -- Bank has multiple tab types based on ID range
-      if tabID == 1 then
-        -- Single bank tab (when character bank tabs disabled)
-        if bag.behavior.SwitchToBank then
-          bag.behavior:SwitchToBank(ctx)
-        end
-      elseif const.BANK_ONLY_BAGS and const.BANK_ONLY_BAGS[tabID] then
-        -- Character bank tab (membership-tested against the Constants table so
-        -- all tabs are recognized regardless of count: 6 on retail, 9 on Camelot).
-        if bag.behavior.SwitchToCharacterBankTab then
-          bag.behavior:SwitchToCharacterBankTab(ctx, tabID)
-        end
-      elseif const.ACCOUNT_BANK_BAGS and const.ACCOUNT_BANK_BAGS[tabID] then
-        -- Account/warbank tab (membership-tested; 5 on retail, 9 on Camelot).
-        if bag.behavior.SwitchToAccountBank then
-          bag.behavior:SwitchToAccountBank(ctx, tabID)
-        end
+    elseif self:ShowsBlizzardBankTabs() then
+      -- The classic bank's tab slots panel marks its tab, then has the bank show it; BetterBags Next's tab rail
+      -- follows the bank.
+      if bag.slots and bag.slots.SelectTab then
+        bag.slots:SelectTab(ctx, tabID)
       else
-        -- Fallback: unknown tab type, use visual-only (a BetterBags Next bank's tabs have none)
-        if bag.tabs and bag.tabs.SetTabByID then
-          bag.tabs:SetTabByID(ctx, tabID)
-        end
+        bag.behavior:SwitchToBlizzardTab(ctx, tabID)
       end
+    elseif bag.tabs then
+      -- The classic design's bank on Classic clients has no tabs (bags/classic/bank.lua, bags/era/bank.lua).
+      bag.behavior:SwitchToGroup(ctx, tabID)
     end
   end
 
@@ -178,13 +163,31 @@ function quickfind:ShowInBag(id)
 
   local searchBox = bag.searchBox
   if searchBox and searchBox.textBox then
-    searchBox.textBox:SetText(itemData.itemInfo.itemName)
+    searchBox.textBox:SetText(self:NameQuery(itemData.itemInfo.itemName))
     searchBox.textBox:SetFocus()
     searchBox.textBox:HighlightText()
   end
 end
 
----Gets the tab ID for an item based on its category/group
+---Returns the search for the items of exactly this name: name == "...", the name one quoted text, its quotation marks
+---escaped (util/query.lua). Unquoted, its words would be read as terms and operators.
+---@param name string
+---@return string
+function quickfind:NameQuery(name)
+  return 'name == "' .. name:gsub('"', '\\"') .. '"'
+end
+
+---Says whether the bank shows Blizzard's bank tabs (Show Bank Tabs, the classic bank's Show Bags) rather than its
+---groups: retail's alone; a setting left on elsewhere splits the bank's data by bag, never by group.
+---@return boolean
+function quickfind:ShowsBlizzardBankTabs()
+  return addon.isRetail and database:GetShowBankTabs() and true or false
+end
+
+---Gets the tab holding an item: for the backpack, the group its category is assigned to; for the bank, the Blizzard
+---bank tab it is in while the bank shows those, else the group its category is assigned to for its bank type, or that
+---bank type's default group, as the bank's data is split (data/items.lua, ItemBelongsToTab). Nil while the bag shows no
+---tabs.
 ---@param itemData ItemData
 ---@param bagKind BagKind
 ---@return number?
@@ -206,11 +209,28 @@ function quickfind:GetTabIDForItem(itemData, bagKind)
 
     -- Default to group 1 (Backpack) for items without a group
     return 1
-  else
-    -- For bank, tabs are bag IDs for character bank, or special handling for account bank
-    -- For now, just return the bag ID as the tab
+  end
+
+  -- Each of Blizzard's bank tabs is one bag.
+  if self:ShowsBlizzardBankTabs() then
     return itemData.bagid
   end
+  if database:GetShowBankTabs() or not database:GetGroupsEnabled(bagKind) then
+    return nil
+  end
+
+  -- A category is assigned to a bank group for a bank type: on retail, the Warbank's or the character bank's.
+  local bankType = nil
+  if addon.isRetail then
+    bankType = const.ACCOUNT_BANK_BAGS[itemData.bagid] ~= nil and Enum.BankType.Account or Enum.BankType.Character
+  end
+  local category = itemData.itemInfo.category
+  local groupID = category and groups:GetGroupForCategory(bagKind, category, bankType)
+  if groupID then
+    return groupID
+  end
+  local default = groups:GetDefaultBankGroup(bankType)
+  return default and default.id
 end
 
 ---Parses the QuickFind ID into bag kind and slotkey

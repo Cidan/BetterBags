@@ -28,17 +28,18 @@ end
 ## Always Use Behavior Methods for Programmatic Tab/View Switching
 **Problem**: Calling visual-only methods like `tabs:SetTabByID()` highlights the tab button but doesn't update bag contents. This is the wrong layer.
 **Why the split exists**:
-- **Visual methods** (`SetTabByID`, `SelectTab`): Only update button appearance
-- **Behavior methods** (`SwitchToGroup`, `SwitchToCharacterBankTab`, etc.): Full state management — update state vars, set context filters, clear caches, call `BankPanel:SetBankType()`, send refresh events, call `ItemButtonUtil.TriggerEvent()`, then finally call visual methods
+- **Visual methods** (`SetTabByID`): Only update button appearance
+- **Behavior methods** (`SwitchToGroup`, `SwitchToBlizzardTab`): Full state management — update state vars, set context filters, clear caches, call `BankPanel:SetBankType()`, send refresh events, call `ItemButtonUtil.TriggerEvent()`, then finally call visual methods
 
-**Solution**: Always dispatch to the behavior layer:
-- Backpack: `bag.behavior:SwitchToGroup(ctx, tabID)`
-- Bank (single tab): `bag.behavior:SwitchToBank(ctx)`
-- Bank (char tab): `bag.behavior:SwitchToCharacterBankTab(ctx, tabID)` (tabID 6–11)
-- Bank (account tab): `bag.behavior:SwitchToAccountBank(ctx, tabID)` (tabID 13–17)
+**Solution**: Always dispatch to the behavior layer. These are the only tab switches the bags define (classic and BetterBags Next alike):
+- Backpack, a group: `bag.behavior:SwitchToGroup(ctx, groupID)`
+- Bank, a group (the Bank, the Warbank, or one the player made): `bag.behavior:SwitchToGroup(ctx, groupID)`; the classic design's bank on Classic clients has no tab bar (`bag.tabs` nil), and its inherited `SwitchToGroup` errors there
+- Bank, one of Blizzard's bank tabs (retail and Forever, Show Bank Tabs / Show Bags): the classic bank's tab slots panel `bag.slots:SelectTab(ctx, bagIndex)`, which marks the tab and calls `behavior:SwitchToBlizzardTab`; BetterBags Next's `bag.behavior:SwitchToBlizzardTab(ctx, bagIndex)`
+
+There is no `SwitchToBank`, `SwitchToCharacterBankTab` or `SwitchToAccountBank`: QuickFind once called them, and a spec mock that defined them hid it (quickfind.md §3). A mock of a bag's behavior has only the methods the real one has.
 
 **Diagnostic**: Tab highlights ✅ but bag contents don't update ❌ → calling visual instead of behavior method.
-**Related Files**: `bags/backpack.lua:342-356`, `bags/bank.lua:590-667`, `integrations/quickfind.lua:137-170`
+**Related Files**: `bags/backpack.lua` (`SwitchToGroup`), `bags/bank.lua` (`SwitchToGroup`, `SwitchToBlizzardTab`), `next/bank.lua` (`behavior`), `frames/bankslots.lua` (`SelectTab`), `integrations/quickfind.lua` (`ShowInBag`)
 
 ## WoW Bank System Architecture
 - **Character Bank**: BagIndex 6–11 (`CharacterBankTab_1` to `CharacterBankTab_6`)

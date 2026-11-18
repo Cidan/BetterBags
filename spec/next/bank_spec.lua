@@ -61,8 +61,10 @@ for _, m in ipairs({ { "NextStyle", "next/style.lua" }, { "NextTween", "next/twe
   ResetModuleStub(m[1], m[2])
   LoadBetterBagsModule(m[2])
 end
+LoadBetterBagsModule("integrations/quickfind.lua")
 
 local nextBank = addon:GetModule("NextBank")
+local quickfind = addon:GetModule("QuickFind")
 local style = addon:GetModule("NextStyle")
 local tween = addon:GetModule("NextTween")
 local render = addon:GetModule("Render")
@@ -286,7 +288,7 @@ describe("NextBank", function()
   end)
 
   teardown(function()
-    for _, m in ipairs({ "NextBank", "NextPanel", "NextDrag", "NextContent", "NextTabs", "NextSparkles", "NextTween", "NextStyle" }) do
+    for _, m in ipairs({ "QuickFind", "NextBank", "NextPanel", "NextDrag", "NextContent", "NextTabs", "NextSparkles", "NextTween", "NextStyle" }) do
       ResetModuleStub(m)
     end
     for i = #createdStubs, 1, -1 do ResetModuleStub(createdStubs[i]) end
@@ -1174,6 +1176,59 @@ describe("NextBank", function()
       _G._itemsAtLocation = {}
       eventsRegistered["BAG_CONTAINER_UPDATE"](ctx())
       assert.are.equal(EMPTY_BAG_SLOT, tabOf(bank, 7).icon:GetTexture())
+    end)
+  end)
+
+  -- QuickFind (integrations/quickfind.lua, quickfind.md §3) shows a bank item through the bank's own methods (#1343),
+  -- and searches for its exact name (#1344).
+  describe("an item picked in QuickFind", function()
+    local function pick(bank, bagid, category)
+      override(addon, "Bags", { Bank = bank })
+      override(stubs.items, "GetItemDataFromSlotKey", function(_, slotkey)
+        return { slotkey = slotkey, bagid = bagid, itemInfo = { itemName = category .. " Bar", category = category } }
+      end)
+      quickfind:ShowInBag("bank:" .. bagid .. "_1")
+    end
+
+    before_each(function()
+      -- A category is assigned to a group for a bank type (DB:GetCategoryGroup); each bank type has a default group.
+      local assigned = { [CHAR] = { Herbs = 4 }, [ACCOUNT] = { Gems = 5 } }
+      override(stubs.groups, "GetGroupForCategory", function(_, _, category, bankType)
+        return assigned[bankType][category]
+      end)
+      override(stubs.groups, "GetDefaultBankGroup", function(_, bankType)
+        return bankType == ACCOUNT and allGroups[3] or allGroups[2]
+      end)
+    end)
+
+    it("shows the Warbank group for a Warbank item while the Bank group is shown, and searches for its name", function()
+      local bank = opened()
+      pick(bank, 12, "Ore")
+      assert.are.equal(3, db.active)
+      assert.are.equal(3, bank.tabs.selected)
+      assert.are.equal("Warbank", bank.title:GetText())
+      assert.are.equal("Ore", bank.content.order[1].name)
+      assert.are.equal(ACCOUNT, calls.bankTypes[#calls.bankTypes])
+      assert.are.equal('name == "Ore Bar"', bank.searchBox.textBox:GetText())
+    end)
+
+    it("shows the group a Warbank item's category is assigned to", function()
+      local bank = opened()
+      pick(bank, 13, "Gems")
+      assert.are.equal(5, db.active)
+      assert.are.equal("Gems", bank.content.order[1].name)
+    end)
+
+    it("shows the Blizzard tab holding the item with Show Bank Tabs on, leaving the group shown as it was", function()
+      db.showBankTabs = true
+      db.view = SECTION_ALL_BAGS
+      local bank = opened()
+      pick(bank, 12, "Ore")
+      assert.are.equal(12, bank.blizzardBankTab)
+      assert.are.equal(12, bank.tabs.selected)
+      assert.are.equal("Shared", bank.title:GetText())
+      assert.are.equal("#1: Warbank", bank.content.order[1].name)
+      assert.are.equal(2, db.active)
     end)
   end)
 

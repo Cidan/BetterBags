@@ -125,10 +125,10 @@ identical on retail):
   `content.maxCellWidth = #allTabSlots` (was a fixed 11-entry literal + `maxCellWidth = 11`).
   Renders 11 slots on retail, 18 on Camelot. Coverage: `spec/frames/bankslots_spec.lua`
   ("Dynamic tab count derived from Constants").
-- `integrations/quickfind.lua` classifies a bank tab id via membership in `const.BANK_ONLY_BAGS`
-  / `const.ACCOUNT_BANK_BAGS` instead of the old hard bounds `<= CharacterBankTab_6` /
-  `<= AccountBankTab_5` (which dropped Camelot tabs 7-9 / 6-9 into the visual-only fallback).
-  Coverage: `spec/quickfind_spec.lua`.
+- `integrations/quickfind.lua` shows a bank item's Blizzard tab by its bag ID, whatever the tab count, and its group
+  by its bank type, a Warbank bag being one in `const.ACCOUNT_BANK_BAGS` (empty here, so every Camelot item is the
+  character bank's) (quickfind.md §3; it once classified tab IDs into methods no bank defines). Coverage:
+  `spec/quickfind_spec.lua` (a ninth character tab, Forever's groups).
 
 ## 4. No warbank on Forever — `addon.hasWarbank`
 

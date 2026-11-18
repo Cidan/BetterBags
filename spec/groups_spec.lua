@@ -410,6 +410,19 @@ describe("Groups", function()
       }
       assert.is_nil(groups:GetDefaultBankGroup())
     end)
+
+    -- QuickFind shows a Warbank item in the Warbank's default group (quickfind.md §3).
+    it("returns the default group of the bank type asked for", function()
+      dbGroups[const.BAG_KIND.BANK] = {
+        [10] = {id = 10, name = "Bank", isDefault = true, bankType = 1},
+        [11] = {id = 11, name = "Warbank", isDefault = true, bankType = 2},
+        [12] = {id = 12, name = "Gems", bankType = 2},
+      }
+      assert.are.equal(11, groups:GetDefaultBankGroup(Enum.BankType.Account).id)
+      assert.are.equal(10, groups:GetDefaultBankGroup(Enum.BankType.Character).id)
+      dbGroups[const.BAG_KIND.BANK][11] = nil
+      assert.is_nil(groups:GetDefaultBankGroup(Enum.BankType.Account), "never the bank type's custom group")
+    end)
   end)
 
   -- ─── OnCategoryDeleted ──────────────────────────────────────────────────────

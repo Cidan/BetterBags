@@ -569,8 +569,8 @@ module), `spec/core/init_spec.lua` ("makes the backpack a BetterBags Next panel 
 "makes the bank a BetterBags Next panel when it is on"), `spec/config/config_spec.lua` (`/bb next`,
 `/bbanchor` without anchors), `spec/config/settings_effects_spec.lua` (the switch, the Scale setting
 without a window),
-`spec/frames/search_overlay_spec.lua` (the keybinding), `spec/quickfind_spec.lua` (a bank whose
-tabs have no visual switch), `spec/core/constants_spec.lua`, `spec/database_spec.lua`,
+`spec/frames/search_overlay_spec.lua` (the keybinding), `spec/next/bank_spec.lua` ("an item picked
+in QuickFind": its group, a Warbank item's, Show Bank Tabs' tab, quickfind.md §3), `spec/core/constants_spec.lua`, `spec/database_spec.lua`,
 `spec/render/toc_spec.lua` (load order). Moving sections: `spec/next/drag_spec.lua` (on the real
 backpack and bank panels: picking up into the drag layer where it was, the lift around the grabbed
 point, the gap, categories only, never in Show Bags, one at a time, following; the gap under the
