@@ -1,16 +1,22 @@
 {
-  "id": 1794969330,
+  "id": 1794969338,
   "version": "v0.9.5",
-  "channel": "alpha",
+  "channel": "release",
   "date": "2026-11-18",
-  "from": "31edf8d04f3e9443558e1b6d6dac78a6876292c3",
-  "to": "a1116a1a583aaea382335be4a618217c2c9d0e65",
-  "headline": "Fixes backpack items being dimmed while the guild bank is open.",
+  "from": "v0.9.4",
+  "to": "v0.9.5",
+  "headline": "Adds a searchable in-game Help to the settings window and fixes backpack items dimming at the guild bank.",
   "entries": [
+    {
+      "category": "New",
+      "title": "Searchable in-game Help in the settings window",
+      "details": "A new Help page in the settings window offers 80 searchable articles on everything BetterBags does, complete with links and the settings themselves. Open it with /bb help followed by optional search words, or find articles under Help Articles in settings search.",
+      "clients": []
+    },
     {
       "category": "Fixed",
       "title": "Backpack items no longer dim at the guild bank",
-      "details": "Backpack items are no longer dimmed while the guild bank is open. Previously, every backpack item was dimmed during a guild bank visit, including items the guild bank accepts.",
+      "details": "Backpack items are no longer dimmed while the guild bank is open. Previously, every item in your backpack, including tradable inks that the guild bank accepts, was greyed out during a guild bank visit.",
       "clients": []
     }
   ]
