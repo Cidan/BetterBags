@@ -78,8 +78,8 @@ local function field(tbl, name)
 end
 
 -- bankAllowed records whether each bank takes the item, by its Enum.BankType name: Blizzard's own code asks
--- C_Bank.IsItemAllowedInBankType only of the bank and the Warbank, and BetterBags asks it of the guild bank too
--- (item-drawing.md §8). Nothing on a client without the check.
+-- C_Bank.IsItemAllowedInBankType only of the bank and the Warbank, and what it answers for the guild bank is not known
+-- (guild-bank.md §3a). Nothing on a client without the check.
 ---@param location ItemLocationMixin
 ---@return table<string, table>?
 local function bankAllowed(location)

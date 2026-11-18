@@ -2735,10 +2735,10 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
 
     end)
 
-    -- Issue #768: what the guild bank would refuse dims in the backpack while it is open, as what the Warbank refuses
-    -- does at the bank. Blizzard has no item context for the guild bank (ItemButtonUtil.GetItemContext, ItemUtil.lua),
-    -- so the rule is BetterBags' own, asking C_Bank.IsItemAllowedInBankType(Enum.BankType.Guild, itemLocation)
-    -- (BankDocumentation.lua), which Blizzard's own code asks only of the bank and the Warbank.
+    -- Issue #1364: nothing in the backpack dims while the guild bank is open. v0.9.4 dimmed what
+    -- C_Bank.IsItemAllowedInBankType(Enum.BankType.Guild, itemLocation) refused (#768), which Blizzard's own code asks
+    -- only of the bank and the Warbank; a player saw it refuse tradable inks the guild bank takes, and every item dimmed.
+    -- The check is not asked until what it answers has been captured (guild-bank.md §3a).
     describe("at the guild bank", function()
       -- ItemButtonUtil.ItemContextMatchResult (ItemUtil.lua).
       local MATCH, MISMATCH, DOES_NOT_APPLY = 1, 2, 3
@@ -2783,36 +2783,28 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
         return out
       end
 
-      it("dims what it refuses while it is open, and nothing once it closes", function()
-        local kept = refreshBackpack().itemsBySlotKey["0_2"]
-        assert.are.equal(DOES_NOT_APPLY, dim("0_2"), "closed")
-        assert.are.same({}, guildAsked(), "nothing asked of it while it is closed")
+      it("dims nothing while it is open, even what the check refuses, and asks it nothing", function()
+        addon.atGuildBank = true
+        refreshBackpack()
+        assert.are.equal(DOES_NOT_APPLY, dim("0_2"), "refused by the check")
+        assert.are.equal(DOES_NOT_APPLY, dim("0_1"))
+        assert.are.same({}, guildAsked())
+      end)
+
+      it("keeps the backpack's grey-out as it opens and closes", function()
+        refreshBackpack()
+        local resolved = 0
+        local resolve = items.ResolveItemContextMatchResult
+        override(items, "ResolveItemContextMatchResult", function(...)
+          resolved = resolved + 1
+          return resolve(...)
+        end)
         addon.atGuildBank = true
         refreshBackpack({ derive = true, categoriesUnchanged = true })
-        assert.are.equal(kept, items.slotInfo[0].itemsBySlotKey["0_2"], "a kept item's dimming is worked out again")
-        assert.are.equal(MISMATCH, dim("0_2"))
-        assert.are.equal(DOES_NOT_APPLY, dim("0_1"), "what it takes is left alone")
-        assert.are.same({ "0:1", "0:2" }, guildAsked())
+        assert.are.equal(0, resolved, "as it opens")
         addon.atGuildBank = false
         refreshBackpack({ derive = true, categoriesUnchanged = true })
-        assert.are.equal(DOES_NOT_APPLY, dim("0_2"))
-        assert.are.same({}, guildAsked())
-      end)
-
-      it("keeps the dimming it worked out while it stays open", function()
-        addon.atGuildBank = true
-        refreshBackpack()
-        guildAsked()
-        refreshBackpack({ derive = true, categoriesUnchanged = true })
-        assert.are.equal(MISMATCH, dim("0_2"))
-        assert.are.same({}, guildAsked())
-      end)
-
-      it("dims nothing on a client without the check (TBC Anniversary, Mists)", function()
-        override(_G, "C_Bank", {})
-        addon.atGuildBank = true
-        refreshBackpack()
-        assert.are.equal(DOES_NOT_APPLY, dim("0_2"))
+        assert.are.equal(0, resolved, "as it closes")
       end)
 
       it("leaves an item another window's context matches alone", function()
@@ -2821,13 +2813,6 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
         addon.atGuildBank = true
         refreshBackpack()
         assert.are.equal(MATCH, dim("0_2"))
-      end)
-
-      it("does not dim the bank's items", function()
-        mockContainer[6] = { { itemID = 202, guid = "guid-202b", count = 1 } }
-        addon.atGuildBank = true
-        assert.are.equal(MATCH, items:ResolveItemContextMatchResult({ bagid = 6, slotid = 1, itemInfo = {} }))
-        assert.are.same({}, guildAsked())
       end)
     end)
 

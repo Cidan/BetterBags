@@ -347,8 +347,8 @@ end
 
 -- contextSignature is what grey-out (ResolveItemContextMatchResult) reads besides the item, or nil
 -- when kept grey-out cannot stand. With no item context (ItemButtonUtil.GetItemContext, every
--- client) it reads whether the bank is open, whether it shows a Warbank tab, whether the Auction
--- House is open, and whether the guild bank is open. While a context is
+-- client) it reads whether the bank is open, whether it shows a Warbank tab, and whether the Auction
+-- House is open. While a context is
 -- active, Blizzard's answer can depend on more than the context (the spell being cast for Enchanting,
 -- CheckItemCondition, ReplaceBonusTree or JumpUpgradeTrack; the recipe while recrafting:
 -- ItemButtonUtil.GetItemContextMatchResultForItem), so it is worked out on every refresh, as before.
@@ -367,7 +367,6 @@ function items:contextSignature()
     warbank = accountBankStart ~= nil and bank.bankTab >= accountBankStart
   end
   return tostring(addon.atBank == true) .. "|" .. tostring(warbank) .. "|" .. tostring(addon.atAuctionHouse == true)
-    .. "|" .. tostring(addon.atGuildBank == true)
 end
 
 -- vendorOpen says whether a vendor is open as Blizzard's UpdateJunkItem reads it when it shows the junk coin:
@@ -540,12 +539,6 @@ function items:ResolveItemContextMatchResult(data)
     end
     -- What cannot be posted dims while the Auction House is open, as what the Warbank refuses does there.
     if addon.atAuctionHouse and data.isAuctionable == false then
-      return mismatch
-    end
-    -- What the guild bank refuses dims while it is open (#768). Blizzard has no item context for the guild bank, so
-    -- this is BetterBags' own rule; a client without the check (TBC Anniversary, Mists) dims nothing there.
-    if addon.atGuildBank and C_Bank and C_Bank.IsItemAllowedInBankType
-      and not C_Bank.IsItemAllowedInBankType(Enum.BankType.Guild, itemLocation) then
       return mismatch
     end
 

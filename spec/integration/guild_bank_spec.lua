@@ -572,11 +572,12 @@ describe("a guild bank visit on the whole addon", function()
     assert.are.same({}, handle.errors)
   end)
 
-  -- Issue #768: the backpack's items the guild bank would refuse dim while it is open. The guild bank's own listener
-  -- sets addon.atGuildBank on the guild banker interaction's events, and the backpack is recalculated for the window on
-  -- the same events (core/hooks.lua), as the visit starts and as it ends.
+  -- Issue #1364: nothing in the backpack dims while the guild bank is open, not even an item
+  -- C_Bank.IsItemAllowedInBankType(Enum.BankType.Guild, ...) refuses (v0.9.4 dimmed those, #768, and a player saw it refuse
+  -- items the guild bank takes). The backpack is still recalculated for the window as the visit starts and as it ends
+  -- (core/hooks.lua).
   for _, design in ipairs({ "classic", "next" }) do
-    it("dims the backpack's items the guild bank refuses while it is open, with the " .. design .. " bags", function()
+    it("dims none of the backpack's items while the guild bank is open, with the " .. design .. " bags", function()
       local addon = start(design, { { id = 100 }, { id = 200, refused = true } })
       guild()
       local items = addon:GetModule("Items")
@@ -588,7 +589,7 @@ describe("a guild bank visit on the whole addon", function()
       openGuildBank(addon)
       if design == "next" then slideIn(addon) end
       assert.is_true(addon.Bags.Backpack:IsShown(), "the backpack opened with it")
-      assert.are.equal(2, dim("0_2"), "refused")
+      assert.are.equal(3, dim("0_2"), "refused by the check")
       assert.are.equal(3, dim("0_1"), "taken")
       addon:GetModule("Events")._eventMap["PLAYER_INTERACTION_MANAGER_FRAME_HIDE"].fn(
         "PLAYER_INTERACTION_MANAGER_FRAME_HIDE", Enum.PlayerInteractionType.GuildBanker)
