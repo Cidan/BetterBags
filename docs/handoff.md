@@ -58,4 +58,4 @@ To verify the stability of the entire pipeline and keep the suite warning-free:
    ```bash
    busted
    ```
-3. **In-game Slash Commands:** You can run `/bb debugitems` in-game at any time to verify that the Phase 2 physical data map is successfully being harvested and updated.
+3. **In-game Dump:** Open the debug window with `/bbdb` and click **Dump Backpack Items** on its Dump tab to record the backpack items BetterBags read, with what the client's APIs answered about each, in the saved variables. (The former `/bb debugitems` command was removed: it claimed `/bb` a second time, and on some setups `/bb` stopped opening the settings, #1360.)

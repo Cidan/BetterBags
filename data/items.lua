@@ -1,4 +1,4 @@
--- luacheck: ignore 212 211, globals SLASH_BETTERBAGS_DEBUGITEMS1 SlashCmdList
+-- luacheck: ignore 212 211
 local addonName = ... ---@type string
 
 ---@class BetterBags: AceAddon
@@ -2954,27 +2954,6 @@ function items:HarvestEquipment(rereadAll)
     end
   end
   return equipmentData
-end
-
--- IN-GAME DEBUG SLASH COMMAND
-SLASH_BETTERBAGS_DEBUGITEMS1 = "/bb"
-SlashCmdList["BETTERBAGS_DEBUGITEMS"] = function(msg)
-  if msg == "debugitems" then
-    print("|cff00ff00BetterBags Debug Physical Items Map:|r")
-    -- Collect backpack bags
-    local backpackItems = items:Harvest(const.BAG_KIND.BACKPACK, const.BACKPACK_BAGS, true)
-    local count = 0
-    for slotkey, data in pairs(backpackItems) do
-      if not data.isItemEmpty then
-        print(format("Slotkey: %s | ItemID: %d | Name: %s | Count: %d",
-          slotkey, data.itemInfo.itemID, data.itemInfo.itemName, data.itemInfo.currentItemCount))
-        count = count + 1
-      end
-    end
-    print(format("|cff00ff00Total Non-Empty Backpack Items Harvested: %d|r", count))
-  else
-    print("BetterBags Debug Commands: use '/bb debugitems' to dump harvested physical items.")
-  end
 end
 
 -- ClientNewItemFlag is an item's new-item flag (the glow): the client's own flag alone. The
