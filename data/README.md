@@ -273,7 +273,8 @@ Tracks which items belong to equipment sets, and makes each set's category.
 - **Gear Set Categories**: `Update(ctx)` lists every set (`GetSets()`: `{ id, name }`) and hands them to
   `Categories:SyncGearSets`, which makes a `Gear: <set>` category for each from what the profile saved for the set's ID
   (`DB:GetGearSet`). A set's category takes its items in the order of the Categories list and follows the set when it
-  is renamed. After `EQUIPMENT_SETS_CHANGED` (`SetsChanged`), a set the last read listed and this one does not was
+  is renamed. A set another category (yours or a plugin's) is named after gets none, and its items go to that category
+  instead. After `EQUIPMENT_SETS_CHANGED` (`SetsChanged`), a set the last read listed and this one does not was
   deleted: `Categories:ForgetGearSets` forgets what was saved for it first (`.claude/rules/category-lifecycle.md` §12)
 
 ### Binding (`binding.lua`)

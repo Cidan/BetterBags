@@ -4317,12 +4317,14 @@ function items:GetCategory(ctx, data, own, ignoreRecent, withoutAdded)
     searchCategory = self.searchCache[data.kind] and self.searchCache[data.kind][data.slotkey]
     searchPriority = self.categoryPriorityCache[data.kind] and self.categoryPriorityCache[data.kind][data.slotkey]
   end
-  local customCategory, customPriority, customFilter = categories:GetCustomCategory(ctx, data.kind, data, withoutAdded)
+  local customCategory, customPriority, customFilter, added = categories:GetCustomCategory(ctx, data.kind, data,
+    withoutAdded)
 
   -- An item added by hand to a category of yours stays there, whatever the order (category-lifecycle.md
-  -- §7). A plugin's item lists and gear sets (§12) compete with rules by priority, the list winning a tie.
+  -- §7). A plugin's item lists and gear sets (§12), a category of yours named after a set included, compete
+  -- with rules by priority, the list winning a tie.
   if searchCategory and customCategory then
-    if (customFilter and customFilter.save) or (customPriority or 10) <= (searchPriority or 10) then
+    if added or (customPriority or 10) <= (searchPriority or 10) then
       return self:GroupedCategory(ctx, customCategory, customFilter, data)
     end
     return searchCategory

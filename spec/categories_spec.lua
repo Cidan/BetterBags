@@ -1770,7 +1770,9 @@ describe("Categories", function()
       categories:AddPermanentItemToCategory(ctx, 101, "Trinket")
       categories:SyncGearSets(ctx, { { id = 3, name = "Tank" } })
       assert.are.equal("Gear: Tank", categories:GetOrder()[1], "the set is on top")
-      assert.are.equal("Trinket", (categories:GetCustomCategory(ctx, 0, setItem(101, "Tank"))))
+      local name, _, _, added = categories:GetCustomCategory(ctx, 0, setItem(101, "Tank"))
+      assert.are.equal("Trinket", name)
+      assert.is_true(added, "added by hand, so it stays whatever the rules")
       assert.are.equal("Gear: Tank", (categories:GetCustomCategory(ctx, 0, setItem(101, "Tank"), true)),
         "where it lands without it")
     end)
@@ -1995,6 +1997,57 @@ describe("Categories", function()
       assert.is_nil(dbGearSets[3])
     end)
 
+    -- Issue #1368: older versions labeled a set's items "Gear: " and the set's name, so a category of yours of that
+    -- name (made by hand, as a rule, or by the classic Shift title drop) held every one of them. With no category made
+    -- for the set, they went to their type and its rule matched none.
+    it("gives a set's items to a category of yours named after it, which competes by the order", function()
+      categories:CreateCategory(ctx, { name = "Gear: Tank", itemList = {}, save = true })
+      categories:SyncGearSets(ctx, { { id = 3, name = "Tank" } })
+      local mine = dbCategories["Gear: Tank"]
+      local name, priority, filter, added = categories:GetCustomCategory(ctx, 0, setItem(101, "Tank"))
+      assert.are.equal("Gear: Tank", name)
+      assert.are.equal(mine, filter, "yours, no category being made for the set")
+      assert.are.equal(mine.priority, priority)
+      assert.is_falsy(added, "not added by hand: a rule above it takes the item")
+      assert.is_nil((categories:GetCustomCategory(ctx, 0, setItem(102, "Heal"))), "another set's item")
+      categories:CreateCategory(ctx, { name = "Openable", itemList = { [101] = true } })
+      assert.are.equal("Openable", (categories:GetCustomCategory(ctx, 0, setItem(101, "Tank"))), "a plugin's list above it")
+      categories:MoveCategory(ctx, "Gear: Tank")
+      assert.are.equal("Gear: Tank", (categories:GetCustomCategory(ctx, 0, setItem(101, "Tank"))))
+      categories:DeleteCategory(ctx, "Gear: Tank")
+      categories:SyncGearSets(ctx, { { id = 3, name = "Tank" } })
+      assert.is_true(categories:IsGearSet("Gear: Tank"), "yours deleted, the set has its own")
+      assert.are.equal(3, select(3, categories:GetCustomCategory(ctx, 0, setItem(101, "Tank"))).gearSet)
+    end)
+
+    -- Found by the bug review: nothing said which of two categories of the set's name, yours and a plugin's (the classic
+    -- Shift title drop on a plugin's header makes one of yours of its name), takes the items. Yours, as GetCategoryByName
+    -- reads the section's settings from yours.
+    it("gives a set's items to yours when a plugin's category has the set's name too", function()
+      categories:CreateCategory(ctx, { name = "Gear: Tank", itemList = {} })
+      dbCategories["Gear: Tank"] = { name = "Gear: Tank", save = true, itemList = {}, priority = 20,
+        enabled = { [0] = true, [1] = true, [2] = true } }
+      categories:SyncGearSets(ctx, { { id = 3, name = "Tank" } })
+      assert.are.equal(dbCategories["Gear: Tank"], select(3, categories:GetCustomCategory(ctx, 0, setItem(101, "Tank"))))
+      assert.are.equal(dbCategories["Gear: Tank"], categories:GetCategoryByName("Gear: Tank"))
+    end)
+
+    it("gives a set's items to a plugin's category named after it, as the set's: ignored, Used In and the switch", function()
+      categories:CreateCategory(ctx, { name = "Gear: Tank", itemList = {} })
+      categories:SyncGearSets(ctx, { { id = 3, name = "Tank" } })
+      assert.is_false(categories:IsGearSet("Gear: Tank"))
+      local item = setItem(101, "Tank")
+      assert.are.equal("Gear: Tank", (categories:GetCustomCategory(ctx, 0, item)))
+      categories:IgnoreItem(ctx, 101, "Gear: Tank")
+      assert.is_nil((categories:GetCustomCategory(ctx, 0, item)))
+      categories:UnignoreItem(ctx, 101, "Gear: Tank")
+      categories:DisableCategory(1, "Gear: Tank")
+      assert.is_nil((categories:GetCustomCategory(ctx, 1, item)), "not used in the bank")
+      assert.are.equal("Gear: Tank", (categories:GetCustomCategory(ctx, 0, item)))
+      gearSetFilter = false
+      assert.is_nil((categories:GetCustomCategory(ctx, 0, item)), "the bag's Equipment Set off")
+    end)
+
     it("leaves a set renamed onto another category's name without one, its record as it was", function()
       categories:SyncGearSets(ctx, { { id = 3, name = "Tank" } })
       categories:CreateCategory(ctx, { name = "Gear: Mine", itemList = {}, save = true })
@@ -2003,6 +2056,7 @@ describe("Categories", function()
       assert.is_true(categories:GetCategoryByName("Gear: Mine").save, "yours")
       assert.are.same({}, renamed)
       assert.are.equal("Gear: Tank", dbGearSets[3].name)
+      assert.are.equal("Gear: Mine", (categories:GetCustomCategory(ctx, 0, setItem(101, "Mine"))), "its items go to yours")
     end)
 
     -- Two characters of the profile whose sets have each other's names under their IDs: each name is another set's too,

@@ -130,7 +130,7 @@ describe("NextMerchant", function()
     override(stubs.categories, "GetCustomCategory", function(_, _, kind, data)
       assert.are.equal(BACKPACK, kind)
       local c = customByID[data.itemInfo.itemID]
-      if c then return c[1], c[2], c[3] end
+      if c then return c[1], c[2], c[3], c[4] end
       return nil, nil
     end)
     override(stubs.categories, "GetSortedSearchCategories", function() return searchCategories end)
@@ -269,10 +269,19 @@ describe("NextMerchant", function()
     -- order; a plugin's item lists compete with rules by priority, the list winning a tie.
     it("keeps an item added by hand to a category of yours there, even with a rule above it, as the bags do", function()
       _G._merchant.items = { vendorItem(13) }
-      customByID[13] = { "Blades", 5, { name = "Blades", save = true } }
+      customByID[13] = { "Blades", 5, { name = "Blades", save = true }, true }
       searchCategories = { { name = "Shiny", priority = 1, enabled = { [BACKPACK] = true },
         searchCategory = { query = "rarity >= 3" } } }
       assert.are.equal("Blades", merchant:ReadItems(ctx())[1].category)
+    end)
+
+    -- Issue #1368: a category of yours named after an item's equipment set takes it as the set's own category would.
+    it("gives an item a category of yours has through its set to a rule above it, as the bags do", function()
+      _G._merchant.items = { vendorItem(13) }
+      customByID[13] = { "Gear: Tank", 5, { name = "Gear: Tank", save = true } }
+      searchCategories = { { name = "Shiny", priority = 1, enabled = { [BACKPACK] = true },
+        searchCategory = { query = "rarity >= 3" } } }
+      assert.are.equal("Shiny", merchant:ReadItems(ctx())[1].category)
     end)
 
     it("gives a tie between a plugin's item list and a rule to the list, as the bags do", function()

@@ -9,6 +9,8 @@ paths:
   - "next/settings/categories.lua"
   - "next/settings/bagcategories.lua"
   - "next/settings/content.lua"
+  - "next/merchant.lua"
+  - "spec/next/merchant_spec.lua"
   - "spec/categories_spec.lua"
   - "spec/equipmentsets_spec.lua"
   - "spec/database_migration_spec.lua"
@@ -176,7 +178,9 @@ true: what a plugin hides this way stays shown. Hiding came back as a player's p
 **Resolution** (`items:GetCategory`, and the vendor's copy in `next/merchant.lua`): an item added by
 hand to a category of yours stays there, whatever the order (§7); a plugin's item lists compete with
 rules by priority, the lower number winning, the list winning a tie (before §7, an item placed by hand
-also only won ties). A category with a group by shows a hand-placed
+also only won ties). Both read "added by hand" from `GetCustomCategory`'s fourth result (`added`), not
+from the category's `save` flag: a category of yours named after an equipment set takes the set's items
+(§12) and competes for them by the order. A category with a group by shows a hand-placed
 item in its sub-category for the item (`items:GroupedCategory`), made as for rule matches
 (`items:ensureSubcategory`: the same bags, color and priority).
 
@@ -476,7 +480,7 @@ character deletes is forgotten: "we just watch the event".
   is renamed in place, and `categories/Changed` names both, as `RenameCategory` does, so the Categories page keeps it
   chosen, shown or not (next-settings-categories.md §5). A rename made while BetterBags was not loaded is found the same
   way. A set renamed onto a name another category has gets no category and its record stays as it was, until the name
-  is free.
+  is free; its items go to that category meanwhile (below).
 - **Deleted on this character** (`EquipmentSets:SetsChanged`, from `EQUIPMENT_SETS_CHANGED`; asked: "we just watch the
   event"): once the client says its sets changed, the next `Update` takes a set the last one read and this one does not
   for one this character deleted, and `categories:ForgetGearSets(ctx, ids)` forgets it before the sync: its record; its
@@ -500,8 +504,21 @@ character deletes is forgotten: "we just watch the event".
   are left alone: not loaded (`categories:OnEnable` skips a dynamic `"Gear: "` entry but a group by's sections:
   `isOlderGearSet`), not changed (the record holds copies), and deleted only with their set, by the player (above), so a
   set made again under the name starts fresh.
-- **A set another category is named after** (yours, or a plugin's) gets no category and no record; the set's items go
-  where they would without one.
+- **A set another category is named after** (yours, or a plugin's) gets no category and no record; that category is
+  the set's (issue #1368; asked 2026-11-18: give the set's items to the category of its name). `gearSetOf` takes it for
+  a set whose name no gear set category has: the bag's Equipment Set switch, the category's Used In and its Ignored
+  Items apply as for a set's category, and it competes by the order as a set's would; only an item added to it by hand
+  stays whatever the rules (`GetCustomCategory`'s `added`, §6). Why: older versions labeled a set's items
+  `"Gear: " .. setName` ahead of every category, so a category of yours of that name (made by hand to style the
+  section, a rule named after it, or made by the classic Shift title drop on the set's header) held every item of the
+  set. The first build of this design sent them where they would go without a set, so such a rule's
+  `category = "Gear: X"` matched nothing and a bare set name matched only item names (reproduced on the real modules
+  over `test.lua`, the build before #1333 against this one). The category stays yours: it is renamed, deleted and
+  exported as yours, and has Added Items; deleting it gives the set a category of its own at the next sweep. When yours
+  and a plugin's both have the name, yours takes the items, as `GetCategoryByName` (the section's settings) reads yours.
+  Not built for (the review's, not seen): a set whose `"Gear: "` name is a group by's section of another category
+  (a set "Tank - Armor" beside your "Gear: Tank" grouped by type) puts its items in that section, whose own Ignored
+  Items are empty, so the parent's do not apply to them.
 - **Plugins' older calls** (`IsCategoryEnabled`, `ToggleCategory`, `EnableCategory`, `DisableCategory`,
   `SetCategoryState`) answer a gear set's Used In from its category and save it to its record (`setEphemeralEnabled`),
   never to an older entry of its name.
@@ -520,8 +537,8 @@ character deletes is forgotten: "we just watch the event".
   own `EQUIPMENT_SETS_CHANGED` and a sweep follows it, so this needs an order not seen.
 - **Where its items go** (`categories:GetCustomCategory`): an item added by hand to a category of yours is in it,
   whatever the order (§7). Else its gear set's category (`gearSetOf`: the bag's Equipment Set switch on, the category
-  used in the bag, not ignoring the item; for an item in several sets, the one higher in the order, where before it was
-  always the first set) and a plugin's (`pluginCategoryOf`: its list, else a category function) compete by the order
+  used in the bag, not ignoring the item; for a set with none, the category of yours or the plugin's named after it,
+  above; for an item in several sets, the one higher in the order, where before it was always the first set) and a plugin's (`pluginCategoryOf`: its list, else a category function) compete by the order
   (`before`). The winner competes with rules in `items:GetCategory` as a plugin's list does (§6): the lower priority
   number wins, the list on a tie. So a gear set is part of the item's own category, which rules are matched against
   (data-loader.md §8): README's `category = "gear:"` keeps working, and a rule above the set takes its items.
@@ -541,11 +558,14 @@ character deletes is forgotten: "we just watch the event".
   Items winning, a plugin's list and a category function by the order, two sets and the first by default, ignored, Used
   In and the switch, the next session, renamed in game, a record of another name for the ID, deleted, a set this
   character does not have, older entries copied once and left alone, a group by's sections, a category of yours of the
-  name, a rename onto it, no rename, header drops), `spec/equipmentsets_spec.lua` ("the sets' categories": the list, a
+  name, one of yours and a plugin's taking the set's items by the order, a rename onto it, no rename, header drops),
+  `spec/equipmentsets_spec.lua` ("the sets' categories": the list, a
   set with no name, deletions only after the event, an ID reused before the next read),
   `spec/debug_dump_harness_spec.lua` (the real Default profile: its older entries, two characters sharing set 0, a
-  deletion through the event, the freed ID fresh), `spec/database_spec.lua` ("a gear set's category"),
-  `spec/refresh_pipeline_spec.lua` ("gear set labeling": Added Items, a rule above and below, a rule's `category`),
+  deletion through the event, the freed ID fresh; a rule and a list of yours named after a set taking its items, the
+  profile's rules above the list taking theirs), `spec/database_spec.lua` ("a gear set's category"),
+  `spec/refresh_pipeline_spec.lua` ("gear set labeling": Added Items, a rule above and below, a rule's `category`, a
+  rule above a category of yours named after the set), `spec/next/merchant_spec.lua` (the vendor's copy of that),
   `spec/next/settings/categories_spec.lua` (the heading and tabs, a renamed category kept chosen),
   `spec/next/settings/content_spec.lua`, `spec/next/categorypicker_spec.lua`, `spec/next/drag_spec.lua` (the header)
   and `spec/frames/bag_draw_ownership_spec.lua` (the classic Shift drop).
