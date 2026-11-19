@@ -1,0 +1,17 @@
+{
+  "id": 1795065876,
+  "version": "v0.9.5-4-g5e5b7be",
+  "channel": "alpha",
+  "date": "2026-11-19",
+  "from": "ef3582b1307e9ce290ea346646f25de01d950134",
+  "to": "5e5b7bee02644227f70edcc6385d813054ffa1ca",
+  "headline": "Categories named after an equipment set now receive that set's items.",
+  "entries": [
+    {
+      "category": "Fixed",
+      "title": "Categories named after a gear set now receive its items",
+      "details": "A custom, search, or plugin category named \"Gear: \u003cset\u003e\" now receives that equipment set's items instead of letting them fall through. It follows your category order, Used In, Ignored Items, and the Equipment Set switch, and deleting your category restores the set's own.",
+      "clients": []
+    }
+  ]
+}
