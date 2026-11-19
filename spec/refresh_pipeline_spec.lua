@@ -2155,7 +2155,7 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
     local tools = { name = "Tools", save = true, priority = 5, enabled = { [const.BAG_KIND.BACKPACK] = true } }
     local custom = tools
     override(categories, "GetCustomCategory", function(_, _, _, data)
-      if data.itemInfo.itemID == 101 then return custom.name, custom.priority, custom end
+      if data.itemInfo.itemID == 101 then return custom.name, custom.priority, custom, custom == tools end
       return nil, nil
     end)
     override(categories, "GetSortedSearchCategories", function()
@@ -4151,7 +4151,7 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
     it("leaves out the category it was added to by hand and Recent Items, a rule still counting", function()
       override(database, "GetCategoryFilter", function(_, _, filter) return filter == "RecentItems" end)
       override(categories, "GetCustomCategory", function(_, _, _, data, withoutAdded)
-        if data.itemInfo.itemID == 101 and not withoutAdded then return "Mats", 10, { save = true } end
+        if data.itemInfo.itemID == 101 and not withoutAdded then return "Mats", 10, { save = true }, true end
         return nil, nil
       end)
       mockContainer[0] = { { itemID = 101, guid = "guid-101", count = 1 }, { itemID = 202, guid = "guid-202", count = 1 } }
@@ -6082,7 +6082,7 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       pendingSets[0] = { [1] = { "Tank" }, [2] = { "Tank" } }
       local trinket = { name = "Trinket", save = true, priority = 20, enabled = { [const.BAG_KIND.BACKPACK] = true } }
       override(categories, "GetCustomCategory", function(_, _, _, data)
-        if data.itemInfo.itemID == 101 then return trinket.name, trinket.priority, trinket end
+        if data.itemInfo.itemID == 101 then return trinket.name, trinket.priority, trinket, true end
         return gearSetCategory(nil, nil, nil, data)
       end)
       mockContainer[0] = { { itemID = 101, guid = "gear-a", count = 1 }, { itemID = 202, guid = "gear-b", count = 1 } }
@@ -6093,6 +6093,26 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
 
     it("gives an item in a set to a rule above its set, and keeps it from one below", function()
       pendingSets[0] = { [1] = { "Tank" } }
+      local rule = { name = "Trinkets", enabled = { [const.BAG_KIND.BACKPACK] = true }, priority = 1,
+        searchCategory = { query = "alpha" } }
+      override(categories, "GetSortedSearchCategories", function() return { rule } end)
+      mockContainer[0] = { { itemID = 101, guid = "gear-a", count = 1 } }
+      local slotInfo = refreshBackpack()
+      assert.equal("Trinkets", slotInfo.itemsBySlotKey["0_1"].itemInfo.category)
+      rule.priority = 20
+      slotInfo = refreshBackpack({ derive = true })
+      assert.equal("Gear: Tank", slotInfo.itemsBySlotKey["0_1"].itemInfo.category)
+    end)
+
+    -- Issue #1368: a category of yours named after the set takes the set's items as the set's own category would, by the
+    -- order; only an item added to it by hand stays whatever the rules.
+    it("gives an item in a set to a rule above the category of yours named after the set", function()
+      pendingSets[0] = { [1] = { "Tank" } }
+      local mine = { name = "Gear: Tank", save = true, priority = 10, enabled = { [const.BAG_KIND.BACKPACK] = true } }
+      override(categories, "GetCustomCategory", function(_, _, _, data)
+        if data.itemInfo.equipmentSets ~= nil then return mine.name, mine.priority, mine end
+        return nil, nil
+      end)
       local rule = { name = "Trinkets", enabled = { [const.BAG_KIND.BACKPACK] = true }, priority = 1,
         searchCategory = { query = "alpha" } }
       override(categories, "GetSortedSearchCategories", function() return { rule } end)

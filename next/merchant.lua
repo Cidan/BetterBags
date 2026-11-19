@@ -284,11 +284,10 @@ function merchant:ReadItems(ctx)
     local hit = found[item.record.slotkey]
     if hit then
       -- As items:GetCategory weighs them (category-lifecycle.md §7): an item added by hand to a category
-      -- of yours stays there; a plugin's item list loses to a rule only with a lower priority number.
-      local custom, customPriority, customFilter = categories:GetCustomCategory(ctx, const.BAG_KIND.BACKPACK,
+      -- of yours stays there; a plugin's item list or a gear set loses to a rule only with a lower priority number.
+      local custom, customPriority, _, added = categories:GetCustomCategory(ctx, const.BAG_KIND.BACKPACK,
         item.record)
-      local yours = customFilter ~= nil and customFilter.save == true
-      if not custom or (not yours and (customPriority or 10) > hit.priority) then
+      if not custom or (not added and (customPriority or 10) > hit.priority) then
         local old = item.category
         item.category = hit.name
         item.record.itemInfo.category = hit.name

@@ -351,7 +351,7 @@ articles:Define({
     { list = {
       L:G("An item added by hand to one of your own categories stays in that category even if it belongs to an equipment set."),
       L:G("Otherwise, an equipment set category competes with search rules, plugin categories, and other equipment sets by its position in the Categories list."),
-      L:G("If another category of yours or a plugin category already uses the exact Gear: name, the equipment set does not receive a category."),
+      L:G("If one of your categories or a plugin category already uses the exact Gear: name, the equipment set does not get a category of its own. Its items go to that category instead, which competes for them by its position in the Categories list."),
     } },
     { heading = L:G("Editable Settings") },
     { text = L:G("You can drag an equipment set category up or down in the Categories list, set its Used In bags, toggle Hide In, pick a Color or Reset Color, ignore items in Ignored Items, toggle Skip Recent Items, and set Own Item Order.") },

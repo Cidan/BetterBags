@@ -391,6 +391,79 @@ describe("Debug Dump Harness with test.lua", function()
     end)
   end)
 
+  -- Issue #1368: older versions labeled a set's items "Gear: " and the set's name, so a category of yours of that name
+  -- (made by hand, as a rule, or by the classic Shift title drop) held every one of them. A set another category is
+  -- named after gets none of its own; its items go to that category, which competes by the order as the set's would.
+  it("gives a set's items to a category of yours named after the set, on the real profile", function()
+    withEquipmentSets(function(client)
+      DB.data:SetProfile("Default")
+      local profile = DB.data.profile
+      DB:SetCategoryFilter(const.BAG_KIND.BACKPACK, "GearSet", true)
+      local dumpItems = profile.debugBackpackDump
+      local keys = {}
+      for slotkey in pairs(dumpItems) do table.insert(keys, slotkey) end
+      table.sort(keys)
+      local inSet = {}
+      for _, slotkey in ipairs(keys) do
+        local info = dumpItems[slotkey].itemInfo
+        if not dumpItems[slotkey].isItemEmpty and info and (info.classID == 4 or info.classID == 2) and #inSet < 3 then
+          info.equipmentSets = { "Tank" }
+          inSet[#inSet + 1] = slotkey
+        end
+      end
+      assert.are.equal(3, #inSet)
+      local getItemSets, harvest, sendMessage = equipmentSets.GetItemSets, items.Harvest, events.SendMessage
+      equipmentSets.GetItemSets = function(_, bag, slot)
+        local item = dumpItems[bag .. "_" .. slot]
+        return item and item.itemInfo and item.itemInfo.equipmentSets
+      end
+      items.Harvest = function() return dumpItems, {} end
+      events.SendMessage = function() end
+      local function shownIn()
+        items:ProcessRefresh(context:New("sweep"), const.BAG_KIND.BACKPACK)
+        local out = {}
+        for i, slotkey in ipairs(inSet) do
+          out[i] = items.slotInfo[const.BAG_KIND.BACKPACK].itemsBySlotKey[slotkey].itemInfo.category
+        end
+        return out
+      end
+      local function matches(query)
+        local found, n = search:Search(query) or {}, 0
+        for _, slotkey in ipairs(inSet) do
+          if found[slotkey] then n = n + 1 end
+        end
+        return n
+      end
+      local ok, err = pcall(function()
+        -- A rule named after the set, matching it by its category.
+        profile.customCategoryFilters["Gear: Tank"] = { name = "Gear: Tank", save = true, priority = 0, itemList = {},
+          enabled = { [0] = true, [1] = true, [2] = true }, searchCategory = { query = 'category = "Gear: Tank"' } }
+        loginAs(client, { [0] = "Tank" })
+        assert.is_false(categories:IsGearSet("Gear: Tank"), "yours, no category made for the set")
+        assert.are.same({ "Gear: Tank", "Gear: Tank", "Gear: Tank" }, shownIn())
+        assert.are.equal(3, matches('category = "Gear: Tank"'))
+        assert.are.equal(3, matches("tank"), "the set's name, through the item's category")
+
+        -- A list of yours holding one of the set's items (the classic Shift title drop's), below the profile's rules:
+        -- the item added by hand stays, the rules above it take the others they match.
+        local first = dumpItems[inSet[1]].itemInfo.itemID
+        profile.customCategoryFilters["Gear: Tank"] = { name = "Gear: Tank", save = true, priority = 50,
+          itemList = { [first] = true }, enabled = { [0] = true, [1] = true, [2] = true } }
+        profile.customCategoryIndex[first] = "Gear: Tank"
+        loginAs(client, { [0] = "Tank" })
+        categories:ReprocessAllItems(context:New("reprocess"))
+        local shown = shownIn()
+        assert.are.equal("Gear: Tank", shown[1])
+        assert.are_not.equal("Gear: Tank", shown[2], "a rule above it")
+        assert.are_not.equal("Gear: Tank", shown[3], "a rule above it")
+        categories:MoveCategory(context:New("move"), "Gear: Tank")
+        assert.are.same({ "Gear: Tank", "Gear: Tank", "Gear: Tank" }, shownIn(), "on top, every item of the set")
+      end)
+      equipmentSets.GetItemSets, items.Harvest, events.SendMessage = getItemSets, harvest, sendMessage
+      assert(ok, err)
+    end)
+  end)
+
   -- Issue #1333, found by the bug review: the Dump tab keeps each dump's equipment sets in an account-wide list, which
   -- the real defaults (core/constants.lua) must give saved variables from before the list existed, as test.lua's are.
   it("keeps equipment set captures account wide on the real defaults, in saved variables from before them", function()

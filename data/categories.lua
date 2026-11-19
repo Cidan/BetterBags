@@ -1429,7 +1429,7 @@ end
 -- another character of the profile): its settings stay with the ID, its pins and tabs move to the new name unless
 -- another category or set uses either name (renameGearSets). A set no
 -- longer listed leaves the list, what was saved for it kept (ForgetGearSets forgets a deleted one's). A set another
--- category is named after gets none. sets is what EquipmentSets:Update read. It returns whether anything changed; then
+-- category is named after gets none: its items go to that category (gearSetOf). sets is what EquipmentSets:Update read. It returns whether anything changed; then
 -- a new generation starts and the Categories page is told.
 ---@param ctx Context
 ---@param sets EquipmentSet[]
@@ -1504,8 +1504,8 @@ end
 -- that ignores the item (Ignored Items) is passed over, whatever gave it the item: added by hand, a
 -- plugin's list, a category function (which does not file the item there) or a gear set. withoutAdded
 -- leaves out the category the item was added to by hand: where it lands without it (FileItem). An item
--- added by hand to a category of yours is in it; else its gear set's category and a plugin's compete by
--- the order, the one higher in the Categories list winning (category-lifecycle.md §12).
+-- added by hand to a category of yours is in it, whatever the rules (added); else its gear set's category and
+-- a plugin's compete by the order, the one higher in the Categories list winning (category-lifecycle.md §12).
 ---@param ctx Context
 ---@param kind BagKind
 ---@param data ItemData The item data to get the custom category for.
@@ -1513,6 +1513,7 @@ end
 ---@return string|nil categoryName
 ---@return number|nil priority
 ---@return CustomCategoryFilter|nil filter The category, for the bags to group its items (its groupBy).
+---@return boolean|nil added The item was added to it by hand, so no rule takes it.
 function categories:GetCustomCategory(ctx, kind, data, withoutAdded)
   -- HACKFIX: This is a backwards compatibility shim for the old way of adding items to categories.
   -- To be removed eventually.
@@ -1525,7 +1526,7 @@ function categories:GetCustomCategory(ctx, kind, data, withoutAdded)
   if not itemID then return nil, nil end
   local filter = database:GetItemCategoryByItemID(itemID)
   if not withoutAdded and filter.enabled and filter.enabled[kind] and not ignores(filter, itemID) then
-    return filter.name, filter.priority or 10, filter
+    return filter.name, filter.priority or 10, filter, true
   end
 
   local gear = self:gearSetOf(kind, data)
@@ -1537,7 +1538,10 @@ function categories:GetCustomCategory(ctx, kind, data, withoutAdded)
 end
 
 -- gearSetOf returns the category of the item's gear set used in the bag, the one higher in the order for an item in
--- several, passing over one that ignores the item; none while the bag's Equipment Set switch is off.
+-- several, passing over one that ignores the item; none while the bag's Equipment Set switch is off. A set another
+-- category is named after has none of its own (SyncGearSets), so that category, yours or a plugin's, is the set's:
+-- older versions labeled a set's items "Gear: " and its name, which put every one of them in a category of that name
+-- (issue #1368).
 ---@private
 ---@param kind BagKind
 ---@param data ItemData
@@ -1549,8 +1553,12 @@ function categories:gearSetOf(kind, data)
   end
   local best
   for _, set in ipairs(sets) do
-    local filter = self.ephemeralCategories[GEAR_PREFIX .. set]
-    if filter ~= nil and filter.gearSet ~= nil and filter.enabled ~= nil and filter.enabled[kind]
+    local name = GEAR_PREFIX .. set
+    local filter = self.ephemeralCategories[name]
+    if filter == nil or filter.gearSet == nil then
+      filter = database:GetItemCategory(name) or filter
+    end
+    if filter ~= nil and filter.enabled ~= nil and filter.enabled[kind]
       and not ignores(filter, data.itemInfo.itemID) and (best == nil or before(filter, best)) then
       best = filter
     end
