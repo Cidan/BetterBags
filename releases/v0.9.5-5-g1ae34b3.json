@@ -1,0 +1,17 @@
+{
+  "id": 1795066650,
+  "version": "v0.9.5-5-g1ae34b3",
+  "channel": "alpha",
+  "date": "2026-11-19",
+  "from": "5e5b7bee02644227f70edcc6385d813054ffa1ca",
+  "to": "1ae34b3a08813bc2cb2b3c3b7fb56aa4cb19221f",
+  "headline": "Fixed the /bb slash command sometimes failing to open settings.",
+  "entries": [
+    {
+      "category": "Fixed",
+      "title": "/bb printing a debug message instead of opening settings",
+      "details": "The /bb, /bb help, /bb changelog, and /bb next commands sometimes printed a debug message instead of opening settings or running, depending on other installed addons. The /bb command now always opens settings and runs its subcommands reliably.",
+      "clients": []
+    }
+  ]
+}
