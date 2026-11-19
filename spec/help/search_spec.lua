@@ -276,6 +276,127 @@ describe("HelpSearch", function()
       assert.is_truthy(text:sub(at + #inner, at + #inner):find("^[ %.]?$"), "ends at a word's end: " .. inner)
     end)
 
+    it("never starts past the first match when no space comes before it", function()
+      local text = ("x"):rep(40) .. "/merchant and more words after it."
+      local snippet, spans = search:Snippet(text, { merchant = true }, 30)
+      assert.are.equal("…merchant and more…", snippet)
+      assert.are.equal("merchant", snippet:sub(spans[1][1], spans[1][2]))
+    end)
+
+    it("keeps whole the words at both edges of a crop that fall on a word's edge", function()
+      local text = "zzzz abc efghi merchant golf hotels india juliet kilo."
+      assert.are.equal("…abc efghi merchant golf hotels…", (search:Snippet(text, { merchant = true }, 30)))
+    end)
+
+    it("cuts at the width when no word's edge comes between the match and it", function()
+      local text = ("word "):rep(10) .. "merchant" .. ("/x"):rep(80) .. " end."
+      local snippet, spans = search:Snippet(text, { merchant = true }, 60)
+      assert.are.equal("…" .. text:sub(31, 90) .. "…", snippet)
+      assert.are.equal("merchant", snippet:sub(spans[1][1], spans[1][2]))
+      local long = ("abcdefghij"):rep(20) .. "."
+      assert.are.equal(long:sub(1, 140) .. "…", (search:Snippet(long, {}, 140)))
+    end)
+
+    -- chars returns text's characters.
+    local function chars(text)
+      local list = {}
+      for ch in text:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
+        table.insert(list, ch)
+      end
+      return list
+    end
+
+    it("cuts Korean, which has spaces between words, only at a space", function()
+      local text = ("가방을 정리하는 설정은 "):rep(20):gsub(" $", "")
+      assert.are.equal(table.concat(chars(text), "", 1, 138) .. "…", (search:Snippet(text, {}, 140)))
+    end)
+
+    describe("in Chinese and Japanese, which have no spaces between words", function()
+      local POOL = chars("天地玄黄宇宙洪荒日月盈昃辰宿列张寒来暑往秋收冬藏闰余成岁律吕调阳云腾致雨露结为霜金生丽水玉出昆冈剑号巨阙")
+      local KANA = chars("あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをん")
+      local MATCHED = { ["背包"] = true }
+
+      -- sentence returns the characters of a sentence of n with no space: nine ideographs then a full-width comma (no
+      -- comma at all when bare), with each of puts' texts written over it from the character its key names.
+      local function sentence(n, bare, puts, pool)
+        pool = pool or POOL
+        local list = {}
+        for i = 1, n do
+          list[i] = (not bare and i % 10 == 0) and "，" or pool[(i - 1) % #pool + 1]
+        end
+        for at, put in pairs(puts or {}) do
+          for k, ch in ipairs(chars(put)) do
+            list[at + k - 1] = ch
+          end
+        end
+        return list
+      end
+
+      it("cuts between two characters, showing as many as fit, when nothing matched", function()
+        local list = sentence(200, true)
+        assert.are.equal(table.concat(list, "", 1, 140) .. "…", (search:Snippet(table.concat(list), {}, 140)))
+      end)
+
+      it("cuts Japanese between two characters", function()
+        local list = sentence(200, true, { [100] = "倉庫" }, KANA)
+        local snippet = search:Snippet(table.concat(list), { ["倉庫"] = true }, 140)
+        assert.are.equal("…" .. table.concat(list, "", 54, 193) .. "…", snippet)
+      end)
+
+      it("never starts with a mark that closes what comes before it, nor ends with one that opens", function()
+        local list = sentence(200, true, { [100] = "背包", [54] = "）", [193] = "（" })
+        assert.are.equal("…" .. table.concat(list, "", 55, 192) .. "…",
+          (search:Snippet(table.concat(list), MATCHED, 140)))
+        list = sentence(200, true, { [100] = "背包", [54] = "”", [193] = "“" })
+        assert.are.equal("…" .. table.concat(list, "", 55, 192) .. "…",
+          (search:Snippet(table.concat(list), MATCHED, 140)))
+      end)
+
+      it("leaves out an ideographic space at either edge", function()
+        local list = sentence(200, true, { [100] = "背包", [54] = "　", [193] = "　" })
+        assert.are.equal("…" .. table.concat(list, "", 55, 192) .. "…",
+          (search:Snippet(table.concat(list), MATCHED, 140)))
+      end)
+
+      it("shows the characters matched with a third of the width before them", function()
+        local list = sentence(200, false, { [51] = "背包" })
+        local snippet, spans = search:Snippet(table.concat(list), MATCHED, 140)
+        assert.are.equal("…" .. table.concat(list, "", 5, 144) .. "…", snippet)
+        assert.are.equal(1, #spans)
+        assert.is_truthy(snippet:sub(spans[1][1], spans[1][2]):find("背包", 1, true))
+      end)
+
+      it("ends at the sentence's end when the match is among its last characters", function()
+        local list = sentence(200, false, { [121] = "背包" })
+        assert.are.equal("…" .. table.concat(list, "", 61, 200), (search:Snippet(table.concat(list), MATCHED, 140)))
+      end)
+
+      it("finds the match inside a long run of characters with no punctuation", function()
+        local list = sentence(200, true, { [100] = "背包" })
+        local snippet, spans = search:Snippet(table.concat(list), MATCHED, 140)
+        assert.are.equal("…" .. table.concat(list, "", 54, 193) .. "…", snippet)
+        assert.is_truthy(snippet:sub(spans[1][1], spans[1][2]):find("背包", 1, true))
+      end)
+
+      it("cuts beside a word in Latin letters, never inside it", function()
+        local function snippetOf(list)
+          return (search:Snippet(table.concat(list), {}, 140))
+        end
+        local list = sentence(200, false, { [15] = "BetterBags Next" })
+        assert.are.equal(table.concat(list, "", 1, 140) .. "…", snippetOf(list))
+        list = sentence(200, false, { [133] = "BetterBags Next" })
+        assert.are.equal(table.concat(list, "", 1, 132) .. "…", snippetOf(list))
+        list = sentence(200, false, { [131] = "BetterBags" })
+        assert.are.equal(table.concat(list, "", 1, 140) .. "…", snippetOf(list))
+        list = sentence(200, false, { [135] = "ＢｅｔｔｅｒＢａｇｓ" })
+        assert.are.equal(table.concat(list, "", 1, 134) .. "…", snippetOf(list))
+        list = sentence(200, false, { [125] = "BetterBags、BetterBags" })
+        assert.are.equal(table.concat(list, "", 1, 135) .. "…", snippetOf(list))
+        list = sentence(200, false, { [125] = "BetterBags，BetterBags" })
+        assert.are.equal(table.concat(list, "", 1, 135) .. "…", snippetOf(list))
+      end)
+    end)
+
     it("ignores the client's escape codes in what it shows", function()
       local snippet, spans = search:Snippet("|cffffd100Sell|r your junk.", { [search:Stem("sell")] = true }, 80)
       assert.are.equal("Sell your junk.", snippet)

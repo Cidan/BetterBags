@@ -140,6 +140,27 @@ headings, so they favour its words, and the text players now read was worth that
 misses), measure on it, and add it to `queries.tsv` and the floors. Never tune against round 3.
 
 `Snippet` returns the part of an article's text around the words matched, with where they are, for a result card.
+A sentence longer than the width (`SNIPPET`, 140 characters, `help/articles.lua`) is cut to it, starting up to a third
+of it before the first match: a word's start, or in a wide run (Korean, Chinese, Japanese) the first pair matched, not
+the run's start, since a Chinese run between two punctuation marks can be longer than the width. A cut falls where
+`breaks` allows one: beside a space, or beside a character of text written without spaces (`isUnspaced`: kana, CJK
+ideographs, the ideographic space U+3000, CJK punctuation and the full-width punctuation sub-ranges FF01-FF0F, FF1A-FF20,
+FF3B-FF40 and FF5B-FF65; not full-width letters and digits, which are words). Hangul is wide (searched by pairs) but not
+unspaced: Korean puts spaces between words, so it is cut only at them. No cut leaves a mark that closes (`CLOSES`:
+，。、）」』】”’ and the rest of Chinese and Japanese line breaking's no-line-start marks) at the snippet's start, nor one
+that opens (`OPENS`: （「『【“‘ ...) at its end. Spaces and ideographic spaces (`isBlank`) are trimmed off both edges.
+The start moves forward to a cut but never past the match; the end moves back to a cut but never before the match's
+end, and is cut at the width when no cut lies between them (one long token).
+Before #1357 the cuts looked for ASCII spaces alone: a Chinese sentence over the width came back as its first character,
+or one character between two ellipses, and a translation keeping a Latin name ("BetterBags Next") was cut at that name's
+space (`spec/help/search_spec.lua`, "in Chinese and Japanese, which have no spaces between words"). Its review compared
+the old and new crops on every article sentence over the width with each of its terms (10,377 crops) and 1,810 snippets
+of real searches: no English snippet changed. It found the marks and the ideographic space at the edges and full-width
+letters cut inside a word, fixed test-first. Not changed: a match more than two thirds of the width long is cut inside
+(no word is), and Korean text with no space in the third of the width before a match starts inside a word (no Korean
+word is that long). Two mutants survive the specs, each the same on any real text: the match's last character taken as
+its first, for a Latin word (no cut falls inside one) and for a wide pair (only closing marks all the way to the width
+tell them apart).
 
 ## 3. Writing the articles
 
@@ -292,9 +313,8 @@ Two reviews of the code (CLAUDE.md, Prime Directive #2), and one of the articles
   or fewer selling at once, the Warbank's gold clicks, the classic bank's tabs and bags, profile switches, and more);
   each was read in the code and corrected.
 - **Left as they are, reported to the user**: an article opened from the window's search or the tree keeps the Help
-  search box's last words (a choice, not a fault); reversing a slide part way may jump (not reproduced); a snippet is
-  cut at spaces, so a translation with no spaces between words (Korean, Chinese) would be cut short (no such text
-  yet); the word being typed matches at most 40 longer words, in the index's order; a setting row's label is not
+  search box's last words (a choice, not a fault); reversing a slide part way may jump (not reproduced); the word being
+  typed matches at most 40 longer words, in the index's order; a setting row's label is not
   restyled before it is measured, so a theme's font wrapping a setting's name onto more lines would leave its block
   short until the next article (the mock's text has one size, so not reproduced).
 
