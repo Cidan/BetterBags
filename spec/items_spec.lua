@@ -1796,6 +1796,47 @@ describe("Items (New Data Farming Engine)", function()
         assert.are.same(bags, items:Phase1_DetermineBags(Context:New("T"), const.BAG_KIND.BANK))
       end)
 
+      describe("whatever the bank shows", function()
+        local savedBags, savedActiveGroup, savedGroup
+
+        before_each(function()
+          savedBags = addon.Bags
+          savedActiveGroup, savedGroup = rawget(database, "GetActiveGroup"), rawget(database, "GetGroup")
+          database.GetActiveGroup = function() return 2 end
+          database.GetGroup = function() return { id = 2, bankType = Enum.BankType.Account } end
+        end)
+
+        after_each(function()
+          addon.Bags = savedBags
+          database.GetActiveGroup, database.GetGroup = savedActiveGroup, savedGroup
+          addon.isRetail = true
+        end)
+
+        it("reads every character and Warbank tab on retail, for the character bank, with a Warbank tab shown",
+          function()
+            const.BANK_TAB = { BANK = -2, ACCOUNT_BANK_1 = 13 }
+            addon.Bags = { Bank = { blizzardBankTab = 13, bankTab = 13 } }
+            local ctx = Context:New("T")
+            local expected = {}
+            for bag in pairs(const.BANK_BAGS) do expected[bag] = bag end
+            for bag in pairs(const.ACCOUNT_BANK_BAGS) do expected[bag] = bag end
+            assert.are.same(expected, items:BankBags(ctx))
+            assert.are.equal(-2, ctx:Get("bagid"))
+          end)
+
+        it("reads the bank, its bags and the reagent bank on Classic, for the bank, with a Warbank group active",
+          function()
+            addon.isRetail = false
+            const.BANK_TAB = { BANK = -1, REAGENT = -3, ACCOUNT_BANK_1 = 99 }
+            const.BANK_BAGS = { [-1] = -1, [5] = 5, [6] = 6 }
+            const.ACCOUNT_BANK_BAGS = { [13] = 13 }
+            addon.Bags = { Bank = { bankTab = -1 } }
+            local ctx = Context:New("T")
+            assert.are.same({ [-1] = -1, [5] = 5, [6] = 6, [-3] = -3 }, items:BankBags(ctx))
+            assert.are.equal(-1, ctx:Get("bagid"))
+          end)
+      end)
+
       it("reads only the tabs loaded, even when a read names others", function()
         items:SetLoadedBankBags({ [7] = true, [13] = true })
         assert.are.same({ [7] = 7, [13] = 13 }, items:Phase1_DetermineBags(Context:New("T"), const.BAG_KIND.BANK))

@@ -1118,49 +1118,18 @@ function items:BankBags(ctx)
       ctx:Set("bagid", bagid)
     end
   end
-  local blizzardTab = addon.Bags and addon.Bags.Bank and addon.Bags.Bank.blizzardBankTab
+  mark(const.BANK_TAB.BANK)
+  for _, bag in pairs(const.BANK_BAGS) do
+    bagList[bag] = bag
+  end
   if addon.isRetail then
-    mark(const.BANK_TAB.BANK)
-    for _, bag in pairs(const.BANK_BAGS) do
-      bagList[bag] = bag
-    end
     if const.ACCOUNT_BANK_BAGS then
       for _, bag in pairs(const.ACCOUNT_BANK_BAGS) do
         bagList[bag] = bag
       end
     end
-    local reagentBank = not addon.isRetail and const.BANK_TAB.REAGENT or nil
-    if reagentBank then
-      bagList[reagentBank] = reagentBank
-    end
-  elseif blizzardTab and addon.isRetail then
-    if Enum.BagIndex and Enum.BagIndex.AccountBankTab_1 and blizzardTab >= Enum.BagIndex.AccountBankTab_1 then
-      mark(const.BANK_TAB.ACCOUNT_BANK_1)
-    else
-      mark(const.BANK_TAB.BANK)
-    end
-    bagList[blizzardTab] = blizzardTab
-  else
-    local activeGroupID = database:GetActiveGroup(const.BAG_KIND.BANK)
-    local activeGroup = activeGroupID and database:GetGroup(const.BAG_KIND.BANK, activeGroupID)
-    local reagentBank = not addon.isRetail and const.BANK_TAB.REAGENT or nil
-
-    if activeGroup and addon.isRetail and activeGroup.bankType == (Enum and Enum.BankType and Enum.BankType.Account) then
-      mark(const.BANK_TAB.ACCOUNT_BANK_1)
-      if const.ACCOUNT_BANK_BAGS then
-        for _, bag in pairs(const.ACCOUNT_BANK_BAGS) do
-          bagList[bag] = bag
-        end
-      end
-    else
-      mark(const.BANK_TAB.BANK)
-      for _, bag in pairs(const.BANK_BAGS) do
-        bagList[bag] = bag
-      end
-      if reagentBank then
-        bagList[reagentBank] = reagentBank
-      end
-    end
+  elseif const.BANK_TAB.REAGENT then
+    bagList[const.BANK_TAB.REAGENT] = const.BANK_TAB.REAGENT
   end
   return bagList
 end

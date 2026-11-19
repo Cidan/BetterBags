@@ -118,13 +118,12 @@ Detects the current context for item movement operations.
 **Movement Flow Types:**
 ```lua
 MOVEMENT_FLOW = {
-  UNDEFINED = 0,
-  BANK = 1,
-  SENDMAIL = 2,
-  TRADE = 3,
-  NPCSHOP = 4,
-  WARBANK = 5,
-  REAGENT = 6
+  UNDEFINED = -1,
+  BANK = 0,
+  WARBANK = 2,
+  SENDMAIL = 3,
+  TRADE = 4,
+  NPCSHOP = 5
 }
 ```
 
@@ -138,8 +137,9 @@ MOVEMENT_FLOW = {
 
 **Context Detection:**
 - Checks open UI frames
-- Determines bank tab type
+- At the bank: `WARBANK` while the bank's `bankTab` is a Warbank tab, else `BANK`
 - Handles retail/classic differences
+- No flow names a reagent bank: no supported client has one (`.claude/rules/patterns-state.md`)
 
 ### Query Parser (`query.lua`)
 

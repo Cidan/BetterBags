@@ -7,19 +7,19 @@ local const = StubBetterBagsModule("Constants")
 const.MOVEMENT_FLOW = {
   UNDEFINED = 0,
   BANK = 1,
-  REAGENT = 2,
   WARBANK = 3,
   SENDMAIL = 4,
   TRADE = 5,
   NPCSHOP = 6,
 }
 
--- Classic-style bank tab constants (used when not retail)
--- Reagent bank tab must be below ACCOUNT_BANK_1, otherwise
--- GetMovementFlow's WARBANK check (bankTab >= accountBankStart) matches first.
+-- Classic's bank tab constants (used when not retail): Blizzard's Enum.BagIndex on Classic Era, The
+-- Burning Crusade Anniversary and Mists of Pandaria Classic (Bank -1, Reagentbank -3,
+-- AccountBankTab_1 13).
 const.BANK_TAB = {
+  BANK = -1,
+  REAGENT = -3,
   ACCOUNT_BANK_1 = 13,
-  REAGENT = 5,
 }
 
 -- Set addon state defaults
@@ -134,10 +134,14 @@ describe("MovementFlow", function()
       assert.are.equal(const.MOVEMENT_FLOW.WARBANK, movementFlow:GetMovementFlow())
     end)
 
-    it("returns REAGENT for reagent bank tab (non-retail)", function()
+    -- No client has a reagent bank: Blizzard's source for none of them has its frame or its API.
+    -- Classic's Enum.BagIndex still names one (Reagentbank, -3).
+    it("moves to the bank, never a reagent bank, on Classic's reagent bank index (non-retail)", function()
       addon.atBank = true
-      addon.Bags.Bank = { bankTab = 5 }
-      assert.are.equal(const.MOVEMENT_FLOW.REAGENT, movementFlow:GetMovementFlow())
+      addon.Bags.Bank = { bankTab = const.BANK_TAB.REAGENT }
+      assert.are.equal(const.MOVEMENT_FLOW.BANK, movementFlow:GetMovementFlow())
+      addon.Bags.Bank = { bankTab = const.BANK_TAB.BANK }
+      assert.are.equal(const.MOVEMENT_FLOW.BANK, movementFlow:GetMovementFlow())
     end)
 
     it("returns regular BANK when bank tab is below account bank start", function()
