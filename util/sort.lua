@@ -478,8 +478,8 @@ function sort.SortSectionsBySizeAscending(kind, a, b)
   return a.title:GetText() < b.title:GetText()
 end
 
--- slotOrder is where a bag's slots go in slot order: the backpack's keyring (Classic Era, WoW: Forever), whose bag
--- ID is below the backpack's, after every bag, as its number says (items:GetBagName).
+-- slotOrder is where a bag's slots go in slot order: the backpack's keyring (Classic Era, TBC Anniversary, WoW:
+-- Forever), whose bag ID is below the backpack's, after every bag, as its number says (items:GetBagName).
 ---@param bagid number
 ---@return number
 local function slotOrder(bagid)

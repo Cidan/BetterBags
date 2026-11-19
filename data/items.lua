@@ -129,7 +129,8 @@ end
 -- The bag family of keys, which only the keyring holds (const.EMPTY_SLOT_FAMILY_ICON).
 local KEYRING_FAMILY = 256
 
--- isBackpackKeyring says whether a bag is the keyring the backpack reads (Classic Era, WoW: Forever; keyring.md):
+-- isBackpackKeyring says whether a bag is the keyring the backpack reads (Classic Era, TBC Anniversary, WoW: Forever;
+-- keyring.md):
 -- live retail's enum has a Keyring member and no keyring, and on the Classic clients -1 is the bank.
 ---@param bagid number
 ---@return boolean
@@ -880,7 +881,7 @@ function items:GetBagName(bagid)
   if const.BACKPACK_BAGS[bagid] ~= nil then
     local displayid = bagid + 1
     if Enum and Enum.BagIndex and Enum.BagIndex.Keyring and bagid == Enum.BagIndex.Keyring then
-      -- After the last bag: #6 on Classic Era (bags 0-4), #7 on Forever (with the reagent bag).
+      -- After the last bag: #6 on Classic Era and TBC Anniversary (bags 0-4), #7 on Forever (with the reagent bag).
       local lastBag = 0
       for id in pairs(const.BACKPACK_BAGS) do
         if id ~= bagid and id > lastBag then
@@ -978,7 +979,7 @@ local function IncludeBagInFreeSpace(kind, bagid, tabID)
     return tabID == const.GUILD_BANK_ALL_TAB and guildTabOf(bagid) ~= nil
   end
   if kind == const.BAG_KIND.BACKPACK then
-    -- The keyring (WoW: Forever) holds only keys: its slots are not free space.
+    -- The keyring (Classic Era, TBC Anniversary, WoW: Forever) holds only keys: its slots are not free space.
     local isKeyring = Enum.BagIndex and Enum.BagIndex.Keyring and bagid == Enum.BagIndex.Keyring
     return const.BACKPACK_BAGS[bagid] ~= nil and not isKeyring
   end
@@ -2862,8 +2863,9 @@ function items:Harvest(kind, bagList, includeEquipment, previousItems, rereadEqu
   -- 1. Sweep physical container bags
   for bagid in pairs(bagList) do
     local size = C_Container.GetContainerNumSlots(bagid)
-    -- The keyring (Classic Era, WoW: Forever) reports about 32 slots, but the game opens only GetKeyRingSize()'s
-    -- (every key is in one of them); Blizzard's bags padlock the rest (ContainerFrame_GetContainerNumSlots).
+    -- The keyring (Classic Era, TBC Anniversary, WoW: Forever) reports about 32 slots, but the game opens only
+    -- GetKeyRingSize()'s (every key is in one of them); Blizzard's bags padlock the rest
+    -- (ContainerFrame_GetContainerNumSlots).
     if bagid == Enum.BagIndex.Keyring and const.BACKPACK_BAGS[bagid] ~= nil then
       size = GetKeyRingSize()
     end

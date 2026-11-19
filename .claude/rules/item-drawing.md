@@ -261,10 +261,11 @@ glance. Generic bags (family `0`) draw nothing.
   `SetTexture` does (it was there because `SetAtlas` could take the atlas's size); it is kept so the
   glyph is 24×24 on every draw, as before. On Next it also resets the whole-pixel size `NextItemFit`
   gave the glyph until the grid is fitted again, as the `SetAtlas` draw did (next-pixel-perfect.md).
-  And on Classic Era the keyring's empty slots are drawn in place in Show Bags only when
-  `C_Container.GetBagName(-2)` names the keyring (`drawsEmptySlotsInPlace`); Blizzard titles the
-  keyring itself there (`Classic/ContainerFrame_Shared.lua`), so whether Era shows the key needs an
-  in-game check. On WoW: Forever they are drawn (keyring.md §1: a Forever screenshot showed them).
+  And on Classic Era and TBC Anniversary the keyring's empty slots are drawn in place in Show Bags
+  only when `C_Container.GetBagName(-2)` names the keyring (`drawsEmptySlotsInPlace`); Blizzard
+  titles the keyring itself on both (`Classic/ContainerFrame_Shared.lua`), so whether they show the
+  key needs an in-game check. On WoW: Forever they are drawn (keyring.md §1: a Forever screenshot
+  showed them).
 - **Coverage:** `spec/core/constants_spec.lua` ("gives every specialized bag type a glyph of its own,
   shipped with BetterBags": the map, the default, each file a 64 × 64 RGBA PNG), `spec/items_spec.lua`
   ("Empty slot family icons (specialized bags)": resolver semantics, `Phase5` family capture, `Phase6`

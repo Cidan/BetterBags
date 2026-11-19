@@ -9,19 +9,24 @@ paths:
 ---
 # The Keyring
 
-Classic Era and WoW: Forever have a keyring, read with the backpack: `Enum.BagIndex.Keyring` (-2 on Classic Era, -1 on
-Forever) is in `const.BACKPACK_BAGS` (`core/era/constants.lua`; on Forever `core/constants.lua` while
-`C_ActionBar.ShouldShowKeyring()`, camelot-forever.md §7). It has no bag slot button, its slots are not free space
-(`IncludeBagInFreeSpace`), and Show Bags names it "Keyring", numbered after the last bag (`items:GetBagName`: "#6" on
-Classic Era, "#7" on Forever). Every check for it also asks that the backpack reads it
-(`const.BACKPACK_BAGS[bagid] ~= nil`): live retail's enum has a `Keyring` member (-1) with no keyring, and on the
-Classic clients -1 is the bank.
+Classic Era, The Burning Crusade Anniversary (TBC Anniversary) and WoW: Forever have a keyring, read with the
+backpack: `Enum.BagIndex.Keyring` (-2 on Classic Era and TBC Anniversary, -1 on Forever) is in `const.BACKPACK_BAGS`
+(`core/era/constants.lua`, loaded on Classic Era and on TBC Anniversary; on Forever
+`core/constants.lua` while `C_ActionBar.ShouldShowKeyring()`, camelot-forever.md §7). It has no bag slot button, its
+slots are not free space (`IncludeBagInFreeSpace`), and Show Bags names it "Keyring", numbered after the last bag
+(`items:GetBagName`: "#6" on Classic Era and TBC Anniversary, "#7" on Forever). Every check for it also asks that the
+backpack reads it (`const.BACKPACK_BAGS[bagid] ~= nil`): live retail's enum has a `Keyring` member (-1) with no
+keyring, and on the Classic clients -1 is the bank. No check asks which client runs, so TBC Anniversary, with Classic
+Era's bag IDs and constants, does all this exactly as Classic Era does (issue #1359). On those two clients BetterBags
+does not ask `IsKeyRingEnabled()`, which Blizzard's keyring button does (`Classic/Keyring.lua`): a keyring with no
+slots reads as none (`GetKeyRingSize()` is never more than the keyring's slots).
 
 ## 1. Only the slots the game opens
 
 The keyring reports about 32 slots (`C_Container.GetContainerNumSlots`), but the game opens only `GetKeyRingSize()`'s.
 That is Blizzard's own Lua (`Blizzard_MainMenuBarBagButtons`: `Camelot/MainMenuBarBagButtons.lua` on Forever,
-`Classic/MainMenuBarBagButtons.lua` on Classic Era, loaded at startup on both): the last filled slot rounded up to a
+`Classic/MainMenuBarBagButtons.lua` on Classic Era and TBC Anniversary, the same function on both, loaded at startup
+on all three): the last filled slot rounded up to a
 row of 4, a row more once every slot up to it holds a key, never more than the keyring's slots; 4 for an empty
 keyring. Every key is in one of those slots. Blizzard's bags show the keyring that size
 (`ContainerFrame_GetContainerNumSlots` returns it for `KEYRING_CONTAINER`), and its item buttons padlock a slot past it
@@ -57,8 +62,9 @@ keyring's bag ID is below the backpack's, so it came first, before "#1: Backpack
 place.
 
 Coverage: `spec/sort_spec.lua` ("the backpack's keyring": after every bag on Classic Era and Forever, the Classic Era
-bank first, live retail's enum ID left alone), `spec/refresh_pipeline_spec.lua` ("lists the keyring's section after
-every bag's", through the whole read with the real slot order).
+bank first, live retail's enum ID left alone; the Classic Era case is TBC Anniversary's too, the same bag IDs),
+`spec/refresh_pipeline_spec.lua` ("lists the keyring's section after every bag's", through the whole read with the real
+slot order).
 
 ## 3. The key glyph in its slots
 
