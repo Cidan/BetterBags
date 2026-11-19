@@ -145,7 +145,7 @@ Rather than keeping the legacy modules running alongside the new ones, we will e
 
 1. **Legacy Deactivation:** We will disable the legacy `data/items.lua`, `data/stacks.lua`, `data/search.lua`, and view modules in all `.toc` files. The BetterBags window will boot with blank frames and no items.
 2. **Bottom-Up Building:** As we complete each new phase, we will add the new files directly to the active `.toc` lists.
-3. **In-Game Debugging:** We will implement slash commands or developer logs in the new files. For example, once Phase 2 (Farming) and Phase 3 (Stacking) are active in-game, we can run a debug slash command `/bb debugitems` to inspect the generated flat datasets and stack structures using real client state, verifying correctness long before any UI button is rendered!
+3. **In-Game Debugging:** We will implement slash commands or developer logs in the new files. For example, once Phase 2 (Farming) and Phase 3 (Stacking) are active in-game, we can run a debug slash command `/bb debugitems` to inspect the generated flat datasets and stack structures using real client state, verifying correctness long before any UI button is rendered! (`/bb debugitems` has since been removed: it claimed `/bb` a second time, #1360. The `/bbdb` debug window's **Dump Backpack Items** records the backpack items BetterBags read.)
 4. **Final Restoration:** When Phase 8 is completed, the main UI frames will fully re-bind to the clean-room pipeline, restoring 100% of game functionality.
 
 ### Testing Strategy per Phase

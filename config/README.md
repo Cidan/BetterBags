@@ -35,6 +35,10 @@ Chat commands:
   (`.claude/rules/next-bag-anchor.md` §30b).
 - `/bbdb` turns debug mode on and off.
 
+Every BetterBags chat command is registered here and nowhere else: the client keeps one handler per command, so a
+second registration of `/bb` elsewhere left `/bb` printing another handler's text on some setups
+(`.claude/rules/slash-commands.md`).
+
 ### plugin.lua
 
 `Config:AddPluginConfig(title, options)` gives a plugin its page of the settings window (under
