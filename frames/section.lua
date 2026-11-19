@@ -565,7 +565,7 @@ function sectionFrame:MoveItems(list, bankType)
   end
 
   for _, item in ipairs(all) do
-    C_Container.UseContainerItem(item.bagid, item.slotid, nil, containerType, flow == const.MOVEMENT_FLOW.REAGENT)
+    C_Container.UseContainerItem(item.bagid, item.slotid, nil, containerType)
   end
 end
 

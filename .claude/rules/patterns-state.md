@@ -44,7 +44,7 @@ There is no `SwitchToBank`, `SwitchToCharacterBankTab` or `SwitchToAccountBank`:
 ## WoW Bank System Architecture
 - **Character Bank**: BagIndex 6–11 (`CharacterBankTab_1` to `CharacterBankTab_6`)
 - **Account Bank**: BagIndex 13–17 (`AccountBankTab_1` to `AccountBankTab_5`)
-- **Reagent Bank**: `BagIndex.Reagentbank`
+- **Reagent Bank**: none on any client BetterBags supports. Retail and WoW: Forever have no `Enum.BagIndex.Reagentbank`; Classic Era, The Burning Crusade Anniversary and Mists of Pandaria Classic still list it (-3), but Blizzard's source for each has no reagent bank frame or API (`ReagentBankFrame`, `DepositReagentBank`, `IsReagentBankUnlocked`) and one bank panel. `Items:BankBags` still reads -3 with the Classic bank, and `refresh:BankTabs` keeps it only with slots. No movement flow or move names a reagent bank: the `REAGENT` flow and `UseContainerItem`'s `reagentBankOpen` argument were removed as unreachable (#1358), as Blizzard's bag code sets that argument to false on every client.
 - Right-click item destination is determined by `BankPanel:GetActiveBankType()`
 - Always use `BankPanel:SetBankType(Enum.BankType.Character/Account)` — never assign directly to `BankPanel.bankType` (direct assignment taints BankPanel and causes `ADDON_ACTION_FORBIDDEN`)
 - Account bank tabs show aggregate items; character bank tabs each correspond to one bag

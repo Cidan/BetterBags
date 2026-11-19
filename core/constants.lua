@@ -118,7 +118,6 @@ end
 const.MOVEMENT_FLOW = {
   UNDEFINED = -1,
   BANK = 0,
-  REAGENT = 1,
   WARBANK = 2,
   SENDMAIL = 3,
   TRADE = 4,

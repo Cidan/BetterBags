@@ -193,8 +193,8 @@ Items only with that category on, outside the bag-by-bag views, and when its cat
 
 **Bugs in the addon the checks found**, outside the help and not fixed (QuickFind's bank tab and its search by a
 name's first word were fixed since, #1343 and #1344, and the quickfind article's Item Selection written again; its bank
-items listed only while the bank is open are kept by design, quickfind.md §3): the reagent bank move on a section right-click cannot be reached from
-any bank view; a double click on the vendor's red destroy card destroys two stacks; `rarity %= x` raises "Unknown
+items listed only while the bank is open are kept by design, quickfind.md §3; the reagent bank move on a section
+right-click, which no bank view could reach, was removed, #1358, patterns-state.md): a double click on the vendor's red destroy card destroys two stacks; `rarity %= x` raises "Unknown
 operator"; Flash Stacks (`newItemFlash`) is read by nothing; New Profile makes the new profile active before asking, so
 Cancel leaves the character on it, and Copy Profile switches whichever button is chosen; Enable Enter to Make Category
 is hidden in BetterBags Next but still acts there; a search rule with a syntax mistake shows 0 results and can still be

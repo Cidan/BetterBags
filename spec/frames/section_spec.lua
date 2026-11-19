@@ -16,7 +16,7 @@ local const = StubBetterBagsModule("Constants")
 const.BAG_VIEW = { SECTION_GRID = 1 }
 const.BAG_KIND = { BACKPACK = 1, BANK = 2 }
 -- The real values (core/constants.lua).
-const.MOVEMENT_FLOW = { UNDEFINED = -1, BANK = 0, REAGENT = 1, WARBANK = 2, SENDMAIL = 3, TRADE = 4, NPCSHOP = 5 }
+const.MOVEMENT_FLOW = { UNDEFINED = -1, BANK = 0, WARBANK = 2, SENDMAIL = 3, TRADE = 4, NPCSHOP = 5 }
 
 StubBetterBagsModule("Sort")
 
@@ -338,6 +338,18 @@ describe("Section Frame", function()
         movementFlow.GetMovementFlow = function() return const.MOVEMENT_FLOW.WARBANK end
         sectionFrame:MoveItems({ item(1) })
         assert.are.same({ { 0, 1, nil, Enum.BankType.Account } }, used)
+      end)
+
+      -- No client has a reagent bank, and Blizzard's bag code sets its reagentBankOpen to false on each
+      -- (ContainerFrameItemButton_OnClick), UseContainerItem's default.
+      it("names no reagent bank when it moves items", function()
+        local counts = {}
+        _G.C_Container.UseContainerItem = function(...) table.insert(counts, select("#", ...)) end
+        movementFlow.GetMovementFlow = function() return const.MOVEMENT_FLOW.BANK end
+        sectionFrame:MoveItems({ item(1) })
+        movementFlow.GetMovementFlow = function() return const.MOVEMENT_FLOW.WARBANK end
+        sectionFrame:MoveItems({ item(2) })
+        assert.are.same({ 4, 4 }, counts)
       end)
 
       it("moves into the bank type it is given while the bank is open, whatever the flow", function()
