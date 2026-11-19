@@ -3521,7 +3521,8 @@ _G.C_ActionBar.ShouldShowKeyring = function() return _G._keyringEnabled ~= false
 -- GetKeyRingSize() -> how many keyring slots the game opens; Blizzard's bags padlock the rest
 -- (ContainerFrame_GetContainerNumSlots). Blizzard's own Lua, ported as is from
 -- Blizzard_MainMenuBarBagButtons (Camelot/MainMenuBarBagButtons.lua on WoW: Forever,
--- Classic/MainMenuBarBagButtons.lua on Classic Era), with KEYRING_CONTAINER (Enum.BagIndex.Keyring,
+-- Classic/MainMenuBarBagButtons.lua on Classic Era and TBC Anniversary, the same function on both),
+-- with KEYRING_CONTAINER (Enum.BagIndex.Keyring,
 -- Blizzard_FrameXMLBase Constants.lua): the last filled slot rounded up to a row of 4, a row more
 -- once every slot up to it is filled, never more than the keyring's slots.
 _G.GetKeyRingSize = function()

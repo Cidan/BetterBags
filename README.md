@@ -125,7 +125,7 @@ This temporary view allows you to see your bags and the items within them how th
 
 ### Dropping Items Into Your Bags
 You can drop an item anywhere on the bag or bank window, not just on an empty slot: drag it there and let go, or pick it up and left-click the window. This is the quickest way to unequip gear, by dragging it from your character panel onto your bags.
-- The item goes into the first free slot of a bag made for it (a profession bag of its kind, the reagent bag for crafting reagents, the keyring for keys on Classic Era and WoW: Forever), otherwise into the first ordinary bag, starting with your backpack. It is never put in a special bag it doesn't fit.
+- The item goes into the first free slot of a bag made for it (a profession bag of its kind, the reagent bag for crafting reagents, the keyring for keys on Classic Era, The Burning Crusade Classic and WoW: Forever), otherwise into the first ordinary bag, starting with your backpack. It is never put in a special bag it doesn't fit.
 - Dropping on the bank window stores the item in the bank type you are looking at (your character bank or the Warband bank), starting with the tab you have selected.
 - An item you picked up from the same window goes back where it came from.
 - If there is no room, you get the usual "Inventory is full." message and the item stays on your cursor.
