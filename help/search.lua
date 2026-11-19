@@ -148,13 +148,24 @@ local function codePoint(ch)
   return (b1 - 0xF0) * 262144 + (b2 - 0x80) * 4096 + (b3 - 0x80) * 64 + (b4 - 0x80)
 end
 
--- isWide says whether a code point is a letter of a script written without spaces between words: kana, CJK
--- ideographs, Hangul.
+-- isWide says whether a code point is a letter of a script searched by pairs of characters: kana, CJK ideographs,
+-- Hangul.
 ---@param cp number
 ---@return boolean
 local function isWide(cp)
   return (cp >= 0x3040 and cp <= 0x30FF) or (cp >= 0x3400 and cp <= 0x4DBF) or (cp >= 0x4E00 and cp <= 0x9FFF)
     or (cp >= 0xAC00 and cp <= 0xD7AF) or (cp >= 0xF900 and cp <= 0xFAFF)
+end
+
+-- isUnspaced says whether a code point is of text written without spaces between words, which a snippet may be cut
+-- beside: kana, CJK ideographs, the ideographic space, CJK and full-width punctuation (not full-width letters and
+-- digits, cut as words are). Not Hangul: Korean puts spaces between words.
+---@param cp number
+---@return boolean
+local function isUnspaced(cp)
+  return (cp >= 0x3000 and cp <= 0x30FF) or (cp >= 0x3400 and cp <= 0x4DBF) or (cp >= 0x4E00 and cp <= 0x9FFF)
+    or (cp >= 0xF900 and cp <= 0xFAFF) or (cp >= 0xFF01 and cp <= 0xFF0F) or (cp >= 0xFF1A and cp <= 0xFF20)
+    or (cp >= 0xFF3B and cp <= 0xFF40) or (cp >= 0xFF5B and cp <= 0xFF65)
 end
 
 -- isLetter says whether a code point past ASCII is part of a word: Latin, Greek and Cyrillic letters.
@@ -744,22 +755,62 @@ local function sentences(text)
   return list
 end
 
--- matches says whether a word of a snippet is one of the terms matched (a wide run when any of its pairs is).
+-- matchAt returns the first of a word's terms matched and which it is (a wide run's pair, counted from the run's
+-- start), or nil when the word is none of the terms matched.
 ---@param word HelpWord
 ---@param terms table<string, boolean>
----@return boolean
-local function matches(word, terms)
-  for _, term in ipairs(termsOf(word)) do
+---@return number? at
+---@return string? term
+local function matchAt(word, terms)
+  for i, term in ipairs(termsOf(word)) do
     if terms[term] then
-      return true
+      return i, term
     end
   end
-  return false
+  return nil, nil
+end
+
+-- Marks a snippet may not start with, as they close what comes before them, and marks it may not end with, as they
+-- open what comes after (the line breaking rules of Chinese and Japanese).
+local CLOSES, OPENS = {}, {}
+for _, cp in ipairs({ 0x2019, 0x201D, 0x3001, 0x3002, 0x3009, 0x300B, 0x300D, 0x300F, 0x3011, 0x3015, 0x3017, 0x3019,
+  0x301B, 0x301E, 0x301F, 0x30FB, 0x30FC, 0xFF01, 0xFF09, 0xFF0C, 0xFF0E, 0xFF1A, 0xFF1B, 0xFF1F, 0xFF3D, 0xFF5D,
+  0xFF60, 0xFF61, 0xFF63, 0xFF64, 0xFF65 }) do
+  CLOSES[cp] = true
+end
+for _, cp in ipairs({ 0x2018, 0x201C, 0x3008, 0x300A, 0x300C, 0x300E, 0x3010, 0x3014, 0x3016, 0x3018, 0x301A, 0x301D,
+  0xFF08, 0xFF3B, 0xFF5B, 0xFF5F, 0xFF62 }) do
+  OPENS[cp] = true
+end
+
+-- breaks says whether a sentence may be cut between its characters i and i + 1: at its ends, beside a space, or beside
+-- a character of text written without spaces, unless that leaves a mark at the snippet's edge that belongs inside it.
+---@param letters string[]
+---@param i number
+---@return boolean
+local function breaks(letters, i)
+  local a, b = letters[i], letters[i + 1]
+  if a == nil or b == nil then
+    return true
+  end
+  local ca, cb = codePoint(a), codePoint(b)
+  if OPENS[ca] or CLOSES[cb] then
+    return false
+  end
+  return a == " " or b == " " or isUnspaced(ca) or isUnspaced(cb)
+end
+
+-- isBlank says whether a character is a space or the ideographic space, left off a snippet's edges.
+---@param ch string
+---@return boolean
+local function isBlank(ch)
+  return ch == " " or ch == "\227\128\128"
 end
 
 -- Snippet returns the sentence of text with the most terms matched (the first sentence when none is), at most width
--- characters of it round its first match, cut at a word's edge with an ellipsis; and where each matched word is in
--- what it returns (first and last byte), to mark them.
+-- characters of it round its first match, cut at a word's edge (between any two characters of text written without
+-- spaces) with an ellipsis, cut at the width when no edge is between the match and it; and where each matched word is
+-- in what it returns (first and last byte), to mark them.
 ---@param text string
 ---@param terms table<string, boolean>
 ---@param width number
@@ -786,10 +837,17 @@ function search:Snippet(text, terms, width)
   local letters = chars(best)
   local snippet = best
   if #letters > width then
-    local first = 1
+    local first, last = 1, 0
     for _, word in ipairs(scan(best)) do
-      if matches(word, terms) then
+      local at, term = matchAt(word, terms)
+      if at ~= nil then
         first = #chars(best:sub(1, word.s - 1)) + 1
+        if word.wide then
+          first = first + at - 1
+          last = first + #chars(term) - 1
+        else
+          last = #chars(best:sub(1, word.e))
+        end
         break
       end
     end
@@ -798,27 +856,27 @@ function search:Snippet(text, terms, width)
     if to == #letters then
       from = math.max(1, to - width + 1)
     end
-    if from > 1 and letters[from - 1] ~= " " then
-      while from <= first and letters[from] ~= " " do
-        from = from + 1
-      end
-    end
-    while from < #letters and letters[from] == " " do
+    while from < first and not breaks(letters, from - 1) do
       from = from + 1
     end
-    if to < #letters and letters[to + 1] ~= " " then
-      while to > from and letters[to] ~= " " do
-        to = to - 1
-      end
+    while from < #letters and isBlank(letters[from]) do
+      from = from + 1
     end
-    while to > from and letters[to] == " " do
+    local cut = to
+    while cut > math.max(from, last) and not breaks(letters, cut) do
+      cut = cut - 1
+    end
+    if breaks(letters, cut) then
+      to = cut
+    end
+    while to > from and isBlank(letters[to]) do
       to = to - 1
     end
     snippet = (from > 1 and "…" or "") .. table.concat(letters, "", from, to) .. (to < #letters and "…" or "")
   end
   local spans = {}
   for _, word in ipairs(scan(snippet)) do
-    if matches(word, terms) then
+    if matchAt(word, terms) ~= nil then
       table.insert(spans, { word.s, word.e })
     end
   end
