@@ -1242,6 +1242,102 @@ describe("Search", function()
       assert.is_nil(results["sword"])
     end)
   end)
+
+  -- ─── What a search rule's suggestions read (search-completion.md §2) ─────────
+
+  describe("fields and values for suggestions", function()
+
+    local function names()
+      local list = {}
+      for _, f in ipairs(search:Fields()) do list[f.name] = f end
+      return list
+    end
+
+    it("lists every field and alias a query reads, once each, by name, with its kind", function()
+      local fields = search:Fields()
+      local by = names()
+      for i = 2, #fields do
+        assert.is_true(fields[i - 1].name < fields[i].name, "by name, once each: " .. fields[i].name)
+      end
+      assert.same({ name = "name", key = "name", kind = "text" }, by.name)
+      assert.same({ name = "ilvl", key = "level", kind = "number", alias = "level" }, by.ilvl)
+      assert.same({ name = "level", key = "level", kind = "number" }, by.level)
+      assert.same({ name = "pet", key = "pet", kind = "boolean" }, by.pet)
+      assert.same({ name = "ah", key = "auctionable", kind = "boolean", alias = "auctionable" }, by.ah)
+      assert.same({ name = "stat", key = "stats", kind = "text", list = true }, by.stat)
+      assert.same({ name = "equipmentset", key = "sets", kind = "text", list = true }, by.equipmentset)
+      assert.same({ name = "bonusid", key = "bonusIDs", kind = "number", list = true }, by.bonusid)
+      assert.same({ name = "slot", key = "equipmentlocation", kind = "text", alias = "equipmentlocation" }, by.slot)
+      assert.is_nil(by.expansionid, "the release order of expansion, never typed")
+      for _, f in ipairs(fields) do
+        assert.is_not_nil(search:GetIndex(f.name), "a query reads " .. f.name)
+      end
+    end)
+
+    it("lists the player values a query reads, each a number or text", function()
+      local list = {}
+      for _, p in ipairs(search.PLAYER_VALUES) do
+        list[#list + 1] = p.name .. ":" .. p.kind
+      end
+      assert.same({ "level:number", "ilvl:number", "equippedilvl:number", "class:text", "classid:number", "spec:text",
+        "specid:number", "profession:text", "name:text", "realm:text" }, list)
+    end)
+
+    it("says what field a word names, in any case, or nothing", function()
+      assert.same({ name = "ilvl", key = "level", kind = "number", alias = "level" }, search:FieldOf("ILVL"))
+      assert.are.equal("bagname", search:FieldOf("bagName").name)
+      assert.is_nil(search:FieldOf("sword"))
+      assert.is_nil(search:FieldOf("player.level"))
+    end)
+
+    it("counts the values a field has in the items given, as they are written, the most common first", function()
+      search:Add(MockSearchItem({ slotkey = "a", itemType = "Armor", equipmentSets = { "Tank", "Heal" } }))
+      search:Add(MockSearchItem({ slotkey = "b", itemType = "Armor", equipmentSets = { "Tank" } }))
+      search:Add(MockSearchItem({ slotkey = "c", itemType = "Weapon" }))
+      search:Add(MockSearchItem({ slotkey = "d", itemType = "Weapon" }))
+      search:Add(MockSearchItem({ slotkey = "e", itemType = "Consumable" }))
+      local within = { a = true, b = true, c = true, e = true }
+      assert.same({ { value = "Armor", count = 2 }, { value = "Consumable", count = 1 }, { value = "Weapon", count = 1 } },
+        search:ValuesOf("type", within), "d is not among the items given")
+      assert.same({ { value = "Tank", count = 2 }, { value = "Heal", count = 1 } }, search:ValuesOf("equipmentset", within),
+        "each of a list's values")
+      assert.same({ { value = 1, count = 4 } }, search:ValuesOf("ilvl", within), "an alias, a number")
+      assert.same({ { value = false, count = 4 } }, search:ValuesOf("reagent", within))
+      assert.same({}, search:ValuesOf("sword", within))
+    end)
+
+    it("gives each of the items given its value for a field, by slot key", function()
+      search:Add(MockSearchItem({ slotkey = "a", currentItemLevel = 600 }))
+      search:Add(MockSearchItem({ slotkey = "b", currentItemLevel = 610 }))
+      search:Add(MockSearchItem({ slotkey = "c", currentItemLevel = 620 }))
+      assert.same({ a = 600, b = 610 }, search:ValuesBySlot("ILVL", { a = true, b = true, gone = true }))
+      assert.same({}, search:ValuesBySlot("sword", { a = true }))
+    end)
+
+    it("finds the items given that have a value for a field", function()
+      search:Add(MockSearchItem({ slotkey = "hero", traits = { upgradeTrack = "Hero", stats = {} } }))
+      search:Add(MockSearchItem({ slotkey = "ore", traits = { stats = {} } }))
+      search:Add(MockSearchItem({ slotkey = "set", equipmentSets = { "Tank" } }))
+      local within = { hero = true, ore = true, set = true }
+      assert.same({ hero = true }, search:HasValue("track", within))
+      assert.same({ set = true }, search:HasValue("equipmentset", within), "a list with a value")
+      assert.same({ hero = true }, search:HasValue("track", { hero = true, gone = true }), "only items indexed")
+      assert.same({}, search:HasValue("sword", within))
+    end)
+
+    it("evaluates a set of items given in place of a condition", function()
+      search:Add(MockSearchItem({ slotkey = "plate", itemType = "Armor" }))
+      search:Add(MockSearchItem({ slotkey = "cloth", itemType = "Armor" }))
+      search:Add(MockSearchItem({ slotkey = "blade", itemType = "Weapon" }))
+      local parser = addon:GetModule("QueryParser")
+      local set = { type = "set", set = { plate = true, blade = true } }
+      local ast = { type = "logical", operator = "AND", left = parser:Query("type = armor"), right = set }
+      assert.same({ plate = true }, search:EvaluateQuery(ast))
+      assert.same({ cloth = true }, search:EvaluateQuery({ type = "logical", operator = "NOT", expression = set }))
+      assert.same({ plate = true, blade = true },
+        search:EvaluateQuery({ type = "logical", operator = "OR", left = parser:Query("name = nothing"), right = set }))
+    end)
+  end)
 end)
 
 -- The index is kept up to date incrementally: each sweep re-indexes only the items whose

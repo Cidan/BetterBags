@@ -167,6 +167,7 @@ A complete lexer and parser for search query syntax, supporting complex boolean 
 | Method | Description | Parameters | Returns |
 |--------|-------------|------------|---------|
 | `Query(input)` | Parse query string | `string` | `QueryNode` |
+| `Context(input, cursor)` | Returns the syntactic context at `cursor` (a byte offset): whether the query accepts a condition, an operator, a value, `AND`, `OR`, or nothing; the word at `cursor` and the byte range a suggestion replaces; and the field and operator of a value. Derived from lexer tokens alone so partially typed queries resolve. Used by the Search Rule tab's suggestions (`.claude/rules/search-completion.md` §1). | `string`, `number` | `QueryContext?` (`nil` when the lexer cannot read `input`) |
 
 **Example Queries:**
 ```lua
@@ -413,6 +414,7 @@ movementFlow:AtNPCShopWindow(): boolean
 ### QueryParser Module
 ```lua
 QueryParser:Query(input: string): QueryNode?
+QueryParser:Context(input: string, cursor: number): QueryContext?
 ```
 
 ### Serialization Module

@@ -170,6 +170,51 @@ describe("the help on the whole addon", function()
     assert.are.same({}, problems)
   end)
 
+  -- A part titled with a search keyword (keyword = true) names what a query reads: each word a field or an alias, a
+  -- player value, a function (with math. or () if written so), or one token of its own (an operator, AND, OR, NOT, a
+  -- parenthesis, an arithmetic sign), as the lexer reads it.
+  it("titles a part with a search keyword only when a query reads it", function()
+    local addon = start({ next = true })
+    local parser = addon:GetModule("QueryParser")
+    local search = addon:GetModule("Search")
+    local OWN = { operator = true, logical = true, paren = true, arith = true }
+    local function reads(word)
+      local tokens = parser:Lexer(word)
+      if #tokens == 1 and OWN[tokens[1].type] then
+        return true
+      end
+      local w = word:lower()
+      if search:FieldOf(w) ~= nil then
+        return true
+      end
+      local fn = w:gsub("^math%.", ""):gsub("%(%)$", "")
+      if parser.FUNCTIONS[fn] then
+        return true
+      end
+      for _, p in ipairs(search.PLAYER_VALUES) do
+        if w == "player." .. p.name then
+          return true
+        end
+      end
+      return false
+    end
+    local problems, keywords = {}, 0
+    for _, a in ipairs(addon:GetModule("HelpArticles").list) do
+      for _, block in ipairs(a.body) do
+        if block.keyword then
+          keywords = keywords + 1
+          for word in block.heading:gmatch("%S+") do
+            if not reads(word) then
+              table.insert(problems, a.id .. ": " .. block.heading)
+            end
+          end
+        end
+      end
+    end
+    assert.are.same({}, problems)
+    assert.is_true(keywords > 0, "the search help's parts are titled with its keywords")
+  end)
+
   for _, design in ipairs({ "next", "classic" }) do
     it("shows every article on the Help page without an error, with " .. design, function()
       local addon = start({ next = design == "next" })

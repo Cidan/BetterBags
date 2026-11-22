@@ -176,6 +176,13 @@ Provides a powerful full-text search engine with query parsing capabilities.
 "NOT reagent=true"
 ```
 
+#### What the Search Rule Suggestions Read
+`search:Fields()` and `search:FieldOf(word)` list every field and alias read by queries from the evaluator's own tables. Given slot keys in `within`, `search:ValuesOf(word, within)` returns the values a field has among those items ordered most common first, `search:ValuesBySlot(word, within)` returns each item's value, and `search:HasValue(word, within)` returns the items that have a value. `search.PLAYER_VALUES` lists the `player.` names, and `EvaluateAST` accepts a `set` node supplying items in place of a condition. See `.claude/rules/search-completion.md` §2.
+
+### Search Completion (`searchcompletion.lua`)
+
+`SearchCompletion:Suggest(text, cursor, within)` returns candidate completions valid at `cursor` in a search rule: fields, `NOT`, player values, and functions at a condition start; operators accepted by a field; comparison values (every rarity, expansion, binding, and true-or-false value for those fields, and the values present on the items in `within` otherwise); and `AND` and `OR` after a complete condition. Each suggestion includes the resulting query, the updated cursor position, and the count of matching items in `within` (for a field, the count of items remaining after the rest of the rule that have a value for that field; `0` for suggestions that do not form a complete rule). Value counts are computed by evaluating the rest of the rule once (`ValueCounter`), and numeric field counts are computed by binary search over the field's item values. The Search Rule tab displays these suggestions (`next/settings/categories.lua`); see `.claude/rules/search-completion.md`.
+
 #### Key Functions
 ```lua
 -- Search for items

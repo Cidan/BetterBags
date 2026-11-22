@@ -358,7 +358,8 @@ function viewProto:Show(article, ctx)
     if block ~= nil then
       block.def = def
       if kind == "heading" then
-        block.label:SetText(C.TitleUpper == false and def.heading or string.upper(def.heading))
+        -- A search keyword (keyword = true) is typed as it is written.
+        block.label:SetText((C.TitleUpper == false or def.keyword) and def.heading or string.upper(def.heading))
       elseif kind == "text" or kind == "tip" or kind == "warning" then
         block.label:SetText(def[kind] or def.text)
       elseif kind == "list" or kind == "steps" then

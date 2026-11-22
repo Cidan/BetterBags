@@ -100,6 +100,7 @@ describe("NextSettingsHelp", function()
       id = "search", group = "bags", title = "Searching your bags", featured = true,
       summary = "Find any item by typing.", keywords = { "find", "filter" },
       body = { { text = "Type in the search box at the top of your bags." },
+        { heading = "ilvl", keyword = true },
         { example = "ilvl >= 600", text = "Items of item level 600 and up." } },
     })
     articles:Define({
@@ -589,6 +590,13 @@ describe("NextSettingsHelp", function()
         last = -y
         assert.is_true(block.frame:GetWidth() <= H().MaxWidth)
       end
+    end)
+
+    -- Asked: the search help's keywords as the titles of its sections; a search keyword is typed as it is written.
+    it("titles a part with a search keyword as it is typed, not in capitals", function()
+      help:OpenArticle(ctx(), "search")
+      settle()
+      assert.are.equal("ilvl", blocksOf("heading")[1].label:GetText())
     end)
 
     it("shows a search example as typed in a field, with what it finds", function()

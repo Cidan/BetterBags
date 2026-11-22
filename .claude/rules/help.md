@@ -40,6 +40,19 @@ user:
   three words in Title Case naming what the part covers, never a clause, a question or a statement, each its own in
   its article. The first drafts' headings were phrases, and the writer was asked only for "short, Sentence case"
   headings, so it kept them: the writer's brief for any heading states this rule.
+- **A search keyword titles its part as it is typed** (asked, 2026-11-22: "break down the search help a bit more so
+  keywords are formal titles of sections"): a `heading` with `keyword = true` (`ilvl`, `%=`, `( )`, `player.level`),
+  raw, never `L:G` (a query is never translated), shown as typed, not in capitals (`next/settings/article.lua`), exempt
+  from Title Case, the clause words and the trailing punctuation check, still one to three words and its own in its
+  article (`spec/help/content_spec.lua`); `spec/integration/help_coverage_spec.lua` checks a query reads each of its
+  words (a field or alias, a player value, a function, or one token of its own as the lexer reads it). The search
+  articles title every field, alias, operator, function and player value so, one each; what is not one keyword
+  (arithmetic, money, quotes, precedence) keeps a Title Case heading.
+- **Nothing "holds" anything** (asked, the same day: "nothing 'holds' anything, this is a claude-ism in speech, this
+  should have been written by the writer agent"): a field, page, tab, section, bag or setting never holds what it has;
+  the writer's brief states it. The search articles were written again without it; the other articles still use it
+  about 40 times (start, next, bags, bank, automation, categories, profiles, integrations, troubleshooting), not
+  rewritten yet.
 
 ## 1. Articles (`help/articles.lua`, `HelpArticles`; `help/articles/*.lua`)
 
@@ -131,6 +144,10 @@ words were tuned against; round 3 was not, and measures the search:
 | 3, after the headings were made titles | 77.5% | 89.5% | 0.841 |
 | 3, the text written from the code, old weights | 71.0% | 85.0% | 0.795 |
 | 3, the text written from the code, weights tuned again | 73.0% | 86.5% | 0.806 |
+| 3, the search articles' keywords made their parts' titles (2026-11-22) | 72.8% | 85.8% | not measured |
+
+Rounds 1 and 2 with the keyword titles: 72.3% / 90.7% and 72.3% / 90.5% (from 71.8% / 91.0% and 72.0% / 90.2%), every
+floor kept; nothing tuned.
 
 On round 3, a question, a short search and a search with a typo find their article first about 89% of the time; a
 symptom ("my bags keep...") 56%, WoW slang 60%, and those are most of what misses: a word search cannot tell what a

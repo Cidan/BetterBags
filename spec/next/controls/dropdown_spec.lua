@@ -567,6 +567,112 @@ describe("NextMenu, with a field to find a choice", function()
   end)
 end)
 
+-- A menu at a text cursor (search-completion.md §4: a search rule's suggestions): the field it belongs to keeps
+-- focus and gives it its keys, and a click outside it goes where it was meant to.
+describe("NextMenu, at a text cursor", function()
+  local anchor, saved, picked, closed
+
+  local function list(n)
+    local out = {}
+    for i = 1, n do
+      out[i] = { text = "Choice " .. i, value = i, note = i .. " results" }
+    end
+    return out
+  end
+
+  local function open(items)
+    nextMenu:Open(anchor, { items = items or list(3), attached = true,
+      onPick = function(_, item) table.insert(picked, item.value) end,
+      onClose = function() closed = closed + 1 end })
+    return nextMenu.frame
+  end
+
+  local function lit()
+    local out = {}
+    for i, row in ipairs(nextMenu:Rows()) do
+      if row.hover:IsShown() then table.insert(out, i) end
+    end
+    return out
+  end
+
+  local function mouseDown(button)
+    nextMenu.frame:GetScript("OnEvent")(nextMenu.frame, "GLOBAL_MOUSE_DOWN", button or "LeftButton")
+  end
+
+  before_each(function()
+    picked, closed = {}, 0
+    saved = { _G.UISpecialFrames, C_Timer.After }
+    _G.UISpecialFrames = {}
+    C_Timer.After = function(_, fn) fn() end
+    controls.escape = {}
+    anchor = CreateFrame("Frame", nil, CreateFrame("Frame"))
+    anchor:SetSize(1, 12)
+    anchor:Show()
+  end)
+
+  after_each(function()
+    nextMenu:Close()
+    _G.UISpecialFrames, C_Timer.After = saved[1], saved[2]
+  end)
+
+  it("opens below the cursor with no catcher over the screen, the first choice lit, its notes at their right", function()
+    local frame = open()
+    assert.is_true(frame:IsShown())
+    assert.are.same({ "TOPLEFT", anchor, "BOTTOMLEFT", 0, -M().Gap }, { frame:GetPoint(1) })
+    assert.is_false(nextMenu.catcher:IsShown(), "a click in the field moves its cursor")
+    assert.are.same({ 1 }, lit())
+    assert.are.equal("1 results", nextMenu:Rows()[1].note:GetText())
+    assert.is_true(nextMenu:Rows()[1].note:IsShown())
+    assert.is_true(frame:IsEventRegistered("GLOBAL_MOUSE_DOWN"))
+  end)
+
+  -- As Blizzard's menus close (Blizzard_Menu/Menu.lua, MenuManagerMixin:HandleGlobalMouseEvent): a left or right
+  -- button down anywhere the menu is not.
+  it("closes on a left or right button down outside it, and not over it", function()
+    local frame = open()
+    frame.IsMouseOver = function() return true end
+    mouseDown()
+    assert.is_true(frame:IsShown(), "over it: a click on a choice")
+    frame.IsMouseOver = function() return false end
+    mouseDown("MiddleButton")
+    assert.is_true(frame:IsShown())
+    mouseDown("RightButton")
+    assert.is_false(frame:IsShown())
+    assert.are.equal(1, closed)
+    frame.IsMouseOver = nil
+    assert.is_false(frame:IsEventRegistered("GLOBAL_MOUSE_DOWN"), "it listens only while open")
+  end)
+
+  it("keeps the light where the pointer leaves it, moves it with Arrow, and Take takes it", function()
+    open()
+    local row = nextMenu:Rows()[2]
+    row.frame:GetScript("OnEnter")(row.frame)
+    row.frame:GetScript("OnLeave")(row.frame)
+    assert.are.same({ 2 }, lit())
+    nextMenu:Arrow("DOWN")
+    assert.are.same({ 3 }, lit())
+    nextMenu:Take(addon:GetModule("Context"):New("spec"))
+    assert.are.same({ 3 }, picked)
+    assert.is_false(nextMenu.frame:IsShown())
+  end)
+
+  it("shows other choices in place, open, the one given lit", function()
+    open()
+    nextMenu:SetItems(list(5), 4)
+    assert.is_true(nextMenu.frame:IsShown())
+    assert.are.equal(5, #nextMenu:Rows())
+    assert.are.same({ 4 }, lit())
+    assert.are.equal(0, closed)
+    assert.are.equal(5 * M().ItemHeight + 2 * M().Padding, nextMenu.frame:GetHeight())
+  end)
+
+  it("keeps the catcher for a menu opened by a click", function()
+    nextMenu:Open(anchor, { items = list(2), onPick = function() end })
+    assert.is_true(nextMenu.catcher:IsShown())
+    assert.is_false(nextMenu.frame:IsEventRegistered("GLOBAL_MOUSE_DOWN"))
+  end)
+end)
+
 describe("NextMenu, themed", function()
   local anchor, saved
 

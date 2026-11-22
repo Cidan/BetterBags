@@ -1431,6 +1431,32 @@ end
 function WidgetMethods:HighlightText(start, stop)
   self._highlight = { start or 0, stop or -1 }
 end
+-- EditBox:GetCursorPosition() / SetCursorPosition(position) (SimpleEditBoxAPIDocumentation): the bytes of its text
+-- before the cursor (Blizzard puts it at the end with SetCursorPosition(strlen(text)), AutoComplete.lua), at the end
+-- until set. Setting it runs OnCursorChanged(self, x, y, width, height) (warcraft.wiki.gg UIHANDLER_OnCursorChanged:
+-- y 0 on the first line, lower further down; height one line's): one line here, x as GetStringWidth measures the
+-- text before the cursor.
+function WidgetMethods:GetCursorPosition()
+  local length = #(self._text or "")
+  if self._cursor == nil or self._cursor > length then
+    return length
+  end
+  return self._cursor
+end
+function WidgetMethods:SetCursorPosition(position)
+  self._cursor = math.max(0, math.min(position, #(self._text or "")))
+  local onCursor = self._scripts and self._scripts.OnCursorChanged
+  if onCursor then
+    onCursor(self, self._cursor * 6, 0, 2, self:GetLineHeight())
+  end
+end
+-- EditBox:Insert(text) (SimpleEditBoxAPIDocumentation): the text at the cursor, the cursor after it (the developer
+-- console's Shift-Enter inserts its new line so, Blizzard_Console.xml).
+function WidgetMethods:Insert(text)
+  local current, at = self:GetText(), self:GetCursorPosition()
+  self._text = current:sub(1, at) .. text .. current:sub(at + 1)
+  self._cursor = at + #text
+end
 function WidgetMethods:SetFocus()
   self._hasFocus = true
 end

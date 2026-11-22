@@ -133,11 +133,15 @@ describe("the help's articles", function()
             first = first or word:lower()
           end
           assert.is_true(words >= 1 and words <= 3, a.id .. ": " .. h)
-          assert.is_nil(CLAUSE[first], a.id .. ": " .. h .. " reads as a clause")
-          assert.is_nil(h:find("[%.%?!:,]$"), a.id .. ": " .. h)
-          assert.is_truthy(h:find("^%u"), a.id .. ": " .. h .. " in Title Case")
           assert.is_nil(seen[h], a.id .. ": two parts headed " .. h)
           seen[h] = true
+          -- A search keyword (keyword = true: ilvl, %=, player.level) is the title as it is typed; the integration
+          -- spec checks a query reads it (spec/integration/help_coverage_spec.lua).
+          if not block.keyword then
+            assert.is_nil(CLAUSE[first], a.id .. ": " .. h .. " reads as a clause")
+            assert.is_nil(h:find("[%.%?!:,]$"), a.id .. ": " .. h)
+            assert.is_truthy(h:find("^%u"), a.id .. ": " .. h .. " in Title Case")
+          end
         end
       end
     end
@@ -156,7 +160,8 @@ describe("the help's articles", function()
           end
         end
         for key in pairs(block) do
-          assert.is_true(KINDS[key] ~= nil or key == "bag", a.id .. " block " .. i .. " has " .. key)
+          assert.is_true(KINDS[key] ~= nil or key == "bag" or (key == "keyword" and block.heading ~= nil),
+            a.id .. " block " .. i .. " has " .. key)
         end
         assert.are.equal(1, #kinds, a.id .. " block " .. i .. ": " .. table.concat(kinds, ", "))
         if block.open then

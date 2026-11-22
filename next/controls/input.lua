@@ -69,6 +69,18 @@ addon:GetModule('Perf'):RegisterPrototype(inputProto, 'NextInputFrame')
 ---@field help? string
 ---@field maxLetters? number
 ---@field onChange? fun(ctx: Context, text: string, userInput: boolean)
+---@field complete? fun(text: string, cursor: number): NextCompletion? Suggestions at the cursor as the player types (search-completion.md §4).
+
+-- What a text area suggests at its cursor: the choices (each one's value the text and cursor it makes, and whether
+-- the next suggestions follow at once), and where the word they replace starts, where they show.
+---@class (exact) NextCompletion
+---@field items NextMenuItem[]
+---@field from number The first byte of what they replace.
+
+---@class (exact) NextCompletionValue
+---@field text string
+---@field cursor number
+---@field chain? boolean
 
 ---@class NextTextAreaFrame
 ---@field frame Frame
@@ -80,10 +92,26 @@ addon:GetModule('Perf'):RegisterPrototype(inputProto, 'NextInputFrame')
 ---@field help FontString
 ---@field opts NextTextAreaOptions
 ---@field readOnly? boolean It shows its text and takes no typing (SetReadOnly).
+---@field caret? Frame Where its suggestions show: at the start of the word at the cursor, a line tall.
+---@field measure? FontString Measures the text before the cursor of the word at it, in its font.
+---@field cursorX? number Where its cursor is (OnCursorChanged), from its edit box's top left.
+---@field cursorY? number
+---@field cursorHeight? number
+---@field pending? boolean Its suggestions are read again once this frame ends.
+---@field typed? boolean The player typed since its suggestions were last read.
+---@field dismissed? boolean Escape closed them: none until the next key typed.
+---@field arrowed? boolean Up or Down moved the light: the cursor goes back where they were read.
+---@field at? {text: string, cursor: number} The text and cursor its suggestions shown were read for.
 local areaProto = {}
 addon:GetModule('Perf'):RegisterPrototype(areaProto, 'NextTextAreaFrame')
 
 nextInput.all = {}
+
+-- menu returns NextMenu, which loads after this module (its field is a NextInput).
+---@return NextMenu
+local function menu()
+  return addon:GetModule('NextMenu')
+end
 
 ---@param ctx? Context
 function nextInput:ApplyStyle(ctx)
@@ -315,9 +343,34 @@ function nextInput:CreateArea(parent, opts)
   end)
   addon.SetScript(editBox, "OnEditFocusGained", function() area:OnFocus(true) end)
   addon.SetScript(editBox, "OnEditFocusLost", function() area:OnFocus(false) end)
-  addon.SetScript(editBox, "OnEscapePressed", function() editBox:ClearFocus() end)
+  addon.SetScript(editBox, "OnEscapePressed", function()
+    if not area:CloseSuggestions(true) then
+      editBox:ClearFocus()
+    end
+  end)
   addon.SetScript(editBox, "OnTextChanged", function(ctx, _, userInput) area:OnTextChanged(ctx, userInput) end)
-  addon.SetScript(editBox, "OnCursorChanged", function(_, _, _, y, _, height) area:FollowCursor(y, height) end)
+  addon.SetScript(editBox, "OnCursorChanged", function(_, _, x, y, _, height)
+    area:FollowCursor(y, height)
+    area:CursorMoved(x, y, height)
+  end)
+  -- With suggestions, the area takes Tab, Enter and Up and Down while they show; Enter starts a new line otherwise, as
+  -- the developer console's own Enter does (Blizzard_Console.xml: a multi-line edit box with an OnEnterPressed puts in
+  -- its new line itself), and Up and Down are read from OnKeyDown, as that console reads them in its multi-line box.
+  if opts.complete then
+    area.caret = CreateFrame("Frame", nil, editBox)
+    area.measure = editBox:CreateFontString(nil, "ARTWORK")
+    area.measure:Hide()
+    addon.SetScript(editBox, "OnTabPressed", function(ctx) area:TakeSuggestion(ctx) end)
+    addon.SetScript(editBox, "OnEnterPressed", function(ctx)
+      if not area:TakeSuggestion(ctx) then
+        area:NewLine(ctx)
+      end
+    end)
+    addon.SetScript(editBox, "OnKeyDown", function(_, _, key) area:OnKey(key) end)
+    -- The box takes the wheel while focused: the list would stay by a line scrolled away, so it closes, as the
+    -- catcher of a menu opened by a click closes one on the wheel.
+    addon.HookScript(box, "OnMouseWheel", function() area:CloseSuggestions() end)
+  end
   table.insert(self.all, area)
   sonataNext:RegisterWidget(self)
   area:Style()
@@ -337,6 +390,9 @@ function areaProto:Style()
   pixel:TextInsets(self.editBox, 0, pixel:Length(self.editBox, S.Width) + pixel:Length(self.editBox, S.Inset), 0, 0)
   style:SetFont(self.editBox, I.Font)
   style:SetFont(self.help, I.HelpFont)
+  if self.measure then
+    style:SetFont(self.measure, I.Font)
+  end
   self.help:ClearAllPoints()
   pixel:Point(self.help, "TOPLEFT", frame, "TOPLEFT", pad, -pad)
   self:Paint()
@@ -376,6 +432,7 @@ function areaProto:SetEnabled(enabled)
   self.editBox:SetEnabled(enabled)
   if not enabled then
     self.editBox:ClearFocus()
+    self:CloseSuggestions()
   end
   self.frame:SetAlpha(enabled and 1 or controls:Theme("Button").DisabledAlpha)
   self:Paint()
@@ -389,6 +446,7 @@ function areaProto:SetReadOnly(readOnly)
   self.editBox:SetEnabled(not readOnly)
   if readOnly then
     self.editBox:ClearFocus()
+    self:CloseSuggestions()
   end
   self:Paint()
 end
@@ -396,6 +454,9 @@ end
 ---@param focused boolean
 function areaProto:OnFocus(focused)
   self.box:EnableMouseWheel(focused)
+  if not focused then
+    self:CloseSuggestions()
+  end
   self:Paint()
 end
 
@@ -407,6 +468,174 @@ function areaProto:OnTextChanged(ctx, userInput)
   if userInput and self.opts.onChange then
     self.opts.onChange(ctx, self:GetText(), true)
   end
+  if userInput then
+    self.typed, self.dismissed = true, false
+    self:schedule()
+  end
+end
+
+-- suggesting says whether this area's suggestions show.
+---@private
+---@return boolean
+function areaProto:suggesting()
+  return self.caret ~= nil and menu():IsOpenFor(self.caret)
+end
+
+-- CursorMoved records where the cursor is, and reads the suggestions shown again for where it went.
+---@param x number
+---@param y number
+---@param height number
+function areaProto:CursorMoved(x, y, height)
+  self.cursorX, self.cursorY, self.cursorHeight = x, y, height
+  if self:suggesting() then
+    self:schedule()
+  end
+end
+
+-- schedule reads the suggestions once this frame ends: once for every key and cursor move in it, and after whatever
+-- the edit box does with a key itself.
+---@private
+function areaProto:schedule()
+  if self.opts.complete == nil or self.pending then
+    return
+  end
+  self.pending = true
+  C_Timer.After(0, function()
+    self.pending = false
+    self:Suggest()
+  end)
+end
+
+-- Suggest reads the suggestions at the cursor and shows them, or closes them when there are none. It returns what it
+-- did: "closed" (no focus, or closed by Escape), "kept" (the cursor put back after Up or Down), "idle" (none shown,
+-- nothing typed), "unchanged" (the text and cursor they show for), "none" or "shown".
+---@return string
+function areaProto:Suggest()
+  local editBox = self.editBox
+  if not editBox:HasFocus() or self.dismissed then
+    self:CloseSuggestions()
+    return "closed"
+  end
+  local shown = self:suggesting()
+  local text, cursor = self:GetText(), editBox:GetCursorPosition()
+  -- After Up or Down the cursor goes back where they were read, unless a key typed in the same frame changed the text.
+  if self.arrowed and shown and self.at ~= nil and self.at.text == text then
+    self.arrowed = false
+    editBox:SetCursorPosition(self.at.cursor)
+    return "kept"
+  end
+  self.arrowed = false
+  if not shown and not self.typed then
+    return "idle"
+  end
+  if shown and self.at ~= nil and self.at.text == text and self.at.cursor == cursor then
+    return "unchanged"
+  end
+  self.typed = false
+  local result = self.opts.complete(text, cursor)
+  if result == nil or #result.items == 0 then
+    self:CloseSuggestions()
+    return "none"
+  end
+  self.at = { text = text, cursor = cursor }
+  self:placeCaret(text, result.from, cursor)
+  if shown then
+    menu():SetItems(result.items, 1)
+  else
+    menu():Open(self.caret, {
+      items = result.items, attached = true,
+      onPick = function(ctx, item) self:Accept(ctx, item.value) end,
+      onClose = function() self.at = nil end,
+    })
+  end
+  return "shown"
+end
+
+-- placeCaret puts the frame the suggestions show below at the start of the word they replace: the cursor's place,
+-- less the width of what of the word is before it, on the cursor's line, in whole pixels.
+---@private
+---@param text string
+---@param from number
+---@param cursor number
+function areaProto:placeCaret(text, from, cursor)
+  self.measure:SetText(text:sub(from, cursor))
+  local x = math.max(0, (self.cursorX or 0) - self.measure:GetStringWidth())
+  self.caret:ClearAllPoints()
+  pixel:Point(self.caret, "TOPLEFT", self.editBox, "TOPLEFT", x, self.cursorY or 0)
+  pixel:Size(self.caret, 1, math.max(1, self.cursorHeight or 0))
+end
+
+-- Accept puts in a suggestion taken (its text and cursor), reported as typed, and reads the next suggestions at once
+-- for one that chains (an operator after a field).
+---@param ctx Context
+---@param value NextCompletionValue
+function areaProto:Accept(ctx, value)
+  local editBox = self.editBox
+  editBox:SetText(value.text)
+  editBox:SetCursorPosition(value.cursor)
+  self.box:FullUpdate(true)
+  self:Paint()
+  if self.opts.onChange then
+    self.opts.onChange(ctx, value.text, true)
+  end
+  if value.chain then
+    self.typed = true
+    self:schedule()
+  end
+end
+
+-- TakeSuggestion takes the lit suggestion (Tab, Enter) and says whether there was one. Those shown were read for the
+-- text and cursor the frame before: a key typed since, in this frame, has them read again first.
+---@param ctx Context
+---@return boolean
+function areaProto:TakeSuggestion(ctx)
+  if not self:suggesting() then
+    return false
+  end
+  local at = self.at
+  if at == nil or at.text ~= self:GetText() or at.cursor ~= self.editBox:GetCursorPosition() then
+    self:Suggest()
+    if not self:suggesting() then
+      return false
+    end
+  end
+  if menu().lit == nil then
+    return false
+  end
+  menu():Take(ctx)
+  return true
+end
+
+-- NewLine starts a new line at the cursor, as typed (Enter with no suggestion shown).
+---@param ctx Context
+function areaProto:NewLine(ctx)
+  self.editBox:Insert("\n")
+  self:OnTextChanged(ctx, true)
+end
+
+-- OnKey moves the light over the suggestions shown with Up and Down; the cursor goes back where they were read.
+---@param key string
+function areaProto:OnKey(key)
+  if (key == "UP" or key == "DOWN") and self:suggesting() then
+    menu():Arrow(key)
+    self.arrowed = true
+    self:schedule()
+  end
+end
+
+-- CloseSuggestions closes the suggestions shown and says whether there were any; with dismiss (Escape) none show
+-- again until the next key typed.
+---@param dismiss? boolean
+---@return boolean
+function areaProto:CloseSuggestions(dismiss)
+  if not self:suggesting() then
+    return false
+  end
+  menu():Close()
+  if dismiss then
+    self.dismissed = true
+  end
+  return true
 end
 
 -- FollowCursor scrolls the box so the cursor (y down from the text's top, height tall) stays seen.
@@ -431,6 +660,8 @@ end
 -- SetText shows a text set from code: nothing is reported.
 ---@param text string
 function areaProto:SetText(text)
+  self:CloseSuggestions()
+  self.typed, self.dismissed = false, false
   self.editBox:SetText(text or "")
   self.box:FullUpdate(true)
   self:Paint()

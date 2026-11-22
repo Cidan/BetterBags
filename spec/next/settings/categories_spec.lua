@@ -25,6 +25,7 @@ local database = StubBetterBagsModule("Database")
 local categories = StubBetterBagsModule("Categories")
 local items = StubBetterBagsModule("Items")
 local search = StubBetterBagsModule("Search")
+local completion = StubBetterBagsModule("SearchCompletion")
 local settings = StubBetterBagsModule("NextSettings")
 for _, m in ipairs({ { "Sort", "util/sort.lua" }, { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.lua" },
   { "NextFrameArt", "next/frameart.lua" }, { "NextFill", "next/fill.lua" }, { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
@@ -1579,6 +1580,30 @@ describe("NextSettingsCategories", function()
       tab:Refresh(ctx())
       assert.is_true(tab.rule.editBox:IsEnabled())
       assert.is_true(tab.apply.frame:IsShown())
+    end)
+
+    -- Asked: suggestions at the cursor, as an IDE's, each saying how many items match, as the Search Results count
+    -- them ("N results"; 0 results where it makes no whole rule).
+    it("suggests at its cursor, each counted among the items of the bags it shows, in the Search Results' words", function()
+      local asked
+      override(completion, "Suggest", function(_, text, cursor, within)
+        asked = { text, cursor, within }
+        return { { label = "rarity", kind = "field", count = 3, text = "rarity ", cursor = 7, chain = true },
+          { label = "rare", kind = "value", count = 1, text = "rare ", cursor = 5 },
+          { label = "NOT", kind = "keyword", count = 0, text = "NOT ", cursor = 4 } }, { from = 1 }
+      end)
+      local result = tab.rule.opts.complete("ra", 2)
+      assert.same({ "ra", 2 }, { asked[1], asked[2] })
+      assert.same({ ["0_1"] = true, ["0_2"] = true, ["0_3"] = true, ["0_4"] = true, ["0_6"] = true, ["6_1"] = true,
+        ["6_2"] = true }, asked[3], "the items of the bags the settings show")
+      assert.are.equal(1, result.from)
+      assert.same({ "rarity", "3 results" }, { result.items[1].text, result.items[1].note })
+      assert.same({ "rare", "1 result" }, { result.items[2].text, result.items[2].note })
+      assert.same({ "NOT", "0 results" }, { result.items[3].text, result.items[3].note })
+      assert.same({ "rarity ", 7, true }, { result.items[1].value.text, result.items[1].value.cursor,
+        result.items[1].value.chain })
+      override(completion, "Suggest", function() return {}, { from = 1 } end)
+      assert.is_nil(tab.rule.opts.complete("zz", 2))
     end)
   end)
 

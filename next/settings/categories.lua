@@ -21,6 +21,9 @@ local items = addon:GetModule('Items')
 ---@class Search: AceModule
 local search = addon:GetModule('Search')
 
+---@class SearchCompletion: AceModule
+local completion = addon:GetModule('SearchCompletion')
+
 ---@class Localization: AceModule
 local L = addon:GetModule('Localization')
 
@@ -1828,6 +1831,7 @@ function editor:CreateRuleTab(parent, owner, bags)
   tab.rule = nextInput:CreateArea(frame, {
     height = 1, help = L:G("For example: type = consumable"),
     onChange = function() tab:Check() end,
+    complete = function(text, cursor) return tab:Complete(text, cursor) end,
   })
   tab.apply = nextButton:Create(frame, {
     text = L:G("Apply Search Rule"), style = "Primary", onClick = function(ctx) tab:Apply(ctx) end,
@@ -1940,6 +1944,28 @@ function ruleTabProto:Check()
   self.grid:SetEntries(entries)
   local saved = categories:RuleOf(filter) or ""
   self.apply:SetEnabled(not isPlugins(filter) and valid and text ~= saved)
+end
+
+-- Complete returns the suggestions at the rule's cursor (search-completion.md), each saying how many items the rule
+-- then matches in the bags the settings show, as the Search Results count them ("0 results" for what makes no whole
+-- rule); nil for none.
+---@param text string
+---@param cursor number
+---@return NextCompletion?
+function ruleTabProto:Complete(text, cursor)
+  local within = {}
+  bagItemsOf(self.bags(), function(_, slotkey)
+    within[slotkey] = true
+  end)
+  local list, at = completion:Suggest(text, cursor, within)
+  if at == nil or #list == 0 then
+    return nil
+  end
+  local entries = {}
+  for i, s in ipairs(list) do
+    entries[i] = { text = s.label, note = count(s.count, L:G("%d result"), L:G("%d results")), value = s }
+  end
+  return { items = entries, from = at.from }
 end
 
 -- Apply saves the search rule typed (none for an empty one). Its button is on only when that can be

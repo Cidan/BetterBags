@@ -761,6 +761,160 @@ function search:GetIndex(property)
   return self.indicies[property] or self.indexLookup[property]
 end
 
+-- LIST_KINDS are the kind of each value a list field holds.
+local LIST_KINDS = { equipmentset = 'text', stat = 'text', bonusid = 'number' }
+
+---@class SearchField
+---@field name string The word a query names it by, lower case.
+---@field key string Its value's key in an item's snapshot.
+---@field kind "text"|"number"|"boolean"
+---@field list? boolean An item can have several values.
+---@field alias? string The field this word is another name of.
+
+---@type SearchField[]?
+local fieldList
+---@type table<string, SearchField>
+local fieldByName = {}
+
+-- kindOf returns the kind of a field by its own name, and whether it is a list.
+---@param name string
+---@return string, boolean?
+local function kindOf(name)
+  if NUMERIC[name] then return 'number' end
+  if BOOLEAN[name] then return 'boolean' end
+  if TEXT_FIELDS[name] then return 'text' end
+  return LIST_KINDS[name], true
+end
+
+-- Fields returns every field and alias a query reads (search-completion.md §2), by name, each once: the fields a
+-- search rule's suggestions offer. Not expansionid, the order expansions are compared in, which no one types. The
+-- entries are shared: read them, never change them.
+---@return SearchField[]
+function search:Fields()
+  if fieldList == nil then
+    local names = {}
+    for name in pairs(TEXT_FIELDS) do table.insert(names, name) end
+    for _, name in ipairs(NUMBER_FIELDS) do
+      if name ~= 'expansionid' then table.insert(names, name) end
+    end
+    for _, name in ipairs(BOOL_FIELDS) do table.insert(names, name) end
+    for name in pairs(LIST_KEYS) do table.insert(names, name) end
+    for name in pairs(ALIASES) do table.insert(names, name) end
+    table.sort(names)
+    fieldList = {}
+    for _, name in ipairs(names) do
+      local own = ALIASES[name] or name
+      local kind, list = kindOf(own)
+      local field = { name = name, key = fieldKey(name), kind = kind, list = list, alias = ALIASES[name] }
+      table.insert(fieldList, field)
+      fieldByName[name] = field
+    end
+  end
+  return fieldList
+end
+
+-- FieldOf returns the field a word names, in any case, or nil for a word that names none.
+---@param word string
+---@return SearchField?
+function search:FieldOf(word)
+  self:Fields()
+  return fieldByName[string.lower(word)]
+end
+
+-- ValuesOf returns the values a field has among the items given (slot keys), as their snapshots hold them (text as
+-- written), each with how many of those items have it: the most common first, then by value. A list field's
+-- values count each once per item.
+---@param word string
+---@param within table<string, any>
+---@return {value: any, count: number}[]
+function search:ValuesOf(word, within)
+  local field = self:FieldOf(word)
+  if field == nil then
+    return {}
+  end
+  local counts, order = {}, {}
+  local function add(value)
+    if counts[value] == nil then
+      counts[value] = 0
+      table.insert(order, value)
+    end
+    counts[value] = counts[value] + 1
+  end
+  for slotkey in pairs(within) do
+    local snap = self.indexed[slotkey]
+    local value = snap and snap[field.key]
+    if field.list then
+      local seen = {}
+      for _, v in ipairs(value or {}) do
+        if not seen[v] then
+          seen[v] = true
+          add(v)
+        end
+      end
+    elseif value ~= nil then
+      add(value)
+    end
+  end
+  local list, keys = {}, {}
+  for _, value in ipairs(order) do
+    local entry = { value = value, count = counts[value] }
+    local text = tostring(value)
+    keys[entry] = { string.lower(text), text }
+    table.insert(list, entry)
+  end
+  table.sort(list, function(a, b)
+    if a.count ~= b.count then
+      return a.count > b.count
+    end
+    local x, y = keys[a], keys[b]
+    if x[1] ~= y[1] then
+      return x[1] < y[1]
+    end
+    return x[2] < y[2]
+  end)
+  return list
+end
+
+-- ValuesBySlot returns the value each of the items given (slot keys) has for a field, as its snapshot holds it,
+-- by slot key; the items without one are left out.
+---@param word string
+---@param within table<string, any>
+---@return table<string, any>
+function search:ValuesBySlot(word, within)
+  local field = self:FieldOf(word)
+  local values = {}
+  if field == nil then
+    return values
+  end
+  for slotkey in pairs(within) do
+    local snap = self.indexed[slotkey]
+    if snap ~= nil and snap[field.key] ~= nil then
+      values[slotkey] = snap[field.key]
+    end
+  end
+  return values
+end
+
+-- HasValue returns the items given (slot keys) that have a value for a field: a list field one value at least.
+---@param word string
+---@param within table<string, any>
+---@return table<string, boolean>
+function search:HasValue(word, within)
+  local field = self:FieldOf(word)
+  local found = {}
+  if field == nil then
+    return found
+  end
+  for slotkey in pairs(within) do
+    local snap = self.indexed[slotkey]
+    local value = snap and snap[field.key]
+    if value ~= nil and (not field.list or value[1] ~= nil) then
+      found[slotkey] = true
+    end
+  end
+  return found
+end
+
 ---@param name string The name of the search index to lookup
 ---@param value any
 ---@return table<string, boolean>
@@ -1032,6 +1186,15 @@ local function playerSpecialization()
   local id, name = info(index)
   return id, name
 end
+
+-- PLAYER_VALUES are the names PlayerValue reads after "player.", in the order a rule's suggestions offer them, each
+-- with the kind of its value (search-completion.md §3).
+search.PLAYER_VALUES = {
+  { name = 'level', kind = 'number' }, { name = 'ilvl', kind = 'number' }, { name = 'equippedilvl', kind = 'number' },
+  { name = 'class', kind = 'text' }, { name = 'classid', kind = 'number' }, { name = 'spec', kind = 'text' },
+  { name = 'specid', kind = 'number' }, { name = 'profession', kind = 'text' }, { name = 'name', kind = 'text' },
+  { name = 'realm', kind = 'text' },
+}
 
 -- PlayerValue reads a player value (player.level, ...) as Vendor's player functions do, when the
 -- query is evaluated; nil for one the client cannot say or a name that is none. Text values that
@@ -1400,6 +1563,16 @@ function search:EvaluateAST(node, within)
         end
       end
       return found
+  elseif node.type == "set" then
+      -- Items given in place of a condition (search-completion.md §2: what a field's suggestion counts).
+      ---@type table<string, boolean>
+      local result = {}
+      for slotkey in pairs(node.set) do
+        if within == nil or within[slotkey] then
+          result[slotkey] = true
+        end
+      end
+      return result
   else
       error("Unknown node type: " .. node.type)
   end

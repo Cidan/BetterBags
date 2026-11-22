@@ -547,6 +547,8 @@ To create a Search Category, type in a search, then press `Enter`. Fill out the 
 - Group By (string) allows you to create multiple categories from 1 string. Valid options are none, type, subtype, and expansion. This can be chosen as an option or included directly in the search string.  
 `exp = mid and not "housing decor" group by type` will create a category for every type of item from the Midnight expansion, eg. "Midnight - Armor", "Midnight - Weapon", etc.
 
+On the Categories page, a category's Search Rule box displays completion suggestions as you type: field names, operators accepted by a field, values present on your items, AND, and OR. Each suggestion displays how many results the rule matches once you take that suggestion. Press Up or Down to move through the suggestions, Tab or Enter to take a suggestion, and Escape to close the list.
+
 <table>
 	<tr>
 		<td align="middle">

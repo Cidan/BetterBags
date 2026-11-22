@@ -97,6 +97,10 @@ page's `Content.Top` and `Bottom`).
   The results are a grid in full color (asked), those showing in this category first; the tooltip of
   one showing elsewhere says "Shows in X." What is typed is kept while the same category shows. A
   plugin's rule shows read-only (the field disabled, no Apply Search Rule).
+  **Suggestions at the cursor** (asked: "like an IDE ... text aligned right ... that says how many items match";
+  search-completion.md): the field is a text area with `complete` (`ruleTabProto:Complete`), each suggestion from
+  `SearchCompletion:Suggest` over the items of the bags the settings show (`bagItemsOf`), its note the count in the
+  Search Results' words (`count(n, "%d result", "%d results")`: "0 results" for what makes no whole rule).
 - **Added Items tab** (asked: "Placed Here" made no sense; its line "Drag an item here to manually add
   it to this category."): how many items were added (or "3 of 12"
   while filtered), a filter by name, Remove All (asks first; `WipeCategory`, then the bags
@@ -219,7 +223,8 @@ away; the heading and which tabs show;
 Export, Rename and Delete; importing one shared (`AskImport`, import-export.md §7); the Settings tab: its height,
 none, fields, saving, a plugin's, what the bags show
 and reading them again; the Search Rule tab: its names, the count as typed, the results in full color,
-the box where the Settings tab's is, Apply Search Rule, typed text kept, a plugin's; the Added Items
+the box where the Settings tab's is, Apply Search Rule, typed text kept, a plugin's, its suggestions counted in the
+bags shown; the Added Items
 tab: order, icons, faded items, the filter, names loading once, drops, removing, Remove All, a plugin's,
 its line, an ignored item; the Ignored Items tab: its count, line, filter, drops (a plugin's too),
 removing, Remove All), `spec/next/controls/itemgrid_spec.lua` (columns, only the rows in view, scrolling to the
