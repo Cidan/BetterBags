@@ -683,4 +683,112 @@ describe("QueryParser", function()
       assert.same({type = "term", value = "junk"}, ast.expression)
     end)
   end)
+
+  -- ─── Context (search-completion.md §1) ──────────────────────────────────────
+  -- What a query expects at its cursor (the bytes before it, as EditBox:GetCursorPosition counts them), and the
+  -- part of the text a suggestion there replaces.
+
+  describe("Context", function()
+
+    local function at(text, cursor)
+      return QueryParser:Context(text, cursor or #text)
+    end
+
+    it("expects a condition in an empty query, replacing nothing", function()
+      assert.same({ expects = "condition", prefix = "", from = 1, to = 0 }, at(""))
+    end)
+
+    it("expects a condition while its first word is typed, replacing the whole word", function()
+      assert.same({ expects = "condition", prefix = "rar", from = 1, to = 3 }, at("rar"))
+      assert.same({ expects = "condition", prefix = "ra", from = 1, to = 6 }, at("rarity", 2),
+        "the cursor inside a word: what is before it is typed, the word is replaced")
+    end)
+
+    it("says what follows what it replaces", function()
+      assert.are.equal("operator", at("ra = epic", 2).after)
+      assert.are.equal("term", at("rarity", 0).after)
+      assert.is_nil(at("rar").after)
+    end)
+
+    it("expects a condition after AND, OR, NOT and an opening parenthesis", function()
+      for _, text in ipairs({ "type = armor AND sl", "a OR sl", "NOT sl", "(sl", "a and not (sl" }) do
+        local c = at(text)
+        assert.are.equal("condition", c.expects, text)
+        assert.are.equal("sl", c.prefix, text)
+      end
+    end)
+
+    it("expects an operator after a word, naming the word", function()
+      assert.same({ expects = "operator", prefix = "", from = 8, to = 7, field = "rarity" }, at("rarity "))
+      assert.same({ expects = "operator", prefix = ">", from = 8, to = 8, field = "rarity" }, at("rarity >"))
+      assert.same({ expects = "operator", prefix = "a", from = 6, to = 6, field = "type" }, at("type a"),
+        "a word after a word: an operator, or AND and OR after a plain word")
+    end)
+
+    it("expects a value after an operator, naming the field and the operator", function()
+      assert.same({ expects = "value", prefix = "", from = 11, to = 10, field = "rarity", operator = ">=", start = 1 },
+        at("rarity >= "))
+      assert.same({ expects = "value", prefix = "ep", from = 9, to = 10, field = "rarity", operator = ">=", start = 1 },
+        at("rarity>=ep"), "unspaced")
+      assert.are.equal("operator", at("ilvl >").expects, "right after an operator it may still grow (>=)")
+    end)
+
+    it("says where a value's comparison starts: its field's first byte", function()
+      assert.are.equal(1, at("rarity >= ").start)
+      assert.are.equal(18, at("type = armor AND ilvl > 5").start)
+      assert.are.equal(6, at("NOT (ilvl > ").start)
+      assert.is_nil(at("ilvl + 5 > ").start, "no one field")
+    end)
+
+    it("names no field for a value after an expression, or inside a function's arguments", function()
+      local c = at("ilvl + 5 > ")
+      assert.are.equal("value", c.expects)
+      assert.is_nil(c.field)
+      assert.are.equal(">", c.operator)
+      assert.is_nil(at("ilvl > player.ilvl - ").field, "the value side already has a part")
+      c = at("max(il")
+      assert.are.equal("value", c.expects)
+      assert.are.equal("il", c.prefix)
+      assert.is_nil(c.field)
+      assert.are.equal("value", at("level > min(1, ").expects)
+      assert.are.equal("none", at("max(ilvl ").expects, "after an argument only a comma, a sign or ) comes")
+      -- Found in review: a parenthesis after an operator opens a value worked out, not a condition.
+      c = at("ilvl > (le")
+      assert.are.equal("value", c.expects)
+      assert.is_nil(c.field)
+      assert.are.equal("none", at("ilvl > (level ").expects)
+      assert.are.equal("join", at("ilvl > (level + 5) ").expects)
+    end)
+
+    it("reads a quoted value from after its quote, replacing it quotes and all", function()
+      assert.same({ expects = "value", prefix = "Hearth", from = 8, to = 14, quote = '"', field = "name", operator = "=",
+        start = 1 }, at('name = "Hearth'))
+      local c = at('name = "Hearth" AND x', 11)
+      assert.are.equal("Hea", c.prefix)
+      assert.same({ 8, 15 }, { c.from, c.to }, "a closed quote is replaced with its closing quote")
+      assert.are.equal("logical", c.after)
+      c = at("name = 'Hea AND x", 11)
+      assert.are.equal("'", c.quote)
+      assert.same({ 8, 11 }, { c.from, c.to }, "an unclosed quote reads to the end: only what is before the cursor goes")
+    end)
+
+    it("takes a closed quote as finished once the cursor is past it", function()
+      local c = at('"a b"')
+      assert.are.equal("operator", c.expects)
+      assert.is_nil(c.field, "a quoted word is text, never a field")
+    end)
+
+    it("expects AND or OR after a whole condition or a group", function()
+      assert.same({ expects = "join", prefix = "", from = 14, to = 13 }, at("type = armor "))
+      assert.same({ expects = "join", prefix = "a", from = 14, to = 14 }, at("type = armor a"))
+      assert.same({ expects = "join", prefix = "AND", from = 7, to = 9 }, at("a = b AND"), "a whole AND being typed")
+      assert.are.equal("operator", at("x AND").expects, "after a plain word an operator may come, or AND and OR")
+      assert.are.equal("join", at("(a OR b) ").expects)
+      assert.are.equal("join", at("ilvl > max(1, 2) ").expects)
+    end)
+
+    it("returns nil for a query the lexer cannot read", function()
+      assert.is_nil(at("a\1"))
+    end)
+  end)
 end)

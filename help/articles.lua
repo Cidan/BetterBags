@@ -27,6 +27,7 @@ local articles = addon:NewModule('HelpArticles')
 -- a link to another article, or a setting shown as its own row, which changes it.
 ---@class (exact) HelpBlock
 ---@field heading? string
+---@field keyword? boolean With heading: a search keyword (a field, an operator, AND, a function, a player value), never translated, shown as it is typed.
 ---@field text? string A paragraph; with example, what the example finds.
 ---@field list? string[]
 ---@field steps? string[]

@@ -1176,7 +1176,7 @@ describe("BetterBags Next, pixel perfect", function()
       local lines = audit:WindowOf(bag.frame).layout()
       assert.is_truthy(lines[1]:find("^canvas "), lines[1])
       assert.is_truthy(lines[1]:find("scroll ", 1, true), lines[1])
-      assert.are.equal("drag: column none | dragging none | lift holds nothing | left button up", lines[2])
+      assert.are.equal("drag: column none | dragging none | lift contains nothing | left button up", lines[2])
       local names = {}
       for i = 3, #lines do
         names[#names + 1] = lines[i]:match("^%d+ ([^:]+):")
@@ -1186,7 +1186,7 @@ describe("BetterBags Next, pixel perfect", function()
         assert.is_truthy(lines[i]:find("still", 1, true), lines[i])
       end
       assert.are.same({ "Herbs", "Ore", "Cloth" }, names)
-      -- A drag in progress: which section the column keeps a room for, where, the drag, what the lift holds.
+      -- A drag in progress: which section the column keeps a room for, where, the drag, what the lift contains.
       local ore = bag.content.byName["Ore"]
       local sc = ore.frame:GetEffectiveScale()
       _G._cursorX, _G._cursorY = (ore.frame:GetLeft() + 20) * sc, (ore.frame:GetTop() - 10) * sc
@@ -1198,7 +1198,7 @@ describe("BetterBags Next, pixel perfect", function()
       end)
       lines = audit:WindowOf(bag.frame).layout()
       assert.is_truthy(lines[2]:find("^drag: column Ore index 2 room "), lines[2])
-      assert.is_truthy(lines[2]:find("| dragging Ore | lift holds Ore | left button down$"), lines[2])
+      assert.is_truthy(lines[2]:find("| dragging Ore | lift contains Ore | left button down$"), lines[2])
       assert.is_falsy(lines[4]:find("hangs from canvas", 1, true), lines[4])
     end)
 

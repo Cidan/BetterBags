@@ -70,6 +70,22 @@ Every UI element must reuse the design that already exists for that kind of elem
 
 Mistakes this rule comes from: the category Automation tab first hand-placed bare switches instead of the settings rows every other page uses; the vendor's destroy card was first drawn with art of its own instead of the sell dock's card; the settings lists first got a drag of their own (a drop line) instead of the lift-and-slide the bags' sections already had; and a confirmed Auto Sell was first proposed as a new box drawing the category's items as cards, beside the dock a dragged section already waits in (rejected: "common actions should have common interfaces and should avoid split interactions based on case").
 
+## Writing Register: Technical, Never Personified
+
+All text a person reads is written in a highly technical register: literal, precise, mechanical. This covers help articles, in-game strings (labels, tooltips, setting descriptions, dialogs, status and error messages), README files, docs, the release-note prompt (`tools/changelog/gemini.go`), commit messages, PR descriptions, issue replies, and code comments.
+
+1. **Never personify software, interface or game objects.** BetterBags, a window, panel, bag, tab, page, section, row, field, setting, category, rule, item, stack, slot, file or module never holds, keeps, knows, remembers, forgets, wants, needs, likes, asks, tells, says, answers, waits, learns, decides, tries, refuses, sees, watches, thinks, expects or cares. State the mechanism or the value: "contains", "has", "stores", "lists", "displays", "is set to", "matches", "reads", "rejects", "remains", "returns".
+   - Not "the name field holds the item's name", but "name: the item's name".
+   - Not "the General page holds addon-wide settings", but "the General page contains addon-wide settings".
+   - Not "the category waits at the vendor", but "the category's section is docked in the Vendor window until you sell it".
+   - Not "BetterBags learns the maximum item level", but "BetterBags records the highest item level it reads".
+2. **No colloquial verbs or casual metaphors.** Not "gets", "takes", "handles", "talks to", "lives in", "jumps to", "takes turns", "is smart about"; name the exact operation ("receives", "accepts", "processes", "sends a request to", "is located in", "moves to", "alternates").
+3. **The player is the only actor with intent.** "Hold Shift", "pick up an item", "choose a category" describe the player and are correct.
+4. **Every piece of human-facing text goes through the `writer` agent** (the global instructions' procedure), its brief stating this rule; before using what it returns, check it for the words in rule 1.
+5. **Text from before this rule** is fixed in the same change that touches it. The sweep of 2026-11-22 rewrote the help articles, the in-game strings, the settings descriptions and the README files; code comments and the design notes under `docs/` were not swept.
+
+Mistakes this rule comes from: the help said "name holds the item's name", "category holds the section label", "the General page holds addon-wide settings" and "the category waits at the vendor", about 60 times in all. The user: "nothing 'holds' anything, this is a claude-ism in speech, this should have been written by the writer agent", and "all text should be highly technical".
+
 ## Mocking and WoW API Mocks
 
 To ensure the reliability of the addon and prevent regressions, adhere to the following strict mocking and testing rules:

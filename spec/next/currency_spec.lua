@@ -656,7 +656,7 @@ describe("BetterBags Next's currencies", function()
       local e = strip(backpack()).entries["currency:1"]
       e.frame:GetScript("OnEnter")(e.frame)
       assert.are.equal(1, _G._accountCurrencyRequests)
-      assert.are.equal("Asking your Warband...", GameTooltip.lines[2].text)
+      assert.are.equal("Loading Warband data...", GameTooltip.lines[2].text)
       _G._accountCurrencyReady = true
       _G._accountCurrencies[1] = { { characterName = "Alt", quantity = 30 } }
       fire("ACCOUNT_CHARACTER_CURRENCY_DATA_RECEIVED")

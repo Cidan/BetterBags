@@ -673,7 +673,7 @@ function buttonProto:OnEnter()
     GameTooltip:AddLine(" ")
     addCosts(item.price, item.costs)
     if self.quantity then
-      GameTooltip:AddLine(format(L:G("Your shopping list needs %d"), self.quantity), 1, 1, 1)
+      GameTooltip:AddLine(format(L:G("Your shopping list requires %d"), self.quantity), 1, 1, 1)
     end
     GameTooltip:AddLine(L:G("Right-click to buy"), 0.8, 0.8, 0.8)
     if item.maxStack > 1 then

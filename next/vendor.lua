@@ -654,7 +654,7 @@ function vendorProto:buildRepair(previous)
     end
   end
   local footer = total > 0 and (L:G("Repair all: ") .. GetMoneyString(total, true)) or ""
-  return sections, footer, L:G("Nothing needs repair")
+  return sections, footer, L:G("Nothing requires repair")
 end
 
 -- Draw draws the tab shown, keeping each button that is drawn again; a draw while hidden waits
@@ -946,7 +946,7 @@ function vendorProto:SectionOffer(section, opts)
     local ctx = ctxOf()
     if phase == "selling" then
       local left = job and seller:Left(job) or 0
-      return format(L:G("Selling %d of %d..."), total - left, total), L:G("One item at a time, as the merchant takes them."),
+      return format(L:G("Selling %d of %d..."), total - left, total), L:G("One item at a time, as the merchant accepts them."),
         L:G("Right-click to stop")
     end
     if phase == "confirm" then
@@ -1109,7 +1109,7 @@ end
 function vendorProto:RepairLines(guild)
   local cost, canRepair = GetRepairAllCost()
   if not canRepair or cost <= 0 then
-    return { { L:G("Nothing needs repair"), 1, 1, 1 } }
+    return { { L:G("Nothing requires repair"), 1, 1, 1 } }
   end
   local lines = { { L:G("Repair all: ") .. GetMoneyString(cost, true), 1, 1, 1 } }
   if guild then

@@ -363,3 +363,12 @@ Issue #1242: find what can be posted on the Auction House, dim the rest while it
 - **The dump** (`debug/itemprobe.lua`) records the answer and `IsUsingLegacyAuctionClient`, so a capture can settle what is not verified: a bank slot, a damaged item, a locked item, a lockbox, and WoW: Forever and Mists. Not seen in game: the worked-out answer, and dimming with it on those clients (`PlayerInteractionFrameManager.lua` maps the Auctioneer interaction on both branches).
 - **The mock:** `ItemLocation:IsValid` is now `C_Item.DoesItemExist`, as Blizzard's is (it always said true); `IsSellItemValid` raises an error for an empty location, as `CanBeRefunded`'s does.
 - **Coverage:** `spec/refresh_pipeline_spec.lua` ("auctionable and lootable": asking, the search and its alias, a kept item, cold reads, on the legacy auction house: each reason, no game check, no tooltip of its own, a repair, a cold read, dimming; no API, an emptied slot, one location, what can be opened; at the Auction House: dimming and undimming, no answer, another window's context, a kept item's change, the bank's items; a tooltip scanned before the item's data loaded), `spec/frames/item_classic_spec.lua` ("dimming what does not fit an item context"), `spec/search_spec.lua` (the fields, the alias with every operator, a bare `ah` as text; per-field re-index tests), `spec/tooltip_spec.lua` ("what keeps an item off the legacy auction house": each mark, words inside a line, other locales' strings, retail leaving them out), `spec/guildbank_pipeline_spec.lua`, `spec/core/interaction_refresh_spec.lua`, `spec/debug/itemprobe_spec.lua`.
+
+### 19. What a Search Rule's Suggestions Read
+The Search Rule tab's suggestions (search-completion.md §2) read the index through public methods, never `search.indexed`:
+`search:Fields()` and `search:FieldOf(word)` (every field and alias a query reads, built from the evaluator's own
+tables, so a field added there is suggested), `search:ValuesOf`, `search:ValuesBySlot` and `search:HasValue` (over the
+slot keys given), and `search.PLAYER_VALUES` (keep it in step with `PlayerValue`). `EvaluateAST` takes a `set` node, a
+set of items in place of a condition, which only the suggestions build. A field added to `fillSnapshot` and the
+evaluator's tables needs nothing more to be suggested; one compared with names of its own (as rarity and expansion are)
+needs its names in `SearchCompletion`'s `FIXED`. Coverage: `spec/search_spec.lua` ("fields and values for suggestions").

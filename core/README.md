@@ -26,7 +26,7 @@ Provides asynchronous execution capabilities using coroutines to prevent UI free
 
 ### boot.lua
 
-Handles the initial bootstrapping of the addon and creates the root module.
+Performs the initial bootstrapping of the addon and creates the root module.
 
 - Creates the main BetterBags addon using AceAddon-3.0
 - Sets default module state to disabled
@@ -58,7 +58,7 @@ Provides a context system for passing state between function calls, similar to G
 - **`New(event)`**: Creates a new context object
 - **`Set(key, value)`**: Stores a value in the context
 - **`Get(key)`**: Retrieves a value from the context
-- **`Event()`**: Gets the event that created the context
+- **`Event()`**: Returns the event that created the context
 - **`Cancel()`**: Cancels the context
 - **`Timeout(seconds, callback)`**: Auto-cancels context after timeout
 - **`Copy()`**: Creates a copy of the context
@@ -79,7 +79,7 @@ Manages all persistent data storage and settings using AceDB-3.0.
 - **Design and Integration Switches**: `GetNextEnabled`; BetterBags Next's vendor and guild bank windows
   (`GetNextVendorEnabled`, `GetNextGuildBankEnabled`, `.claude/rules/next-bagsystem.md` §11g); the QuickFind
   integration (`GetQuickFindEnabled`, `.claude/rules/quickfind.md`); each on by default but BetterBags Next
-- **Migration**: Handles database schema updates between versions (`DB:Migrate`, run at every load). Among them, `RenameRepeatedTypeCategories` moves the hidden state (`categoryOptions`), pinned order (`customSectionSort`) and group assignments (`categoryToGroup`) saved under a built-in category name that repeated its item type ("Quest - Quest") to its current name ("Quest"), skipping custom categories and keeping a setting already saved under the current name. Migrations never drop a pin because its category has no stored filter: built-in categories have none (issue #1107, `.claude/rules/category-lifecycle.md` §3). `SplitSizeOptions` gives every BetterBags Next bag, the vendor too, the Size tab settings the player chose when one set sized every bag (`nextIconScale`, `nextBagScale`, `nextFitNamesWhileOpen`, `nextAutosize`, now `nextSizeOptions[kind]`), leaving each bag its own default where none was chosen, and drops the old keys; it runs after a profile copy too (`.claude/rules/next-bag-settings.md` §4)
+- **Migration**: Applies database schema updates between versions (`DB:Migrate`, run at every load). Among them, `RenameRepeatedTypeCategories` moves the hidden state (`categoryOptions`), pinned order (`customSectionSort`) and group assignments (`categoryToGroup`) saved under a built-in category name that repeated its item type ("Quest - Quest") to its current name ("Quest"), skipping custom categories and preserving a setting already saved under the current name. Migrations never drop a pin because its category has no stored filter: built-in categories have none (issue #1107, `.claude/rules/category-lifecycle.md` §3). `SplitSizeOptions` assigns every BetterBags Next bag, the vendor too, the Size tab settings the player chose when one set sized every bag (`nextIconScale`, `nextBagScale`, `nextFitNamesWhileOpen`, `nextAutosize`, now `nextSizeOptions[kind]`), leaving each bag its own default where none was chosen, and drops the old keys; it runs after a profile copy too (`.claude/rules/next-bag-settings.md` §4)
 
 ### bagsystem.lua
 
@@ -87,7 +87,7 @@ Makes the bags in one of the two designs, the classic bags or BetterBags Next, e
 and switches between them without a reload (`Switch`, `.claude/rules/next-bagsystem.md` §11). With BetterBags Next
 in use, its vendor and guild bank, which stand in for Blizzard's merchant and guild bank frames, are each switched
 off and on at once (`SetVendorEnabled`, `SetGuildBankEnabled`, §11g): off, the panel answers nothing and Blizzard's
-frame shows the vendor or the guild bank. Every switch is refused in the places a frame would change hands open
+frame shows the vendor or the guild bank. Every switch is rejected where an affected frame is open
 (at a vendor, at the guild bank; the design switch also in combat and at the bank). Every bag window it makes is handed
 to the gamepad support as it is made (`Gamepad:Add`, `integrations/gamepad.lua`, `.claude/rules/gamepad.md`), which
 `init.lua` starts before the bags are made.
@@ -119,8 +119,8 @@ Manages UI hooks and interaction with the default Blizzard interface.
 #### Key Features
 
 - Intercepts bag toggle commands
-- Handles NPC interaction windows (vendor, bank, mail, etc.): each opens the backpack and closes it again, only
-  opens it, or leaves it alone, as the player picks per interaction (`DB:GetInteractionBags`, General >
+- Responds to NPC interaction windows (vendor, bank, mail, etc.): each opens the backpack and closes it again, only
+  opens it, or leaves it unchanged, as the player picks per interaction (`DB:GetInteractionBags`, General >
   Interactions, `.claude/rules/interaction-bags.md`); every one recalculates the bags for the window as it opens
   and closes
 - Forces hiding of Blizzard bag frames
@@ -168,7 +168,7 @@ Safe file for manual translation overrides.
 Object pooling system for performance optimization.
 
 - **`Create(createFn, resetFn)`**: Creates a new object pool
-- **`Acquire(ctx)`**: Gets an object from pool or creates new
+- **`Acquire(ctx)`**: Retrieves an object from pool or creates new
 - **`Release(ctx, item)`**: Returns object to pool after reset
 - Reduces garbage collection pressure
 
@@ -217,7 +217,7 @@ local context = addon:GetModule('Context')
 
 ## Version Compatibility
 
-The core module handles differences between WoW versions:
+The core module accounts for differences between WoW versions:
 - Retail (mainline)
 - Classic Era
 - Burning Crusade Classic

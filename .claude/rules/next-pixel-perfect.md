@@ -341,7 +341,7 @@ actually opens, on the real client: real fonts, art, Blizzard's templates, other
   (`layout`), and every check keeps each window's last one, clean or not (`pixelAudit.lastLayouts[title]` =
   `{ at, count, others, lines }`). A panel's (`panelProto:PixelLayout`): the canvas (anchor, where in pixels,
   the scroll offset), a drag line (the section the column keeps a room for, its index, the room's height and
-  where it starts; the drag in progress; what the lift holds; the left button), then each section (shown,
+  where it starts; the drag in progress; what the lift contains; the left button), then each section (shown,
   docked, leaving, height, what it hangs from, where in units and pixels, Motion's move).
 - **Reports**: one per new set of parts off the grid for a window (the same set again is not reported; a
   window found clean forgets it, so parts coming back are reported again). A report (`id`, `at`, `window`,

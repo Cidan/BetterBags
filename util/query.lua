@@ -14,7 +14,8 @@ QueryParser.VERSION = 2
 -- value, both plain words: what the search has always read), "compare" (left op right, either an
 -- expression), "term" (a word searched for everywhere), and the expressions: "word" (a word the
 -- search resolves: a field, a player value, a number, money, or text), "arith" (+ - * / %), "neg"
--- (unary minus), "call" (a function).
+-- (unary minus), "call" (a function). Never parsed: "set", items given in place of a condition (search-completion.md
+-- §2).
 ---@class QueryNode
 ---@field type string
 ---@field value? string
@@ -26,6 +27,7 @@ QueryParser.VERSION = 2
 ---@field expression? QueryNode
 ---@field name? string A call's function.
 ---@field args? QueryNode[] A call's arguments.
+---@field set? table<string, boolean> A set's items, by slot key.
 
 -- FUNCTIONS are the functions a query can call; Vendor's math. spelling names the same.
 QueryParser.FUNCTIONS = { min = true, max = true, floor = true, ceil = true, abs = true }
@@ -161,6 +163,157 @@ function QueryParser:Lexer(input)
   end
 
   return tokens, spans
+end
+
+-- TYPED are the tokens a cursor can be part way through typing; a parenthesis, a comma or a lone sign is whole as
+-- soon as it is typed.
+local TYPED = { term = true, operator = true, logical = true }
+
+-- closedAt returns where a quoted token's closing quote is, or nil for a quote that runs to the end of the query.
+---@param input string
+---@param first number The opening quote.
+---@param last number
+---@return number?
+local function closedAt(input, first, last)
+  local quote = input:sub(first, first)
+  local i = first + 1
+  while i <= last do
+    local char = input:sub(i, i)
+    if char == "\\" and input:sub(i + 1, i + 1) == quote then
+      i = i + 2
+    elseif char == quote then
+      return i
+    else
+      i = i + 1
+    end
+  end
+  return nil
+end
+
+---@class QueryContext
+---@field expects "condition"|"operator"|"value"|"join"|"none" What may come at the cursor.
+---@field prefix string What is typed of the word at the cursor, up to it (inside its quotes for a quoted one).
+---@field from number The first byte a suggestion replaces.
+---@field to number The last byte it replaces (from - 1: none).
+---@field quote? string The quote the word at the cursor opened with.
+---@field field? string For an operator or a value: the one word on the left of the comparison.
+---@field operator? string For a value: the comparison's operator.
+---@field start? number For a value of a field: where the comparison starts, its field's first byte.
+---@field after? string The type of the token after what is replaced.
+
+-- Context returns what a query expects at its cursor (search-completion.md §1), from its tokens alone, so a query
+-- typed only part way says it too: a condition (a field, NOT, a word), an operator after a word, a value after an
+-- operator, AND or OR after a whole condition, or nothing (inside a function's arguments, after one). The word the
+-- cursor is in or at the end of is what a suggestion replaces, all of it: a quoted one from its opening quote to
+-- its closing quote, or to the cursor when it has none (it would run to the end of the query). nil when the lexer
+-- cannot read the query.
+---@param input string
+---@param cursor number The bytes before the cursor (EditBox:GetCursorPosition).
+---@return QueryContext?
+function QueryParser:Context(input, cursor)
+  local ok, tokens, spans = pcall(self.Lexer, self, input)
+  if not ok then
+    return nil
+  end
+  local current, before = nil, 0
+  for n, span in ipairs(spans) do
+    local first, last = span[1], span[2]
+    if first > cursor then
+      break
+    end
+    local token = tokens[n]
+    local stop = last
+    if token.quoted and closedAt(input, first, last) ~= nil then
+      stop = last - 1
+    end
+    if TYPED[token.type] and cursor <= stop then
+      current = n
+      break
+    end
+    before = n
+  end
+  ---@type QueryContext
+  local c = { expects = "condition", prefix = "", from = cursor + 1, to = cursor }
+  if current ~= nil then
+    local first, last = spans[current][1], spans[current][2]
+    if tokens[current].quoted then
+      local quote = input:sub(first, first)
+      c.quote = quote
+      c.prefix = input:sub(first + 1, cursor):gsub("\\" .. quote, quote)
+      c.from, c.to = first, closedAt(input, first, last) or cursor
+    else
+      c.prefix = input:sub(first, cursor)
+      c.from, c.to = first, last
+    end
+  end
+  local following = tokens[(current or before) + 1]
+  c.after = following and following.type or nil
+
+  -- What the tokens before the word at the cursor leave expected: the condition being read (its side of the
+  -- comparison, how many parts that side has, its one word and the operator), each parenthesis it is inside, and
+  -- whether an operand or what follows one comes next.
+  local stack = {}
+  local cur = { side = "left", parts = 0 }
+  local expect = "operand"
+  for n = 1, before do
+    local t = tokens[n]
+    if t.type == "paren" and t.value == "(" then
+      local prev = tokens[n - 1]
+      local call = expect == "after" and prev ~= nil and prev.type == "term" and not prev.quoted
+      table.insert(stack, { cur = cur, call = call })
+      -- A call's arguments, and a parenthesis in a value (after an operator), are a value worked out; a parenthesis
+      -- where a condition starts groups conditions.
+      cur = { side = (call or cur.side ~= "left") and "arg" or "left", parts = 0 }
+      expect = "operand"
+    elseif t.type == "paren" then
+      local top = table.remove(stack)
+      if top ~= nil then
+        cur = top.cur
+        cur.expr = true
+        cur.done = top.cond and not top.call
+      end
+      expect = "after"
+    elseif t.type == "comma" then
+      expect = "operand"
+    elseif t.type == "logical" or t.type == "operator" then
+      if stack[#stack] ~= nil then
+        stack[#stack].cond = true
+      end
+      if t.type == "operator" then
+        cur.field = cur.side == "left" and cur.parts == 1 and not cur.expr and cur.word or nil
+        cur.start = cur.field and cur.wordAt or nil
+        cur.op, cur.side, cur.parts, cur.expr = t.value, "right", 0, false
+      elseif t.value ~= "NOT" then
+        cur = { side = "left", parts = 0 }
+      end
+      expect = "operand"
+    elseif t.type == "arith" then
+      cur.expr = true
+      expect = "operand"
+    else
+      cur.parts = cur.parts + 1
+      cur.word = not t.quoted and t.value or nil
+      cur.wordAt = spans[n][1]
+      expect = "after"
+    end
+  end
+  if expect == "operand" then
+    if cur.side == "right" then
+      c.expects, c.operator = "value", cur.op
+      c.field = cur.parts == 0 and not cur.expr and cur.field or nil
+      c.start = c.field and cur.start or nil
+    elseif cur.side == "arg" then
+      c.expects = "value"
+    end
+  elseif cur.side == "arg" then
+    c.expects = "none"
+  elseif cur.side == "left" and not cur.done then
+    c.expects = "operator"
+    c.field = cur.parts == 1 and not cur.expr and cur.word or nil
+  else
+    c.expects = "join"
+  end
+  return c
 end
 
 -- CONDITIONS are the node types that are true or false for an item; the others are values.

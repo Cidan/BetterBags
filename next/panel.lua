@@ -515,7 +515,7 @@ end
 
 -- PixelLayout describes the panel's column for a pixel check report (data-driven.md): the canvas (its anchor, where
 -- it is in screen pixels, the scroll offset in pixels); a drag: the section the column keeps a room for (where and how
--- tall), the drag in progress, what the lift holds, whether the left button is down; then each section in order:
+-- tall), the drag in progress, what the lift contains, whether the left button is down; then each section in order:
 -- shown, docked (away) or leaving, its height, what it hangs from, where, in units and screen pixels, and where
 -- Motion moves it, if it does.
 ---@return string[]
@@ -544,7 +544,7 @@ function panelProto:PixelLayout()
     column = string.format("%s index %d room %.3f (%.3f px) at %.3f px", tostring(drag.section.name), drag.index,
       drag.height or 0, (drag.height or 0) * k, (canvas:GetDragSlotY() or 0) * k)
   end
-  table.insert(lines, string.format("drag: column %s | dragging %s | lift holds %s | left button %s", column,
+  table.insert(lines, string.format("drag: column %s | dragging %s | lift contains %s | left button %s", column,
     current ~= nil and tostring(current.name) or "none", held ~= nil and nameOf(held.frame) or "nothing",
     IsMouseButtonDown("LeftButton") and "down" or "up"))
   for i, section in ipairs(canvas.order) do

@@ -98,7 +98,7 @@ spec/
 
 ## Writing New Tests
 
-Each BetterBags module file expects `...` (vararg) to resolve to the addon name. The test helpers handle this automatically.
+Each BetterBags module file requires `...` (vararg) to resolve to the addon name. The test helpers pass this automatically.
 
 ### Adding tests for a new module
 
@@ -131,12 +131,12 @@ LoadBetterBagsModule("path/to/module_that_needs_database.lua")
 
 ## Mock Architecture
 
-`spec/setup.lua` is the busted helper (configured in `.busted`). It builds the world a spec file runs in with `helpers/world.lua`, a new one when every spec file starts, on the globals Lua and busted start with, and lets the last file's go: every file runs as it would alone, and the suite holds one file's memory at a time (`.claude/rules/test-harness.md` §6). The world is made of:
+`spec/setup.lua` is the busted helper (configured in `.busted`). It builds the world a spec file runs in with `helpers/world.lua`, a new one when every spec file starts, on the globals Lua and busted start with, and discards the previous file's world: every file runs as it would alone, and the suite retains one file's memory at a time (`.claude/rules/test-harness.md` §6). The world is made of:
 
 - **`helpers/wow_mocks.lua`**: Sets WoW global functions and aliases (`_G.CreateFrame`, `_G.C_Timer`, `_G.strmatch`, `_G.wipe`, etc.)
 - **`helpers/encoding_util.lua`**: `C_EncodingUtil` and its enums, real CBOR and Base64 and Deflate's stored blocks (`.claude/rules/import-export.md` §4)
 - **the Ace3 libraries** (`libs/`)
 - **`helpers/addon_loader.lua`**: Creates the BetterBags addon via AceAddon and provides `LoadBetterBagsModule()` and `StubBetterBagsModule()` helpers
-- **the modules every spec needs** (the profiler engine, Motion, BetterBags Next's pixel grid and themes, and the rest `helpers/world.lua` lists) and **`helpers/mock_data.lua`** (`MockData`)
+- **the modules every spec requires** (the profiler engine, Motion, BetterBags Next's pixel grid and themes, and the rest `helpers/world.lua` lists) and **`helpers/mock_data.lua`** (`MockData`)
 
 To add new WoW API mocks, edit `helpers/wow_mocks.lua`. To change addon bootstrapping, edit `helpers/addon_loader.lua`; to load something for every spec, `helpers/world.lua`. Only Lua's own libraries (`string`, `table`, `math`, `os`, `io`, `debug`) are shared from one spec file to the next: a spec that replaces one of their functions puts it back.

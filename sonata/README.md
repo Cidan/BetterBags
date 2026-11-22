@@ -1,7 +1,7 @@
 # Writing BetterBags Themes (Sonata)
 
 BetterBags draws every window, dialog, panel, item button, tab, section title, search box and
-button through **Sonata**, a declarative theme engine. A theme is **data**: tables that say
+button through **Sonata**, a declarative theme engine. A theme is **data**: tables that specify
 what each kind of window and each kind of element looks like. A theme contains no code that
 builds frames; BetterBags owns every frame and applies the theme to it, and re-applies another
 theme cleanly when the player switches.
@@ -13,7 +13,7 @@ parent), `elvui.lua` and `gw2.lua`
 (themes that depend on another addon and read its settings through variables).
 
 > The theme API before BetterBags' Sonata (a `themes:RegisterTheme(key, { Portrait = function
-> ... })` table of functions that built decoration frames) is gone. See "Porting an old
+> ... })` table of functions that built decoration frames) is removed. See "Porting an old
 > theme" at the end.
 
 ## Registering a theme from your addon
@@ -49,7 +49,7 @@ draws Default until your addon registers it, then switches to it in the same ses
 | `Parent` | the theme this one inherits from; unset means `Base` |
 | `Hidden` | never listed or applied; for a parent that only shares settings |
 | `Available` | `true`/`false`, or a function returning one (for example, whether an addon is loaded); unavailable themes are listed but cannot be applied |
-| `Masque` | `false` keeps Masque off BetterBags' item buttons while this theme is applied |
+| `Masque` | `false` prevents Masque from skinning BetterBags' item buttons while this theme is applied |
 | `Variables` | named values, or functions returning them, used anywhere as `"$Name"` |
 | `Windows` | window styles by window kind |
 | `Elements` | element styles by element kind |
@@ -63,7 +63,7 @@ merges into what came before:
 
 - tables merge key by key, so a theme sets only what it changes;
 - lists (a table with `[1]`, such as `Points` or animation lists) **replace** the inherited list;
-- `false` **removes** an inherited table: `CloseButton = false` takes away a parent's close
+- `false` **removes** an inherited table: `CloseButton = false` removes a parent's close
   button, `MenuButton = false` hides the bag's menu button.
 
 ### Variables
@@ -77,14 +77,14 @@ Windows = { Bag = { Backdrop = { BorderColor = "$Edge" } } },
 ```
 
 A string that is exactly `"$Name"` becomes a copy of the variable. Functions run each time the
-theme is applied, so a theme can follow another addon's settings (the ElvUI theme reads ElvUI's
+theme is applied, so a theme can track another addon's settings (the ElvUI theme reads ElvUI's
 colors and textures this way). A child theme can override a parent's variables.
 
 A variable can also **name** another addon's value instead of computing it: a reference,
 `{ Global, Path, Fallback, Alpha, Map, Scale, Add }`. It is read every time the theme resolves, raw
 (nothing of the other addon runs), and the `Fallback` is used while the value is not there or is another
-kind (a color comes back as `{ r, g, b, a }`; a number times `Scale` plus `Add`). A `Path` key that is
-`"$Name"` is another variable's value, so one reference can read what another names. BetterBags Next's themes, which cannot hold functions, follow
+kind (a color is returned as `{ r, g, b, a }`; a number times `Scale` plus `Add`). A `Path` key that is
+`"$Name"` is another variable's value, so one reference can read what another names. BetterBags Next's themes, which cannot contain functions, track
 another addon this way, and may `Watch` that addon's methods to be drawn again when it changes them
 (the ElvUI Next theme, `themes/next/elvui.lua`):
 
@@ -99,7 +99,7 @@ The rules are in `.claude/rules/next-themes-references.md`.
 
 ### Per-client overrides
 
-`Clients` holds partial themes merged on top on some clients, general before specific:
+`Clients` contains partial themes merged on top on some clients, general before specific:
 `Retail`; `Retail` then `Forever` on WoW: Forever; `Classic` then `Era`, `TBC`, `Mists`, `Cata`,
 or `TBC` then `Anniversary`.
 
@@ -140,9 +140,9 @@ A window style:
 
 Anything set to `false` builds nothing, even if a parent theme defined it.
 
-BetterBags keeps content above a window's fills: the backdrop, background, border and textures
-are drawn on the window frame below its contents, a template sits below the window, and
-`Above` textures, the title and the close button sit on an overlay that never takes the mouse
+BetterBags places content above a window's fills: the backdrop, background, border and textures
+are drawn on the window frame below its contents, a template is placed below the window, and
+`Above` textures, the title and the close button are placed on an overlay that never receives mouse input
 (so dropping an item anywhere on a bag still works).
 
 ### Bag layout
@@ -151,15 +151,15 @@ A `Bag` style's `Layout` places the parts the bag owns, relative to the window:
 
 | Key | What it places |
 |---|---|
-| `Search` | the in-bag search box: `Points`, and `Reserve` (the rows above the content it takes while shown) |
-| `Footer` | the money and currency bar: `Left`, `Right`, `Bottom`, `Height`, `Reserve`; the money sits 4 in from its right end, the currencies 4 in from its left end |
+| `Search` | the in-bag search box: `Points`, and `Reserve` (the rows above the content it occupies while shown) |
+| `Footer` | the money and currency bar: `Left`, `Right`, `Bottom`, `Height`, `Reserve`; the money is positioned 4 from its right end, the currencies 4 from its left end |
 | `MenuButton` | the round bag menu button: `Points`; `false` hides it |
-| `Tabs` | the tab bar below the bag: `Offset = { X, Y }`, where the bar's top left sits from the bag's bottom left (default `0, 2`: 2 into the window). The bar is drawn below the window, so a theme whose art reaches below the window hangs it below that art |
+| `Tabs` | the tab bar below the bag: `Offset = { X, Y }`, where the bar's top left is placed relative to the bag's bottom left (default `0, 2`: 2 into the window). The bar is drawn below the window, so a theme whose art extends below the window places the bar below that art |
 | `Actions` | buttons running BetterBags actions (GW2's side panel): `Points` (the first button), `Size`, `Spacing`, `Buttons = { { Action, Normal, Highlight, Pushed }, ... }`, where `Action` is `ShowBags`, `Sort`, `Settings` or `Menu`; buttons stack downwards |
 
-A `Slots` style's `Layout.Offset = { X, Y }` is where the panel's top left sits from its bag's
+A `Slots` style's `Layout.Offset = { X, Y }` is where the panel's top left is placed relative to its bag's
 bottom left. To place it anywhere else around its bag, give `Layout.Points` instead (relative to
-the bag): `Points = { { Point = "BOTTOMLEFT", RelativePoint = "TOPLEFT" } }` sits it above the
+the bag): `Points = { { Point = "BOTTOMLEFT", RelativePoint = "TOPLEFT" } }` places the panel above the
 bag.
 
 ## Elements
@@ -174,17 +174,17 @@ bag.
 | `Button` | buttons in dialogs and settings | `Strip`, `Background`, `Border`, `HoverBorderColor`, `Highlight` (`false` hides it), `Font`, `HighlightFont`, `DisabledFont` |
 | `EditBox` | edit boxes in dialogs | `Strip`, `Background`, `Border`, `Font` |
 
-An element style sets everything it controls; whatever it leaves out keeps Blizzard's look, so
+An element style sets everything it controls; whatever it omits retains Blizzard's look, so
 switching themes never leaves part of the last theme behind. Fills and borders on elements
-take a texture spec or a color: `Background = { Color = { 0, 0, 0, 0.8 } }`,
+accept a texture spec or a color: `Background = { Color = { 0, 0, 0, 0.8 } }`,
 `Border = { Color = { 0.3, 0.3, 0.3, 1 }, EdgeSize = 1, Inset = -1 }`.
 
 ## Text
 
 BetterBags' own text, in the settings window, dialogs, the search category editor, the search
 panel, the debug window and the bag footer, is drawn with **text roles**: fonts named by what the
-text is. Every theme inherits Base's roles, which take their colors from these variables, so a
-light theme only needs to set the variables:
+text is. Every theme inherits Base's roles, which read their colors from these variables, so a
+light theme requires setting only the variables:
 
 | Variable | Base | Used for |
 |---|---|---|
@@ -219,12 +219,12 @@ are styled by their window and element styles (`Title.Font`, `SectionHeader.Font
   such as `UnitFrame12White`, are found by name too), then optionally `Path`, `Size`, `Flags`,
   `Color`, `Shadow = { X, Y, Color }`, `Justify`. Use the client's locale font globals
   (`STANDARD_TEXT_FONT`, `UNIT_NAME_FONT`, `DAMAGE_TEXT_FONT`) or a font object rather than a
-  font file, or other alphabets lose their glyphs.
+  font file, or characters in other alphabets lack glyphs.
 - **Textures**: one of `Texture` (a file), `Atlas` (`UseAtlasSize`) or `Color`, plus `Layer`,
   `SubLevel`, `SliceMode` (`"Stretched"` or `"Tiled"`) with `SliceMargins = { Left, Right,
   Top, Bottom }` for nine-sliced art, `TexCoords`, `VertexColor`, `BlendMode`, `Desaturated`,
   `HorizTile`, `VertTile` (tile the art; Sonata loads it with the `REPEAT` wrap mode the tiling
-  needs), `Alpha`.
+  requires), `Alpha`.
 - **Points**: a list of `{ Point, RelativeTo, RelativePoint, X, Y }`; `RelativeTo` defaults to
   the window (or the element) and may name a texture or `Title` where noted.
 

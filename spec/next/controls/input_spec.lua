@@ -7,12 +7,13 @@ local addon = LibStub("AceAddon-3.0"):GetAddon("BetterBags")
 LoadBetterBagsModule("core/context.lua")
 for _, m in ipairs({ { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.lua" },
   { "NextFrameArt", "next/frameart.lua" }, { "NextFill", "next/fill.lua" }, { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
-  { "NextInput", "next/controls/input.lua" } }) do
+  { "NextInput", "next/controls/input.lua" }, { "NextMenu", "next/controls/menu.lua" } }) do
   ResetModuleStub(m[1], m[2])
   LoadBetterBagsModule(m[2])
 end
 
 local nextInput = addon:GetModule("NextInput")
+local nextMenu = addon:GetModule("NextMenu")
 local style = addon:GetModule("NextStyle")
 
 local function alphaOf(texture)
@@ -374,5 +375,272 @@ describe("NextTextArea", function()
     area.editBox:SetFocus()
     area.editBox:GetScript("OnEscapePressed")(area.editBox)
     assert.is_false(area.editBox:HasFocus())
+  end)
+
+  -- Without suggestions, the game's own keys: Enter starts a new line, Tab and the arrows are the edit box's.
+  it("leaves Enter, Tab and the arrows to the game when it has no suggestions", function()
+    local area = make()
+    assert.is_nil(area.editBox:GetScript("OnEnterPressed"))
+    assert.is_nil(area.editBox:GetScript("OnTabPressed"))
+    assert.is_nil(area.editBox:GetScript("OnKeyDown"))
+    assert.is_nil(area.caret)
+  end)
+end)
+
+-- A text area with suggestions at its cursor (search-completion.md §4: a search rule's): read once a frame after the
+-- player types, shown in a NextMenu at the cursor, given its keys by the area, which keeps focus.
+describe("NextTextArea, with suggestions", function()
+  local area, changes, asked, timers, saved, offer
+
+  local function flush()
+    local run = timers
+    timers = {}
+    for _, fn in ipairs(run) do fn() end
+  end
+
+  -- typeText is the player typing: the text, the cursor at its end (or where given), the change reported.
+  local function typeText(text, cursor)
+    area.editBox:SetText(text)
+    area.editBox:SetCursorPosition(cursor or #text)
+    area.editBox:GetScript("OnTextChanged")(area.editBox, true)
+  end
+
+  local function press(script, ...)
+    area.editBox:GetScript(script)(area.editBox, ...)
+  end
+
+  local function shown()
+    return nextMenu:IsOpenFor(area.caret)
+  end
+
+  local function labels()
+    local out = {}
+    for i, row in ipairs(nextMenu:Rows()) do out[i] = row.label:GetText() end
+    return out
+  end
+
+  local function lit()
+    local out = {}
+    for i, row in ipairs(nextMenu:Rows()) do
+      if row.hover:IsShown() then table.insert(out, i) end
+    end
+    return out
+  end
+
+  before_each(function()
+    changes, asked, timers = {}, {}, {}
+    saved = { _G.UISpecialFrames, C_Timer.After }
+    _G.UISpecialFrames = {}
+    C_Timer.After = function(_, fn) table.insert(timers, fn) end
+    addon:GetModule("NextControls").escape = {}
+    -- offer: two suggestions for the last word typed, replacing it; "rarity " chains.
+    offer = function(text, cursor)
+      local from = (text:sub(1, cursor):find("%S*$"))
+      if text:sub(from, cursor) == "" then return nil end
+      local head, tail = text:sub(1, from - 1), text:sub(cursor + 1)
+      return { from = from, items = {
+        { text = "rarity", note = "3 results", value = { text = head .. "rarity " .. tail, cursor = #head + 7, chain = true } },
+        { text = "rare", note = "1 result", value = { text = head .. "rare " .. tail, cursor = #head + 5 } },
+      } }
+    end
+    area = nextInput:CreateArea(CreateFrame("Frame"), {
+      height = 120,
+      onChange = function(_, text, user) table.insert(changes, { text, user }) end,
+      complete = function(text, cursor)
+        table.insert(asked, { text, cursor })
+        return offer(text, cursor)
+      end,
+    })
+    area.frame:SetWidth(300)
+    area.editBox:SetFocus()
+  end)
+
+  after_each(function()
+    nextMenu:Close()
+    _G.UISpecialFrames, C_Timer.After = saved[1], saved[2]
+  end)
+
+  it("shows the suggestions at the start of the word at the cursor, once a frame after the player types", function()
+    typeText("type = ra")
+    typeText("type = rar")
+    assert.is_false(shown(), "read once the frame ends")
+    flush()
+    assert.same({ { "type = rar", 10 } }, asked, "once for both keys")
+    assert.is_true(shown())
+    assert.same({ "rarity", "rare" }, labels())
+    assert.are.equal("3 results", nextMenu:Rows()[1].note:GetText())
+    assert.same({ 1 }, lit())
+    -- The mock edit box measures 6 a letter: the cursor at 60, the word "rar" 18 wide.
+    assert.are.same({ "TOPLEFT", area.editBox, "TOPLEFT", 42, 0 }, { area.caret:GetPoint(1) })
+    assert.are.equal(area.caret, nextMenu.anchor)
+  end)
+
+  it("asks nothing when the cursor moves with no suggestions shown", function()
+    area.editBox:SetText("type = ra")
+    area.editBox:SetCursorPosition(3)
+    flush()
+    assert.same({}, asked)
+    assert.is_false(shown())
+  end)
+
+  it("takes the lit suggestion with Tab: its text and cursor, reported as typed, the next ones at once when it chains", function()
+    typeText("ra")
+    flush()
+    press("OnTabPressed")
+    assert.are.equal("rarity ", area:GetText())
+    assert.are.equal(7, area.editBox:GetCursorPosition())
+    assert.same({ { "ra", true }, { "rarity ", true } }, changes)
+    assert.is_false(shown())
+    offer = function() return { from = 8, items = { { text = "=", value = { text = "rarity = ", cursor = 9 } },
+      { text = ">", value = { text = "rarity > ", cursor = 9 } } } } end
+    flush()
+    assert.same({ "ra", 2 }, asked[1])
+    assert.same({ "rarity ", 7 }, asked[2], "asked again for what follows")
+    assert.same({ "=", ">" }, labels())
+  end)
+
+  it("takes the lit suggestion with Enter, and with the suggestions closed starts a new line", function()
+    typeText("ra")
+    flush()
+    press("OnKeyDown", "DOWN")
+    press("OnEnterPressed")
+    assert.are.equal("rare ", area:GetText())
+    assert.is_false(shown())
+    flush()
+    assert.are.equal(1, #asked, "a suggestion that does not chain asks nothing more")
+    area.editBox:SetCursorPosition(2)
+    press("OnEnterPressed")
+    assert.are.equal("ra\nre ", area:GetText())
+    assert.are.equal(3, area.editBox:GetCursorPosition())
+    assert.same({ "ra\nre ", true }, changes[#changes])
+  end)
+
+  it("takes a suggestion clicked", function()
+    typeText("ra")
+    flush()
+    local row = nextMenu:Rows()[2]
+    row.frame:GetScript("OnClick")(row.frame, "LeftButton")
+    assert.are.equal("rare ", area:GetText())
+    assert.is_true(area.editBox:HasFocus())
+  end)
+
+  -- Whether the edit box moves its cursor a line before or after its key runs is not known: the cursor is put back
+  -- where the suggestions were read once the frame ends, whichever came first.
+  it("moves the light with Up and Down, putting the cursor back where it was", function()
+    typeText("type = ra")
+    flush()
+    press("OnKeyDown", "DOWN")
+    area.editBox:SetCursorPosition(0)
+    flush()
+    assert.are.equal(9, area.editBox:GetCursorPosition())
+    assert.same({ 2 }, lit())
+    flush()
+    assert.are.equal(1, #asked, "nothing changed: not asked again")
+    assert.is_true(shown())
+    press("OnKeyDown", "UP")
+    flush()
+    assert.same({ 1 }, lit())
+    press("OnKeyDown", "LEFT")
+    area.editBox:SetCursorPosition(8)
+    flush()
+    assert.are.equal(8, area.editBox:GetCursorPosition(), "left and right move the cursor: it stays where it went")
+    assert.same({ "type = ra", 8 }, asked[#asked], "read again where it went")
+  end)
+
+  -- Found in review: suggestions are read once a frame, so a key typed in the same frame as Tab, Enter or an arrow
+  -- left the list (and the cursor to put back) of the text before it.
+  it("reads the suggestions again before Tab or Enter takes one, for a key typed in the same frame", function()
+    typeText("type = ra")
+    flush()
+    typeText("type = ra ")
+    press("OnTabPressed")
+    assert.are.equal("type = ra ", area:GetText(), "after a space there is no word: nothing taken")
+    assert.is_false(shown())
+    press("OnEnterPressed")
+    assert.are.equal("type = ra \n", area:GetText(), "a new line")
+    typeText("type = ra")
+    flush()
+    typeText("type = rar")
+    press("OnTabPressed")
+    assert.same({ "type = rar", 10 }, asked[#asked])
+    assert.are.equal("type = rarity ", area:GetText())
+  end)
+
+  it("puts the cursor back after Up or Down only when no key changed the text in the same frame", function()
+    typeText("type = ra")
+    flush()
+    press("OnKeyDown", "DOWN")
+    typeText("type = rax")
+    flush()
+    assert.are.equal(10, area.editBox:GetCursorPosition())
+    assert.same({ "type = rax", 10 }, asked[#asked])
+  end)
+
+  -- Found in review: the box takes the wheel while focused, and with no catcher the list stayed by a line scrolled away.
+  it("closes them when the box scrolls with the wheel", function()
+    typeText("ra")
+    flush()
+    area.box:GetScript("OnMouseWheel")(area.box, -1)
+    assert.is_false(shown())
+  end)
+
+  it("reads them again as the cursor moves while they show, and closes them when there are none", function()
+    typeText("type = ra")
+    flush()
+    area.editBox:SetCursorPosition(8)
+    flush()
+    assert.same({ "type = ra", 8 }, asked[2])
+    assert.is_true(shown())
+    area.editBox:SetCursorPosition(7)
+    flush()
+    assert.is_false(shown(), "after a space, no word: none")
+  end)
+
+  it("closes them on Escape, keeping focus, until the next key typed", function()
+    typeText("ra")
+    flush()
+    press("OnEscapePressed")
+    assert.is_false(shown())
+    assert.is_true(area.editBox:HasFocus())
+    area.editBox:SetCursorPosition(1)
+    flush()
+    assert.is_false(shown())
+    typeText("rar")
+    flush()
+    assert.is_true(shown())
+    nextMenu:Close()
+    press("OnEscapePressed")
+    assert.is_false(area.editBox:HasFocus(), "with none shown, Escape lets go of focus")
+  end)
+
+  it("closes them when it loses focus, its text is set from code, or it is disabled", function()
+    typeText("ra")
+    flush()
+    area.editBox:ClearFocus()
+    press("OnEditFocusLost")
+    assert.is_false(shown())
+    area.editBox:SetFocus()
+    typeText("ra")
+    flush()
+    area:SetText("exp = mid")
+    assert.is_false(shown())
+    typeText("ra")
+    flush()
+    area:SetEnabled(false)
+    assert.is_false(shown())
+    area:SetEnabled(true)
+    area.editBox:SetFocus()
+    typeText("ra")
+    flush()
+    assert.is_true(shown())
+    area:SetReadOnly(true)
+    assert.is_false(shown(), "made read only")
+  end)
+
+  it("shows nothing while it does not have focus", function()
+    area.editBox:ClearFocus()
+    typeText("ra")
+    flush()
+    assert.is_false(shown())
   end)
 end)

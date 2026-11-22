@@ -61,24 +61,24 @@ loaded on every Forever client; elsewhere the module does nothing.
 
 **Features (while the gamepad interface style is in use; the player can switch styles at any time):**
 - Every open bag window (both designs' backpack and bank, BetterBags Next's vendor and guild bank) joins Blizzard's
-  window list a frame after it opens and leaves it as it starts to close: the d-pad cursor moves over its buttons, the
+  window list a frame after it opens and is removed from the list as it starts to close: the d-pad cursor moves over its buttons, the
   triggers move between windows (Blizzard's trigger hints show)
-- The cursor lands only on buttons the windows mark (`bbGamepad`: item, vendor, guild, tab); a native `ScrollFrame` in
-  each window's scroll box keeps Blizzard's navigation off the addon-built box (`Scrollbox:SetGamepad`), and the box
+- The cursor moves only to buttons the windows mark (`bbGamepad`: item, vendor, guild, tab); a native `ScrollFrame` in
+  each window's scroll box excludes the addon-built box from Blizzard's navigation (`Scrollbox:SetGamepad`), and the box
   scrolls to the selected button (`Scrollbox:ScrollIntoView`)
 - A presses the button, X right-clicks the selected item through a secure button (use, sell, move, place), B puts back an
-  item held or closes the window; Blizzard's input legend under the window says which
+  item held or closes the window; Blizzard's input legend under the window shows which
 - The radial menu's Bags toggles the backpack; its Character entry opens it (never closing one already open)
 - Blizzard's bank, merchant and guild bank frames BetterBags stands in for are taken out of Blizzard's window list
-- In combat the windows leave Blizzard's window list (as the combat restriction comes, while Blizzard still takes the
-  calls) and join again after it: no bag navigation with the gamepad in combat, and no call Blizzard would refuse
+- In combat the windows are removed from Blizzard's window list (when the combat restriction activates, while Blizzard still accepts the
+  calls) and are added again after combat ends: no bag navigation with the gamepad in combat, and no call Blizzard would reject
 
 **Methods:**
 | Method | Description | Parameters | Returns |
 |--------|-------------|------------|---------|
-| `Add(window)` | Take in a bag window (`frame`, `scroll`, `Show`, `Hide`, `IsShown`, `IsClosing`); `BagSystem` calls it for every window it makes | `table` | `"added"`, `"already"`, `"unavailable"` |
-| `Update()` | Bring Blizzard's window list and every window in line (run a frame after any change) | - | windows in the list |
-| `Dump()` | What it knows, for `/bbdb`'s dump (`debugDumpExtras.gamepad`) | - | `table` |
+| `Add(window)` | Accept a bag window (`frame`, `scroll`, `Show`, `Hide`, `IsShown`, `IsClosing`); `BagSystem` calls `Add` for every window it creates | `table` | `"added"`, `"already"`, `"unavailable"` |
+| `Update()` | Synchronize Blizzard's window list and every window (run a frame after any change) | - | windows in the list |
+| `Dump()` | Current gamepad state, for `/bbdb`'s dump (`debugDumpExtras.gamepad`) | - | `table` |
 
 ### Masque (`masque.lua`)
 
@@ -87,7 +87,7 @@ Integrates with Masque for custom button skinning.
 **Features:**
 - Custom button skins for item buttons
 - Separate groups for Backpack, Bank and BetterBags Next's Vendor, Guild Bank and Food & Drink bar
-- Respects the theme's `Masque = false` (`Sonata:UsesMasque()`), taking buttons out of their groups when such a theme is applied
+- Applies the theme's `Masque = false` (`Sonata:UsesMasque()`), removing buttons from their groups when such a theme is applied
 - Dynamic button registration/removal
 - Blend mode fixes for proper display
 
@@ -104,7 +104,7 @@ Integrates with Masque for custom button skinning.
   button, with its parts named (`Icon`, `IconBorder`, `Count`, `Highlight`), as an `Item` button
 - `BetterBags/Guild Bank` - BetterBags Next's guild bank buttons (`next/guildbutton.lua`)
 - `BetterBags/Food & Drink` - BetterBags Next's Food & Drink bar (`next/fooddrinkbar.lua`): BetterBags' own item
-  buttons, skinned on `item/NewButton` and `item/Updated` as the bags' are, in this group because they say so
+  buttons, skinned on `item/NewButton` and `item/Updated` as the bags' are, assigned to this group
   (`item.masqueGroup`, `.claude/rules/food-drink.md` §3)
 
 **Event Handlers:**
@@ -114,7 +114,7 @@ Integrates with Masque for custom button skinning.
 - `bagbutton/Updated` - Register bag slot buttons
 - `bagbutton/Clearing` - Remove bag slot buttons
 - `vendor/NewButton` - Register a new vendor button (sent once per button; vendor buttons are reused,
-  and a theme that uses Masque adds back the ones a theme without it took out)
+  and a theme that uses Masque adds back the buttons that a theme without Masque removed)
 - `vendor/Updated` - Re-skin a vendor button that styled itself again for a new pixel grid (its icon,
   count and highlight drawn over the skin; `NextVendorButton:Fit`), adding it when it is not in the group
 - `guild/NewButton`, `guild/Updated` - Register a guild bank button, and re-skin it after every draw or
@@ -127,11 +127,11 @@ Integrates with Masque for custom button skinning.
 | `RemoveButtonFromGroup(group, button)` | Remove button from group | `string`, `Button` | - |
 | `IsGroupEnabled(group)` | Check if group is enabled | `string` | `boolean` |
 | `ReapplyBlend(button)` | Fix blend mode | `Button` | - |
-| `IsSkinned(button)` | Whether the button is in one of BetterBags' Masque groups (Masque places its parts; BetterBags Next's item fitter leaves them alone) | `Button` | `boolean` |
+| `IsSkinned(button)` | Whether the button is in one of BetterBags' Masque groups (Masque places its parts; BetterBags Next's item fitter does not modify them) | `Button` | `boolean` |
 
 ### Pawn (`pawn.lua`)
 
-Shows item upgrade indicators using Pawn's upgrade detection, the way Pawn asks a bag addon to work with it (`PawnBags.lua`).
+Shows item upgrade indicators using Pawn's upgrade detection, as specified by Pawn for bag addons (`PawnBags.lua`).
 
 **Key Components:**
 ```lua
@@ -142,10 +142,10 @@ PawnRegisterThirdPartyBag("BetterBags", { RefreshAll = ... })
 ```
 
 **Behavior:**
-- Answers are kept by item link, without the player's level and spec: a sort, a re-read or a respec asks Pawn nothing in the read, and a read only asks about an item it has not seen
-- An item Pawn has no answer for yet is not treated as "not an upgrade": no `upgrade` search field, and Automation leaves it alone
-- Pawn's signal asks for no refresh: every item held is checked again a few at a time, showing its old arrow meanwhile
-- Only an arrow that changed recalculates the bags holding it, and no category or button is redone for it
+- Results are stored by item link, without the player's level and spec: a sort, a re-read or a respec does not query Pawn during the read, and a read queries Pawn only for an item not yet queried
+- An item Pawn has no result for yet is not treated as "not an upgrade": no `upgrade` search field, and Automation ignores it
+- Pawn's signal triggers no refresh: every item in the bags is checked again a few at a time, displaying its previous arrow meanwhile
+- Only an arrow that changed recalculates the bags containing that item, and no category or button is redone for it
 - Nothing is checked again during combat
 
 Details: `.claude/rules/caches.md` §2a.
@@ -176,7 +176,7 @@ SimpleItemLevel.API.ItemIsUpgrade(itemLink)
 
 ### Profession Shopping List (`professionshoppinglist.lua`)
 
-Buys what Profession Shopping List's list needs from a BetterBags Next vendor
+Buys the items required by Profession Shopping List's list from a BetterBags Next vendor
 (`.claude/rules/profession-shopping-list.md`).
 
 **Features:**
@@ -206,7 +206,7 @@ Blizzard's merchant frame (`.claude/rules/tradeskillmaster.md`, issue #1315).
 **Features:**
 - At a vendor, whichever TSM saved last opens: TSM's window alone, or BetterBags Next's vendor
 - A TradeSkillMaster button on the vendor opens TSM's window, and the vendor slides out with the visit still open
-- TSM's own WoW UI button brings the vendor back; closing TSM's window ends the visit
+- TSM's own WoW UI button restores the vendor; closing TSM's window ends the visit
 
 **Key Components:**
 ```lua
@@ -219,8 +219,8 @@ TradeSkillMasterDB["g@ @vendoringUIContext@showDefault"] -- false: its window is
 
 **Behavior:**
 - Nothing without TSM: `TSM_API` absent, the button hidden, nothing followed
-- While a vendor is open it looks at TSM's window every frame (`Follow`, `Look`) and tells the vendor what changed
-- `NextUIPanels:Retake` keeps the merchant frame out of Blizzard's panel layout after TSM writes its width there
+- While a vendor is open, the integration checks TSM's window every frame (`Follow`, `Look`) and reports changes to the vendor
+- `NextUIPanels:Retake` removes the merchant frame from Blizzard's panel layout after TSM writes its width there
 
 ### QuickFind (`quickfind.lua`)
 
@@ -230,7 +230,7 @@ Makes the items in the backpack and bank findable from the QuickFind addon (`.cl
 - Every item of both bags is a QuickFind entry, tagged with its type, subtype, category, equipment slot and
   location ("Backpack", "Bank"); bank items only while the bank is open (closing it clears BetterBags' bank data,
   `items:ClearBankCache`)
-- Enter on one opens its bag and switches to the tab holding it through the bag's own behavior: a backpack group, or a
+- Enter on one opens its bag and switches to the tab containing it through the bag's own behavior: a backpack group, or a
   bank group by the item's category and bank type (`SwitchToGroup`); with Show Bank Tabs on, the Blizzard bank tab it
   is in (`SwitchToBlizzardTab`, through the classic bank's tab slots panel, `SelectTab`)
 - With In-Bag Search on, it searches for the item's exact name: `name == "Item Name"` (`NameQuery`)
@@ -325,7 +325,7 @@ end
    - Check for addon presence in `OnEnable`
    - Use events for reactive integration
    - Print confirmation message
-   - Handle nil/missing values gracefully
+   - Check for nil or missing values
 
 3. **Common integration points:**
    - `item/Updated` - Item button updates

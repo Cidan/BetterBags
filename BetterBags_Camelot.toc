@@ -112,6 +112,7 @@ util\query.lua
 
 data\binding.lua
 data\search.lua
+data\searchcompletion.lua
 data\tooltip.lua
 data\equipmentsets.lua
 data\categories.lua

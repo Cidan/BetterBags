@@ -40,6 +40,29 @@ user:
   three words in Title Case naming what the part covers, never a clause, a question or a statement, each its own in
   its article. The first drafts' headings were phrases, and the writer was asked only for "short, Sentence case"
   headings, so it kept them: the writer's brief for any heading states this rule.
+- **A search keyword titles its part as it is typed** (asked, 2026-11-22: "break down the search help a bit more so
+  keywords are formal titles of sections"): a `heading` with `keyword = true` (`ilvl`, `%=`, `( )`, `player.level`),
+  raw, never `L:G` (a query is never translated), shown as typed, not in capitals (`next/settings/article.lua`), exempt
+  from Title Case, the clause words and the trailing punctuation check, still one to three words and its own in its
+  article (`spec/help/content_spec.lua`); `spec/integration/help_coverage_spec.lua` checks a query reads each of its
+  words (a field or alias, a player value, a function, or one token of its own as the lexer reads it). The search
+  articles title every field, alias, operator, function and player value so, one each; what is not one keyword
+  (arithmetic, money, quotes, precedence) keeps a Title Case heading.
+- **Nothing "holds" anything, and nothing is a person** (asked, the same day: "nothing 'holds' anything, this is a
+  claude-ism in speech, this should have been written by the writer agent", then "fix all the rest of the docs that has
+  'holds' and other human like personifications ... all text should be highly technical"; CLAUDE.md, "Writing Register:
+  Technical, Never Personified"): no field, page, tab, section, bag, setting, category or item holds, keeps, knows,
+  waits, asks, decides or claims anything; the writer's brief states it. The search articles were written again without
+  it; the sweep after it rewrote every other article's personified sentences.
+- **How the sweep ran** (reusable for the next one; throwaway scripts in `/tmp/help_author/`): a loose verb filter
+  picked candidate strings (the articles' shown text, never `keywords` or `questions`; the other in-game strings; the
+  settings descriptions; README lines); the writer, given one shared brief (what personifies, what to leave: the
+  player's own actions), returned only the entries it changed as `id TAB new text`, and decided the borderline ones
+  again when told how; a script applied each by exact match (placeholders and escapes checked, specs asserting the old
+  text updated) and kept every old/new pair; the decision tool read the pairs in chunks of ten for a changed fact or a
+  person left, and every chunk it was unsure about was read in full. Strings written as several literals joined with
+  `..` are found as one (the first filter missed them: "the Item Order holds equal"). Measured after it: rounds 1, 2
+  and 3 at 72.0% / 90.7%, 71.5% / 90.2% and 72.5% / 86.0%, every floor kept.
 
 ## 1. Articles (`help/articles.lua`, `HelpArticles`; `help/articles/*.lua`)
 
@@ -131,6 +154,10 @@ words were tuned against; round 3 was not, and measures the search:
 | 3, after the headings were made titles | 77.5% | 89.5% | 0.841 |
 | 3, the text written from the code, old weights | 71.0% | 85.0% | 0.795 |
 | 3, the text written from the code, weights tuned again | 73.0% | 86.5% | 0.806 |
+| 3, the search articles' keywords made their parts' titles (2026-11-22) | 72.8% | 85.8% | not measured |
+
+Rounds 1 and 2 with the keyword titles: 72.3% / 90.7% and 72.3% / 90.5% (from 71.8% / 91.0% and 72.0% / 90.2%), every
+floor kept; nothing tuned.
 
 On round 3, a question, a short search and a search with a typo find their article first about 89% of the time; a
 symptom ("my bags keep...") 56%, WoW slang 60%, and those are most of what misses: a word search cannot tell what a

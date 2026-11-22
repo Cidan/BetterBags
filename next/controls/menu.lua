@@ -34,7 +34,11 @@ local pixelAudit = addon:GetModule('PixelAudit')
 -- hiding, closes it. A menu to find a choice in (opts.filter: the category picker, issue #1270) has a
 -- field over its choices, focused, that reads them again as the player types; the choice Enter takes
 -- is lit (Up and Down move the light, the pointer leaves it where it last was), and Escape in the field
--- closes it. Over both, a head may say what the menu is for (an item's icon, its name and a note).
+-- closes it. Over both, a head may say what the menu is for (an item's icon, its name and a note). A menu at a text
+-- cursor (opts.attached: a search rule's suggestions, search-completion.md §4) is given its keys by the field, which
+-- keeps focus: the first choice lit, the light kept where the pointer leaves it, its choices shown again in place
+-- (SetItems), and no catcher over the screen, so a click goes where it was meant to; a left or right button down
+-- anywhere but over the menu closes it, as Blizzard's menus close (Blizzard_Menu/Menu.lua, GLOBAL_MOUSE_DOWN).
 ---@class NextMenu: AceModule
 ---@field frame Frame
 ---@field fill Texture
@@ -86,6 +90,8 @@ local nextMenu = addon:NewModule('NextMenu')
 ---@field style? table Over the theme's Menu.
 ---@field head? NextMenuHead
 ---@field filter? NextMenuFilter
+---@field attached? boolean At a text cursor: its field keeps focus and gives it its keys (Arrow, Take), no catcher.
+---@field lit? number The choice lit when it opens at a text cursor (the first that can be taken when none is given).
 
 ---@class NextMenuRow
 ---@field frame Button
@@ -142,6 +148,7 @@ function nextMenu:build()
   addon.SetScript(catcher, "OnMouseDown", function() self:Close() end)
   addon.SetScript(catcher, "OnMouseWheel", function() self:Close() end)
   addon.SetScript(frame, "OnHide", function() self:hidden() end)
+  addon.SetScript(frame, "OnEvent", function(_, _, event, button) self:OnMouseDownAnywhere(event, button) end)
   local headFrame = CreateFrame("Frame", nil, frame)
   self.headIcon = headFrame:CreateTexture(nil, "ARTWORK")
   self.headIcon:SetAllPoints(headFrame)
@@ -203,7 +210,7 @@ function nextMenu:row(i)
   -- A choice that cannot be taken is never lit: in a menu with a field the light stays where it was.
   addon.SetScript(frame, "OnEnter", function()
     if row.item ~= nil and row.item.disabled then
-      if not (self.opts and self.opts.filter) then
+      if not self:keyed() then
         self:Light(nil)
       end
       return
@@ -212,12 +219,20 @@ function nextMenu:row(i)
   end)
   -- In a menu with a field the light stays where the pointer left it: Enter takes what was last pointed at.
   addon.SetScript(frame, "OnLeave", function()
-    if not (self.opts and self.opts.filter) then
+    if not self:keyed() then
       self:Light(nil)
     end
   end)
   self.rows[i] = row
   return row
+end
+
+-- keyed says whether the open menu is driven from the keyboard (a field over it, or the field it is at): its light
+-- is what Enter takes, kept where the pointer leaves it.
+---@private
+---@return boolean
+function nextMenu:keyed()
+  return self.opts ~= nil and (self.opts.filter ~= nil or self.opts.attached == true)
 end
 
 ---@param hovered boolean
@@ -256,6 +271,9 @@ function nextMenu:Open(anchor, opts)
     self.items, self.lit = opts.filter.items("")
   else
     self.items = opts.items
+    if opts.attached then
+      self.lit = opts.lit or self:firstTakeable()
+    end
   end
   if not self.hooked[anchor] then
     self.hooked[anchor] = true
@@ -267,11 +285,51 @@ function nextMenu:Open(anchor, opts)
   end
   self:Style()
   self.open = true
-  self.catcher:Show()
+  self.catcher:SetShown(not opts.attached)
+  if opts.attached then
+    self.frame:RegisterEvent("GLOBAL_MOUSE_DOWN")
+  end
   self.frame:Show()
   controls:PushEscape(self.frame)
   if opts.filter then
     self.field:SetFocus()
+  end
+end
+
+-- firstTakeable returns the first choice that can be taken, or nil.
+---@private
+---@return number?
+function nextMenu:firstTakeable()
+  for i, item in ipairs(self.items) do
+    if not item.disabled then
+      return i
+    end
+  end
+  return nil
+end
+
+-- SetItems shows other choices in the open menu, in place, the one given lit (a menu at a text cursor, as what is
+-- typed changes).
+---@param items NextMenuItem[]
+---@param lit? number
+function nextMenu:SetItems(items, lit)
+  if not self.open then
+    return
+  end
+  self.items, self.lit = items, lit
+  self:Style()
+end
+
+-- OnMouseDownAnywhere closes a menu at a text cursor on a left or right button down anywhere but over it
+-- (GLOBAL_MOUSE_DOWN, as MenuManagerMixin:HandleGlobalMouseEvent does): the click itself goes on to what is under it.
+---@param event string
+---@param button string
+function nextMenu:OnMouseDownAnywhere(event, button)
+  if event ~= "GLOBAL_MOUSE_DOWN" or not self.open or (button ~= "LeftButton" and button ~= "RightButton") then
+    return
+  end
+  if not self.frame:IsMouseOver() then
+    self:Close()
   end
 end
 
@@ -302,6 +360,7 @@ function nextMenu:hidden()
   end
   self.open = false
   self.catcher:Hide()
+  self.frame:UnregisterEvent("GLOBAL_MOUSE_DOWN")
   self.field.frame:ClearFocus()
   controls:ReleaseEscape(self.frame)
   local opts = self.opts

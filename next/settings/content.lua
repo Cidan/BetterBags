@@ -129,7 +129,7 @@ local function colorOption(key, name)
     kind = "color",
     hasOpacity = true,
     title = function() return name(breakpoints()) end,
-    description = L:G("The color of an item level in this range. The ranges follow the highest item level you have seen."),
+    description = L:G("The color of an item level in this range. The ranges scale with the highest item level you have seen."),
     keywords = { "item level", "ilvl", "color" },
     get = function()
       local c = db:GetItemLevelColors()[key]
@@ -447,7 +447,7 @@ function content:Init()
   })
   pages:Define({
     id = "appearance", group = L:G("BetterBags"), title = L:G("Appearance"),
-    description = L:G("How BetterBags looks. A theme you pick shows at once; Apply Theme keeps it."),
+    description = L:G("How BetterBags looks. A theme you pick shows at once; Apply Theme saves it."),
     -- BetterBags Next's themes draw its bags and this window; the classic bags' themes draw theirs. Animation is BetterBags
     -- Next's: the classic bags have none of its effects. Each bag is sized on its own page (sizeTab).
     tabs = { { id = "theme", title = L:G("Theme"), sections = {
@@ -495,7 +495,7 @@ function content:Init()
         { option = colorOption("max", function(max) return format(L:G("Max Item Level Color (%d+)"), max) end) },
         { text = function()
           local max = breakpoints()
-          return format(L:G("The highest item level you have seen is %d. The ranges move up as you get better gear."), max)
+          return format(L:G("The highest item level you have seen is %d. The ranges move up as you obtain better gear."), max)
         end },
         { buttons = {
           { text = L:G("Reset Colors"), onClick = function(ctx)
@@ -585,7 +585,7 @@ function content:Init()
   -- out of it show, in what order, and how. Currencies on clients with them; items everywhere.
   pages:Define({
     id = "currencies", group = L:G("BetterBags"), title = L:G("Currencies"), design = "next",
-    description = L:G("The currencies and items you keep an eye on, at the bottom of your backpack and in its tracker."),
+    description = L:G("The currencies and items you track, at the bottom of your backpack and in its tracker."),
     tabs = {
       { id = "tracked", title = L:G("Tracked"), sections = { tabSection(L:G("Tracked"),
         { "currency", "currencies", "tracked", "order", "tokens", "items" },
@@ -704,7 +704,7 @@ function content:Init()
       { title = L:G("How it works"), rows = {
         { text = L:G("BetterBags integrates with the QuickFind addon to make your items searchable.") },
         { text = L:G("All items in your backpack and bank are registered as a QuickFind source, tagged with their type, category and location.") },
-        { text = L:G("When you press Enter on an item in QuickFind, BetterBags opens the bag it is in, switches to the tab that holds it, and searches for its name.") },
+        { text = L:G("When you press Enter on an item in QuickFind, BetterBags opens the bag it is in, switches to the tab that contains it, and searches for its name.") },
       } },
     } } },
   })
