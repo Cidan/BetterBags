@@ -71,7 +71,7 @@ The main container frame for displaying bags (backpack or bank).
 
 **Window Mouse and Drops:**
 
-The window frame is the only mouse-enabled frame under the bag's backgrounds (section frames, grids and scroll boxes take no mouse), so a drop on a background, a gap or the empty part of a section reaches it. Item buttons, section titles and the bag button sit above it and take their own drops first. While an item is on the cursor, pressing on the window is a drop and never moves it; `OnDragStop` saves the position only after a move started (`movingWindow`). The placement rules and why a drop cannot taint are in `.claude/rules/bag-drop-zone.md`.
+The window frame is the only mouse-enabled frame under the bag's backgrounds (section frames, grids and scroll boxes accept no mouse input), so a drop on a background, a gap or the empty part of a section is received by the window frame. Item buttons, section titles and the bag button are layered above it and receive their own drops first. While an item is on the cursor, pressing on the window is a drop and never moves the window; `OnDragStop` saves the position only after a move started (`movingWindow`). The placement rules and why a drop cannot taint are in `.claude/rules/bag-drop-zone.md`.
 
 ### Item Frame (`item.lua`)
 
@@ -86,10 +86,10 @@ Individual item button implementation with full WoW item functionality.
 - Search highlighting
 - Upgrade indicator
 - Junk coin at a vendor (Blizzard's `UpdateJunkItem`), redrawn when a vendor opens or closes through the sweep's junk mark (`data.junkMarked`, one of the inputs a skipped redraw compares; `.claude/rules/item-drawing.md` §7b)
-- Dimming what does not fit Blizzard's item context (`itemFrame.GetItemContextMatchResult`): the answer the sweep worked out (`data.itemContextMatchResult`), except while a spell targets an item (Feed Pet, an enchant, a sharpening stone) or after one the sweep's answer was worked out under, when Blizzard is asked again, since those start and end with no bag refresh (`.claude/rules/item-drawing.md` §8)
+- Dimming what does not fit Blizzard's item context (`itemFrame.GetItemContextMatchResult`): the result the sweep computed (`data.itemContextMatchResult`), except while a spell targets an item (Feed Pet, an enchant, a sharpening stone) or after one the sweep's result was computed under, when Blizzard's API is queried again, since those start and end with no bag refresh (`.claude/rules/item-drawing.md` §8)
 - Stack management
-- WoW: Forever's gamepad cursor lands on the interaction button (`bbGamepad = "item"`), never on the decoration behind it; X right-clicks it (`.claude/rules/gamepad.md` §5)
-- Free slot display: a specialized bag's empty slots draw its bag type's glyph (a quiver's arrow, a herb bag's sprig, the keyring's key, ...; BetterBags' own files from `tools/textures/next_icons.py`), small, centered and faint in the item button theme's color (`ItemButton.FamilyIcon`: white at 0.4 unless the theme says otherwise), the reagent bag's for a bag type with none (`.claude/rules/item-drawing.md` §11)
+- WoW: Forever's gamepad cursor targets the interaction button (`bbGamepad = "item"`), never the decoration behind it; X right-clicks it (`.claude/rules/gamepad.md` §5)
+- Free slot display: a specialized bag's empty slots draw its bag type's glyph (a quiver's arrow, a herb bag's sprig, the keyring's key, ...; BetterBags' own files from `tools/textures/next_icons.py`), small, centered and faint in the item button theme's color (`ItemButton.FamilyIcon`: white at 0.4 unless the theme specifies otherwise), the reagent bag's for a bag type with none (`.claude/rules/item-drawing.md` §11)
 
 **Main Class:**
 ```lua
@@ -165,10 +165,10 @@ Flexible grid system for arranging UI elements.
 
 WoW does not bubble mouse wheel events up the parent-child hierarchy. Each WowScrollBox (created by `grid:Create`) automatically registers an `OnMouseWheel` handler via the template, which would intercept all scroll events — even on non-scrollable inner grids (e.g. section content grids).
 
-To ensure scroll events reach the outer bag container:
+To ensure scroll events propagate to the outer bag container:
 - `EnableMouseWheelScroll(false)` is called on all section content grids (non-scrollable inner grids)
 - Mouse wheel is disabled on all item buttons (`ContainerFrameItemButtonTemplate` enables it via its mixin)
-- Events then fall through to the outer bag grid's WowScrollBox, which handles scrolling
+- Events then fall through to the outer bag grid's WowScrollBox, which processes scrolling
 
 **Main Class:**
 ```lua
@@ -246,7 +246,7 @@ Right-click context menu system.
 - Character bank tabs toggle (retail)
 - Bank tab purchases
 - Sort operations (Sort Bank only sorts; Clean Up Warbank)
-- The Warbank's item deposit, with a Warbank: Deposit All Warbound Items (the bank's deposit, which asks first when a refund would end) and Include tradeable reagents (the client's `bankAutoDepositReagents` CVar), Blizzard's button and checkbox in Blizzard's words (`.claude/rules/warbank-deposit.md`)
+- The Warbank's item deposit, with a Warbank: Deposit All Warbound Items (the bank's deposit, which prompts first when a refund would end) and Include tradeable reagents (the client's `bankAutoDepositReagents` CVar), Blizzard's button and checkbox in Blizzard's words (`.claude/rules/warbank-deposit.md`)
 
 ### Tabs (`tabs.lua`)
 
@@ -264,7 +264,7 @@ Tab management for bank views.
 - Drag-to-reorder with cross-section drag constraint
 - Icon-only tab minimum width enforcement (50px)
 - Functional disable state (`SetTabsDisabled`) available for external use
-- WoW: Forever's gamepad cursor lands on a tab's decoration, which takes its clicks (`bbGamepad = "tab"`, `.claude/rules/gamepad.md` §5)
+- WoW: Forever's gamepad cursor targets a tab's decoration, which receives its clicks (`bbGamepad = "tab"`, `.claude/rules/gamepad.md` §5)
 
 **Tab Disable State:**
 
@@ -278,7 +278,7 @@ Each tab has one decoration, `tabs:GetDecoration(ctx, tab)`, made once from `Bet
 
 Tabs that display only an icon (no text label), such as the '+' new-group button, use `PanelTemplates_TabResize(decoration, nil, 50)` to enforce a 50-pixel minimum width. Without this minimum, the tab renderer returns only the width of the left and right edge textures (~20px), making icon-only tabs noticeably narrower than adjacent text tabs. Passing `50` as the third argument ensures they visually match a typical short-label tab (e.g. "Bank").
 
-The icon is anchored to the tab's **content region**, not the raw frame center: `decoration.tabIcon:SetPoint("CENTER", decoration, "CENTER", 0, decoration.deselectedTextY and (decoration.deselectedTextY - 4) or 1)`. The Classic tab template (`templates/era/container.xml`, which does **not** inherit `PanelTabButtonTemplate`) positions its label baseline ~10px above the frame center via `deselectedTextY = 10`; anchoring the icon to the plain frame center (the old `+1` offset) left the '+' low and bleeding out the bottom of the tab on Classic, while anchoring to the full baseline (`+10`) sat it a touch high (an icon's *center* isn't the text *baseline*), so it lands at `deselectedTextY - 4` (`+6`). Retail's `PanelTabButtonTemplate` has no `deselectedTextY`, so the `or 1` fallback preserves the original retail placement. Covered by `spec/frames/tabs_spec.lua`.
+The icon is anchored to the tab's **content region**, not the raw frame center: `decoration.tabIcon:SetPoint("CENTER", decoration, "CENTER", 0, decoration.deselectedTextY and (decoration.deselectedTextY - 4) or 1)`. The Classic tab template (`templates/era/container.xml`, which does **not** inherit `PanelTabButtonTemplate`) positions its label baseline ~10px above the frame center via `deselectedTextY = 10`; anchoring the icon to the plain frame center (the old `+1` offset) left the '+' low and extending past the bottom of the tab on Classic, while anchoring to the full baseline (`+10`) positioned it slightly high (an icon's *center* isn't the text *baseline*), so it is placed at `deselectedTextY - 4` (`+6`). Retail's `PanelTabButtonTemplate` has no `deselectedTextY`, so the `or 1` fallback preserves the original retail placement. Covered by `spec/frames/tabs_spec.lua`.
 
 **Bank Tab Sort Order (Retail):**
 
@@ -313,7 +313,7 @@ Display panel for equipped bags.
 
 ### Bank Tab Slots Panel (`bankslots.lua`)
 
-Slide-out panel showing all possible Blizzard bank tab slots (retail only). When toggled **on**, the panel appears at the **bottom** of the bank window (where the group tabs normally sit) and replaces the normal group-based bank view with a per-Blizzard-tab filtered view. When toggled **off**, everything reverts: the panel moves back above the window, group tabs reappear, and the window title is restored.
+Slide-out panel showing all possible Blizzard bank tab slots (retail only). When toggled **on**, the panel appears at the **bottom** of the bank window (where the group tabs are normally placed) and replaces the normal group-based bank view with a per-Blizzard-tab filtered view. When toggled **off**, everything reverts: the panel moves back above the window, group tabs reappear, and the window title is restored.
 
 **Features:**
 - 11 slot buttons: 6 character bank tabs (`CharacterBankTab_1`–`_6`) followed by 5 warbank tabs (`AccountBankTab_1`–`_5`), in order left to right
@@ -332,7 +332,7 @@ Slide-out panel showing all possible Blizzard bank tab slots (retail only). When
 
 When `Show()` is called the panel transitions into an active mode that fully transforms the bank window layout:
 
-1. The panel frame is reanchored from **above** the bag window (`BOTTOMLEFT` → `TOPLEFT`) to **below** it (`TOPLEFT` → `BOTTOMLEFT`), occupying the space where group tabs normally sit.
+1. The panel frame is reanchored from **above** the bag window (`BOTTOMLEFT` → `TOPLEFT`) to **below** it (`TOPLEFT` → `BOTTOMLEFT`), occupying the space where group tabs are normally placed.
 2. The group tabs frame is **completely hidden** (not just disabled). The previous visibility state is saved in `tabsWereShown` so it can be restored correctly.
 
 The Bank Tabs window itself is registered with an empty title (`""`), so no title text is ever rendered in the window decoration across any theme. This is permanent — the title is absent by design, not toggled. In the Default theme, `TitleContainer` is also explicitly hidden when the title is empty so its visual bar does not create a top gap. The content grid uses a symmetric 12 px inset on both top and bottom (matching `BAG_LEFT_INSET`-style padding) so the slot icons appear vertically centred.
@@ -489,7 +489,7 @@ Players can toggle between modes using the context menu option "Show Character B
 
 #### Tab Generation
 When multiple tabs mode is enabled:
-- Each bank bag gets its own tab with names retrieved from the WoW API
+- Each bank bag receives its own tab with names retrieved from the WoW API
 - Tab names are fetched using `C_Bank.FetchPurchasedBankTabData(Enum.BankType.Character)`
 - If API data is unavailable, falls back to bag item names or generic "Bank Tab X" labels
 - Tabs use the actual bag IDs (Enum.BagIndex.CharacterBankTab_1 through CharacterBankTab_6)
@@ -506,7 +506,7 @@ When multiple tabs mode is enabled:
 When a specific character bank tab is selected:
 - Only items from that specific bank bag are displayed
 - The `filterBagID` context variable is used to filter items during refresh
-- The items module handles the actual filtering in `RefreshBank()`
+- The items module performs the actual filtering in `RefreshBank()`
 
 #### Tab Switching
 - `SwitchToCharacterBankTab(ctx, tabID)`: Switches to a specific character bank tab
@@ -677,7 +677,7 @@ local query = searchBox:GetText()
 
 ## Integration with Other Modules
 
-- **Items Module**: Provides item data for display, handles filtering for character bank tabs
+- **Items Module**: Provides item data for display, performs filtering for character bank tabs
 - **Categories Module**: Determines section grouping
 - **Window and Sonata Modules**: every window is a `Window`, drawn and restyled by the active Sonata theme (`.claude/rules/window.md`, `sonata/README.md`)
 - **Events Module**: Coordinates frame updates

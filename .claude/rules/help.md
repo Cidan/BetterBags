@@ -48,11 +48,21 @@ user:
   words (a field or alias, a player value, a function, or one token of its own as the lexer reads it). The search
   articles title every field, alias, operator, function and player value so, one each; what is not one keyword
   (arithmetic, money, quotes, precedence) keeps a Title Case heading.
-- **Nothing "holds" anything** (asked, the same day: "nothing 'holds' anything, this is a claude-ism in speech, this
-  should have been written by the writer agent"): a field, page, tab, section, bag or setting never holds what it has;
-  the writer's brief states it. The search articles were written again without it; the other articles still use it
-  about 40 times (start, next, bags, bank, automation, categories, profiles, integrations, troubleshooting), not
-  rewritten yet.
+- **Nothing "holds" anything, and nothing is a person** (asked, the same day: "nothing 'holds' anything, this is a
+  claude-ism in speech, this should have been written by the writer agent", then "fix all the rest of the docs that has
+  'holds' and other human like personifications ... all text should be highly technical"; CLAUDE.md, "Writing Register:
+  Technical, Never Personified"): no field, page, tab, section, bag, setting, category or item holds, keeps, knows,
+  waits, asks, decides or claims anything; the writer's brief states it. The search articles were written again without
+  it; the sweep after it rewrote every other article's personified sentences.
+- **How the sweep ran** (reusable for the next one; throwaway scripts in `/tmp/help_author/`): a loose verb filter
+  picked candidate strings (the articles' shown text, never `keywords` or `questions`; the other in-game strings; the
+  settings descriptions; README lines); the writer, given one shared brief (what personifies, what to leave: the
+  player's own actions), returned only the entries it changed as `id TAB new text`, and decided the borderline ones
+  again when told how; a script applied each by exact match (placeholders and escapes checked, specs asserting the old
+  text updated) and kept every old/new pair; the decision tool read the pairs in chunks of ten for a changed fact or a
+  person left, and every chunk it was unsure about was read in full. Strings written as several literals joined with
+  `..` are found as one (the first filter missed them: "the Item Order holds equal"). Measured after it: rounds 1, 2
+  and 3 at 72.0% / 90.7%, 71.5% / 90.2% and 72.5% / 86.0%, every floor kept.
 
 ## 1. Articles (`help/articles.lua`, `HelpArticles`; `help/articles/*.lua`)
 

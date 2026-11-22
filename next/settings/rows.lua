@@ -496,7 +496,7 @@ function rowProto:Write(ctx, value)
   if self.option.reload then
     nextDialog:Show(self.owner, {
       title = L:G("Reload UI"),
-      text = L:G("BetterBags needs to reload the UI for this change to take effect. Reload now?"),
+      text = L:G("BetterBags requires a UI reload for this change to take effect. Reload now?"),
       buttons = {
         { text = L:G("Later"), onClick = function() end },
         { text = L:G("Reload"), style = "Primary", onClick = function() ReloadUI() end },

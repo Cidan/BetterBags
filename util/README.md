@@ -95,9 +95,9 @@ Puts the item on the cursor into a free slot of the bags a bag window shows, the
 **Methods:**
 | Method | Description | Parameters | Returns |
 |--------|-------------|------------|---------|
-| `PlaceCursorItem(kind, bankTab)` | Handle an item dropped on a window | `BagKind`, active bank tab or `nil` | `"placed"`, `"returned"`, `"full"` or `"ignored"` |
-| `TargetBags(kind, bankTab)` | The bags a drop can fill, in the order tried | `BagKind`, `number?` | `number[]` |
-| `FindFreeSlot(bags, itemID)` | The slot an item goes to | `number[]`, `number` | `bagid?, slotid?` |
+| `PlaceCursorItem(kind, bankTab)` | Process an item dropped on a window | `BagKind`, active bank tab or `nil` | `"placed"`, `"returned"`, `"full"` or `"ignored"` |
+| `TargetBags(kind, bankTab)` | The bags a drop can fill, in the order checked | `BagKind`, `number?` | `number[]` |
+| `FindFreeSlot(bags, itemID)` | The slot an item is placed in | `number[]`, `number` | `bagid?, slotid?` |
 | `ShowsWarbank(kind, bankTab)` | Whether the window shows the Warbank | `BagKind`, `number?` | `boolean` |
 | `IsWindowBag(kind, bagid)` | Whether a window shows a bag | `BagKind`, `number` | `boolean` |
 
@@ -105,7 +105,7 @@ Puts the item on the cursor into a free slot of the bags a bag window shows, the
 - Only items (`GetCursorInfo()` type `"item"`); vendor items and money are ignored.
 - An item picked up from the same window returns to its slot (`ClearCursor`); the bank window counts both bank types.
 - The backpack window fills `BACKPACK_BAGS`; the bank window fills the Warbank while its active tab is a Warbank tab, else the character bank, active tab first.
-- A bag made for the item wins (a profession bag of its family, the reagent bag for a crafting reagent, the keyring for a key on Classic Era, TBC Anniversary and WoW: Forever), else the first bag that holds anything, backpack first. A specialized bag the item does not fit is never used; bag items only go in plain bags.
+- A bag made for the item is selected first (a profession bag of its family, the reagent bag for a crafting reagent, the keyring for a key on Classic Era, TBC Anniversary and WoW: Forever), else the first bag that accepts any item, backpack first. A specialized bag the item does not fit is never used; bag items are placed only in plain bags.
 - Free slots are read from the client at the drop (`C_Container.GetContainerFreeSlots`), never from committed data.
 - A refundable item is left on the cursor while the bank shows the Warbank.
 - No room: `UIErrorsFrame` shows `ERR_INV_FULL` (`ERR_BANK_FULL` for the bank).
@@ -138,7 +138,7 @@ MOVEMENT_FLOW = {
 **Context Detection:**
 - Checks open UI frames
 - At the bank: `WARBANK` while the bank's `bankTab` is a Warbank tab, else `BANK`
-- Handles retail/classic differences
+- Accounts for retail and classic differences
 - No flow names a reagent bank: no supported client has one (`.claude/rules/patterns-state.md`)
 
 ### Query Parser (`query.lua`)
@@ -192,7 +192,7 @@ Pasted text is untrusted, so it is read as data and never run.
 | Function | Description | Returns |
 |----------|-------------|---------|
 | `Encode(value)` | CBOR, compressed with Deflate, in Base64 (`C_EncodingUtil`, every client) | `string` |
-| `Decode(text)` | Reads what `Encode` wrote; refuses text that is not Base64, not compressed, not CBOR or not a table | `table` or `nil, reason` |
+| `Decode(text)` | Reads what `Encode` wrote; rejects text that is not Base64, not compressed, not CBOR or not a table | `table` or `nil, reason` |
 | `DecodeLegacy(text)` | Reads a `!BB` string exported before #1317 (Base64 of a Lua table constructor) with a parser for exactly what the old writer wrote | `table` or `nil, reason` |
 | `DeepCopy(value)` | A copy of a table and everything in it, metatables included | `any` |
 
@@ -241,7 +241,7 @@ category may have its own (`Categories:ItemOrderOf`, its Item Order tab).
 | `ItemOrderKeyName(key)` | A key's name in the dropdowns | `ItemOrderKey` | `string` |
 | `ItemOrderChoices(order, tier)` | What a tier's dropdown lists: every key for the first, None and the keys not taken above for a later one | `ItemOrderKey[]`, `number` | `string[]` |
 | `ItemOrderChoice(order, tier)` | What a tier's dropdown shows | `ItemOrderKey[]`, `number` | `string` |
-| `WithItemOrderChoice(order, tier, choice)` | A new order with a tier set: a key leaves the tier below that had it, None takes a later tier out | `ItemOrderKey[]`, `number`, `string` | `ItemOrderKey[]` |
+| `WithItemOrderChoice(order, tier, choice)` | A new order with a tier set: a key is removed from the tier below that contained it, and None removes a later tier | `ItemOrderKey[]`, `number`, `string` | `ItemOrderKey[]` |
 | `SortSectionsByPriority(kind, a, b)` | Priority-based section sort | `BagKind`, `Section`, `Section` | `boolean, boolean` |
 
 **Sort Algorithms:**
@@ -458,7 +458,7 @@ IntervalTree:ExactMatch(value: number): IntervalTreeNode?
 ### Error Handling
 - Query parser returns nil on invalid syntax
 - Movement flow defaults to UNDEFINED
-- Sort functions handle invalid data gracefully
+- Sort functions guard against invalid data
 - Window groups require fadeIn/fadeOut animations
 
 ### Memory Management

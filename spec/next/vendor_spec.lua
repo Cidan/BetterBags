@@ -568,7 +568,7 @@ describe("NextVendor", function()
         -- the plain drop down menu").
         assert.are.same({ "Filter", "Sell Junk", "Repair All", "Small Bags", "Open Options Screen" }, names)
         assert.is_true(list[4].disabled, "nothing to repair")
-        assert.is_truthy(list[4].tooltipText:find("Nothing needs repair", 1, true))
+        assert.is_truthy(list[4].tooltipText:find("Nothing requires repair", 1, true))
         v:ApplyStyle(ctx())
       end)
 
@@ -1012,7 +1012,7 @@ describe("NextVendor", function()
       assert.are.equal("Repair all: 1,234g", v.freeText:GetText())
       data.repair = { equipped = {}, bags = {} }
       eventsRegistered["UPDATE_INVENTORY_DURABILITY"](ctx())
-      assert.are.equal("Nothing needs repair", v.emptyText:GetText())
+      assert.are.equal("Nothing requires repair", v.emptyText:GetText())
       assert.is_true(v.emptyText:IsShown())
     end)
 
@@ -1283,7 +1283,7 @@ describe("NextVendor", function()
         calls.sales[1].left = 9
         calls.sales[1].opts.onProgress(calls.sales[1])
         assert.are.equal(1, calls.refreshed)
-        assert.are.same({ "Selling 3 of 12...", "One item at a time, as the merchant takes them.", "Right-click to stop" },
+        assert.are.same({ "Selling 3 of 12...", "One item at a time, as the merchant accepts them.", "Right-click to stop" },
           { o.text() })
         assert.is_nil(o.color())
       end)

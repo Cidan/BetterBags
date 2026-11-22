@@ -553,7 +553,7 @@ function listProto:AskRemove(ctx, name)
   local _ = ctx
   nextDialog:Show(self.owner, {
     title = L:G("Remove Category"),
-    text = format(L:G("Remove '%s' from the list? What it left in every bag (its pins and tabs) goes."), name),
+    text = format(L:G("Remove '%s' from the list? Its pins and tabs are removed from every bag."), name),
     buttons = {
       { text = L:G("Cancel"), onClick = function() end },
       { text = L:G("Remove"), style = "Danger", onClick = function(dctx)

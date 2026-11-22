@@ -242,7 +242,7 @@ local categoryName = L:G("My Category")
 -- Don't worry about performance after first scan
 ```
 
-### 4. Handle Nil Gracefully
+### 4. Check for Nil Values
 ```lua
 categories:RegisterCategoryFunction("safe", function(data)
   -- Check for nil values

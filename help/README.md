@@ -13,7 +13,7 @@ The `help/` package contains BetterBags' in-game help data and Lua 5.1 search en
 - `search.STOP`: English stop words excluded from indexing and from finished-word queries.
 - `StripCodes(text)`: removes Blizzard color (`|c...`, `|cn...:`, `|r`), texture (`|T...|t`), and atlas (`|A...|a`) escape sequences, unwraps hyperlinks (`|H...|h...|h`) to their display text, turns `|n` into a space, and unescapes `||` to `|`.
 - `Normalize(text)`: runs `StripCodes`, lowercases ASCII, Latin-1, and Cyrillic characters, and folds Latin-1 accents to ASCII.
-- `Stem(word)`: changes only words made entirely of 3 or more lowercase `a-z` letters, applying Porter's first step and dropping a trailing `e`; shorter words and words with non-`a-z` characters return unchanged. A local `STEMS` table (`{ setting = "setting", settings = "setting" }`, not a module field) gives `setting` and `settings` the stem `setting` so they match each other without colliding with `set` (an equipment set).
+- `Stem(word)`: changes only words made entirely of 3 or more lowercase `a-z` letters, applying Porter's first step and dropping a trailing `e`; shorter words and words with non-`a-z` characters return unchanged. A local `STEMS` table (`{ setting = "setting", settings = "setting" }`, not a module field) assigns `setting` and `settings` the stem `setting` so they match each other without colliding with `set` (an equipment set).
 - `Terms(text)`: runs `StripCodes`, scans words, drops stop words in `search.STOP`, stems non-wide words, and converts Korean, Chinese, and Japanese runs into overlapping two-character pairs (or a single character when length is 1).
 - `Build(docs)`: builds a `HelpIndex` from `HelpSearchDoc` entries (`{ id, fields = { title, keywords, questions, headings, body } }`), where every field is an array of strings. Document order is preserved for tie-breaking.
 - `index:Query(text, opts)`: ranks documents matching `text` by BM25F (`K1 = 1.2`) multiplied by the coverage factor `0.3 + 0.7 * matched_items / total_items`, truncates to `opts.limit`, and returns `(results, matched)`. Each entry in `results` is `{ id, score }`, and `matched` maps matched stems to `true`.
@@ -45,7 +45,7 @@ Eleven files define the 11 groups and 80 articles in TOC load order: `start.lua`
 - Home, search results, and cards (`next/settings/help.lua`, `next/settings/article.lua`): the home view displays at most 6 featured cards (the first 6 shown featured articles in tree order). `article.summary` displays under the title in the page header, on the home page's featured cards, and on the `Previous` and `Next` cards at the bottom of an article; search result cards display the cropped 140-character snippet from `HelpArticles:Search`.
 - Dynamic visibility and refresh (`next/settings/article.lua`, `next/settings/pages.lua`, `next/settings/help.lua`): `NextHelpView:Refresh` re-reads the displayed article whenever the `Help` page comes back into view, preserving scroll position. `NextHelpArticle:Show` evaluates every dynamic element for the active design, client, and page state:
   - A `see` block renders only while `HelpArticles:IsShown` returns `true` for the target article.
-  - An `open` block renders only while `NextSettingsPages:IsShown` returns `true` for the target page and, when `tab` is specified, while that tab appears in `NextSettingsPages:ShownTabs(page)` (calling `page.choose()` first when defined, such as on the `Categories` page), because the settings window falls back to its first shown page or tab when asked to open an unshown one.
+  - An `open` block renders only while `NextSettingsPages:IsShown` returns `true` for the target page and, when `tab` is specified, while that tab appears in `NextSettingsPages:ShownTabs(page)` (calling `page.choose()` first when defined, such as on the `Categories` page), because the settings window falls back to its first shown page or tab when requested to open an unshown one.
   - A `setting` block renders only while `NextSettingsPages:ShowsSetting(id, bag)` returns `true` (a shown page and shown tab bound to that `bag.kind` containing a matching, non-hidden section and row for the active design and bag).
   - `Related Articles` lists only shown related articles not already linked by a `see` block in `body`.
 
@@ -58,7 +58,7 @@ Eleven files define the 11 groups and 80 articles in TOC load order: `start.lua`
 
 ### `HelpBlock` Kinds
 
-Each entry in `body` holds one block kind:
+Each entry in `body` contains one block kind:
 
 - `heading`: 1 to 3 words, unique within the article. A standard heading begins with an uppercase letter, does not start with any clause word rejected by `spec/help/content_spec.lua`, and omits trailing punctuation. A heading with `keyword = true` specifies a search keyword written as typed in a query (a field, an alias, an operator, `AND`, `OR`, `NOT`, parentheses, a function, or a player value such as `player.level`) as a raw string never wrapped in `L:G`: `next/settings/article.lua` displays that heading as typed instead of in uppercase, `spec/help/content_spec.lua` skips the uppercase first letter, clause word, and trailing punctuation checks while still enforcing the 1-to-3-word and uniqueness rules, and `spec/integration/help_coverage_spec.lua` verifies that a query reads each word of that heading.
 - `text`: paragraph string.
@@ -85,7 +85,7 @@ Every localizable string must use `L:G("...")` on a single line in double quotes
 
 ## Search Quality
 
-`spec/help/queries.tsv` holds three rounds of 400 queries (5 per article), authored by the `writer` agent from each article's title, summary, and headings in an earlier version of the text as players would type them. `spec/help/quality_spec.lua` runs each query against `HelpArticles:Search(query, 3)` under a design and client configuration (`retail`, `Classic Era`, `Mists of Pandaria Classic`, `WoW: Forever`) where the target article is shown, and enforces minimum top-1 and top-3 hit rates:
+`spec/help/queries.tsv` contains three rounds of 400 queries (5 per article), authored by the `writer` agent from each article's title, summary, and headings in an earlier version of the text as players would type them. `spec/help/quality_spec.lua` runs each query against `HelpArticles:Search(query, 3)` under a design and client configuration (`retail`, `Classic Era`, `Mists of Pandaria Classic`, `WoW: Forever`) where the target article is shown, and enforces minimum top-1 and top-3 hit rates:
 
 - Round 1: floors `0.71` first / `0.90` top 3 (measured `72.2%` / `90.8%`).
 - Round 2: floors `0.71` first / `0.90` top 3 (measured `72.2%` / `90.8%`).

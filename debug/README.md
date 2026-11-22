@@ -68,7 +68,7 @@ saved sessions offline with `tools/flamegraph`.
 - `perf/sessions.lua` (`PerfSessions`): storage, settings, start/stop, capture next reload.
 
 No timing calls are needed in ordinary code. For a `local function` the wrappers cannot
-reach, or a span inside a method:
+wrap, or a span inside a method:
 
 ```lua
 local perf = addon:GetModule('Perf')
@@ -155,13 +155,13 @@ dumped backpack item as `apiProbe`), so one dump from the game settles what an A
 
 - `ItemProbe:Probe(bagid, slotid)`, `ItemProbe:ProbeEquipped(slot)`, `ItemProbe:ProbeEquipment()`: every value each
   item API returned (`n` is how many), an error recorded instead of raised, a value the addon may not access recorded
-  as `<secret type>`, an API the client lacks left out. Among them whether each bank takes the item
+  as `<secret type>`, an API the client lacks left out. Among them whether each bank accepts the item
   (`bankAllowed`: `C_Bank.IsItemAllowedInBankType` for every `Enum.BankType`, by name). A dump at the guild bank
-  shows what the check answers there, which guild bank dimming waits on (`.claude/rules/guild-bank.md` §3a).
+  shows what the check returns there, which guild bank dimming depends on (`.claude/rules/guild-bank.md` §3a).
 - `ItemProbe:Player()`, `ItemProbe:BagNames()`, `ItemProbe:Sample()`, `ItemProbe:Client()`: the player's values, every
-  container's name and size, what follows the character for the backpack's items, and the client the dump came from.
+  container's name and size, what depends on the character for the backpack's items, and the client the dump came from.
 - `ItemProbe:EquipmentSets()`: every equipment set the client lists for the character, by ID, with every value each
-  `C_EquipmentSet` API answered, its locations unpacked, and BetterBags' bag/slot map. Each dump also keeps it, with
+  `C_EquipmentSet` API returned, its locations unpacked, and BetterBags' bag/slot map. Each dump also stores it, with
   who took it, where and when, in an account-wide list (`DB:AddDebugEquipmentSets`), so several dumps compare in one
   saved variables file.
 
@@ -322,5 +322,5 @@ Data types are color-coded in debug output:
 - The profiler times with `debugprofilestop()` and never calls `debugprofilestart()`, which resets a timer every addon shares
 - Tooltip alternates colors every other line for readability
 - Frame walking prevents infinite recursion with visited tracking
-- Table inspection handles metatables safely
+- Table inspection processes metatables safely
 - Analytics data is sent to Wago.io for aggregation

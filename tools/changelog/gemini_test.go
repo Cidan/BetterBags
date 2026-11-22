@@ -376,6 +376,19 @@ func TestTheNotesAskForTheClientsQuote(t *testing.T) {
 	}
 }
 
+// The notes are asked for in a technical register, the addon and its parts never written of as people (CLAUDE.md,
+// "Writing Register: Technical, Never Personified").
+func TestTheNotesAreAskedForInATechnicalRegister(t *testing.T) {
+	for _, rule := range []string{"literal, precise technical register", "Never write that BetterBags", "holds", "The player is the only one"} {
+		if !strings.Contains(systemInstruction, rule) {
+			t.Errorf("system instruction lacks %q", rule)
+		}
+	}
+	if strings.Contains(systemInstruction, "in plain language") {
+		t.Error("the notes are asked for in plain language")
+	}
+}
+
 // Each word the commits use for a client names it, alone and as a whole word.
 func TestEachClientWordNamesItsClient(t *testing.T) {
 	words := map[string]string{

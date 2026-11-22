@@ -4,7 +4,7 @@ The Data module is the core data management layer of BetterBags, responsible for
 
 ## Overview
 
-The Data module handles:
+The Data module provides:
 - Item data loading and caching
 - Category management (both custom and search-based)
 - Full-text search with query parsing
@@ -15,14 +15,14 @@ The Data module handles:
 - Item stacking logic
 - Slot management
 - The guild bank as a source (`guildbank.lua`, `GuildBank`): its visits, tabs and slots, and its item and money logs
-  and tabs' info text, each asked of the server one at a time, as Blizzard's guild bank frame asks
+  and tabs' info text, each requested from the server one at a time, as Blizzard's guild bank frame requests
   (`LoadLogs`, `LoadTexts`, `ItemLog`, `MoneyLog`, `Text`, `SaveText`; `.claude/rules/guild-bank.md` §2)
 
 ## Core Components
 
 ### Items (`items.lua`)
 
-The main item management module that handles all item data operations including async loading with ContinuableContainer.
+The main item management module that performs all item data operations including async loading with ContinuableContainer.
 
 #### Key Features
 - **Unified Item Loading**: Uses ContinuableContainer for efficient async item data loading
@@ -31,11 +31,11 @@ The main item management module that handles all item data operations including 
 - **Keystone Level**: Every slot's item info carries a keystone's level (`itemInfo.keystoneLevel`, `ItemInfoOf`), read from its link by `items:KeystoneLevel(link)` (`keystone:itemID:challengeModeID:level:...`), nil for any other item; the button draws it (`.claude/rules/keystone-level.md`)
 - **Bag Type Detection**: Identifies different bag types (normal, profession, reagent, keyring). The keyring (Classic Era, TBC Anniversary, and WoW: Forever) is read with the backpack, only the slots the game opens (`GetKeyRingSize()`; the rest are padlocked), its slots are not free space, and Show Bags names it "Keyring", numbered after the last bag (`GetBagName`) and listed after every bag (`.claude/rules/keyring.md`). Each empty slot of a specialized bag carries its bag type's glyph (`itemInfo.emptySlotFamilyIcon`, `GetEmptySlotFamilyIcon` by bag family; the retail reagent bag and the keyring by bag ID; `.claude/rules/item-drawing.md` §11)
 - **Item Hashing**: Generates unique hashes for item stacking
-- **Category Assignment**: Determines item categories based on filters. Items no custom or search category claims get their built-in category (`BuiltInCategory`), Blizzard's (`BlizzardCategory`): Junk, their equipment location, or the enabled filters joined with " - ": item type, subtype, trade skill, expansion. A subtype equal to the type before it is skipped, so quest items read "Quest", not "Quest - Quest" (settings saved under old names are moved by `DB:RenameRepeatedTypeCategories`, `.claude/rules/category-lifecycle.md` §5). An item that a category of the player's with that Blizzard name ignores, in a bag that uses the category, goes to "Everything" instead (`.claude/rules/category-lifecycle.md` §11)
+- **Category Assignment**: Determines item categories based on filters. Items not matched by any custom or search category receive their built-in category (`BuiltInCategory`), Blizzard's (`BlizzardCategory`): Junk, their equipment location, or the enabled filters joined with " - ": item type, subtype, trade skill, expansion. A subtype equal to the type before it is skipped, so quest items read "Quest", not "Quest - Quest" (settings saved under old names are moved by `DB:RenameRepeatedTypeCategories`, `.claude/rules/category-lifecycle.md` §5). An item that a category of the player's with that Blizzard name ignores, in a bag that uses the category, goes to "Everything" instead (`.claude/rules/category-lifecycle.md` §11)
 - **New Item Tracking**: Manages "new item" status with timers
 - **Junk Mark**: Every sweep marks each item with whether Blizzard's junk coin shows on it (`junkMarked`: poor, sells for something, `MerchantFrame:IsShown()`), so opening or closing a vendor redraws only the junk (`.claude/rules/item-drawing.md` §7b)
-- **Grey-Out**: Every sweep works out whether each backpack item fits the open window (`itemContextMatchResult`, `ResolveItemContextMatchResult`): Blizzard's item context, and BetterBags' own rules for what the Warbank refuses and what cannot be posted at the Auction House (nothing dims for the guild bank, `.claude/rules/guild-bank.md` §3a); kept until the open window changes (`contextSignature`, `.claude/rules/item-drawing.md` §8)
-- **Equipment Data**: Handles equipped item information
+- **Grey-Out**: Every sweep evaluates whether each backpack item fits the open window (`itemContextMatchResult`, `ResolveItemContextMatchResult`): Blizzard's item context, and BetterBags' own rules for what the Warbank rejects and what cannot be posted at the Auction House (nothing dims for the guild bank, `.claude/rules/guild-bank.md` §3a); retained until the open window changes (`contextSignature`, `.claude/rules/item-drawing.md` §8)
+- **Equipment Data**: Reads and caches equipped item information
 
 #### Key Functions
 ```lua
@@ -85,8 +85,8 @@ Manages both custom user-defined categories and dynamic search categories.
 - **Custom Categories**: User-defined item groups
 - **Search Categories**: Dynamic categories based on search queries
 - **Priority System**: Categories can have priorities for ordering
-- **Per-Bag Enable/Disable**: Categories can be toggled per bag type. Whether a bag uses a category decides everything it does there: its color, Hide In, automation, Ignored Items and own item order are looked up through `CategoryIn(name, kind)`, which finds nothing in a bag that does not use it
-- **Blizzard Categories Made Yours**: `Convert(ctx, name)` makes a Blizzard category (one BetterBags names from item data) a category of the player's with the same name, marked `blizzard`, so Blizzard's items keep landing in it; it never groups, and renaming it makes an ordinary category (`.claude/rules/category-lifecycle.md` §11)
+- **Per-Bag Enable/Disable**: Categories can be toggled per bag type. Whether a bag uses a category determines everything it does there: its color, Hide In, automation, Ignored Items and own item order are looked up through `CategoryIn(name, kind)`, which returns nothing in a bag that does not use it
+- **Blizzard Categories Made Yours**: `Convert(ctx, name)` makes a Blizzard category (one BetterBags names from item data) a category of the player's with the same name, marked `blizzard`, so Blizzard's items continue to be sorted into it; it never groups, and renaming it makes an ordinary category (`.claude/rules/category-lifecycle.md` §11)
 - **Ephemeral Categories**: Temporary runtime categories
 - **Category Functions**: Plugin system for dynamic categorization
 
@@ -233,7 +233,7 @@ tooltipScanner:GetCacheSize()
 ```
 
 #### Implementation Details
-- **Retail Extraction**: Uses `C_TooltipInfo.GetBagItem()` to get structured TooltipData with lines array
+- **Retail Extraction**: Uses `C_TooltipInfo.GetBagItem()` to retrieve structured TooltipData with lines array
 - **Classic Extraction**: Creates hidden GameTooltip, populates with `SetBagItem()`, reads FontStrings
 - **Text Concatenation**: All tooltip lines (left and right text) joined with spaces
 - **Classic Line Limit**: Capped at 30 lines to avoid WoW's 9+ line FontString naming bug
@@ -258,7 +258,7 @@ Coordinates bag updates and refresh operations.
 #### Features
 - **Event Batching**: Groups multiple update events
 - **Combat Safety**: Defers certain operations during combat
-- **Sort Integration**: Handles item restacking/sorting
+- **Sort Integration**: Executes item restacking/sorting
 - **Update Queue**: Manages pending updates
 - **Draw Coordination**: Triggers UI redraws after data updates
 
@@ -279,10 +279,10 @@ Tracks which items belong to equipment sets, and makes each set's category.
 - **Cross-Version Support**: Works on Retail and Classic
 - **Gear Set Categories**: `Update(ctx)` lists every set (`GetSets()`: `{ id, name }`) and hands them to
   `Categories:SyncGearSets`, which makes a `Gear: <set>` category for each from what the profile saved for the set's ID
-  (`DB:GetGearSet`). A set's category takes its items in the order of the Categories list and follows the set when it
-  is renamed. A set another category (yours or a plugin's) is named after gets none, and its items go to that category
+  (`DB:GetGearSet`). A set's category receives its items in the order of the Categories list and updates when the set
+  is renamed. A set another category (yours or a plugin's) is named after receives none, and its items go to that category
   instead. After `EQUIPMENT_SETS_CHANGED` (`SetsChanged`), a set the last read listed and this one does not was
-  deleted: `Categories:ForgetGearSets` forgets what was saved for it first (`.claude/rules/category-lifecycle.md` §12)
+  deleted: `Categories:ForgetGearSets` deletes what was saved for it first (`.claude/rules/category-lifecycle.md` §12)
 
 ### Binding (`binding.lua`)
 
@@ -301,7 +301,7 @@ Determines item binding status and scope.
 
 ### Loader (`loader.lua`)
 
-Handles asynchronous item data loading.
+Performs asynchronous item data loading.
 
 #### Features
 - **Batch Processing**: Loads items in batches for performance
@@ -325,41 +325,41 @@ Manages item stacking logic.
 
 #### Features
 - **Stack Tracking**: Groups stackable items
-- **Root Item Selection**: Chooses primary stack item
+- **Root Item Selection**: Selects primary stack item
 - **Dynamic Updates**: Adjusts as items are added/removed
 - **Count Management**: Tracks total stack counts
 
 ### Automation (`automation.lua`)
 
-What a category does with the backpack's items on its own, set in its Automation tab
-(`.claude/rules/automation.md`). Every list reads the bags' last read; the client is asked about a slot
+Actions applied automatically to a category's backpack items, set in its Automation tab
+(`.claude/rules/automation.md`). Every list reads the bags' last read; the client is queried about a slot
 only when acting on it (`StillThere`).
 
 #### Features
 - **Auto Sell** (`OnMerchantShow`, `SellList`): sells a category's items when a merchant opens, through
-  the Seller (`seller.lua`), one item at a time; a category that confirms waits in BetterBags Next's
+  the Seller (`seller.lua`), one item at a time; a category that confirms is placed in BetterBags Next's
   vendor dock (`SaleOffer`)
 - **Destroy What Can't Be Sold** (`DestroyQueue`, `DestroyNext`): destroys what no merchant buys, one
   item per click or key press
 - **Auto Deposit** (`OnBankShow`, `DepositList`, `StartDeposit`): when the bank opens, deposits a
   category's items into the character's bank or the Warbank, the frame after, all at once; Shift held
-  keeps them, and what the Warbank refuses stays in the bags
-- **Left alone** (`BlockedReason`): items whose data has not loaded, whose upgrade state is unknown, in
+  prevents depositing them, and what the Warbank rejects stays in the bags
+- **Blocked items** (`BlockedReason`): items whose data has not loaded, whose upgrade state is unknown, in
   an equipment set, or still refundable
 
 ### Food & Drink (`fooddrink.lua`)
 
-What BetterBags Next's Food & Drink bar eats and drinks (`.claude/rules/food-drink.md` §1, §2).
+Which items BetterBags Next's Food & Drink bar selects (`.claude/rules/food-drink.md` §1, §2).
 
-- **What counts**: `FoodDrink:Kind(data)` says "food", "drink", "both" or nothing for an item in the bags, by the spell it
+- **What counts**: `FoodDrink:Kind(data)` returns "food", "drink", "both" or nothing for an item in the bags, by the spell it
   casts when used (`C_Item.GetItemSpell`): its name compared with what the client calls three reference spells in its
   own language (Food 433, Drink 430, Food & Drink 369166, read once with `C_Spell.GetSpellName`), and a mage's conjured
   food by its spell ID (it is named Refreshment, as buff food is). Only consumables count; buff food and alcohol never do.
-- **The pick**: `FoodDrink:Picks()` is `{ food = pick?, drink = pick? }`, each the stack of the item the rule picks
+- **The pick**: `FoodDrink:Picks()` is `{ food = pick?, drink = pick? }`, each the stack of the item the rule selects
   (`nextFoodDrink.pick`: the highest or lowest item level; then the lower item ID; of that item, the smallest stack) with
   the count of every stack of it.
 - **When**: on every committed read of the backpack (`items/RefreshBackpack/Done`) and `fooddrink/OptionsChanged`;
-  `fooddrink/Changed` is sent only when a pick changed. In combat nothing changes, and one read waits for combat to end
+  `fooddrink/Changed` is sent only when a pick changed. In combat nothing changes, and one read is delayed until combat ends
   (`Async:AfterCombat`).
 
 ### Groups (`groups.lua`)
@@ -368,16 +368,16 @@ A bag's tabs of categories (`.claude/rules/groups.md`): creating, renaming and d
 assigning a category to one, and the group shown. The data is saved by `core/database.lua`; which tab
 each category is on is worked out when a bag is recalculated (`items:Phase10_PartitionIntoTabs`).
 
-`HiddenGroups(kind, tabs, shownID)` says which groups' tabs Hide Empty Groups leaves out (groups.md §3): with
+`HiddenGroups(kind, tabs, shownID)` returns which groups' tabs Hide Empty Groups leaves out (groups.md §3): with
 the bag's setting on, every group but its default ones and the one shown with no item in the bag's data by
 tab (`slotInfo.tabs`, each tab's `totalItems`), unless a category was assigned to it since that data was worked
 out (`AssignCategoryToGroup` records the data it was assigned against, so a group a section was just dropped on
-keeps its tab until the bag is recalculated). `SameGroups(a, b)` compares two such sets.
+retains its tab until the bag is recalculated). `SameGroups(a, b)` compares two such sets.
 
 #### Messages
 - `groups/Created (ctx, group)`, `groups/Changed (ctx, groupID, name, oldName, kind)`
 - `groups/Deleted (ctx, groupID, groupName, kind, wasActive)`: sent once the database has deleted the
-  group and, if it was shown, made the default group active; `wasActive` says whether it was the one
+  group and, if it was shown, made the default group active; `wasActive` indicates whether it was the one
   shown, so a bag switches to the default group
 - `groups/CategoryAssigned`, `groups/CategoryRemoved`, `groups/ActiveChanged`
 - `groups/HideEmptyChanged (ctx, kind, value)`: a bag's Hide Empty Groups was set (the settings catalog sends

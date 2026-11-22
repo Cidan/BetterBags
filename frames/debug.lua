@@ -265,7 +265,7 @@ function debugWindow:CreateDumpFrame()
   desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -10)
   desc:SetWidth(760)
   desc:SetJustifyH("LEFT")
-  desc:SetText("Dump your current full backpack item data to saved variables, with what the game answered about each item, your worn gear, your character, every bag's name and your equipment sets; at a bank, the bank's items too. Each dump's equipment sets are also kept beside the earlier dumps', across characters. This data will be serialized into the WTF folder configuration, which can be extracted and used as a test harness.")
+  desc:SetText("Dump your current full backpack item data to saved variables, with what the game returned for each item, your worn gear, your character, every bag's name and your equipment sets; at a bank, the bank's items too. Each dump's equipment sets are also stored beside the earlier dumps', across characters. This data will be serialized into the WTF folder configuration, which can be extracted and used as a test harness.")
 
   -- Status Label
   local status = sonata:CreateText(f, "Field")

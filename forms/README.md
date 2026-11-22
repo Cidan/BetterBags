@@ -387,7 +387,7 @@ Widget appearance can be customized:
 ## Cross-Version Compatibility
 
 ### Retail vs Classic
-The form system handles differences between WoW versions:
+The form system accounts for differences between WoW versions:
 
 #### Dropdowns
 - **Retail**: Uses `WowStyle1DropdownTemplate`

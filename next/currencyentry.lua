@@ -555,7 +555,7 @@ local function altLines(state)
   local alts = currencies:Alts(state.id)
   GameTooltip:AddLine(" ")
   if alts == nil then
-    addLine(L:G("Asking your Warband..."), GRAY)
+    addLine(L:G("Loading Warband data..."), GRAY)
     return
   end
   if #alts == 0 then

@@ -1,6 +1,6 @@
 # Views Module
 
-The Views module provides the core view system for BetterBags, implementing different display layouts for bag contents. It handles item rendering, section management, and view-specific behaviors for both grid-based category views and bag-based views.
+The Views module provides the core view system for BetterBags, implementing different display layouts for bag contents. The Views module coordinates item rendering, section management, and view-specific behaviors for both grid-based category views and bag-based views.
 
 ## Module Structure
 
@@ -109,7 +109,7 @@ Implements the category-based grid view with sections.
 - **Free Space Display**: Shows available bag slots
 - **Smart Sorting**: Sorts sections and items within sections
 - **Dynamic Sections**: Creates/removes sections as needed
-- **Empty Group Hint**: A backpack group (tab 2 and up) with no category shows "Drag a section header to this tab..." instead of sections, once the bag's data was read (never under Loading...). The view measures the hint's room as its size (`EmptyGroupSizeHandler`: 260 across, the bag's narrowest content, and the text's height with a 20 margin), so the canvas gives it that room, centers it and hangs Free Space below it (`.claude/rules/layout-rendering.md` §5).
+- **Empty Group Hint**: A backpack group (tab 2 and up) with no category shows "Drag a section header to this tab..." instead of sections, once the bag's data was read (never under Loading...). The view measures the hint's room as its size (`EmptyGroupSizeHandler`: 260 across, the bag's narrowest content, and the text's height with a 20 margin), so the canvas allocates that room to the hint, centers the hint and places Free Space below the hint (`.claude/rules/layout-rendering.md` §5).
 - **Sort After Wipe**: Tracks a `sortRequired` flag so that a section sort always runs after the view is wiped, even when the wipe and the subsequent rebuild happen under different context objects (e.g. `SwitchToGroup` wipes with one context, but the refresh pipeline creates a fresh context without `wipe=true`).
 
 #### Key Functions
@@ -118,11 +118,11 @@ Implements the category-based grid view with sections.
 - `CreateButton(ctx, view, slotkey)` - Create item button and add to section
 - `UpdateButton(ctx, view, slotkey)` - Update existing item button
 - `ClearButton(ctx, view, slotkey)` - Clear and defer item button
-- `UpdateDeletedSlot(ctx, view, oldSlotKey, newSlotKey)` - Handle slot deletion
+- `UpdateDeletedSlot(ctx, view, oldSlotKey, newSlotKey)` - Process slot deletion
 
 **Stack Reconciliation:**
 - `ReconcileStack(ctx, view, stackInfo)` - Merge items in a stack
-- `ReconcileWithPartial(ctx, view, stackInfo)` - Handle partial stacks
+- `ReconcileWithPartial(ctx, view, stackInfo)` - Reconcile partial stacks
 
 #### Rendering Process
 
@@ -140,7 +140,7 @@ Implements the category-based grid view with sections.
 Respects database stacking settings:
 - `mergeStacks` - Whether to merge stackable items
 - `unmergeAtShop` - Unmerge when at vendor/bank
-- `dontMergePartial` - Keep partial stacks separate
+- `dontMergePartial` - Separate partial stacks
 - `mergeUnstackable` - Whether to merge unique items
 
 ### Bag View (`bagview.lua`)
@@ -168,7 +168,7 @@ Implements the bag-based view showing items organized by their containing bags.
 
 #### Rendering Process
 
-1. **Change Processing**: Handle added/removed/changed items
+1. **Change Processing**: Process added, removed, and changed items
 2. **Empty Slot Creation**: Create buttons for empty slots
 3. **Section Management**: Create sections for each bag
 4. **Count Updates**: Update item counts
@@ -206,7 +206,7 @@ Implements the bag-based view showing items organized by their containing bags.
 ### Events and Context
 - Uses context system for operation tracking
 - Supports wipe and redraw operations
-- Handles deferred updates
+- Processes deferred updates
 - Manages dirty section tracking
 
 ## Usage Examples
@@ -309,7 +309,7 @@ Views respect various database settings:
 1. Inherit from base View prototype
 2. Implement required methods (Render, etc.)
 3. Set WipeHandler for cleanup
-4. Handle context flags properly
+4. Process context flags properly
 
 ### Performance
 1. Use deferred items for batch updates
@@ -321,11 +321,11 @@ Views respect various database settings:
 1. Create sections on demand
 2. Remove empty sections
 3. Track slot-to-section mapping
-4. Handle section visibility properly
+4. Update section visibility properly
 
 ### Item Updates
 1. Check for existing buttons before creating
-2. Handle stack reconciliation properly
+2. Perform stack reconciliation properly
 3. Clear deferred items after processing
 4. Update counts for stacked items
 
@@ -347,7 +347,7 @@ Potential improvements to the view system:
 
 1. **Custom Layouts**: User-defined view layouts
 2. **View Animations**: Smooth transitions between views
-3. **Virtual Scrolling**: Handle very large inventories
+3. **Virtual Scrolling**: Support very large inventories
 4. **View Caching**: Cache rendered views for quick switching
 5. **Dynamic Columns**: Auto-adjust based on window size
 6. **View Presets**: Save and load view configurations

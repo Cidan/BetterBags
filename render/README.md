@@ -18,14 +18,14 @@ however many of its nodes were invalidated. Nothing in a render may yield.
 ### drawable.lua (`Drawable`)
 
 The base of everything the pipeline draws: an instance has a frame and a render plan, and looks its methods up through
-its prototype, every prototype through the drawable defaults (`Extend`), so the profiler's wrappers on a prototype reach
+its prototype, every prototype through the drawable defaults (`Extend`), so the profiler's wrappers on a prototype apply to
 every instance. Frame helpers (`SetParent`, `SetPoint`, `Show`, `Hide`, sizes) forward to the frame.
 
 ### scrollbox.lua (`Scrollbox`)
 
 A drawable that scrolls one child: a `WowScrollBox` with Blizzard's `MinimalScrollBar` or a caller's bar
-(`CreateBar`, BetterBags Next's). It hands the child the width left of the bar's room, sizes the scroll child to the
-height the child took, and reports the viewport it occupies (the child's height capped at `MaxHeight`, or the fixed
+(`CreateBar`, BetterBags Next's). The scroll box passes the child the width remaining beside the bar, sizes the scroll child to the
+height the child used, and reports the viewport it occupies (the child's height capped at `MaxHeight`, or the fixed
 height of a window the player sized). Options: `Symmetric` (the bar's room on both sides), `AutoHideBar`, `Snap` and
 `SnapScroll` (whole screen pixels). Each window owns one for its lifetime.
 
@@ -35,7 +35,7 @@ between the scroll child and the child, so Blizzard's gamepad cursor never scrol
 
 ### flow.lua (`Flow`)
 
-The packing every grid lays out with, as a pure function: boxes go left to right in rows, a row wraps when the next box
+The packing every grid lays out with, as a pure function: boxes are placed left to right in rows, a row wraps when the next box
 would pass the row limit, and rows split into columns by height. It reads sizes and returns positions; it touches no
 frame, so measuring a layout has no side effects.
 

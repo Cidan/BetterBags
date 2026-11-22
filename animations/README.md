@@ -10,7 +10,7 @@ The animations module provides reusable animation functions that can be attached
 
 ### fade.lua
 
-The main animation module: fade animations for regions inside windows (labels, form panes and tabs). Windows themselves fade with the animations their theme gives them (`Animations` in a Sonata window style, built by the Window module; `.claude/rules/window.md`), not with these helpers.
+The main animation module: fade animations for regions inside windows (labels, form panes and tabs). Windows themselves fade with the animations their theme provides (`Animations` in a Sonata window style, built by the Window module; `.claude/rules/window.md`), not with these helpers.
 
 #### Key Functions
 

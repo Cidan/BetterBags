@@ -359,9 +359,9 @@ end
 ---@return string
 function editor:BlizzardHelp()
   return format(L:G("%s is a built-in category that BetterBags creates from Blizzard's item types. Convert it to your "
-    .. "own category to customize it. Its items will still show up in it, and you'll be able to change its color, hide "
-    .. "it, auto-sell or auto-deposit its items, add or ignore items, and give it a search rule. Converted categories "
-    .. "can't be grouped."), self.selected or "")
+    .. "own category to customize it. Its items will still appear in it, and you'll be able to change its color, hide "
+    .. "it, auto-sell or auto-deposit its items, add or ignore items, and set a search rule for it. Converted "
+    .. "categories can't be grouped."), self.selected or "")
 end
 
 -- Convert makes the Blizzard category chosen yours (Categories:Convert), the bags recalculated, and shows it.
@@ -444,7 +444,7 @@ function editor:AutomationOptions()
     {
       kind = "toggle",
       title = L:G("Confirm Auto Sell"),
-      description = L:G("At a vendor, this category's section waits there to be sold with a double click (BetterBags Next's vendor window; without it, sell it by right-clicking its title). Turned off, it is sold as soon as the vendor opens."),
+      description = L:G("At a vendor, this category's section is docked in the vendor window to be sold with a double click (BetterBags Next's vendor window; without that window, sell the category by right-clicking its title). Turned off, the category is sold as soon as the vendor opens."),
       keywords = { "automation", "sell", "confirm", "vendor", "merchant" },
       disabled = function() return not sells() end,
       get = function()
@@ -461,7 +461,7 @@ function editor:AutomationOptions()
     {
       kind = "toggle",
       title = L:G("Destroy What Can't Be Sold"),
-      description = L:G("Destroy this category's items no merchant buys, one per click. Needs Auto Sell."),
+      description = L:G("Destroy this category's items no merchant buys, one per click. Requires Auto Sell."),
       keywords = { "automation", "destroy", "delete", "junk" },
       disabled = function() return not sells() end,
       get = function() return automation() == "destroy" end,
@@ -497,7 +497,7 @@ function editor:DepositOptions()
     {
       kind = "dropdown",
       title = L:G("Deposit Into"),
-      description = L:G("The bank Auto Deposit puts this category's items in: yours, or the Warbank. Items the Warbank does not take stay in your bags."),
+      description = L:G("The bank Auto Deposit puts this category's items in: yours, or the Warbank. Items the Warbank does not accept remain in your bags."),
       keywords = { "automation", "deposit", "bank", "warbank", "account" },
       items = BANK_NAMES,
       disabled = function() return deposit() == nil end,
@@ -537,22 +537,22 @@ function editor:ItemOrderOptions()
     {
       kind = "toggle",
       title = L:G("Own Item Order"),
-      description = L:G("Order this category's items its own way, in every bag it is used in. Turned off, they follow "
-        .. "the Item Order of the bag they are in (its Layout tab)."),
+      description = L:G("Order this category's items its own way, in every bag it is used in. Turned off, its items "
+        .. "use the Item Order of the bag they are in (its Layout tab)."),
       keywords = { "sort", "order", "items", "item order", "own" },
       get = function() return order() ~= nil end,
       set = function(ctx, on) save(ctx, on and { unpack(const.DEFAULT_ITEM_ORDER) } or false) end,
     },
   }
   local tiers = {
-    { title = L:G("Item Order"), description = L:G("What this category's items are ordered by first. Items still "
-      .. "equal go by name, then the bigger pile."),
+    { title = L:G("Item Order"), description = L:G("What this category's items are ordered by first. Items still equal "
+      .. "are ordered by name, then by the bigger pile."),
       keywords = { "sort", "order", "items", "quality", "item level", "slot", "type", "count", "name", "sell price" } },
-    { title = L:G("Then By"), description = L:G("What its items the Item Order holds equal are ordered by; None for "
-      .. "nothing more. Items still equal go by name, then the bigger pile."),
+    { title = L:G("Then By"), description = L:G("What its items that are equal under Item Order are ordered by; None "
+      .. "for nothing more. Items still equal are ordered by name, then by the bigger pile."),
       keywords = { "sort", "order", "items", "then", "tie", "second" } },
     { title = L:G("And Then By"), description = L:G("What its items still equal after Then By are ordered by; None for "
-      .. "nothing more. Items still equal go by name, then the bigger pile."),
+      .. "nothing more. Items still equal are ordered by name, then by the bigger pile."),
       keywords = { "sort", "order", "items", "then", "tie", "third" } },
   }
   for tier, def in ipairs(tiers) do
@@ -584,7 +584,7 @@ function editor:RecentOptions()
     {
       kind = "toggle",
       title = L:G("Skip Recent Items"),
-      description = L:G("Items that land in this category skip Recent Items: they are no longer marked new, and show here at once."),
+      description = L:G("Items assigned to this category skip Recent Items: they are no longer marked new, and show here at once."),
       keywords = { "automation", "recent", "new", "skip" },
       get = function()
         local filter = self:Chosen()
@@ -754,7 +754,7 @@ function editor:AskImport(owner, shared, done)
       nextDialog:Show(owner, {
         title = title,
         text = format(L:G("Replace the category '%s' with the one imported? Its rule, items, bags and color become the "
-          .. "imported ones; its place in the list, what it does on its own and each bag's pins and tabs stay."), name)
+          .. "imported ones; its place in the list, its automation settings and each bag's pins and tabs remain."), name)
           .. moving(name) .. ungrouped(name, existing),
         buttons = {
           { text = L:G("Cancel"), onClick = function() end },
@@ -1274,8 +1274,8 @@ function actionsProto:ShowExport()
   end
   nextDialog:Show(self.owner, {
     title = L:G("Export Category"),
-    text = format(L:G("Copy the category '%s' with Ctrl+C to share it. What it does on its own (Auto Sell, Auto "
-      .. "Deposit) stays here: whoever imports it chooses their own."), name),
+    text = format(L:G("Copy the category '%s' with Ctrl+C to share it. Its automation settings (Auto Sell, Auto "
+      .. "Deposit) are not included: whoever imports it chooses their own."), name),
     input = { text = database:ExportCategory(name), help = L:G("Category string") },
     buttons = { { text = L:G("Close"), onClick = function() end } },
   })
@@ -1291,7 +1291,7 @@ function actionsProto:AskRename()
   local filter = editor:Chosen()
   local text = format(L:G("Rename the category '%s' to:"), current)
   if filter and filter.blizzard then
-    text = format(L:G("Renaming '%s' turns it into a separate category. Blizzard's items will go back to the built-in "
+    text = format(L:G("Renaming '%s' turns it into a separate category. Blizzard's items will return to the built-in "
       .. "'%s' category, and only your changes move to the new name. Rename it to:"), current, current)
   end
   local function rename(ctx, name)
@@ -1645,7 +1645,7 @@ function settingsTabProto:askHide(bag)
   local name = editor.selected
   nextDialog:Show(self.owner, {
     title = format(L:G("Hide %s?"), name),
-    text = format(L:G("Its items will not show in your %s. They stay in your bags, and the bag's footer says how "
+    text = format(L:G("Its items will not show in your %s. They remain in your bags, and the bag's footer displays how "
       .. "many are hidden. Turn this off to see them again."), L:G(bag.name)),
     buttons = {
       { text = L:G("Cancel"), onClick = function() self.hideToggles[bag.kind]:SetChecked(false) end },
@@ -1885,7 +1885,7 @@ function ruleTabProto:Refresh(ctx)
   end
   self.rule:SetEnabled(not plugins)
   self.apply.frame:SetShown(not plugins)
-  self.help:SetText(plugins and L:G("The plugin that made this category gives its search rule.")
+  self.help:SetText(plugins and L:G("The plugin that made this category provides its search rule.")
     or L:G("A search, as in your bags' search box: the items it matches belong here."))
   self:Check()
 end

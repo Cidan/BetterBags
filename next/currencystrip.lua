@@ -135,7 +135,7 @@ function currencyStrip:Create(panel)
     s.hintText:SetAlpha(1)
     GameTooltip:SetOwner(s.hint, "ANCHOR_TOP")
     GameTooltip:SetText(L:G("Track Currencies"), 1, 1, 1, 1, true)
-    GameTooltip:AddLine(L:G("Pick currencies to keep an eye on here, or drop an item on this spot to track it."),
+    GameTooltip:AddLine(L:G("Pick currencies to track here, or drop an item on this spot to track it."),
       nil, nil, nil, true)
     GameTooltip:Show()
   end)

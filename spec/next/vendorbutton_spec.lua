@@ -531,7 +531,7 @@ describe("NextVendorButton", function()
       enter(b)
       local text = {}
       for _, line in ipairs(GameTooltip.lines) do table.insert(text, line.text) end
-      assert.are.same({ " ", "Price: 15s", "Your shopping list needs 7", "Right-click to buy",
+      assert.are.same({ " ", "Price: 15s", "Your shopping list requires 7", "Right-click to buy",
         "Shift-click to buy a quantity" }, text)
       b:SetBuy(item({ price = 1500 }))
       enter(b)

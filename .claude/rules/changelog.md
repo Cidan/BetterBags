@@ -17,6 +17,12 @@ generated in CI for every alpha (push to `main`) and every tagged release, kept 
 branch, and packaged into the addon. Nothing is committed back to `main`, so tagging never needs a
 source change afterwards.
 
+**Register** (asked, 2026-11-22: "all text should be highly technical"; CLAUDE.md, "Writing Register: Technical, Never
+Personified"): the system instruction (`tools/changelog/gemini.go`) asks for a literal, precise technical register in
+place of "plain language", with a Style section: nothing in the addon holds, keeps, knows, waits, asks or decides
+anything, no colloquialisms, the player the only one with intentions. `TestTheNotesAreAskedForInATechnicalRegister`
+checks the prompt says so. Notes already published (`data/changelogdata.lua`, written by CI) are not rewritten.
+
 ## 1. In game
 
 **Data** (`data/changelogdata.lua`, module `ChangelogData`): `releases`, a list of

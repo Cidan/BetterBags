@@ -281,8 +281,8 @@ define('bankAutoDepositReagents', {
   bag = true,
   only = { const.BAG_KIND.BANK },
   title = 'Include Tradeable Reagents',
-  description = 'If enabled, Deposit All Warbound Items also puts your tradeable reagents into the Warbank. '
-    .. "This is the game's own setting, kept for each character.",
+  description = "If enabled, Deposit All Warbound Items also deposits your tradeable reagents into the Warbank. This "
+    .. "is the game's own setting, saved for each character.",
   keywords = { 'warbank', 'warband', 'deposit', 'reagents', 'tradeable', 'account bank' },
   get = function() return GetCVarBool("bankAutoDepositReagents") end,
   set = function(_, value) SetCVar("bankAutoDepositReagents", value) end,
@@ -310,7 +310,7 @@ define('animateItemMovement', {
 define('clampBagsToScreen', {
   kind = "toggle",
   title = 'Clamp Bags to Screen',
-  description = 'If enabled, bags are kept on the screen: they cannot be moved or grow past its edges. '
+  description = 'If enabled, bags remain on the screen: they cannot be moved or grow past its edges. '
     .. 'In BetterBags Next this applies to small bags; full-size bags rest at the edges of the screen.',
   keywords = { 'clamp', 'screen', 'edge', 'off screen', 'move', 'position' },
   get = function() return db:GetClampBagsToScreen() end,
@@ -341,9 +341,9 @@ define('nextVendor', {
   bag = true,
   only = { VENDOR },
   title = 'Enable Vendor Window',
-  description = 'If enabled, BetterBags Next shows vendors in its own window, their items in your categories. '
-    .. 'If disabled, the default Blizzard vendor window is used, and a category whose Auto Sell confirms is sold by '
-    .. 'right-clicking its title, as with the classic bags. Switches at once, away from vendors.',
+  description = 'If enabled, BetterBags Next displays vendors in its own window, with their items in your categories. '
+    .. 'If disabled, the default Blizzard vendor window is used, and a category with Confirm Auto Sell enabled is sold '
+    .. 'by right-clicking its title, as with the classic bags. Switches at once, away from vendors.',
   keywords = { 'vendor', 'merchant', 'shop', 'blizzard vendor' },
   get = function() return db:GetNextVendorEnabled() end,
   set = function(ctx, value)
@@ -539,8 +539,8 @@ end
 
 itemOrderTier('itemOrder', 1, {
   title = 'Item Order',
-  description = 'What items within each section are ordered by first; Then By and And Then By break its ties. '
-    .. 'Equipment Slot follows the character sheet, Item Type the item\'s type, then its subtype.' .. upgradeTrackText
+  description = "What items within each section are ordered by first; Then By and And Then By break its ties. "
+    .. "Equipment Slot orders by the character sheet, Item Type by the item's type, then its subtype." .. upgradeTrackText
     .. ' Sell Price puts what a vendor pays most for first: the whole stack, or one of it. A category can have its own '
     .. '(Categories, its Item Order tab).' .. itemOrderRest,
   keywords = itemOrderKeywords,
@@ -548,7 +548,7 @@ itemOrderTier('itemOrder', 1, {
 
 itemOrderTier('itemOrderThen', 2, {
   title = 'Then By',
-  description = 'What items Item Order holds equal are ordered by; None for nothing more.' .. itemOrderRest,
+  description = 'What items equal under Item Order are ordered by; None for nothing more.' .. itemOrderRest,
   keywords = { 'sort', 'items', 'order', 'then', 'tie', 'second' },
 })
 
@@ -638,7 +638,7 @@ define('newItemFlash', {
   kind = "toggle",
   bag = true,
   title = 'Flash Stacks',
-  description = 'When a stack of items gets a new item, the stack will flash.',
+  description = 'When a stack of items receives a new item, the stack will flash.',
   keywords = { 'new items', 'flash', 'glow' },
   get = function(_, bag) return db:GetShowNewItemFlash(bag.kind) end,
   set = function(_, value, bag) db:SetShowNewItemFlash(bag.kind, value) end,
@@ -1252,7 +1252,7 @@ currencyOption('nextCurrencyHideEmpty', {
   option = 'hideEmpty',
   kind = "toggle",
   title = 'Hide What You Have None Of',
-  description = 'Currencies and items you have none of wait behind +N in your backpack, and are left out of the '
+  description = 'Currencies and items you have none of are hidden behind +N in your backpack, and are left out of the '
     .. 'tracker. Off, they show faded.',
   keywords = { 'currency', 'currencies', 'empty', 'none', 'zero', 'hide' },
 })
@@ -1287,7 +1287,7 @@ local currencyGrowth = { ["Left"] = { "growX", "left" }, ["Right"] = { "growX", 
 currencyOption('nextCurrencyGrow', {
   kind = "dropdown",
   title = 'Tracker Grows',
-  description = 'Which way the tracker grows as what it tracks gets longer: left from its right edge or right from its '
+  description = 'Which way the tracker grows as what it tracks becomes longer: left from its right edge or right from its '
     .. 'left edge in a row; down from its top or up from its bottom in a column or a list.',
   keywords = { 'currency', 'tracker', 'grow', 'direction', 'anchor', 'left', 'right', 'up', 'down' },
   itemsFunction = function()
@@ -1339,7 +1339,7 @@ currencyOption('nextCurrencyHideInCombat', {
 currencyOption('nextCurrencyTracker', {
   kind = "toggle",
   title = 'Show Tracker',
-  description = 'The tracker you drag out of the bottom of your backpack, kept on screen with your bags closed. On, '
+  description = 'The tracker you drag out of the bottom of your backpack, which remains on screen with your bags closed. On, '
     .. 'it shows where you left it; dropping it back on your backpack puts it away.',
   keywords = { 'currency', 'tracker', 'show', 'detach', 'float' },
   get = function()
@@ -1370,8 +1370,9 @@ end
 foodDrinkOption('nextFoodDrinkBar', {
   kind = "toggle",
   title = 'Show Food & Drink Bar',
-  description = 'Two buttons that stay on screen, your bags open or closed: the food and the drink in your bags. Right-click '
-    .. 'one to eat or drink it. On, it comes out of your backpack; dropping it back on your backpack puts it away.',
+  description = 'Two buttons that stay on screen, your bags open or closed: the food and the drink in your bags. '
+    .. 'Right-click one to eat or drink it. On, the bar moves out of your backpack; dropping it back on your backpack '
+    .. 'puts it away.',
   keywords = { 'food', 'drink', 'eat', 'water', 'bar', 'button', 'show', 'detach', 'float' },
   get = function()
     local out = db:GetNextFoodDrinkBar()
@@ -1410,7 +1411,7 @@ foodDrinkOption('nextFoodDrinkLayout', {
 foodDrinkOption('nextFoodDrinkGrow', {
   kind = "dropdown",
   title = 'Bar Grows',
-  description = 'Which way the Food & Drink bar grows as a button comes or goes: left from its right edge or right from '
+  description = 'Which way the Food & Drink bar grows as a button appears or disappears: left from its right edge or right from '
     .. 'its left edge in a row; down from its top or up from its bottom in a column.',
   keywords = { 'food', 'drink', 'bar', 'grow', 'direction', 'anchor', 'left', 'right', 'up', 'down' },
   itemsFunction = function()

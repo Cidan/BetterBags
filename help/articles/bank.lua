@@ -72,7 +72,7 @@ articles:Define({
   body = {
     { text = L:G("When Enable Bank Bags is on, BetterBags replaces Blizzard's bank frame with its own Bank window in both the classic bags and BetterBags Next, displaying your bank items organized into categories.") },
     { heading = L:G("Bank Settings") },
-    { text = L:G("The Bank page in the settings window configures your bank separately from your backpack across its Layout, Items, Categories, Order, and BetterBags Next Size tabs. Its General tab holds Enable Bank Bags and, on retail, Include Tradeable Reagents for Warbank deposits.") },
+    { text = L:G("The Bank page in the settings window configures your bank separately from your backpack across its Layout, Items, Categories, Order, and BetterBags Next Size tabs. Its General tab contains Enable Bank Bags and, on retail, Include Tradeable Reagents for Warbank deposits.") },
     { text = L:G("Turn off Enable Bank Bags on the General tab of the Bank page to use Blizzard's default bank window instead. BetterBags prompts you to choose Reload or Later because changing Enable Bank Bags requires a UI reload to take effect.") },
     { setting = "enableBankBags", bag = "Bank" },
     { heading = L:G("Sorting") },
@@ -111,7 +111,7 @@ articles:Define({
   body = {
     { text = L:G("On retail, your Warband bank shares the BetterBags Bank window with your character bank. Warbank groups appear alongside your Bank groups—with a teal accent in BetterBags Next—and Warbank tabs appear beside your character tabs in the bank tabs view.") },
     { heading = L:G("Warbound Deposits") },
-    { text = L:G("Use Deposit All Warbound Items to move every warbound item from your bags into the Warbank. If any warbound item in your bags can still be refunded, BetterBags asks for confirmation before depositing because placing it in the Warbank removes its refund timer.") },
+    { text = L:G("Use Deposit All Warbound Items to move every warbound item from your bags into the Warbank. If any warbound item in your bags can still be refunded, BetterBags prompts for confirmation before depositing because placing it in the Warbank removes its refund timer.") },
     { list = {
       L:G("Classic bags: open the bank menu from the round bag button (or the Open Menu button in the Guild Wars 2 theme) and choose Deposit All Warbound Items, or Shift-right-click the round bag button."),
       L:G("BetterBags Next: click the Deposit All Warbound Items button in the Bank header (or in the bag-button menu on themes that move header buttons there), or Shift-right-click the Bank title."),
@@ -156,7 +156,7 @@ articles:Define({
   },
   related = { "bank-basics", "next-bank", "warbank" },
   body = {
-    { text = L:G("On Retail and WoW: Forever, you can switch the bank from your category groups to Blizzard's own bank tabs to view one bank tab at a time. BetterBags remembers your choice the next time you open the bank, and you cannot switch modes while in combat.") },
+    { text = L:G("On Retail and WoW: Forever, you can switch the bank from your category groups to Blizzard's own bank tabs to view one bank tab at a time. BetterBags stores your choice for the next time you open the bank, and you cannot switch modes while in combat.") },
     { heading = L:G("Classic Bags") },
     { steps = {
       L:G("Open the bank menu from the bag button at the top left and click Show Bags."),
@@ -204,9 +204,9 @@ articles:Define({
     } },
     { tip = L:G("BetterBags Next does not show bank bag slots on classic game versions. Switch to the classic bags or turn off Enable Bank Bags temporarily when you want to buy or swap bank bags.") },
     { heading = L:G("WoW: Forever") },
-    { text = L:G("On WoW: Forever, the first character bank tab is a fixed base bank without a bag slot, while every purchased character bank tab after the first is a bag socket that requires an equipped bag to hold items. You manage these tabs and their bags in both designs.") },
+    { text = L:G("On WoW: Forever, the first character bank tab is a fixed base bank without a bag slot, while every purchased character bank tab after the first is a bag socket that requires an equipped bag to store items. You manage these tabs and their bags in both designs.") },
     { list = {
-      L:G("In the classic bags, open the bank menu and choose Show Bags to open the bank tab panel. Each tab keeps its own icon with a small corner badge showing the equipped bag or an empty bag slot, and greys out the tab icon when no bag is equipped."),
+      L:G("In the classic bags, open the bank menu and choose Show Bags to open the bank tab panel. Each tab retains its own icon with a small corner badge showing the equipped bag or an empty bag slot, and greys out the tab icon when no bag is equipped."),
       L:G("In BetterBags Next, click Show Bank Tabs in the bank header. Each socketed tab displays the equipped bag's icon directly, or an empty bag slot icon when empty."),
       L:G("Click a + tab to buy the next bank tab, drop or left-click a bag onto a purchased socket tab to equip or swap a bag, and drag or Shift-left-click a socketed tab to remove its bag."),
     } },
