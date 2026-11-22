@@ -1,0 +1,29 @@
+{
+  "id": 1795386997,
+  "version": "v0.9.5-7-g482c329",
+  "channel": "alpha",
+  "date": "2026-11-22",
+  "from": "fcc6087a4657989c6b237240c980b588a4408aa6",
+  "to": "482c329c4b5f6fe67a49d3ad55f2bb07fa241dd9",
+  "headline": "Search Rules now include cursor completion, and UI and help text use literal technical wording.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "Search Rule cursor completion",
+      "details": "The Search Rule tab on the Categories page displays cursor suggestions with result counts for fields, operators, values, functions, NOT, AND, and OR. Press Up or Down to highlight, Tab or Enter to insert, and Escape to close. Inserting a field or operator opens the next list.",
+      "clients": []
+    },
+    {
+      "category": "Improved",
+      "title": "Search help article sections and headings",
+      "details": "In the search help articles, each field, alias, operator, function, and player value has its own section with its heading displayed as typed. The Search Rules article includes a Suggestions section.",
+      "clients": []
+    },
+    {
+      "category": "Improved",
+      "title": "Technical wording in UI and help articles",
+      "details": "In-game help articles, setting descriptions, labels, tooltips, dialogs, and messages now use literal technical wording without personification.",
+      "clients": []
+    }
+  ]
+}
